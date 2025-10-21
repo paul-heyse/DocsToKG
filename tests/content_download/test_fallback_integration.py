@@ -11,30 +11,25 @@ Tests cover:
 
 from __future__ import annotations
 
-import json
-import sqlite3
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, Optional
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock
 
 import pytest
 
+from DocsToKG.ContentDownload.fallback.integration import (
+    get_fallback_plan_path,
+    is_fallback_enabled,
+    try_fallback_resolution,
+)
+from DocsToKG.ContentDownload.fallback.loader import ConfigurationError, load_fallback_plan
+from DocsToKG.ContentDownload.fallback.orchestrator import FallbackOrchestrator
 from DocsToKG.ContentDownload.fallback.types import (
     AttemptPolicy,
     AttemptResult,
     FallbackPlan,
-    ResolutionOutcome,
     TierPlan,
 )
-from DocsToKG.ContentDownload.fallback.orchestrator import FallbackOrchestrator
-from DocsToKG.ContentDownload.fallback.loader import load_fallback_plan, ConfigurationError
-from DocsToKG.ContentDownload.fallback.integration import (
-    try_fallback_resolution,
-    is_fallback_enabled,
-    get_fallback_plan_path,
-)
-
 
 # ============================================================================
 # CORE ORCHESTRATOR TESTS
@@ -286,6 +281,7 @@ class TestIntegration:
 
     def test_try_fallback_resolution_success(self):
         """Test try_fallback_resolution returns result on success."""
+
         def mock_adapter(policy, context):
             return AttemptResult(
                 outcome="success",
@@ -297,7 +293,8 @@ class TestIntegration:
         with tempfile.TemporaryDirectory() as tmpdir:
             yaml_path = Path(tmpdir) / "fallback.yaml"
             # Use minimal YAML to avoid loading actual file
-            yaml_path.write_text("""
+            yaml_path.write_text(
+                """
 budgets:
   total_timeout_ms: 1000
   total_attempts: 5
@@ -313,7 +310,8 @@ policies:
     timeout_ms: 500
     retries_max: 1
     robots_respect: false
-""")
+"""
+            )
 
             result = try_fallback_resolution(
                 context={"work_id": "123"},
@@ -326,6 +324,7 @@ policies:
 
     def test_try_fallback_resolution_failure_returns_none(self):
         """Test try_fallback_resolution returns None on failure."""
+
         def mock_adapter(policy, context):
             return AttemptResult(
                 outcome="no_pdf",
@@ -335,7 +334,8 @@ policies:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             yaml_path = Path(tmpdir) / "fallback.yaml"
-            yaml_path.write_text("""
+            yaml_path.write_text(
+                """
 budgets:
   total_timeout_ms: 1000
   total_attempts: 5
@@ -351,7 +351,8 @@ policies:
     timeout_ms: 500
     retries_max: 1
     robots_respect: false
-""")
+"""
+            )
 
             result = try_fallback_resolution(
                 context={"work_id": "123"},

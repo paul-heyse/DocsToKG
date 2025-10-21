@@ -28,7 +28,6 @@ from DocsToKG.OntologyDownload.observability.queries import (
     query_summary,
 )
 
-
 # ============================================================================
 # Query Registry Tests
 # ============================================================================

@@ -70,7 +70,7 @@ System Flow (What's Built So Far):
     │   └─ europe_pmc_pdf
     └─ Tier 4: archive
         └─ wayback_pdf (1 serial)
-  
+
   Output: AttemptResult(outcome, reason, url, status, host, meta)
 
 Per-Adapter Flow:
@@ -80,7 +80,7 @@ Per-Adapter Flow:
     ├─ Call appropriate API/service
     ├─ Validate response (head_pdf for PDFs)
     └─ Return AttemptResult
-  
+
   Outcomes: success, no_pdf, skipped, retryable, nonretryable, error
 
 ================================================================================
@@ -96,7 +96,7 @@ PHASE 5: CONFIGURATION LOADER (3 hours, ~300 LOC)
     • Override with CLI args (--fallback-*)
     • Validate schema
     • Build FallbackPlan objects
-  
+
   Key Functions:
     • load_from_yaml(path) → dict
     • load_from_env() → dict
@@ -104,7 +104,7 @@ PHASE 5: CONFIGURATION LOADER (3 hours, ~300 LOC)
     • merge_configs(yaml, env, cli) → dict (with precedence)
     • validate_config(config) → bool
     • build_fallback_plan(config) → FallbackPlan
-  
+
   Integration:
     • Called by download.py or runner.py during setup
     • Produces FallbackPlan used by orchestrator
@@ -116,15 +116,15 @@ PHASE 6: CLI COMMANDS (3 hours, ~180 LOC)
     • fallback plan: Show effective configuration
     • fallback dryrun: Simulate resolution (no actual fetches)
     • fallback tune: Analyze telemetry, suggest improvements
-  
+
   Commands:
     python -m DocsToKG.ContentDownload.cli fallback plan
       → Display current tiers, sources, budgets, policies
-    
+
     python -m DocsToKG.ContentDownload.cli fallback dryrun
       → Dry-run with mock adapters
       → Show which tier would succeed
-    
+
     python -m DocsToKG.ContentDownload.cli fallback tune
       → Analyze recent telemetry
       → Suggest budget/policy adjustments
@@ -136,7 +136,7 @@ PHASE 7: TELEMETRY (2 hours, ~50 LOC)
     • log_fallback_attempt() method
     • log_fallback_summary() method
     • Structured event logging
-  
+
   Events:
     • fallback_attempt: Each source attempt (tier, source, outcome, elapsed)
     • fallback_summary: Overall resolution summary (success, total_attempts, elapsed)
@@ -148,7 +148,7 @@ PHASE 8: INTEGRATION (2 hours, ~40 LOC)
     • Add feature gate (DOCSTOKG_ENABLE_FALLBACK=1)
     • Adapt context for adapters (fill in doi, url, etc.)
     • Map adapter results to existing download outcomes
-  
+
   Integration Points:
     • download.process_one_work(run_config, work_id, url, ...)
     • Create context dict for orchestrator
@@ -162,7 +162,7 @@ PHASE 9: COMPREHENSIVE TESTS (6 hours, ~700 LOC)
     • Integration tests for orchestrator + adapters
     • CLI command tests
     • End-to-end tests with mocked HTTP
-  
+
   Test Coverage:
     • 20+ tests for loader (YAML, env, CLI, merging)
     • 30+ tests for orchestrator (budgets, tiers, success, failure)
@@ -176,7 +176,7 @@ PHASE 10: DOCUMENTATION (2 hours, ~200 LOC)
     • Add operational playbooks
     • Add troubleshooting guide
     • Add examples
-  
+
   Documentation:
     • Overview of 4-tier strategy
     • Tuning guide (fast, reliable, constrained)

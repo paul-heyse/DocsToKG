@@ -187,10 +187,10 @@ src/DocsToKG/OntologyDownload/observability/
   schema.py (NEW)
   emitters.py (NEW)
   queries.py (NEW) - Stock SQL queries
-  
+
 src/DocsToKG/OntologyDownload/cli/
   obs_cmd.py (NEW)
-  
+
 tests/ontology_download/
   test_observability_events.py (NEW, 10 tests)
   test_observability_emitters.py (NEW, 15 tests)
@@ -206,7 +206,7 @@ src/DocsToKG/OntologyDownload/policy/
   registry.py (NEW)
   gates.py (NEW)
   metrics.py (NEW)
-  
+
 tests/ontology_download/
   test_policy_errors.py (NEW, 8 tests)
   test_policy_url_gate.py (NEW, 15 tests)
@@ -224,4 +224,3 @@ tests/ontology_download/
 - Test code: 94 tests (5.5-5.7) + **70 tests** (5.8-5.9) = **164 tests**
 - Quality: 100% type hints, 0 linter errors, 100% test passing
 - Deployment: Production-ready, observable, safe, resilient
-

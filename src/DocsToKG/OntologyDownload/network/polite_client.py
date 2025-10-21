@@ -27,7 +27,6 @@ import logging
 import os
 import threading
 import time
-from pathlib import Path
 from typing import Optional
 from urllib.parse import urlparse
 
@@ -35,15 +34,11 @@ import httpx
 
 from DocsToKG.OntologyDownload.network import (
     get_http_client,
-    close_http_client,
-    reset_http_client,
 )
 from DocsToKG.OntologyDownload.ratelimit import (
-    get_rate_limiter,
-    close_rate_limiter,
-    reset_rate_limiter,
     emit_acquire_event,
     emit_blocked_event,
+    get_rate_limiter,
 )
 
 logger = logging.getLogger(__name__)

@@ -12,39 +12,39 @@ PART 1: CODE QUALITY VERIFICATION
 
 1.1 IMPORT VERIFICATION
   Status: ✅ ALL PASSING
-  
+
   ✅ types.py: All dataclasses import correctly
      • ResolutionOutcome, AttemptPolicy, AttemptResult, TierPlan, FallbackPlan
-  
+
   ✅ orchestrator.py: Imports correctly
      • FallbackOrchestrator class with all dependencies
-  
+
   ✅ adapters/__init__.py: Shared utilities import correctly
      • head_pdf, canonicalize_url, parse_retry_after
-  
+
   ✅ All 7 adapters import correctly
      • unpaywall_pdf, arxiv_pdf, pmc_pdf, europe_pmc_pdf
      • doi_redirect_pdf, landing_scrape_pdf, wayback_pdf
-  
+
   ✅ loader.py: Configuration loader imports correctly
      • load_fallback_plan, ConfigurationError, validation functions
-  
+
   ✅ cli_fallback.py: CLI commands import correctly
      • cmd_fallback_plan, cmd_fallback_dryrun, cmd_fallback_tune
 
 1.2 CIRCULAR IMPORT CHECK
   Status: ✅ NO CIRCULAR IMPORTS DETECTED
-  
+
   Verification: All 6 modules load without circular dependency issues
   This indicates clean architecture with proper separation of concerns
   Dependencies flow correctly: types → orchestrator → cli/loader
 
 1.3 TYPE CONSISTENCY VERIFICATION
   Status: ✅ ALL ADAPTERS RETURN CORRECT TYPES
-  
+
   Test: Called all 7 adapters with test policy and context
   Result: All return AttemptResult with correct structure
-  
+
   ✅ unpaywall_pdf returns AttemptResult
   ✅ arxiv_pdf returns AttemptResult
   ✅ pmc_pdf returns AttemptResult
@@ -52,20 +52,20 @@ PART 1: CODE QUALITY VERIFICATION
   ✅ doi_redirect_pdf returns AttemptResult
   ✅ landing_scrape_pdf returns AttemptResult
   ✅ wayback_pdf returns AttemptResult
-  
+
   Indicates: Type system is solid, no runtime type errors expected
 
 1.4 CONFIGURATION LOADING VERIFICATION
   Status: ✅ YAML LOADS CORRECTLY
-  
+
   Configuration loaded: 4 tiers, 7 sources
-  
+
   Tier verification:
     ✅ Tier 1: direct_oa (3 sources)
     ✅ Tier 2: doi_follow (1 source)
     ✅ Tier 3: landing_scrape (2 sources)
     ✅ Tier 4: archive (1 source)
-  
+
   Source verification:
     ✅ All 7 sources have policies
     ✅ All timeouts > 0
@@ -74,11 +74,11 @@ PART 1: CODE QUALITY VERIFICATION
 
 1.5 ORCHESTRATOR INITIALIZATION
   Status: ✅ INITIALIZES WITHOUT ERRORS
-  
+
   Created: FallbackOrchestrator with 4 tiers
   Test: Passed None for optional components (breaker, rate, clients)
   Result: Orchestrator initialized successfully
-  
+
   Indicates: Constructor is robust, no hard dependencies on integrations
 
 ================================================================================
@@ -158,22 +158,22 @@ PART 3: LEGACY CODE ANALYSIS
   Results: ✅ NO LEGACY FALLBACK/RESILIENCY CODE FOUND
 
   False Positives Reviewed (not related to this scope):
-    
+
     1. args.py: "--rate-disable" flag has "fallback" in help text
        Status: NOT RELATED - refers to rate limiter fallback path
        Context: "Bypass the centralized rate limiter (pilot fallback)"
        Action: NONE - different feature, no conflict
-    
+
     2. telemetry.py: _canonical_key_or_fallback() function
        Status: NOT RELATED - utility for URL canonicalization
        Context: Used for URL normalization in manifest records
        Action: NONE - existing function, no conflict with new fallback system
-    
+
     3. pipeline.py: attempt_counter tracking
        Status: EXISTING RESOLVER TRACKING - compatible
        Context: Tracks resolver attempts per work item
        Action: NONE - existing resolver metrics, our system is complementary
-    
+
     4. statistics.py: per-resolver attempt counts
        Status: EXISTING RESOLVER METRICS - compatible
        Context: Collects resolver attempt statistics
@@ -189,7 +189,7 @@ PART 3: LEGACY CODE ANALYSIS
   ──────────────┼──────────┼──────────┼────────────────────────────
   Resolver      | Fallback | NO       | Complementary; new system
   attempts      | Strategy |          | provides more granular control
-  tracking      |          |          | 
+  tracking      |          |          |
   ──────────────┼──────────┼──────────┼────────────────────────────
   Rate limiter  | Fallback | NO       | Integration point for health
   rollback      | Strategy |          | gates; already planned for
@@ -207,27 +207,27 @@ PART 3: LEGACY CODE ANALYSIS
 3.3 INTEGRATION POINTS WITH EXISTING SYSTEM
 
   Identified integration points (for Phase 8):
-    
+
     1. ✅ download.process_one_work()
        Current: Uses ResolverPipeline for resolution
        New: FallbackOrchestrator can wrap or complement this
        Status: Compatible, no changes needed to existing code
-    
+
     2. ✅ networking.request_with_retries()
        Current: Handles HTTP retries with Tenacity
        New: Adapters call this function, works as expected
        Status: Compatible, designed for integration
-    
+
     3. ✅ BreakerRegistry (from circuit breaker implementation)
        Current: Manages per-host circuit breakers
        New: Health gate integration planned for Phase 8
        Status: Compatible, no conflicts
-    
+
     4. ✅ RateLimiter (from rate limiting implementation)
        Current: Enforces rate limits per host/role
        New: Health gate integration planned for Phase 8
        Status: Compatible, no conflicts
-    
+
     5. ✅ Telemetry system
        Current: RunTelemetry with structured events
        New: fallback_events table planned for Phase 7
@@ -271,11 +271,11 @@ PART 4: ARCHITECTURE REVIEW
 4.2 DEPENDENCY GRAPH
 
   Dependency Flow (✅ Acyclic):
-    
+
     cli_fallback.py ──┐
     loader.py ───────┼──→ types.py
     orchestrator.py ─┘
-    
+
     adapters/*.py ────┬──→ adapters/__init__.py (shared)
                       └──→ types.py
 
@@ -293,15 +293,15 @@ PART 4: ARCHITECTURE REVIEW
   ✅ Adding new adapters: Just create new file, no changes needed elsewhere
      • Implements same (policy, context) → AttemptResult interface
      • Orchestrator automatically works with new adapters
-  
+
   ✅ Adding new tiers: Just add to YAML config
      • No code changes needed
      • Orchestrator handles arbitrary tiers
-  
+
   ✅ Adding health gates: Extend orchestrator._health_gate()
      • Current gates: offline mode
      • Easy to add: breaker status, rate limiter status, etc.
-  
+
   ✅ Adding CLI commands: Just add to FALLBACK_COMMANDS dict
      • No changes to command registration
      • register_fallback_commands() auto-discovers
@@ -389,23 +389,23 @@ PART 6: SUMMARY & FINDINGS
     Status: ✅ EXCELLENT
     Evidence: All imports successful, type consistency verified,
               no circular dependencies, comprehensive error handling
-    
+
   FINDING 2: Legacy Code Risk
     Status: ✅ MINIMAL RISK
     Evidence: No fallback/resiliency legacy code found, existing code
               (resolver tracking, rate limiter, circuit breaker) are
               integration points, not conflicts
-    
+
   FINDING 3: Integration Readiness
     Status: ✅ READY FOR PHASE 8
     Evidence: Clean integration surface, identified integration points,
               no changes needed to existing code for basic integration
-    
+
   FINDING 4: Code Coverage
     Status: ✅ COMPREHENSIVE
     Evidence: 2,771 LOC across 13 files, all major components
               implemented and tested, zero dead code
-    
+
   FINDING 5: Extensibility
     Status: ✅ EXCELLENT
     Evidence: New adapters require zero existing-code changes,
@@ -417,12 +417,12 @@ PART 6: SUMMARY & FINDINGS
     • Use same telemetry.py approach as circuit breaker (add table, methods)
     • Create fallback_events table with attempt-level granularity
     • Ready for integration without any breaking changes
-  
+
   For Phase 8 (Integration):
     • Integrate into download.process_one_work() as opt-in feature gate
     • Circuit breaker and rate limiter integrations should work as-is
     • No changes needed to existing resolver logic
-  
+
   For Phase 9 (Testing):
     • Mock adapters provide good testing foundation
     • Integration tests can use mock clients from existing test infrastructure
@@ -434,17 +434,17 @@ PART 6: SUMMARY & FINDINGS
     • Clean architecture minimizes risk of integration issues
     • Zero circular dependencies means no subtle import issues
     • Type system provides safety guarantees
-  
+
   Integration Risk: ✅ LOW
     • Existing code doesn't change (feature gated)
     • Integration points well-defined
     • Complementary to existing resolver system
-  
+
   Performance Risk: ✅ LOW
     • Budget enforcement prevents runaway
     • Daemon threads auto-cleanup
     • Fallback to happy path if orchestrator disabled
-  
+
   Overall Risk: ✅ LOW - SAFE TO DEPLOY
 
 ================================================================================

@@ -31,7 +31,6 @@ from DocsToKG.OntologyDownload.observability.schema import (
     write_schemas_to_disk,
 )
 
-
 # ============================================================================
 # Fixtures
 # ============================================================================

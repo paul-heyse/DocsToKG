@@ -487,7 +487,7 @@ def embed(
         if output_dir:
             app_ctx.settings.embed.output_vectors_dir = output_dir
         if dense_backend:
-            # Note: embed config doesn't have simple dense_backend field, 
+            # Note: embed config doesn't have simple dense_backend field,
             # so we'd need to handle this through config or skip for now
             pass
         if workers:

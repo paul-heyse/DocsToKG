@@ -5,7 +5,6 @@ from __future__ import annotations
 import os
 import tempfile
 import threading
-import time
 from unittest import TestCase
 
 import pytest
@@ -16,9 +15,9 @@ from DocsToKG.ContentDownload.ratelimit import (
     HostPolicy,
     RateAcquisition,
     RateConfig,
+    RateLimitedTransport,
     RateLimitExceeded,
     RateLimitRegistry,
-    RateLimitedTransport,
     RoleRates,
 )
 from DocsToKG.ContentDownload.ratelimits_loader import load_rate_config

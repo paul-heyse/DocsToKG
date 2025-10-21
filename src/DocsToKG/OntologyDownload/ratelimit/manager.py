@@ -28,12 +28,11 @@ Example:
 import logging
 import os
 import threading
-import time
 from pathlib import Path
 from typing import Dict, List, Optional
 
 import platformdirs
-from pyrate_limiter import Limiter, Rate, Duration, BucketFullException
+from pyrate_limiter import BucketFullException, Limiter, Rate
 
 from DocsToKG.OntologyDownload.ratelimit.config import RateSpec
 

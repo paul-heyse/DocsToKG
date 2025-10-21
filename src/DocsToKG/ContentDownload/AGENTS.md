@@ -682,6 +682,319 @@ SQL
 6. **Test with `--dry-run`:** Before resuming a large run, validate breaker state with `--dry-run`.
 7. **Combine with rate limiter:** Circuit breakers are a last resort; use rate limits to prevent 429s first.
 
+## Fallback & Resiliency Strategy Operations
+
+### Overview
+
+The fallback & resiliency strategy provides deterministic, tiered PDF resolution across 7 sources with budgeted execution, health gates, and full observability. It complements the resolver pipeline as an optional first-attempt strategy.
+
+**Key modules:**
+
+- `fallback/orchestrator.py`: Core `FallbackOrchestrator` orchestrating tiered resolution
+- `fallback/adapters/`: 7 source adapters (Unpaywall, arXiv, PMC, DOI, Landing, Europe PMC, Wayback)
+- `fallback/loader.py`: Configuration loading from YAML, environment, CLI
+- `fallback/integration.py`: Integration utilities and feature gate
+- `fallback/cli_fallback.py`: Operational CLI commands
+
+### Configuration
+
+Fallback strategy configured in `src/DocsToKG/ContentDownload/config/fallback.yaml`:
+
+```yaml
+budgets:
+  total_timeout_ms: 120_000      # 2 minutes for entire resolution
+  total_attempts: 20              # Max attempts across all sources
+  max_concurrent: 3               # Parallel threads per tier
+  per_source_timeout_ms: 10_000   # Default timeout per source
+
+tiers:
+  - name: direct_oa
+    parallel: 2
+    sources:
+      - unpaywall_pdf
+      - arxiv_pdf
+      - pmc_pdf
+  - name: doi_follow
+    parallel: 1
+    sources:
+      - doi_redirect_pdf
+  # ... additional tiers ...
+
+policies:
+  unpaywall_pdf:
+    timeout_ms: 6_000
+    retries_max: 2
+    robots_respect: false
+  # ... per-source configuration ...
+
+gates:
+  skip_if_breaker_open: true      # Skip if circuit breaker open
+  offline_behavior: metadata_only # Handle offline mode
+```
+
+### CLI Operations
+
+#### Enable Fallback Strategy
+
+```bash
+# Enable with default configuration
+python -m DocsToKG.ContentDownload.cli \
+  --enable-fallback-strategy \
+  --topic "machine learning" --max 100 \
+  --out runs/content
+
+# Enable with custom configuration
+python -m DocsToKG.ContentDownload.cli \
+  --enable-fallback-strategy \
+  --fallback-plan-path /custom/fallback.yaml \
+  --out runs/content
+
+# Use environment variable
+export DOCSTOKG_ENABLE_FALLBACK_STRATEGY=1
+python -m DocsToKG.ContentDownload.cli --topic "ai" --out runs/content
+```
+
+#### Inspect Fallback Configuration
+
+```bash
+# Show effective configuration after merging YAML/env/CLI
+python -m DocsToKG.ContentDownload.cli fallback plan
+
+# Output:
+# ================================================================================
+# FALLBACK RESOLUTION PLAN
+# ================================================================================
+#
+# BUDGETS (Global Constraints):
+# ────────────────────────────────────────────────────────────────────────────
+#   Total Timeout:       120,000 ms
+#   Total Attempts:      20
+#   Max Concurrent:      3
+#   Per-Source Timeout:  10,000 ms
+#
+# TIERS (Sequential Resolution Stages):
+# ────────────────────────────────────────────────────────────────────────────
+#   Tier 1: direct_oa            parallel=2 sources=3
+#     1. unpaywall_pdf           timeout=6000ms retries=2
+#     2. arxiv_pdf               timeout=8000ms retries=3
+#     3. pmc_pdf                 timeout=8000ms retries=3
+#   Tier 2: doi_follow           parallel=1 sources=1
+#     1. doi_redirect_pdf        timeout=10000ms retries=2
+#   ... [etc]
+```
+
+#### Dry-Run Fallback Strategy
+
+```bash
+# Simulate resolution without network calls
+python -m DocsToKG.ContentDownload.cli fallback dryrun
+
+# Output shows simulated strategy execution path and budget usage
+```
+
+### Telemetry & Observability
+
+**Fallback events persisted in `manifest.sqlite3`:**
+
+```sql
+-- All fallback attempts for a work
+SELECT timestamp, tier, source, outcome, reason, elapsed_ms, status
+FROM fallback_events
+WHERE work_id = 'work-123'
+ORDER BY timestamp;
+
+-- Success rate by source
+SELECT source, COUNT(*) as attempts,
+       SUM(CASE WHEN outcome='success' THEN 1 ELSE 0 END) as successes,
+       ROUND(100.0 * SUM(CASE WHEN outcome='success' THEN 1 ELSE 0 END) / COUNT(*), 1) as success_rate_pct
+FROM fallback_events
+WHERE outcome != 'summary'
+GROUP BY source
+ORDER BY success_rate_pct DESC;
+
+-- Average response time by tier
+SELECT tier, COUNT(*) as attempts,
+       ROUND(AVG(elapsed_ms), 1) as avg_ms,
+       MAX(elapsed_ms) as max_ms
+FROM fallback_events
+WHERE outcome != 'summary'
+GROUP BY tier
+ORDER BY avg_ms;
+```
+
+**Metrics in `manifest.metrics.json`:**
+
+- `fallback_attempts_total`: Total attempts made
+- `fallback_success_count`: Successful resolutions
+- `fallback_success_rate_pct`: Success rate percentage
+- `fallback_avg_resolution_ms`: Average time to resolve
+- `fallback_source_stats`: Per-source statistics
+
+### Operational Playbooks
+
+#### Scenario 1: Improve Resolution Speed
+
+**Problem:** Downloads taking 2+ minutes on average.
+
+**Diagnosis:**
+
+```bash
+# 1. Check current performance
+sqlite3 runs/content/manifest.sqlite3 << 'SQL'
+SELECT tier, COUNT(*) as attempts, ROUND(AVG(elapsed_ms), 1) as avg_ms
+FROM fallback_events
+WHERE outcome != 'summary'
+GROUP BY tier;
+SQL
+
+# 2. Identify slowest sources
+jq '.[] | select(.record_type=="fallback_attempt") | {source, elapsed_ms}' \
+  runs/content/manifest.jsonl | jq -s 'group_by(.source) | map({source: .[0].source, avg: (map(.elapsed_ms) | add / length)})'
+```
+
+**Optimization:**
+
+```yaml
+# Edit config/fallback.yaml
+budgets:
+  total_timeout_ms: 60_000        # Reduce from 120s
+  max_concurrent: 4               # Increase parallelism
+
+policies:
+  unpaywall_pdf:
+    timeout_ms: 3_000             # Reduce timeout for faster failures
+  doi_redirect_pdf:
+    timeout_ms: 5_000             # Reduce timeout
+```
+
+Re-run with optimized configuration:
+
+```bash
+python -m DocsToKG.ContentDownload.cli \
+  --enable-fallback-strategy \
+  --out runs/content
+```
+
+#### Scenario 2: Maximize Resolution Success Rate
+
+**Problem:** Only 45% of PDFs found by fallback strategy.
+
+**Diagnosis:**
+
+```bash
+# 1. Get success rates by source
+sqlite3 runs/content/manifest.sqlite3 << 'SQL'
+SELECT source,
+       COUNT(*) as attempts,
+       SUM(CASE WHEN outcome='success' THEN 1 ELSE 0 END) as successes,
+       ROUND(100.0 * SUM(CASE WHEN outcome='success' THEN 1 ELSE 0 END) / COUNT(*), 1) as rate_pct
+FROM fallback_events
+WHERE outcome != 'summary'
+GROUP BY source
+ORDER BY rate_pct DESC;
+SQL
+
+# 2. Identify unreliable sources
+jq '.[] | select(.record_type=="fallback_attempt" and .outcome!="success") | {source, reason}' \
+  runs/content/manifest.jsonl | jq -s 'group_by(.source) | map({source: .[0].source, failures: length})'
+```
+
+**Optimization:**
+
+```yaml
+# Add additional tiers or increase retry budgets
+budgets:
+  total_timeout_ms: 180_000       # Increase to 3 minutes
+  total_attempts: 30              # Increase from 20
+  max_concurrent: 2               # Serial to avoid timeouts
+
+# Add Europe PMC and Wayback as additional tiers
+tiers:
+  # ... existing tiers ...
+  - name: additional_sources
+    parallel: 2
+    sources:
+      - europe_pmc_pdf
+      - wayback_pdf
+```
+
+Re-run with increased budget:
+
+```bash
+python -m DocsToKG.ContentDownload.cli \
+  --enable-fallback-strategy \
+  --out runs/content
+```
+
+#### Scenario 3: Handle Circuit Breaker Opens
+
+**Problem:** Fallback strategy blocked when circuit breaker opens.
+
+**Diagnosis:**
+
+```bash
+# 1. Check breaker state
+python -m DocsToKG.ContentDownload.cli breaker show
+
+# 2. Query breaker events during fallback attempts
+sqlite3 runs/content/manifest.sqlite3 << 'SQL'
+SELECT fa.tier, fa.source, be.event_type, be.details
+FROM fallback_events fa
+LEFT JOIN breaker_events be ON fa.host = be.host
+WHERE fa.work_id = 'work-123'
+ORDER BY fa.timestamp;
+SQL
+```
+
+**Remediation:**
+
+Option A - Reduce request rate:
+
+```bash
+python -m DocsToKG.ContentDownload.cli \
+  --enable-fallback-strategy \
+  --rate api.example.org=2/s,100/h \
+  --out runs/content
+```
+
+Option B - Increase breaker reset timeout:
+
+```yaml
+# Edit config/breakers.yaml
+hosts:
+  api.example.org:
+    reset_timeout_s: 120          # Increase from 60
+    fail_max: 3                   # Reduce threshold
+```
+
+Re-run after adjustments:
+
+```bash
+python -m DocsToKG.ContentDownload.cli \
+  --enable-fallback-strategy \
+  --out runs/content
+```
+
+### Best Practices
+
+1. **Start Conservative**: Default configuration is tuned for safety. Only adjust after observing patterns.
+2. **Monitor Telemetry**: Review `fallback_events` table after each run to understand performance.
+3. **Test with Dry-Run**: Use `fallback dryrun` to validate configuration changes before production.
+4. **Combine with Circuit Breakers**: Fallback strategy respects breaker state; configure breakers first.
+5. **Use Feature Gate**: Keep fallback disabled by default in production until confidence is high.
+6. **Track Success Rates**: Monitor per-source success rates to identify underperforming sources.
+7. **Budget Carefully**: Set `total_timeout_ms` to balance speed and success rate for your use case.
+
+### Troubleshooting
+
+| Issue | Symptoms | Solution |
+|-------|----------|----------|
+| Low success rate | <50% PDFs found | Increase budgets, add tiers, check breaker state |
+| Slow resolution | >60s average | Reduce per-source timeouts, increase parallelism, skip slow sources |
+| Frequent timeouts | Many "timeout" outcomes | Increase per-source timeouts, reduce parallelism |
+| Breaker keeps opening | Frequent state changes | Reduce request rate, increase breaker reset timeout |
+| High concurrency issues | Resource exhaustion | Reduce `max_concurrent` from 3 to 2 or 1 |
+
 ## Migration Checklist
 
 - Remove bespoke sleeps/token buckets from automation and rely on the centralized limiter (`--rate*` flags) for host-specific politeness.

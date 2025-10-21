@@ -24,10 +24,10 @@ handling in the networking layer, including:
 
 from __future__ import annotations
 
-import pytest
 import time
-from unittest.mock import Mock, MagicMock, patch
-from typing import Optional
+from unittest.mock import Mock
+
+import pytest
 
 # Check if pybreaker is available
 try:
@@ -38,14 +38,14 @@ except ImportError:
     HAS_PYBREAKER = False
 
 from DocsToKG.ContentDownload.breakers import (
-    BreakerConfig,
-    BreakerPolicy,
     BreakerClassification,
-    RollingWindowPolicy,
-    HalfOpenPolicy,
-    BreakerRegistry,
+    BreakerConfig,
     BreakerOpenError,
+    BreakerPolicy,
+    BreakerRegistry,
+    HalfOpenPolicy,
     RequestRole,
+    RollingWindowPolicy,
 )
 from DocsToKG.ContentDownload.sqlite_cooldown_store import SQLiteCooldownStore
 

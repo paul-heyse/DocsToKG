@@ -15,7 +15,7 @@ from __future__ import annotations
 import logging
 import sqlite3
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any, Optional
 
 LOGGER = logging.getLogger(__name__)
 

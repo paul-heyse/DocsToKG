@@ -10,15 +10,15 @@ Tests cover:
 - PID-aware rebinding
 """
 
-import os
 import pytest
+
+from DocsToKG.OntologyDownload.ratelimit.config import RateSpec
 from DocsToKG.OntologyDownload.ratelimit.manager import (
     RateLimitManager,
-    get_rate_limiter,
     close_rate_limiter,
+    get_rate_limiter,
     reset_rate_limiter,
 )
-from DocsToKG.OntologyDownload.ratelimit.config import RateSpec
 
 
 class TestRateLimitManagerBasics:

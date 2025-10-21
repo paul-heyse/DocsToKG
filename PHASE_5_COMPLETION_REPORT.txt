@@ -68,7 +68,7 @@ CONFIGURATION SOURCES
      • DOCSTOKG_FALLBACK_PER_SOURCE_TIMEOUT_MS
      • DOCSTOKG_FALLBACK_OFFLINE_BEHAVIOR
      • DOCSTOKG_FALLBACK_SKIP_IF_BREAKER_OPEN
-   
+
    Example:
      export DOCSTOKG_FALLBACK_TOTAL_TIMEOUT_MS=60000
      export DOCSTOKG_FALLBACK_MAX_CONCURRENT=2
@@ -81,7 +81,7 @@ CONFIGURATION SOURCES
      • --fallback-offline-mode: Set offline behavior
      • --fallback-fast-mode: Apply FAST profile
      • --fallback-reliable-mode: Apply HIGH RELIABILITY profile
-   
+
    Example:
      python -m cli --fallback-fast-mode
      python -m cli --fallback-timeout-ms 30000
@@ -210,18 +210,18 @@ How Loader Connects to Rest of System:
 Usage in download.py (Future Phase 8):
 
   from DocsToKG.ContentDownload.fallback.loader import load_fallback_plan
-  
+
   def process_one_work(...):
       # Load configuration at start
       fallback_plan = load_fallback_plan()
-      
+
       # Create orchestrator
       orchestrator = FallbackOrchestrator(
           plan=fallback_plan,
           breaker=breaker_registry,
           ...
       )
-      
+
       # Use in resolution
       result = orchestrator.resolve_pdf(context, adapters)
 

@@ -33,15 +33,15 @@ BUDGETS (Global Constraints):
   total_timeout_ms: 120_000 (2 minutes)
     → Hard cap for entire PDF resolution
     → Enforced by orchestrator
-  
+
   total_attempts: 20
     → Maximum attempts across all sources combined
     → Prevents runaway execution
-  
+
   max_concurrent: 3
     → Maximum parallel threads at any time
     → Across all tiers
-  
+
   per_source_timeout_ms: 10_000 (10 seconds)
     → Default per-source timeout
     → Can be overridden per source in policies
@@ -53,19 +53,19 @@ TIERS (4 Sequential Stages):
     • sources: [unpaywall_pdf, arxiv_pdf, pmc_pdf]
     • Why: Fast, reliable, direct links
     • Execution: Launch unpaywall + arxiv parallel, then pmc
-  
+
   Tier 2: doi_follow (DOI Redirect)
     • parallel: 1
     • sources: [doi_redirect_pdf]
     • Why: Covers publisher-specific PDFs
     • Execution: Follow DOI chain to landing page
-  
+
   Tier 3: landing_scrape (HTML Scraping)
     • parallel: 2
     • sources: [landing_scrape_pdf, europe_pmc_pdf]
     • Why: Catches citations, biomedical focus
     • Execution: Scrape landing page + Europe PMC API in parallel
-  
+
   Tier 4: archive (Wayback Machine)
     • parallel: 1
     • sources: [wayback_pdf]
@@ -78,32 +78,32 @@ POLICIES (Per-Source Configuration):
     timeout_ms: 6_000
     retries_max: 2
     robots_respect: false
-  
+
   arxiv_pdf:
     timeout_ms: 8_000
     retries_max: 3
     robots_respect: false
-  
+
   pmc_pdf:
     timeout_ms: 8_000
     retries_max: 3
     robots_respect: false
-  
+
   doi_redirect_pdf:
     timeout_ms: 10_000
     retries_max: 2
     robots_respect: true
-  
+
   landing_scrape_pdf:
     timeout_ms: 12_000
     retries_max: 2
     robots_respect: true
-  
+
   europe_pmc_pdf:
     timeout_ms: 6_000
     retries_max: 2
     robots_respect: false
-  
+
   wayback_pdf:
     timeout_ms: 10_000
     retries_max: 1
@@ -114,12 +114,12 @@ GATES (Health Checks):
   skip_if_breaker_open: true
     → Skip attempts if circuit breaker is open
     → Protects against cascading failures
-  
+
   offline_behavior: metadata_only
     → metadata_only: only metadata APIs (Unpaywall, Europe PMC)
     → block_all: block all attempts (future: for full offline)
     → cache_only: use only cached responses (future)
-  
+
   skip_if_rate_wait_exceeds_ms: 5_000
     → Skip if rate limiter would wait >5 seconds
     → Prevents long waits, tries next source
@@ -131,7 +131,7 @@ THRESHOLDS (HTTP Status Classification):
     - 502 (Bad Gateway)
     - 503 (Service Unavailable)
     - 504 (Gateway Timeout)
-  
+
   terminal_statuses:
     - 400 (Bad Request)
     - 401 (Unauthorized)
@@ -147,20 +147,20 @@ TUNING PROFILES:
     • max_concurrent: 2
     • Remove wayback tier
     • Reduce per-source timeouts by 50%
-  
+
   HIGH RELIABILITY:
     • total_timeout_ms: 180_000 (3 minutes)
     • total_attempts: 30
     • Add more tiers/sources
     • Increase per-source timeouts
     • Set parallel=1 (serial, no races)
-  
+
   RESOURCE CONSTRAINED:
     • total_timeout_ms: 30_000 (30 seconds)
     • max_concurrent: 1
     • Remove landing_scrape tier
     • Set parallel=1 everywhere
-  
+
   BANDWIDTH CONSTRAINED:
     • Reduce per-source timeouts
     • Skip wayback tier

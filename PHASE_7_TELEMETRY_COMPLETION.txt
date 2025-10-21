@@ -14,33 +14,33 @@ DELIVERABLES
 ================================================================================
 
 1. TELEMETRY PROTOCOL ENHANCEMENTS (telemetry.py)
-   
+
    ✅ Added to AttemptSink Protocol:
       • log_fallback_attempt(event) - Log single fallback resolution attempt
       • log_fallback_summary(event) - Log overall fallback summary
-   
+
    ✅ Added to RunTelemetry:
       • log_fallback_attempt() - Delegates to underlying sink
       • log_fallback_summary() - Delegates to underlying sink
-   
+
    ✅ Added to JsonlSink:
       • log_fallback_attempt() - Appends with "fallback_attempt" record type
       • log_fallback_summary() - Appends with "fallback_summary" record type
-   
+
    ✅ Added to MultiSink:
       • log_fallback_attempt() - Fans out to all sinks
       • log_fallback_summary() - Fans out to all sinks
-   
+
    ✅ Added to SqliteSink:
       • log_fallback_attempt() - Persists to fallback_events table
       • log_fallback_summary() - Persists to fallback_events table
-   
+
    ✅ Added to CsvSink, LastAttemptCsvSink, SummarySink, ManifestIndexSink:
       • log_fallback_attempt() - No-op implementations (interface compatibility)
       • log_fallback_summary() - No-op implementations (interface compatibility)
 
 2. DATABASE SCHEMA (telemetry.py)
-   
+
    ✅ Created fallback_events Table:
       • id INTEGER PRIMARY KEY AUTOINCREMENT
       • timestamp TEXT - ISO 8601 timestamp
@@ -55,17 +55,17 @@ DELIVERABLES
       • status INTEGER - HTTP status code
       • host TEXT - Hostname of source
       • payload TEXT - JSON with full event details
-   
+
    ✅ Updated SQLITE_SCHEMA_VERSION: 7 → 8
    ✅ Added migration for version 8 in _run_migrations()
 
 3. ORCHESTRATOR TELEMETRY EMISSION (orchestrator.py)
-   
+
    ✅ Updated resolve_pdf() to emit fallback summaries:
       • On success: Emits summary with tier, reason, elapsed_ms, attempts
       • On exhaustion: Emits summary with exhausted outcome
       • Both events include work_id and artifact_id for correlation
-   
+
    ✅ Existing _emit_attempt_telemetry() already calls log_fallback_attempt()
       • Called for every attempt (success/failure/skip)
       • Includes tier, source, outcome, reason, elapsed_ms, status, host
@@ -115,7 +115,7 @@ Query 1: All fallback attempts for a work
   ORDER BY timestamp;
 
 Query 2: Success rate by source
-  SELECT source, COUNT(*) as attempts, 
+  SELECT source, COUNT(*) as attempts,
          SUM(CASE WHEN outcome='success' THEN 1 ELSE 0 END) as successes,
          ROUND(100.0 * SUM(CASE WHEN outcome='success' THEN 1 ELSE 0 END) / COUNT(*), 1) as success_rate_pct
   FROM fallback_events
@@ -124,7 +124,7 @@ Query 2: Success rate by source
   ORDER BY success_rate_pct DESC;
 
 Query 3: Average response time by tier
-  SELECT tier, COUNT(*) as attempts, 
+  SELECT tier, COUNT(*) as attempts,
          ROUND(AVG(elapsed_ms), 1) as avg_ms,
          MAX(elapsed_ms) as max_ms
   FROM fallback_events
@@ -141,7 +141,7 @@ Query 4: Failure analysis
   ORDER BY count DESC;
 
 Query 5: Resolution summaries for a run
-  SELECT work_id, artifact_id, outcome, 
+  SELECT work_id, artifact_id, outcome,
          total_elapsed_ms, attempts_used
   FROM fallback_events
   WHERE outcome IN ('success', 'exhausted')
@@ -233,28 +233,28 @@ INTEGRATION CHECKLIST
 ✅ Protocol Extended
    • AttemptSink has new methods
    • All implementations provide methods
-   
+
 ✅ Database Ready
    • fallback_events table in schema
    • Migration path clear
    • Query patterns documented
-   
+
 ✅ Telemetry Emission
    • Orchestrator emits on every attempt
    • Orchestrator emits summary on resolution
    • Events include proper correlation IDs
-   
+
 ✅ Persistence
    • JsonlSink: Appends to JSONL
    • SqliteSink: Persists to DB
    • MultiSink: Fans out to all sinks
    • CSV/Summary/Index sinks: No-op (interface compat)
-   
+
 ✅ Testing
    • Manual tests pass
    • No linting errors
    • Thread safety verified
-   
+
 ✅ Documentation
    • Event formats documented
    • Query patterns documented

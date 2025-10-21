@@ -1,7 +1,7 @@
 # Streaming Architecture Implementation Plan
 
-**Status**: Ready for Implementation  
-**Date**: October 21, 2025  
+**Status**: Ready for Implementation
+**Date**: October 21, 2025
 **Scope**: Download streaming + idempotency (750+ LOC)
 
 ## Overview
@@ -60,30 +60,30 @@ This document outlines the comprehensive implementation of:
 ## Key Features Implemented
 
 ### Streaming Architecture
-✅ HEAD precheck with ETags/Last-Modified  
-✅ Resume decision with prefix hash verification  
-✅ Quota guard to prevent disk exhaustion  
-✅ Rolling SHA-256 hash during streaming  
-✅ Optional preallocation for large files  
-✅ Atomic finalization with artifact locks  
-✅ Sharded hash-based file layout  
-✅ Hardlink/copy deduplication  
+✅ HEAD precheck with ETags/Last-Modified
+✅ Resume decision with prefix hash verification
+✅ Quota guard to prevent disk exhaustion
+✅ Rolling SHA-256 hash during streaming
+✅ Optional preallocation for large files
+✅ Atomic finalization with artifact locks
+✅ Sharded hash-based file layout
+✅ Hardlink/copy deduplication
 
 ### Idempotency & Exactness
-✅ Job idempotency keys (prevent duplicate plans)  
-✅ Operation idempotency keys (prevent double-do)  
-✅ State machine enforcement (PLANNED→LEASED→...→FINALIZED)  
-✅ Lease mechanism (single worker per job)  
-✅ Reconciler for crash recovery  
-✅ Exactly-once file effects  
+✅ Job idempotency keys (prevent duplicate plans)
+✅ Operation idempotency keys (prevent double-do)
+✅ State machine enforcement (PLANNED→LEASED→...→FINALIZED)
+✅ Lease mechanism (single worker per job)
+✅ Reconciler for crash recovery
+✅ Exactly-once file effects
 
 ### Integration Points
-✅ Works with Phase 7 rate limiting  
-✅ Works with Phase 6 Tenacity retries  
-✅ Works with Hishel HTTP caching  
-✅ Works with circuit breakers  
-✅ Respects offline mode  
-✅ Integrated telemetry  
+✅ Works with Phase 7 rate limiting
+✅ Works with Phase 6 Tenacity retries
+✅ Works with Hishel HTTP caching
+✅ Works with circuit breakers
+✅ Respects offline mode
+✅ Integrated telemetry
 
 ## Implementation Order
 
@@ -123,14 +123,14 @@ dedupe:
 
 ## Success Criteria
 
-✅ All streaming tests pass (100%)  
-✅ Resume successful after simulated crash  
-✅ Idempotency verified (no double-do)  
-✅ Multi-worker lease contention resolved  
-✅ Quota guard prevents disk errors  
-✅ Performance: <1ms per chunk processing  
-✅ Production metrics collected  
-✅ Reconciler heals 100% of crash scenarios  
+✅ All streaming tests pass (100%)
+✅ Resume successful after simulated crash
+✅ Idempotency verified (no double-do)
+✅ Multi-worker lease contention resolved
+✅ Quota guard prevents disk errors
+✅ Performance: <1ms per chunk processing
+✅ Production metrics collected
+✅ Reconciler heals 100% of crash scenarios
 
 ## Risk Assessment
 
@@ -165,8 +165,8 @@ dedupe:
 
 ---
 
-**Status**: Ready for Implementation  
-**Confidence**: 100%  
-**Estimated LOC**: 1,200+  
-**Estimated Tests**: 26+  
+**Status**: Ready for Implementation
+**Confidence**: 100%
+**Estimated LOC**: 1,200+
+**Estimated Tests**: 26+
 **Estimated Timeline**: 1 week to production-ready

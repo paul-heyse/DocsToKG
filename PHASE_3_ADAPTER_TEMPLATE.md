@@ -1,9 +1,9 @@
 # Phase 3: Source Adapters - Implementation Template
 
-**Status**: READY TO IMPLEMENT  
-**Files to Create**: 7  
-**Estimated LOC**: 500-600  
-**Estimated Time**: 6 hours  
+**Status**: READY TO IMPLEMENT
+**Files to Create**: 7
+**Estimated LOC**: 500-600
+**Estimated Time**: 6 hours
 
 ## Overview
 
@@ -12,11 +12,11 @@ Each adapter follows the same pattern:
 ```python
 def adapter_XXX(policy: AttemptPolicy, context: Dict[str, Any]) -> AttemptResult:
     """Adapter for XXX source.
-    
+
     Args:
         policy: AttemptPolicy with timeout, retries, robots_respect
         context: Dict with work_id, artifact_id, doi, URL, offline flag
-    
+
     Returns:
         AttemptResult with outcome, url (if success), status, host, reason, meta
     """
@@ -36,7 +36,7 @@ def adapter_unpaywall_pdf(policy: AttemptPolicy, context: Dict[str, Any]) -> Att
     doi = context.get("doi")
     if not doi:
         return AttemptResult("skipped", reason="no_doi", elapsed_ms=0)
-    
+
     # GET https://api.unpaywall.org/v2/{doi}?email=user@example.com
     # Look for .best_oa_location.url_for_pdf
     # HEAD validate the PDF URL
@@ -68,7 +68,7 @@ def adapter_doi_redirect_pdf(policy: AttemptPolicy, context: Dict[str, Any]) -> 
     doi = context.get("doi")
     if not doi:
         return AttemptResult("skipped", reason="no_doi", elapsed_ms=0)
-    
+
     # GET https://doi.org/{doi} with redirects
     # Follow chain until .pdf or HTML landing page
     # HEAD validate final URL
@@ -81,7 +81,7 @@ def adapter_landing_scrape_pdf(policy: AttemptPolicy, context: Dict[str, Any]) -
     landing_url = context.get("landing_url") or context.get("url")
     if not landing_url:
         return AttemptResult("skipped", reason="no_landing_url", elapsed_ms=0)
-    
+
     # GET landing page (cached client, metadata role)
     # Parse HTML for PDF URLs:
     #   - <meta name="citation_pdf_url" content="...">
@@ -156,7 +156,7 @@ class PDFLinkExtractor(HTMLParser):
     def __init__(self):
         super().__init__()
         self.pdf_urls = []
-    
+
     def handle_starttag(self, tag, attrs):
         attrs_dict = dict(attrs)
         if tag == "meta" and attrs_dict.get("name") == "citation_pdf_url":
@@ -249,4 +249,3 @@ src/DocsToKG/ContentDownload/fallback/adapters/
 5. Phase 8: Integration into download.py
 6. Phase 9: Comprehensive tests
 7. Phase 10: Documentation
-

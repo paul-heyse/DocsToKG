@@ -215,11 +215,11 @@ from DocsToKG.DocParsing.core import (
     DEFAULT_HEADING_MARKERS,
     DEFAULT_SERIALIZER_PROVIDER,
     DEFAULT_TOKENIZER,
-    ItemFingerprint,
-    ItemOutcome,
     ChunkResult,
     ChunkTask,
     ChunkWorkerConfig,
+    ItemFingerprint,
+    ItemOutcome,
     StageContext,
     StageError,
     StageHooks,
@@ -232,8 +232,8 @@ from DocsToKG.DocParsing.core import (
     dedupe_preserve_order,
     derive_doc_id_and_chunks_path,
     load_structural_marker_config,
-    set_spawn_or_warn,
     run_stage,
+    set_spawn_or_warn,
 )
 from DocsToKG.DocParsing.env import (
     data_chunks,

@@ -61,7 +61,7 @@ except ImportError:
     streaming_schema = None  # type: ignore[assignment]
 
 if TYPE_CHECKING:
-    from DocsToKG.ContentDownload.download import DownloadPreflightPlan
+    pass
 
 
 # ============================================================================

@@ -23,12 +23,11 @@ Tests the CLI interface for:
 
 from __future__ import annotations
 
-import pytest
-import time
 import io
-import sys
-from unittest.mock import Mock, patch, MagicMock
-from typing import Tuple
+import time
+from unittest.mock import patch
+
+import pytest
 
 # Check if pybreaker is available
 try:
@@ -38,24 +37,21 @@ try:
 except ImportError:
     HAS_PYBREAKER = False
 
+import argparse
+
 from DocsToKG.ContentDownload.breakers import (
     BreakerConfig,
-    BreakerPolicy,
-    BreakerClassification,
-    RollingWindowPolicy,
-    HalfOpenPolicy,
-    BreakerRegistry,
     BreakerOpenError,
+    BreakerPolicy,
+    BreakerRegistry,
     RequestRole,
 )
-from DocsToKG.ContentDownload.sqlite_cooldown_store import SQLiteCooldownStore
 from DocsToKG.ContentDownload.cli_breakers import (
-    install_breaker_cli,
-    _cmd_show,
-    _cmd_open,
     _cmd_close,
+    _cmd_open,
+    _cmd_show,
 )
-import argparse
+from DocsToKG.ContentDownload.sqlite_cooldown_store import SQLiteCooldownStore
 
 pytestmark = pytest.mark.skipif(not HAS_PYBREAKER, reason="pybreaker not installed")
 
@@ -227,7 +223,6 @@ class TestBreakerOpenCommand:
         assert until is not None
 
         # Should block on next request
-        from DocsToKG.ContentDownload.breakers import BreakerOpenError
 
         with pytest.raises(BreakerOpenError):
             registry.allow(host, RequestRole.METADATA)
@@ -289,7 +284,6 @@ class TestBreakerOpenCommand:
             _cmd_open(args)
 
         # host1 should be blocked
-        from DocsToKG.ContentDownload.breakers import BreakerOpenError
 
         with pytest.raises(BreakerOpenError):
             registry.allow(host1, RequestRole.METADATA)
@@ -316,7 +310,6 @@ class TestBreakerCloseCommand:
         registry.cooldowns.set_until(host, now_mono + 60, reason="test")
 
         # Verify it's blocked
-        from DocsToKG.ContentDownload.breakers import BreakerOpenError
 
         with pytest.raises(BreakerOpenError):
             registry.allow(host, RequestRole.METADATA)

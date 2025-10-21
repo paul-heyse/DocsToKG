@@ -30,7 +30,7 @@ WHAT WAS BUILT
 
 1. FallbackOrchestrator Class
    Purpose: Core orchestration for tiered, budgeted PDF resolution
-   
+
    Attributes:
      • plan: FallbackPlan with configuration
      • breaker: BreakerRegistry for health checking
@@ -42,7 +42,7 @@ WHAT WAS BUILT
 
 2. resolve_pdf() Method
    Purpose: Main entry point for PDF resolution
-   
+
    Responsibilities:
      • Execute tiers sequentially
      • Parallelize sources within each tier
@@ -50,33 +50,33 @@ WHAT WAS BUILT
      • Stop immediately upon success
      • Emit telemetry for all attempts
      • Handle all exceptions gracefully
-   
+
    Arguments:
      • context: Dict with work_id, artifact_id, offline status, etc.
      • adapters: Mapping of source_name → adapter function
-   
+
    Returns:
      • AttemptResult with outcome, url (if success), reason, metadata
 
 3. Health Gates
    Purpose: Pre-flight checks before attempting a source
-   
+
    Implementation:
      • Offline mode detection (skip artifact attempts if offline)
      • Breaker integration (checked by adapters internally)
      • Expandable for future gates
-   
+
    Method: _health_gate()
 
 4. Threading Model
    Purpose: Parallelize sources within a tier
-   
+
    Implementation:
      • threading.Thread for worker threads
      • queue.Queue for thread-safe result collection
      • threading.Event for cancellation flag
      • Daemon threads with clean shutdown
-   
+
    Key Features:
      • Non-blocking timeout-based queue polling
      • Budget enforcement at each check
@@ -85,13 +85,13 @@ WHAT WAS BUILT
 
 5. Budget Enforcement
    Purpose: Prevent runaway execution
-   
+
    Budgets Enforced:
      • total_timeout_ms: Hard cap from start
      • total_attempts: Across all sources
      • max_concurrent: Parallel threads per tier (via tier.parallel)
      • per_source_timeout_ms: Default timeout
-   
+
    Checks:
      • Before each tier
      • After each attempt
@@ -99,7 +99,7 @@ WHAT WAS BUILT
 
 6. Cancellation Logic
    Purpose: Stop on first success, prevent wasted attempts
-   
+
    Implementation:
      • threading.Event shared across threads
      • Checked in run_attempt()
@@ -109,9 +109,9 @@ WHAT WAS BUILT
 
 7. Telemetry Emission
    Purpose: Structured logging for observability
-   
+
    Implementation: _emit_attempt_telemetry()
-   
+
    Events Emitted:
      • event: "fallback_attempt"
      • tier: Tier name
@@ -121,7 +121,7 @@ WHAT WAS BUILT
      • host, status: HTTP metadata
      • work_id, artifact_id: Context
      • source: If available in metadata
-   
+
    Output:
      • Via telemetry sink (log_fallback_attempt)
      • Via standard logger (DEBUG level)
@@ -167,7 +167,7 @@ Threading Architecture:
        ├─ Call adapter function
        ├─ Time execution
        └─ Put result in queue
-  
+
   Queue-Based Collection (main thread)
     ├─ Get results with timeout
     ├─ Emit telemetry for each

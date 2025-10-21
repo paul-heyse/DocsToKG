@@ -11,7 +11,6 @@ Covers all emitter implementations:
 
 import json
 import tempfile
-from io import StringIO
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -30,9 +29,7 @@ from DocsToKG.OntologyDownload.observability.events import (
     Event,
     EventContext,
     EventIds,
-    emit_event,
 )
-
 
 # ============================================================================
 # Fixtures

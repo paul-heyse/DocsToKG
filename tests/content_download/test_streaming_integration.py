@@ -15,10 +15,7 @@ from __future__ import annotations
 
 import os
 import unittest
-from typing import Any, Dict, Optional
 from unittest import mock
-
-import pytest
 
 
 class TestFeatureFlags(unittest.TestCase):
@@ -51,7 +48,6 @@ class TestFeatureFlags(unittest.TestCase):
     def test_streaming_can_be_disabled(self) -> None:
         """Test that streaming can be disabled via env var."""
         os.environ["DOCSTOKG_ENABLE_STREAMING"] = "0"
-        from DocsToKG.ContentDownload.streaming_integration import streaming_enabled
         import importlib
 
         # Re-import to pick up env var
@@ -69,8 +65,8 @@ class TestFeatureFlags(unittest.TestCase):
     def test_idempotency_can_be_disabled(self) -> None:
         """Test that idempotency can be disabled via env var."""
         os.environ["DOCSTOKG_ENABLE_IDEMPOTENCY"] = "0"
-        from DocsToKG.ContentDownload.streaming_integration import idempotency_enabled
         import importlib
+
         import DocsToKG.ContentDownload.streaming_integration as si
 
         importlib.reload(si)

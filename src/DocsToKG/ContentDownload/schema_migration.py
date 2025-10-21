@@ -44,8 +44,6 @@ Example:
 from __future__ import annotations
 
 import sqlite3
-import time
-from typing import Optional
 
 # SQL migration: add artifact_jobs, artifact_ops, and _meta tables
 _MIGRATION_SQL = """

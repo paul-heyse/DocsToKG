@@ -30,11 +30,9 @@ Tests cover:
 
 from __future__ import annotations
 
-import pytest
 import time
-from pathlib import Path
-from typing import Optional
-from unittest.mock import Mock, MagicMock, patch
+
+import pytest
 
 # Check if pybreaker is available
 try:
@@ -45,15 +43,15 @@ except ImportError:
     HAS_PYBREAKER = False
 
 from DocsToKG.ContentDownload.breakers import (
-    BreakerConfig,
-    BreakerPolicy,
-    BreakerRolePolicy,
     BreakerClassification,
-    RollingWindowPolicy,
-    HalfOpenPolicy,
-    BreakerRegistry,
+    BreakerConfig,
     BreakerOpenError,
+    BreakerPolicy,
+    BreakerRegistry,
+    BreakerRolePolicy,
+    HalfOpenPolicy,
     RequestRole,
+    RollingWindowPolicy,
 )
 from DocsToKG.ContentDownload.sqlite_cooldown_store import SQLiteCooldownStore
 

@@ -73,7 +73,7 @@ COMMANDS REFERENCE
   Command:
     python -m DocsToKG.ContentDownload.cli fallback tune
 
-  Status: 
+  Status:
     • Placeholder for Phase 7 telemetry integration
     • Shows what telemetry will be analyzed
 
@@ -223,10 +223,10 @@ How to Register (Future Phase):
     def main():
         parser = argparse.ArgumentParser()
         subparsers = parser.add_subparsers()
-        
+
         # Register fallback commands
         register_fallback_commands(subparsers)
-        
+
         # ... other commands ...
 
   Usage:

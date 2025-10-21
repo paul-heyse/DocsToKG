@@ -9,7 +9,6 @@ Covers:
 """
 
 import json
-import uuid
 from unittest.mock import Mock
 
 import pytest

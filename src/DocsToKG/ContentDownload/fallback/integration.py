@@ -15,7 +15,6 @@ Responsibilities:
 from __future__ import annotations
 
 import logging
-import time
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional
 
@@ -80,7 +79,9 @@ def try_fallback_resolution(
 
         # Success: return the result
         if result.is_success:
-            logger.info(f"Fallback strategy succeeded for {context.get('work_id')}: {result.reason}")
+            logger.info(
+                f"Fallback strategy succeeded for {context.get('work_id')}: {result.reason}"
+            )
             return result
 
         # Not found or retryable: fall back to pipeline

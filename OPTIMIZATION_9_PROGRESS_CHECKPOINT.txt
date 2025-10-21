@@ -52,7 +52,7 @@ PHASE 3: SOURCE ADAPTERS
     • adapters/landing_scrape.py (120 LOC)
     • adapters/europe_pmc.py (80 LOC)
     • adapters/wayback.py (90 LOC)
-  
+
   Resources Provided:
     ✅ PHASE_3_ADAPTER_TEMPLATE.md - Complete implementation guide
     ✅ Checklist for all 7 adapters
@@ -159,7 +159,7 @@ ARCHITECTURE SNAPSHOT
 ================================================================================
 
 System Flow:
-  
+
   download.py (with feature gate)
       ↓
   orchestrator.resolve_pdf()
@@ -167,13 +167,13 @@ System Flow:
       ├─ Tier 2 (doi_follow): [doi_redirect_pdf]
       ├─ Tier 3 (landing_scrape): [landing_scrape_pdf, europe_pmc_pdf] parallel
       └─ Tier 4 (archive): [wayback_pdf]
-  
+
   Each adapter:
       ├─ Extract context (DOI, URL, etc.)
       ├─ Query API or service
       ├─ HEAD validate candidate PDF
       └─ Return AttemptResult
-  
+
   Orchestrator:
       ├─ Enforce budgets (time, attempts, concurrency)
       ├─ Parallelize within tiers

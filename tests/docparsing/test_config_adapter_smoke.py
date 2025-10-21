@@ -9,10 +9,8 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock
 
-import pytest
-
-from DocsToKG.DocParsing.config_adapter import ConfigurationAdapter
 from DocsToKG.DocParsing.chunking.config import ChunkerCfg
+from DocsToKG.DocParsing.config_adapter import ConfigurationAdapter
 from DocsToKG.DocParsing.doctags import DoctagsCfg
 from DocsToKG.DocParsing.embedding.config import EmbedCfg
 
@@ -98,11 +96,11 @@ class TestConfigurationAdapterSmoke:
 
     def test_stage_entry_points_accept_adapter_parameter(self) -> None:
         """Verify stage entry points have config_adapter parameter."""
+        import inspect
+
         from DocsToKG.DocParsing import doctags as doctags_module
         from DocsToKG.DocParsing.chunking import runtime as chunking_runtime
         from DocsToKG.DocParsing.embedding import runtime as embedding_runtime
-
-        import inspect
 
         # Check doctags
         pdf_sig = inspect.signature(doctags_module.pdf_main)
@@ -121,11 +119,11 @@ class TestConfigurationAdapterSmoke:
 
     def test_stage_entry_points_maintain_backward_compat(self) -> None:
         """Verify stage entry points still accept args=None for backward compat."""
+        import inspect
+
         from DocsToKG.DocParsing import doctags as doctags_module
         from DocsToKG.DocParsing.chunking import runtime as chunking_runtime
         from DocsToKG.DocParsing.embedding import runtime as embedding_runtime
-
-        import inspect
 
         # Check doctags
         pdf_sig = inspect.signature(doctags_module.pdf_main)

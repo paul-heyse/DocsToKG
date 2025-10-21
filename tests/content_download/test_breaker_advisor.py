@@ -22,11 +22,10 @@ Tests the telemetry-driven analysis and auto-tuning system:
 
 from __future__ import annotations
 
-import pytest
 import sqlite3
 import time
-from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+
+import pytest
 
 # Check if pybreaker is available
 try:
@@ -39,11 +38,9 @@ except ImportError:
 from DocsToKG.ContentDownload.breaker_advisor import (
     BreakerAdvisor,
     HostMetrics,
-    HostAdvice,
 )
 from DocsToKG.ContentDownload.breaker_autotune import (
     BreakerAutoTuner,
-    AutoTunePlan,
 )
 from DocsToKG.ContentDownload.breakers import (
     BreakerConfig,
@@ -66,7 +63,8 @@ def telemetry_db(tmp_path):
     conn = sqlite3.connect(db_path)
 
     # Create minimal schema
-    conn.execute("""
+    conn.execute(
+        """
         CREATE TABLE http_events (
             host TEXT,
             ts REAL,
@@ -77,9 +75,11 @@ def telemetry_db(tmp_path):
             breaker_host_state TEXT,
             breaker_recorded TEXT
         )
-    """)
+    """
+    )
 
-    conn.execute("""
+    conn.execute(
+        """
         CREATE TABLE breaker_transitions (
             host TEXT,
             ts REAL,
@@ -87,7 +87,8 @@ def telemetry_db(tmp_path):
             new_state TEXT,
             reset_timeout_s INTEGER
         )
-    """)
+    """
+    )
 
     conn.commit()
     conn.close()

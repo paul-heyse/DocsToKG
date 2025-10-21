@@ -14,12 +14,12 @@ DELIVERABLES
 ================================================================================
 
 1. FALLBACK INTEGRATION MODULE (integration.py)
-   
+
    ✅ Created: src/DocsToKG/ContentDownload/fallback/integration.py (100 LOC)
       • try_fallback_resolution() - Main integration entry point
       • is_fallback_enabled() - Feature gate check
       • get_fallback_plan_path() - Configuration path resolver
-   
+
    ✅ Features:
       • Non-blocking fallback attempt (graceful fallback to pipeline)
       • Proper error handling with logging
@@ -29,25 +29,25 @@ DELIVERABLES
       • Adapter registry placeholder for Phase 9
 
 2. DOWNLOAD CONFIG ENHANCEMENTS (download.py)
-   
+
    ✅ Added fields to DownloadConfig dataclass:
       • enable_fallback_strategy: bool (default False)
       • fallback_plan_path: Optional[str]
-   
+
    ✅ Purpose:
       • Feature gate for enabling/disabling fallback
       • Configuration path for fallback.yaml
       • Allows CLI and runner integration
 
 3. PROCESS_ONE_WORK INTEGRATION (download.py)
-   
+
    ✅ Added integration code before pipeline.run():
       • Check if fallback enabled via feature gate
       • Build resolution context with artifact metadata
       • Call try_fallback_resolution() for orchestrator attempt
       • If success: Create DownloadOutcome, log manifest, return early
       • If failure: Fall through to existing pipeline
-   
+
    ✅ Benefits:
       • Maintains 100% backward compatibility
       • No impact on existing pipeline when disabled
@@ -55,10 +55,10 @@ DELIVERABLES
       • Proper telemetry logging
 
 4. IMPORTS AND INTEGRATION POINTS (download.py)
-   
+
    ✅ Added imports:
       • from DocsToKG.ContentDownload.fallback.integration import (...)
-   
+
    ✅ Access to pipeline resources:
       • BreakerRegistry via pipeline._breaker_registry
       • RateLimiter via pipeline._rate_manager

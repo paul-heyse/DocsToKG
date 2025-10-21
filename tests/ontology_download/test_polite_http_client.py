@@ -9,11 +9,10 @@ Tests cover:
 - Error handling
 """
 
-import pytest
 from DocsToKG.OntologyDownload.network.polite_client import (
     PoliteHttpClient,
-    get_polite_http_client,
     close_polite_http_client,
+    get_polite_http_client,
     reset_polite_http_client,
 )
 

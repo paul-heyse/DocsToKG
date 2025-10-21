@@ -12,21 +12,16 @@ Tests cover:
 
 from __future__ import annotations
 
-import hashlib
-import json
 import logging
-import os
 import sqlite3
 import tempfile
 import time
 from pathlib import Path
-from typing import Any, Dict, Optional
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
 from DocsToKG.ContentDownload import idempotency, streaming
-
 
 # ============================================================================
 # Fixtures
@@ -396,9 +391,7 @@ class TestLeaseManagement:
         test_db.commit()
 
         # Renew lease
-        result = idempotency.renew_lease(
-            test_db, "job-1", "worker-1", 120, now_fn=lambda: now
-        )
+        result = idempotency.renew_lease(test_db, "job-1", "worker-1", 120, now_fn=lambda: now)
         assert result is True
 
 
@@ -625,7 +618,9 @@ class TestStreamingIntegration:
                 cfg=test_config,
                 root_dir=tmp_dir,
                 staging_dir=tmp_dir,
-                artifact_lock=lambda x: MagicMock(__enter__=lambda s: None, __exit__=lambda s, *a: None),
+                artifact_lock=lambda x: MagicMock(
+                    __enter__=lambda s: None, __exit__=lambda s, *a: None
+                ),
                 hash_index=mock_hash_index,
                 manifest_sink=mock_manifest_sink,
                 logger=logging.getLogger(__name__),
@@ -638,7 +633,10 @@ class TestStreamingIntegration:
         """Should use deduplication when hash known."""
         # Setup: hash_index knows about this URL
         mock_hash_index.get_hash_for_url.return_value = "abc123def456"
-        mock_hash_index.get_path_and_size.return_value = (str(tmp_dir / "ab" / "abc123def456.pdf"), 1000)
+        mock_hash_index.get_path_and_size.return_value = (
+            str(tmp_dir / "ab" / "abc123def456.pdf"),
+            1000,
+        )
         mock_hash_index.dedupe_link_or_copy.return_value = "hardlink"
 
         result = streaming.download_pdf(
@@ -648,7 +646,9 @@ class TestStreamingIntegration:
             cfg=test_config,
             root_dir=tmp_dir,
             staging_dir=tmp_dir / ".staging",
-            artifact_lock=lambda x: MagicMock(__enter__=lambda s: None, __exit__=lambda s, *a: None),
+            artifact_lock=lambda x: MagicMock(
+                __enter__=lambda s: None, __exit__=lambda s, *a: None
+            ),
             hash_index=mock_hash_index,
             manifest_sink=mock_manifest_sink,
             logger=logging.getLogger(__name__),

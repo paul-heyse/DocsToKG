@@ -287,6 +287,7 @@ if __name__ == "__main__" and __package__ is None:
         sys.path.insert(0, str(package_root))
 
 import argparse
+import hashlib
 import heapq
 import os
 import random
@@ -319,7 +320,6 @@ from typing import (
     TypeVar,
 )
 
-import hashlib
 import httpx
 from tqdm import tqdm
 
@@ -337,7 +337,6 @@ from DocsToKG.DocParsing.core import (
     StageContext,
     StageError,
     StageHooks,
-    StageOptions,
     StageOutcome,
     StagePlan,
     WorkItem,
@@ -347,7 +346,6 @@ from DocsToKG.DocParsing.core import (
     find_free_port,
     get_http_session,
     normalize_http_timeout,
-    run_stage,
     set_spawn_or_warn,
 )
 from DocsToKG.DocParsing.env import (
@@ -371,7 +369,6 @@ from DocsToKG.DocParsing.io import (
     manifest_append,
     relative_path,
     resolve_attempts_path,
-    resolve_hash_algorithm,
     resolve_manifest_path,
 )
 from DocsToKG.DocParsing.logging import (

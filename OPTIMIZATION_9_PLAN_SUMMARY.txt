@@ -9,8 +9,8 @@ DATE: October 21, 2025
 EXECUTIVE SUMMARY
 ================================================================================
 
-Optimization 9 introduces a deterministic, tiered fallback strategy for PDF 
-resolution. It attempts multiple sources in priority order with budgeted 
+Optimization 9 introduces a deterministic, tiered fallback strategy for PDF
+resolution. It attempts multiple sources in priority order with budgeted
 execution, health gates, and automatic cancellation when a valid PDF is found.
 
 Key Features:

@@ -33,7 +33,7 @@ Option 1: Serial (Fallback First, then Pipeline)
   Pro: Simple, can disable fallback entirely
   Pro: Fallback gets first attempt
   Con: Double attempts if both fail
-  
+
 Option 2: Fallback Alternative (Only if pipeline would fail)
   Pro: Maintains backward compatibility
   Pro: Uses fallback as "enhanced resolver"
@@ -93,7 +93,7 @@ Phase 8 (Integration Phase): Feature disabled by default
   --enable-fallback-strategy not set → Use existing pipeline
   Allows operators to opt-in for testing
 
-Phase 9+ (Testing & Validation): 
+Phase 9+ (Testing & Validation):
   Comprehensive tests validate before changing default
 
 Phase 10+ (Full Production):

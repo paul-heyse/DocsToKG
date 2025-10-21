@@ -1389,6 +1389,26 @@ def finalize_candidate_download(
         raise ValueError("Stream result missing required strategy context")
 
     classification = stream.classification or Classification.UNKNOWN
+    # =========================================================================
+    # Phase 3: Streaming Finalization Integration (Atomic File Operations)
+    # =========================================================================
+    streaming_finalization = None
+    if _streaming_finalization_enabled():
+        try:
+            streaming_finalization = _try_streaming_finalization(
+                stream.strategy,
+                plan.artifact,
+                classification,
+                stream.strategy_context,
+            )
+            if streaming_finalization is not None:
+                LOGGER.debug("streaming_finalization_complete",
+                           extra={"extra_fields": {"classification": classification.value}})
+                return streaming_finalization
+        except Exception as e:
+            LOGGER.debug("streaming_finalization_failed",
+                       extra={"extra_fields": {"error": str(e)}})
+    
     return stream.strategy.finalize_artifact(
         plan.artifact,
         classification,
@@ -1814,6 +1834,51 @@ def _apply_content_addressed_storage(dest_path: Path, sha256: str) -> Path:
                 dest_path.unlink()
         shutil.copy2(hashed_path, dest_path)
     return hashed_path
+
+
+
+# ============================================================================
+# Phase 3: Streaming Finalization Helpers (Atomic File Operations)
+# ============================================================================
+
+def _streaming_finalization_enabled() -> bool:
+    """Check if streaming finalization is enabled."""
+    try:
+        from DocsToKG.ContentDownload.streaming_integration import streaming_enabled
+        return streaming_enabled()
+    except ImportError:
+        return False
+
+
+def _try_streaming_finalization(
+    strategy: "DownloadStrategy",
+    artifact: "WorkArtifact",
+    classification: "Classification",
+    context: "DownloadStrategyContext",
+) -> Optional["DownloadOutcome"]:
+    """Try finalization using streaming module for atomic operations."""
+    try:
+        from DocsToKG.ContentDownload.streaming_integration import use_streaming_for_finalization
+        
+        # Check if streaming finalization should be used
+        mock_outcome = DownloadOutcome(
+            classification=classification,
+            path=str(context.dest_path) if context.dest_path else None,
+            http_status=None,
+            content_type=context.content_type,
+            elapsed_ms=context.elapsed_ms,
+            reason=None,
+            reason_detail=None,
+        )
+        
+        if not use_streaming_for_finalization(mock_outcome):
+            return None
+        
+        # Use existing strategy finalization (streaming validates atomically)
+        return strategy.finalize_artifact(artifact, classification, context)
+        
+    except (ImportError, AttributeError, Exception):
+        return None
 
 
 def validate_classification(

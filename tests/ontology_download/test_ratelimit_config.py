@@ -10,13 +10,14 @@ Tests cover:
 """
 
 import pytest
+
 from DocsToKG.OntologyDownload.ratelimit.config import (
     RateSpec,
+    get_schema_summary,
+    normalize_per_service_rates,
+    normalize_rate_list,
     parse_rate_string,
     validate_rate_list,
-    normalize_rate_list,
-    normalize_per_service_rates,
-    get_schema_summary,
 )
 
 
