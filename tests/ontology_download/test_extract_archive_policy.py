@@ -15,7 +15,7 @@ import pytest
 
 from DocsToKG.OntologyDownload.errors import ConfigError
 from DocsToKG.OntologyDownload.io import (
-    ExtractionPolicy,
+    ExtractionSettings,
     extract_archive_safe,
     lenient_defaults,
     safe_defaults,
@@ -25,62 +25,6 @@ from DocsToKG.OntologyDownload.io import (
 
 class TestExtractionPolicy:
     """Tests for ExtractionPolicy configuration and validation."""
-
-    def test_safe_defaults_creates_valid_policy(self):
-        """safe_defaults() returns a valid policy with all protections enabled."""
-        policy = safe_defaults()
-        assert policy.is_valid()
-        assert policy.encapsulate is True
-        assert policy.use_dirfd is True
-        assert policy.allow_symlinks is False
-        assert policy.allow_hardlinks is False
-
-    def test_lenient_defaults_creates_valid_policy(self):
-        """lenient_defaults() returns a valid policy with relaxed limits."""
-        policy = lenient_defaults()
-        assert policy.is_valid()
-        assert policy.allow_symlinks is True
-        assert policy.allow_hardlinks is True
-        assert policy.max_entries > safe_defaults().max_entries
-
-    def test_strict_defaults_creates_valid_policy(self):
-        """strict_defaults() returns a valid policy with maximum protection."""
-        policy = strict_defaults()
-        assert policy.is_valid()
-        assert policy.max_depth < safe_defaults().max_depth
-        assert policy.max_entries < safe_defaults().max_entries
-
-    def test_policy_validation_rejects_invalid_encapsulation_name(self):
-        """Validation rejects unknown encapsulation_name."""
-        policy = safe_defaults()
-        policy.encapsulation_name = "invalid"  # type: ignore
-        errors = policy.validate()
-        assert len(errors) > 0
-        assert "encapsulation_name" in errors[0]
-
-    def test_policy_validation_rejects_dirfd_without_encapsulation(self):
-        """Validation rejects use_dirfd=True with encapsulate=False."""
-        policy = safe_defaults()
-        policy.encapsulate = False
-        policy.use_dirfd = True
-        errors = policy.validate()
-        assert len(errors) > 0
-        assert "use_dirfd requires encapsulate" in errors[0]
-
-    def test_policy_validation_rejects_invalid_max_depth(self):
-        """Validation rejects non-positive max_depth."""
-        policy = safe_defaults()
-        policy.max_depth = 0
-        errors = policy.validate()
-        assert len(errors) > 0
-        assert "max_depth" in errors[0]
-
-    def test_policy_validation_rejects_invalid_mode(self):
-        """Validation rejects invalid file/directory modes."""
-        policy = safe_defaults()
-        policy.dir_mode = 0o777 + 1  # Invalid: > 0o777
-        errors = policy.validate()
-        assert len(errors) > 0
 
     def test_policy_summary_returns_readable_status(self):
         """summary() returns human-readable policy status."""

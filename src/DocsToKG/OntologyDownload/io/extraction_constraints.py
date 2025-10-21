@@ -27,7 +27,7 @@ from pathlib import Path, PurePosixPath
 from typing import Optional, Set
 
 from ..errors import ConfigError
-from .extraction_policy import ExtractionPolicy
+from .extraction_policy import ExtractionSettings
 from .extraction_telemetry import ExtractionErrorCode, error_message
 
 # ============================================================================
@@ -35,7 +35,7 @@ from .extraction_telemetry import ExtractionErrorCode, error_message
 # ============================================================================
 
 
-def normalize_path_unicode(path: str, policy: ExtractionPolicy) -> str:
+def normalize_path_unicode(path: str, policy: ExtractionSettings) -> str:
     """Normalize path using the configured Unicode normalization form.
 
     Args:
@@ -59,7 +59,7 @@ def normalize_path_unicode(path: str, policy: ExtractionPolicy) -> str:
 
 def validate_path_constraints(
     path: str,
-    policy: ExtractionPolicy,
+    policy: ExtractionSettings,
 ) -> None:
     """Validate path against depth, component length, and total length constraints.
 
@@ -120,7 +120,7 @@ def validate_entry_type(
     is_block_dev: bool,
     is_char_dev: bool,
     is_socket: bool,
-    policy: ExtractionPolicy,
+    policy: ExtractionSettings,
     entry_path: str,
 ) -> None:
     """Validate that entry type is permitted by policy.
@@ -176,7 +176,7 @@ class CaseCollisionDetector:
     when new entries would collide after casefolding normalization.
     """
 
-    def __init__(self, policy: ExtractionPolicy) -> None:
+    def __init__(self, policy: ExtractionSettings) -> None:
         """Initialize detector with policy.
 
         Args:
@@ -217,7 +217,7 @@ class CaseCollisionDetector:
 
 def validate_entry_count(
     current_count: int,
-    policy: ExtractionPolicy,
+    policy: ExtractionSettings,
 ) -> None:
     """Validate that entry count hasn't exceeded the budget.
 
@@ -244,7 +244,7 @@ def validate_entry_count(
 
 def validate_file_size(
     declared_size: Optional[int],
-    policy: ExtractionPolicy,
+    policy: ExtractionSettings,
     entry_path: str,
 ) -> None:
     """Validate that file's declared size is within limits.
@@ -272,7 +272,7 @@ def validate_file_size(
 
 def validate_streaming_file_size(
     bytes_written: int,
-    policy: ExtractionPolicy,
+    policy: ExtractionSettings,
     entry_path: str,
 ) -> None:
     """Validate that streamed file size doesn't exceed limit during extraction.
@@ -305,7 +305,7 @@ def validate_streaming_file_size(
 def validate_entry_compression_ratio(
     uncompressed_size: int,
     compressed_size: int,
-    policy: ExtractionPolicy,
+    policy: ExtractionSettings,
     entry_path: str,
 ) -> None:
     """Validate that entry's compression ratio is within limits.
@@ -344,7 +344,7 @@ class PreScanValidator:
     Groups related validations to reduce code duplication in filesystem.py.
     """
 
-    def __init__(self, policy: ExtractionPolicy) -> None:
+    def __init__(self, policy: ExtractionSettings) -> None:
         """Initialize validator with policy.
 
         Args:
@@ -443,7 +443,7 @@ class PreScanValidator:
 def validate_disk_space(
     required_bytes: int,
     destination: Path,
-    policy: ExtractionPolicy,
+    policy: ExtractionSettings,
 ) -> None:
     """Validate that sufficient disk space is available for extraction.
 
@@ -500,7 +500,7 @@ def validate_disk_space(
 def apply_default_permissions(
     path: Path,
     is_dir: bool,
-    policy: ExtractionPolicy,
+    policy: ExtractionSettings,
 ) -> None:
     """Apply default permissions to extracted file or directory.
 
@@ -546,7 +546,7 @@ class ExtractionGuardian:
     post-extraction finalization.
     """
 
-    def __init__(self, policy: ExtractionPolicy) -> None:
+    def __init__(self, policy: ExtractionSettings) -> None:
         """Initialize guardian with policy.
 
         Args:

@@ -19,7 +19,7 @@ import pytest
 from DocsToKG.OntologyDownload.errors import ConfigError
 from DocsToKG.OntologyDownload.io import (
     ExtractionGuardian,
-    ExtractionPolicy,
+    ExtractionSettings,
     extract_archive_safe,
     safe_defaults,
     strict_defaults,

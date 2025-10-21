@@ -28,7 +28,7 @@ from .extraction_integrity import (
     validate_archive_format,
 )
 from .extraction_policy import (
-    ExtractionPolicy,
+    ExtractionSettings,
     lenient_defaults,
     safe_defaults,
     strict_defaults,
@@ -84,7 +84,7 @@ __all__ = [
     "reset",
     "reset_http_client",
     # Core extraction policy & telemetry
-    "ExtractionPolicy",
+    "ExtractionSettings",
     "safe_defaults",
     "lenient_defaults",
     "strict_defaults",

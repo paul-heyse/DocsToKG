@@ -40,7 +40,7 @@ import libarchive
 from ..errors import ConfigError
 from ..settings import get_default_config
 from .extraction_constraints import ExtractionGuardian, PreScanValidator
-from .extraction_policy import ExtractionPolicy, ExtractionSettings, safe_defaults
+from .extraction_policy import ExtractionSettings, safe_defaults
 from .extraction_telemetry import (
     ExtractionErrorCode,
     ExtractionMetrics,
@@ -51,7 +51,7 @@ from .extraction_telemetry import (
 _MAX_COMPRESSION_RATIO = 10.0
 
 
-def _compute_config_hash(policy: ExtractionPolicy) -> str:
+def _compute_config_hash(policy: ExtractionSettings) -> str:
     """Compute a deterministic hash of extraction policy for provenance tracking."""
     policy_str = json.dumps(
         {
@@ -76,7 +76,7 @@ def _compute_config_hash(policy: ExtractionPolicy) -> str:
 def _write_audit_manifest(
     extract_root: Path,
     archive_path: Path,
-    policy: ExtractionPolicy,
+    policy: ExtractionSettings,
     entries_metadata: List[
         tuple[str, Path, int, Optional[str]]
     ],  # (orig_path, normalized_path, size, sha256)
@@ -298,7 +298,7 @@ def _compute_archive_sha256(archive_path: Path) -> str:
 
 def _generate_encapsulation_root_name(
     archive_path: Path,
-    policy: ExtractionPolicy,
+    policy: ExtractionSettings,
 ) -> str:
     """Generate encapsulation root name based on policy.
 
@@ -387,7 +387,7 @@ def extract_archive_safe(
     *,
     logger: Optional[logging.Logger] = None,
     max_uncompressed_bytes: Optional[int] = None,
-    extraction_policy: Optional[ExtractionPolicy] = None,
+    extraction_policy: Optional[ExtractionSettings] = None,
 ) -> List[Path]:
     """Extract archives safely using libarchive with validation and compression checks.
 

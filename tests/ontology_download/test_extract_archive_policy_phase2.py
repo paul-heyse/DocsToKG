@@ -20,7 +20,7 @@ import pytest
 
 from DocsToKG.OntologyDownload.errors import ConfigError
 from DocsToKG.OntologyDownload.io import (
-    ExtractionPolicy,
+    ExtractionSettings,
     extract_archive_safe,
     safe_defaults,
     strict_defaults,
@@ -64,7 +64,7 @@ class TestPhase2LinkDefense:
             with zipfile.ZipFile(archive_path, "w") as zf:
                 zf.writestr("file.txt", "content")
 
-            policy = ExtractionPolicy()
+            policy = ExtractionSettings()
             policy.allow_symlinks = True
             policy.allow_hardlinks = True
             policy.encapsulate = False

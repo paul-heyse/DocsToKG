@@ -38,7 +38,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from ..errors import ConfigError
-from .extraction_policy import ExtractionPolicy
+from .extraction_policy import ExtractionSettings
 
 # ============================================================================
 # CRC / INTEGRITY VERIFICATION
@@ -89,7 +89,7 @@ class IntegrityCheckResult:
 class IntegrityVerifier:
     """Verifies archive and entry-level integrity."""
 
-    def __init__(self, policy: ExtractionPolicy) -> None:
+    def __init__(self, policy: ExtractionSettings) -> None:
         """Initialize integrity verifier.
 
         Args:
@@ -288,7 +288,7 @@ def normalize_pathname(
 def validate_format_allowed(
     format_name: str,
     filters: List[str],
-    policy: ExtractionPolicy,
+    policy: ExtractionSettings,
 ) -> None:
     """Validate archive format is in allow-list.
 
@@ -368,7 +368,7 @@ class DuplicateEntry:
 class DuplicateDetector:
     """Detects and handles duplicate entries."""
 
-    def __init__(self, policy: ExtractionPolicy) -> None:
+    def __init__(self, policy: ExtractionSettings) -> None:
         """Initialize detector.
 
         Args:
@@ -544,7 +544,7 @@ class ProvenanceManifest:
                 temp_path.unlink()
 
 
-def check_windows_portability(path: str, policy: ExtractionPolicy) -> tuple[bool, Optional[str]]:
+def check_windows_portability(path: str, policy: ExtractionSettings) -> tuple[bool, Optional[str]]:
     """Check if a path violates Windows portability rules.
 
     Args:
@@ -582,7 +582,7 @@ def check_windows_portability(path: str, policy: ExtractionPolicy) -> tuple[bool
 def validate_archive_format(
     format_name: Optional[str],
     filters: Optional[List[str]],
-    policy: ExtractionPolicy,
+    policy: ExtractionSettings,
 ) -> tuple[bool, Optional[str]]:
     """Validate archive format and compression filters against allow-list.
 
