@@ -34,6 +34,7 @@ from tests.conftest import PatchManager
 
 class ResolverMetrics:
     """Stub metrics collector for tests (original was legacy code)."""
+
     pass
 
 
@@ -149,6 +150,8 @@ def test_prepare_candidate_download_skip_head_precheck(
         client.close()
     assert not calls
     assert not plan.head_precheck_passed
+
+
 def test_stream_candidate_payload_returns_cached(
     patcher: PatchManager, artifact: WorkArtifact, tmp_path: Path
 ) -> None:
@@ -304,9 +307,9 @@ def test_download_candidate_retries_and_cleans_partial(
     assert not Path(str(outcome.path) + ".part").exists()
     assert progress
     assert request_calls == [("GET", True), ("GET", True)]
-def test_cleanup_sidecar_files_removes_partial_pdf(
-    tmp_path: Path, artifact: WorkArtifact
-) -> None:
+
+
+def test_cleanup_sidecar_files_removes_partial_pdf(tmp_path: Path, artifact: WorkArtifact) -> None:
     target = artifact.pdf_dir / "example.pdf"
     part_path = target.with_suffix(".pdf.part")
     artifact.pdf_dir.mkdir(parents=True, exist_ok=True)

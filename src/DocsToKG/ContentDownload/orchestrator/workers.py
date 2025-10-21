@@ -30,7 +30,7 @@ This module provides the Worker class that:
         retry_backoff=60,
         jitter=15,
     )
-    
+
     # Process a single leased job
     job = {"id": 123, "artifact_id": "doi:10.1234/example", "artifact_json": "..."}
     worker.run_one(job)
@@ -57,10 +57,10 @@ logger = logging.getLogger(__name__)
 
 class Worker:
     """Job execution wrapper with concurrency control.
-    
+
     Runs jobs from the work queue through the resolver pipeline,
     respecting per-resolver and per-host concurrency limits.
-    
+
     Attributes:
         worker_id: Unique worker identifier for leasing and logging
         heartbeat_sec: Interval (seconds) to extend lease during long operations
@@ -68,7 +68,7 @@ class Worker:
         retry_backoff: Base seconds to delay before retry
         jitter: Random jitter (0 to this value) added to retry backoff
     """
-    
+
     def __init__(
         self,
         worker_id: str,
@@ -82,7 +82,7 @@ class Worker:
         jitter: int,
     ) -> None:
         """Initialize worker.
-        
+
         Args:
             worker_id: Unique identifier for this worker
             queue: WorkQueue for leasing and state management
@@ -103,42 +103,42 @@ class Worker:
         self.max_job_attempts = max_job_attempts
         self.retry_backoff = retry_backoff
         self.jitter = jitter
-        
+
         self._stop = threading.Event()
         self._running_jobs: set[int] = set()
         self._lock = threading.Lock()
-        
+
         logger.debug(f"Worker initialized: {worker_id}")
-    
+
     def stop(self) -> None:
         """Signal worker to stop processing new jobs."""
         self._stop.set()
         logger.info(f"Worker {self.worker_id} stopping...")
-    
+
     def run_one(self, job: Mapping[str, Any]) -> None:
         """Execute a single leased job.
-        
+
         Orchestrates the full job lifecycle:
         1. Rehydrate artifact from JSON
         2. Acquire concurrency limits
         3. Run through pipeline
         4. Ack or fail based on outcome
-        
+
         Args:
             job: Job dict with id, artifact_id, artifact_json
         """
         job_id = job["id"]
         artifact_id = job["artifact_id"]
-        
+
         with self._lock:
             if self._stop.is_set():
                 logger.debug(f"Worker {self.worker_id} is stopping, skipping job {job_id}")
                 return
             self._running_jobs.add(job_id)
-        
+
         try:
             logger.debug(f"Worker {self.worker_id} processing job {job_id} ({artifact_id})")
-            
+
             # Rehydrate artifact from JSON
             try:
                 artifact_json = job.get("artifact_json", "{}")
@@ -152,12 +152,12 @@ class Worker:
                     last_error=f"artifact_rehydration_failed: {str(e)[:100]}",
                 )
                 return
-            
+
             # Run through pipeline (without concurrency guards for now)
             # The limiter guards will be applied in Phase 5 (Orchestrator)
             try:
                 outcome = self.pipeline.process(artifact, ctx=None)
-                
+
                 # Determine terminal state
                 if outcome.ok:
                     state = "done"
@@ -168,11 +168,11 @@ class Worker:
                 else:
                     state = "error"
                     reason = outcome.reason or "download_error"
-                
+
                 # Ack with outcome
                 self.queue.ack(job_id, state, last_error=None)
                 logger.info(f"Job {job_id} completed: {state} ({reason})")
-                
+
             except Exception as e:
                 # Retry on pipeline error
                 logger.warning(f"Job {job_id} failed with error: {e}")
@@ -182,14 +182,14 @@ class Worker:
                     max_attempts=self.max_job_attempts,
                     last_error=f"pipeline_error: {str(e)[:100]}",
                 )
-        
+
         finally:
             with self._lock:
                 self._running_jobs.discard(job_id)
-    
+
     def _compute_backoff(self) -> int:
         """Compute retry backoff with jitter.
-        
+
         Returns:
             Seconds to delay before retry
         """

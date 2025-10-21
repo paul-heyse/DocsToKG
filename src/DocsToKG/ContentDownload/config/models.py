@@ -359,6 +359,87 @@ class ResolversConfig(BaseModel):
 
 
 # ============================================================================
+# Storage & Catalog Configuration (PR #9: Artifact Catalog & Storage Index)
+# ============================================================================
+
+
+class StorageConfig(BaseModel):
+    """Storage backend and layout configuration for downloaded artifacts."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
+
+    backend: Literal["fs", "s3"] = Field(
+        default="fs",
+        description="Storage backend: filesystem or S3",
+    )
+    root_dir: str = Field(
+        default="data/docs",
+        description="Root directory for final artifacts",
+    )
+    layout: Literal["policy_path", "cas"] = Field(
+        default="policy_path",
+        description="Layout strategy: policy_path (human-friendly) or cas (content-addressable)",
+    )
+    cas_prefix: str = Field(
+        default="sha256",
+        description="CAS prefix (e.g., 'sha256')",
+    )
+    hardlink_dedup: bool = Field(
+        default=True,
+        description="Enable hardlink deduplication on POSIX systems",
+    )
+    s3_bucket: Optional[str] = Field(
+        default=None,
+        description="S3 bucket name (required if backend='s3')",
+    )
+    s3_prefix: str = Field(
+        default="docs/",
+        description="S3 object key prefix",
+    )
+    s3_storage_class: str = Field(
+        default="STANDARD",
+        description="S3 storage class (STANDARD, INTELLIGENT_TIERING, GLACIER, etc.)",
+    )
+
+
+class CatalogConfig(BaseModel):
+    """Artifact catalog database and retention configuration."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
+
+    backend: Literal["sqlite", "postgres"] = Field(
+        default="sqlite",
+        description="Database backend (sqlite or postgres)",
+    )
+    path: str = Field(
+        default="state/catalog.sqlite",
+        description="Database file path (for SQLite) or connection URL",
+    )
+    wal_mode: bool = Field(
+        default=True,
+        description="Enable WAL mode for SQLite",
+    )
+    compute_sha256: bool = Field(
+        default=True,
+        description="Compute SHA-256 on successful downloads",
+    )
+    verify_on_register: bool = Field(
+        default=False,
+        description="Verify SHA-256 after finalization before registering",
+    )
+    retention_days: int = Field(
+        default=0,
+        ge=0,
+        description="Retention policy: 0 = disabled; N > 0 = delete records older than N days",
+    )
+    orphan_ttl_days: int = Field(
+        default=7,
+        ge=1,
+        description="GC eligibility: files not referenced for N days are candidates",
+    )
+
+
+# ============================================================================
 # Top-Level Configuration
 # ============================================================================
 
@@ -385,6 +466,14 @@ class ContentDownloadConfig(BaseModel):
     )
     telemetry: TelemetryConfig = Field(
         default_factory=TelemetryConfig, description="Telemetry configuration"
+    )
+    storage: StorageConfig = Field(
+        default_factory=StorageConfig,
+        description="Storage backend configuration",
+    )
+    catalog: CatalogConfig = Field(
+        default_factory=CatalogConfig,
+        description="Artifact catalog configuration",
     )
     resolvers: ResolversConfig = Field(
         default_factory=ResolversConfig, description="Resolver configuration"
