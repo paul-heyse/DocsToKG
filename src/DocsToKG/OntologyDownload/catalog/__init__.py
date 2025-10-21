@@ -5,6 +5,7 @@ Core modules:
 - queries: Type-safe query façades with DTOs
 - boundaries: Transactional context managers (FS↔DB choreography)
 - doctor: Health checks and drift detection
+- gc: Garbage collection and prune operations
 """
 
 from __future__ import annotations
@@ -31,4 +32,13 @@ __all__ = [
     "quick_health_check",
     "detect_db_fs_drifts",
     "generate_doctor_report",
+    "OrphanedItem",
+    "PruneResult",
+    "VacuumResult",
+    "identify_orphaned_artifacts",
+    "identify_orphaned_files",
+    "prune_by_retention_days",
+    "prune_keep_latest_n",
+    "vacuum_database",
+    "garbage_collect",
 ]

@@ -3,6 +3,7 @@
 ## Overview
 
 This document provides a comprehensive implementation guide for:
+
 - **Pillar 7**: Observability that answers questions (events, sinks, instrumentation)
 - **Pillar 8**: Safety & policy, defense-in-depth (gates, policies, error handling)
 
@@ -11,6 +12,7 @@ This document provides a comprehensive implementation guide for:
 ### ✅ Completed (Foundation Laid)
 
 **Pillar 7 Foundation (90% complete):**
+
 - [x] `observability/events.py` - Event model, context management, emission API
 - [x] `observability/schema.py` - JSON Schema generation and validation
 - [x] `observability/emitters.py` - Base emitter classes, JsonStdoutEmitter, FileJsonlEmitter, Buffering
@@ -18,6 +20,7 @@ This document provides a comprehensive implementation guide for:
 - [ ] `observability/queries.py` - Stock queries and dashboarding (not yet created)
 
 **Pillar 8 Foundation (85% complete):**
+
 - [x] `policy/errors.py` - ErrorCode enum, result types, exception classes
 - [x] `policy/registry.py` - Thread-safe singleton registry with decorator pattern
 - [x] `policy/metrics.py` - Per-gate metrics collection and snapshots
@@ -27,6 +30,7 @@ This document provides a comprehensive implementation guide for:
 ### 🔄 In Progress
 
 **CLI Import Fix:**
+
 - [x] Moved `_normalize_plan_args` to `cli_main.py` and re-exported from cli package
 - [x] Added importlib workaround in `cli/__init__.py` to re-export symbols from cli.py
 - [x] Tests now pass: 926 passing, 18 failing (down from 44)
@@ -47,6 +51,7 @@ This document provides a comprehensive implementation guide for:
 ### Phase 7.1: Complete Emitters
 
 **DuckDB Emitter (observability/emitters.py)**
+
 ```python
 class DuckDBEmitter(EventEmitter):
     """Write events to DuckDB events table."""
@@ -116,6 +121,7 @@ class ParquetEmitter(EventEmitter):
 ```
 
 **Key Implementation Points:**
+
 - Thread-safe batch collection with locks
 - Automatic flushing when batch size reached
 - Connection pooling for DuckDB
@@ -150,6 +156,7 @@ Wire event emission into:
 ### Phase 7.3: CLI and Queries
 
 **cli/obs_cmd.py** (EXTEND)
+
 ```python
 @app.command()
 def tail(n: int = 100, follow: bool = False) -> None:
@@ -168,6 +175,7 @@ def export(format: str = "json") -> None:
 ```
 
 **Stock Queries (observability/queries.py)**
+
 ```python
 STOCK_QUERIES = {
     "slo_network": "SELECT service, approx_quantile(payload.elapsed_ms, 0.95) AS p95 FROM events WHERE type='net.request' GROUP BY 1",
@@ -227,6 +235,7 @@ STOCK_QUERIES = {
 ### Phase 8.2: Gate Contracts
 
 **policy/contracts.py** (NEW)
+
 ```python
 @dataclass
 class UrlGateContract:
@@ -248,6 +257,7 @@ class ExtractionGateContract:
 ### Phase 8.3: Telemetry Integration
 
 **Emit events for each gate:**
+
 ```python
 from observability.events import emit_event
 from policy.metrics import get_metrics_collector
@@ -286,6 +296,7 @@ def url_gate(...) -> PolicyResult:
 ## Integration Points
 
 ### Into planning.py
+
 ```python
 # At start: validate config
 gate_result = config_gate(config)
@@ -299,6 +310,7 @@ if isinstance(gate_result, PolicyReject):
 ```
 
 ### Into io/extraction_policy.py
+
 ```python
 # Pre-scan: validate archive structure
 gate_result = extraction_gate(archive, policies)
@@ -307,6 +319,7 @@ if isinstance(gate_result, PolicyReject):
 ```
 
 ### Into io/filesystem.py
+
 ```python
 # Before write: validate paths
 gate_result = filesystem_gate(root_path, entry_paths)
@@ -315,6 +328,7 @@ if isinstance(gate_result, PolicyReject):
 ```
 
 ### Into catalog/boundaries.py
+
 ```python
 # After extraction, before DB: validate boundaries
 gate_result = db_boundary_gate(fs_state, db_state)
@@ -327,12 +341,14 @@ if isinstance(gate_result, PolicyReject):
 ## Testing Strategy
 
 ### Pillar 7 Testing (observability/)
+
 - **Unit**: Event model validation, sink fan-out, drop strategy
 - **Integration**: Full pipeline emits events, DB populates correctly
 - **Performance**: Event emission adds < 2% overhead
 - **Coverage**: 100% of event types and sinks
 
 ### Pillar 8 Testing (policy/)
+
 - **Unit**: Each gate accepts/rejects correctly (white-box)
 - **Property-based**: URL/path generators, normalization idempotent
 - **Integration**: E2E scenarios trigger each error code
@@ -341,6 +357,7 @@ if isinstance(gate_result, PolicyReject):
 - **Coverage**: 100% error codes, all gate combinations
 
 ### Commands to Run Tests
+
 ```bash
 # Observability tests
 ./.venv/bin/pytest tests/ontology_download -k "observability or event or emitter" -q
@@ -357,6 +374,7 @@ if isinstance(gate_result, PolicyReject):
 ## Quality Gates
 
 Before shipping:
+
 1. [ ] 100% of tests passing (target: 950+ tests)
 2. [ ] 0 type errors: `./.venv/bin/mypy src/DocsToKG/OntologyDownload/observability src/DocsToKG/OntologyDownload/policy`
 3. [ ] 0 lint violations: `./.venv/bin/ruff check src/DocsToKG/OntologyDownload/observability src/DocsToKG/OntologyDownload/policy`
@@ -368,6 +386,7 @@ Before shipping:
 ## Files Checklist
 
 ### New Files to Create
+
 - [ ] `observability/queries.py` - Stock queries and dashboards
 - [ ] `policy/contracts.py` - Type contracts for gates
 - [ ] `network/instrumentation.py` - HTTP layer events
@@ -375,6 +394,7 @@ Before shipping:
 - [ ] `catalog/instrumentation.py` - DB boundary events
 
 ### Files to Extend
+
 - [ ] `observability/emitters.py` - Full DuckDB + Parquet
 - [ ] `policy/gates.py` - Complete all 6 gates
 - [ ] `policy/registry.py` - Add gate invocation with metrics
@@ -385,6 +405,7 @@ Before shipping:
 - [ ] `catalog/boundaries.py` - DB boundary gate
 
 ### Test Files to Create
+
 - [ ] `tests/ontology_download/test_observability_foundation.py`
 - [ ] `tests/ontology_download/test_observability_emitters.py`
 - [ ] `tests/ontology_download/test_observability_queries.py`

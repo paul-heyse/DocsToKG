@@ -240,12 +240,17 @@ def prune_by_retention_days(
             duration_ms=duration_ms,
         )
 
-    # Actually delete (must delete FK children first)
+    # Actually delete (cascade: latest_pointer → validations → extracted_files → artifacts → versions)
     try:
         conn.begin()
 
-        # Delete in order: validations → extracted_files → artifacts → versions
         for version_id in old_version_ids:
+            # Delete latest pointer
+            conn.execute(
+                "DELETE FROM latest_pointer WHERE version_id = ?",
+                [version_id],
+            )
+
             # Delete validations
             conn.execute(
                 """DELETE FROM validations WHERE file_id IN (
@@ -255,7 +260,7 @@ def prune_by_retention_days(
                 )""",
                 [version_id],
             )
-            
+
             # Delete extracted files
             conn.execute(
                 """DELETE FROM extracted_files WHERE artifact_id IN (
@@ -263,14 +268,14 @@ def prune_by_retention_days(
                 )""",
                 [version_id],
             )
-            
+
             # Delete artifacts
             conn.execute(
                 "DELETE FROM artifacts WHERE version_id = ?",
                 [version_id],
             )
 
-        # Delete version record
+        # Delete version records
         conn.execute(
             "DELETE FROM versions WHERE ts < ?",
             [cutoff_date],
@@ -279,9 +284,7 @@ def prune_by_retention_days(
         conn.commit()
 
         duration_ms = (time.time() * 1000) - start_ms
-        logger.info(
-            f"Pruned {len(old_version_ids)} versions, freed {bytes_to_free} bytes"
-        )
+        logger.info(f"Pruned {len(old_version_ids)} versions, freed {bytes_to_free} bytes")
         return PruneResult(
             items_identified=len(old_version_ids),
             items_deleted=len(old_version_ids),
@@ -317,27 +320,22 @@ def prune_keep_latest_n(
 
     start_ms = time.time() * 1000
 
-    # Find versions to delete
+    # Find all versions (optionally filtered by service)
     if service:
-        delete_query = """
-            SELECT version_id FROM versions WHERE service = ?
-            ORDER BY ts ASC
-            LIMIT (SELECT COUNT(*) - ? FROM versions WHERE service = ?)
-        """
-        delete_params = [service, keep_count, service]
+        all_versions = conn.execute(
+            "SELECT version_id FROM versions WHERE service = ? ORDER BY ts DESC",
+            [service],
+        ).fetchall()
     else:
-        delete_query = """
-            SELECT version_id FROM versions
-            ORDER BY ts ASC
-            LIMIT (SELECT COUNT(*) - ?)
-        """
-        delete_params = [keep_count]
+        all_versions = conn.execute("SELECT version_id FROM versions ORDER BY ts DESC").fetchall()
 
-    to_delete = conn.execute(delete_query, delete_params).fetchall()
-    delete_ids = [v[0] for v in to_delete]
+    all_version_ids = [v[0] for v in all_versions]
+
+    # Keep only the latest N
+    delete_ids = all_version_ids[keep_count:]
 
     items_identified = len(delete_ids)
-    
+
     # Calculate bytes to free
     bytes_to_free = 0
     for version_id in delete_ids:
@@ -351,8 +349,7 @@ def prune_keep_latest_n(
     if dry_run:
         duration_ms = (time.time() * 1000) - start_ms
         logger.info(
-            f"DRY RUN: Would delete {items_identified} versions, "
-            f"freeing {bytes_to_free} bytes"
+            f"DRY RUN: Would delete {items_identified} versions, " f"freeing {bytes_to_free} bytes"
         )
         return PruneResult(
             items_identified=items_identified,
@@ -362,11 +359,17 @@ def prune_keep_latest_n(
             duration_ms=duration_ms,
         )
 
-    # Actually delete (FK children first)
+    # Actually delete (FK cascade)
     try:
         conn.begin()
 
         for version_id in delete_ids:
+            # Delete latest pointer
+            conn.execute(
+                "DELETE FROM latest_pointer WHERE version_id = ?",
+                [version_id],
+            )
+
             # Delete validations
             conn.execute(
                 """DELETE FROM validations WHERE file_id IN (
@@ -376,7 +379,7 @@ def prune_keep_latest_n(
                 )""",
                 [version_id],
             )
-            
+
             # Delete extracted files
             conn.execute(
                 """DELETE FROM extracted_files WHERE artifact_id IN (
@@ -384,13 +387,13 @@ def prune_keep_latest_n(
                 )""",
                 [version_id],
             )
-            
+
             # Delete artifacts
             conn.execute(
                 "DELETE FROM artifacts WHERE version_id = ?",
                 [version_id],
             )
-            
+
             # Delete version
             conn.execute(
                 "DELETE FROM versions WHERE version_id = ?",
@@ -400,9 +403,7 @@ def prune_keep_latest_n(
         conn.commit()
 
         duration_ms = (time.time() * 1000) - start_ms
-        logger.info(
-            f"Pruned {items_identified} versions, freed {bytes_to_free} bytes"
-        )
+        logger.info(f"Pruned {items_identified} versions, freed {bytes_to_free} bytes")
         return PruneResult(
             items_identified=items_identified,
             items_deleted=items_identified,

@@ -22,6 +22,7 @@ The scope for Pillars 7 (Observability) and 8 (Safety & Policy) has been **analy
 ### Pillar 7: Observability Foundation (90% Complete)
 
 #### Core Infrastructure
+
 - ✅ **events.py** (267 LOC)
   - Event dataclass with frozen fields
   - EventIds, EventContext models
@@ -46,6 +47,7 @@ The scope for Pillars 7 (Observability) and 8 (Safety & Policy) has been **analy
   - ParquetEmitter (stub with batching design)
 
 #### Infrastructure Built
+
 - Thread-safe sink registration system
 - Context variable correlation infrastructure
 - Type-safe result types (frozen dataclasses)
@@ -54,6 +56,7 @@ The scope for Pillars 7 (Observability) and 8 (Safety & Policy) has been **analy
 ### Pillar 8: Safety & Policy Foundation (85% Complete)
 
 #### Core Infrastructure
+
 - ✅ **errors.py** (259 LOC)
   - 33 error codes organized by domain (Network, Filesystem, Extraction, Storage, DB, Config)
   - PolicyOK / PolicyReject frozen result types
@@ -85,6 +88,7 @@ The scope for Pillars 7 (Observability) and 8 (Safety & Policy) has been **analy
   - db_gate() - Database boundary enforcement (stub)
 
 #### Infrastructure Built
+
 - Centralized error catalog (one source of truth)
 - Plugin registry with decorator pattern
 - Policy result type system
@@ -98,6 +102,7 @@ The scope for Pillars 7 (Observability) and 8 (Safety & Policy) has been **analy
 **Issue**: Tests couldn't import from `DocsToKG.OntologyDownload.cli` because cli became a package.
 
 **Solution Implemented**:
+
 - ✅ Created `cli/__init__.py` with importlib workaround
 - ✅ Moved `_normalize_plan_args` to `cli_main.py`
 - ✅ Re-exported all CLI symbols from package
@@ -112,6 +117,7 @@ The scope for Pillars 7 (Observability) and 8 (Safety & Policy) has been **analy
 ### Phase 1: Complete Emitters (0.5 days, 250 LOC)
 
 **observability/emitters.py** - Finish DuckDB and Parquet implementations
+
 - [ ] DuckDBEmitter.emit() - batch collection + insert
 - [ ] DuckDBEmitter._create_table() - full schema with indexes
 - [ ] ParquetEmitter.emit() - PyArrow Table management
@@ -123,11 +129,13 @@ The scope for Pillars 7 (Observability) and 8 (Safety & Policy) has been **analy
 ### Phase 2: Instrumentation Wiring (1 day, 300 LOC)
 
 New files:
+
 - [ ] **network/instrumentation.py** - Hook httpx callbacks for `net.request` events
 - [ ] **ratelimit/instrumentation.py** - Emit `ratelimit.acquire|cooldown`
 - [ ] **catalog/instrumentation.py** - Emit `db.tx.*` events
 
 Extend:
+
 - [ ] **io/extraction_observability.py** - Emit `extract.*` events
 - [ ] **planning.py** - Emit `cli.command.*` events
 
@@ -173,6 +181,7 @@ Extend:
 ### Phase 4: Gate Telemetry Integration (0.5 days, 150 LOC)
 
 **Extend policy/gates.py**: Add event emission and metrics recording to each gate
+
 - [ ] Emit `policy.gate` event on each invocation
 - [ ] Record GateMetric for statistics
 - [ ] Timing instrumentation
@@ -182,9 +191,11 @@ Extend:
 ### Phase 5: CLI & Queries (0.5 days, 200 LOC)
 
 New files:
+
 - [ ] **observability/queries.py** - 5 stock queries (SLO, cache, rate-limit, safety, bombs)
 
 Extend:
+
 - [ ] **cli/obs_cmd.py** - Add `tail`, `stats`, `export` commands
 
 **Tests**: 25 tests for query correctness and CLI output formatting
@@ -192,6 +203,7 @@ Extend:
 ### Phase 6: Integration Testing (1.5 days, 300 LOC)
 
 Create:
+
 - [ ] **tests/ontology_download/test_observability_foundation.py** - Event model, schema
 - [ ] **tests/ontology_download/test_observability_emitters.py** - Sink fan-out, buffering
 - [ ] **tests/ontology_download/test_policy_gates.py** - Each gate white-box tests
@@ -199,6 +211,7 @@ Create:
 - [ ] **tests/ontology_download/test_e2e_events_and_gates.py** - Full pipeline
 
 **Tests**: 100 end-to-end tests covering:
+
 - Events flow through entire pipeline
 - Gates reject invalid inputs correctly
 - Metrics accumulate properly
@@ -215,6 +228,7 @@ Create:
 ```
 
 **Remaining failures** (mostly unrelated to Pillars 7/8):
+
 - 5 doctor/permission tests
 - 4 validation tests
 - 3 normalization tests
@@ -242,6 +256,7 @@ Create:
 ## 📁 File Status Summary
 
 ### ✅ Production-Ready
+
 ```
 src/DocsToKG/OntologyDownload/
 ├── observability/
@@ -256,6 +271,7 @@ src/DocsToKG/OntologyDownload/
 ```
 
 ### 📝 Needs Implementation
+
 ```
 src/DocsToKG/OntologyDownload/
 ├── observability/
@@ -314,6 +330,7 @@ src/DocsToKG/OntologyDownload/
 ## 🎓 Implementation Patterns Established
 
 ### Event Emission Pattern
+
 ```python
 emit_event(
     type="service.operation",
@@ -325,6 +342,7 @@ emit_event(
 ```
 
 ### Gate Pattern
+
 ```python
 @policy_gate(name="gate_name", domain="domain")
 def my_gate(input_data: InputType) -> PolicyResult:
