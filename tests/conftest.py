@@ -59,9 +59,19 @@ from contextlib import ExitStack
 from importlib.machinery import ModuleSpec
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, Generator
 
 import pytest
+
+# Import determinism fixtures to make them globally available
+from tests.fixtures.determinism import (  # noqa: F401
+    deterministic_env,
+    env_snapshot,
+    hypothesis_settings,
+    seed_state,
+    temporary_env_patch,
+    tmp_isolated_dir,
+)
 
 # --- Globals ---
 
@@ -366,7 +376,7 @@ class PatchManager:
 
 
 @pytest.fixture
-def patcher() -> PatchManager:
+def patcher() -> Generator[PatchManager, None, None]:
     """Auto-reverting patch helper based on unittest.mock."""
 
     manager = PatchManager()
@@ -381,6 +391,69 @@ warnings.filterwarnings(
     message=".*SwigPy.*__module__ attribute",
     category=DeprecationWarning,
 )
+# --- Determinism Controls (Optimization 9) ---
+
+
+def _configure_determinism() -> None:
+    """
+    Initialize global determinism controls for reproducible test runs.
+
+    Controls:
+    - PYTHONHASHSEED: Disable hash randomization
+    - random.seed: Python's random module seed
+    - numpy.random.seed: NumPy random seed (if available)
+    - TZ: Set timezone to UTC
+    - LOCALE: Fix locale to C.UTF-8
+    - Environment: Clear proxy variables, disable telemetry
+    """
+    # Hash seed (already set by PYTHONHASHSEED env var, but enforce at init)
+    os.environ.setdefault("PYTHONHASHSEED", "42")
+
+    # Timezone to UTC for reproducible time-dependent tests
+    os.environ["TZ"] = "UTC"
+
+    # Locale to C.UTF-8 for consistent path/string handling across platforms
+    os.environ.setdefault("LC_ALL", "C.UTF-8")
+    os.environ.setdefault("LANG", "C.UTF-8")
+
+    # Disable proxy/network leakage
+    for var in ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy", "NO_PROXY", "no_proxy"]:
+        os.environ.pop(var, None)
+
+    # Disable any telemetry "phone home" behavior
+    os.environ["PYTHONWARNINGS"] = "ignore::DeprecationWarning"
+
+    # Seed Python's random module (seed value is arbitrary but fixed)
+    import random
+
+    random.seed(42)
+
+    # Seed NumPy if available
+    try:
+        import numpy as np
+
+        np.random.seed(42)
+    except ImportError:
+        pass
+
+    # Configure Hypothesis if available
+    try:
+        from hypothesis import HealthCheck, settings
+
+        settings.register_profile(
+            "test",
+            max_examples=100,
+            deadline=None,  # No deadline for I/O-bound tests
+            suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much],
+        )
+        settings.load_profile("test")
+    except ImportError:
+        pass
+
+
+# Initialize determinism at module load time
+_configure_determinism()
+
 # --- Test Cases ---
 
 
@@ -405,6 +478,42 @@ def pytest_configure(config: pytest.Config) -> None:
     )
     config.addinivalue_line(
         "markers", "scale_vectors: mark test as requiring the large-scale real-vector fixture"
+    )
+    # --- Optimization 9 test strata markers ---
+    config.addinivalue_line(
+        "markers",
+        "unit: mark test as pure unit test (no I/O, <50ms, <50 LOC). "
+        "Use for isolated function/method testing without fixtures beyond mocks.",
+    )
+    config.addinivalue_line(
+        "markers",
+        "component: mark test as component-level (touches one subsystem, <500ms). "
+        "Use for HTTP client, extractor, catalog, or ratelimiter integration tests.",
+    )
+    config.addinivalue_line(
+        "markers",
+        "e2e: mark test as end-to-end (small dataset, plan→pull→extract→validate, <5s). "
+        "Use for full pipeline verification with tiny archives.",
+    )
+    config.addinivalue_line(
+        "markers",
+        "property: mark test as property-based (Hypothesis). "
+        "Use for generative testing of gates, URLs, paths, extraction ratios.",
+    )
+    config.addinivalue_line(
+        "markers",
+        "slow: mark test as slow/heavy (opt-in for nightly/local runs). "
+        "Use for large-dataset, long-running, or resource-intensive tests.",
+    )
+    config.addinivalue_line(
+        "markers",
+        "windows_only: mark test as Windows-specific. "
+        "Use for tests that require Windows-only path handling or APIs.",
+    )
+    config.addinivalue_line(
+        "markers",
+        "posix_only: mark test as POSIX-specific (Linux/macOS). "
+        "Use for tests that require POSIX path handling or APIs.",
     )
 
 
