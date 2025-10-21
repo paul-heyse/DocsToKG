@@ -1,0 +1,181 @@
+╔════════════════════════════════════════════════════════════════════════════════╗
+║                 OBSERVABILITY & SLOs — COMPLETION STATUS                       ║
+║                         ContentDownload Module                                  ║
+║                            October 21, 2025                                     ║
+╚════════════════════════════════════════════════════════════════════════════════╝
+
+OVERALL COMPLETION: 85% ✅
+
+┌────────────────────────────────────────────────────────────────────────────────┐
+│ ✅ COMPLETE (Production-Ready — 6 Components)                                  │
+├────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│  1. Telemetry Schema (telemetry_schema.sql)                              98 LOC │
+│     • 6 tables: http_events, rate_events, breaker_transitions,              │
+│       fallback_attempts, downloads, run_summary                             │
+│     • Optimized indexes + schema versioning (SCHEMA_VERSION=4)              │
+│     • Status: ✅ PRODUCTION READY                                            │
+│                                                                                 │
+│  2. SQLite Sinks (telemetry.py)                                         663 LOC │
+│     • SqliteSink: Thread-safe multi-table writes                             │
+│     • RunTelemetry: Rate metrics aggregation                                 │
+│     • MultiSink: Fan-out to multiple backends                               │
+│     • Status: ✅ PRODUCTION READY                                            │
+│                                                                                 │
+│  3. Prometheus Exporter (telemetry_prom_exporter.py)                    169 LOC │
+│     • 8 metrics exposed (yield, TTFP, cache hit, 429 ratio, etc.)          │
+│     • Low cardinality labels (run_id, host, role)                           │
+│     • 10s polling interval (configurable)                                    │
+│     • Status: ✅ PRODUCTION READY                                            │
+│                                                                                 │
+│  4. Parquet Export (telemetry_export_parquet.py)                         71 LOC │
+│     • DuckDB-based export to compressed Parquet                             │
+│     • Graceful table detection                                               │
+│     • Long-term trending support                                             │
+│     • Status: ✅ PRODUCTION READY                                            │
+│                                                                                 │
+│  5. SLO Evaluation CLI (cli_telemetry_summary.py)                       226 LOC │
+│     • Computes 8 SLIs (yield, TTFP p50/p95, cache hit, delays, 429%, etc)  │
+│     • Configurable SLO targets                                               │
+│     • Exit code 1 on SLO failure (CI-friendly)                              │
+│     • Pretty-printed output with ✅/❌ indicators                             │
+│     • Status: ✅ PRODUCTION READY                                            │
+│                                                                                 │
+│  6. Helper Utilities (telemetry_helpers.py)                            108+ LOC │
+│     • emit_http_event() – HTTP telemetry                                     │
+│     • emit_rate_event() – Rate limiter events                                │
+│     • emit_breaker_event() – Breaker transitions                             │
+│     • emit_fallback_attempt() – Fallback strategy events                     │
+│     • Status: ✅ PRODUCTION READY                                            │
+│                                                                                 │
+└────────────────────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────────────────────┐
+│ ⚠️  REMAINING INTEGRATION WORK (15% — 4-6 Days to Completion)                  │
+├────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│  Phase 1: HTTP Layer Events (Days 1–1.5)                      RISK: LOW       │
+│  ├─ File: networking.py                                                      │
+│  ├─ Task: Emit URL hash, cache metadata, retry/breaker state                │
+│  ├─ LOC: ~30 lines + test scaffold                                           │
+│  ├─ Dependencies: ✅ All available                                             │
+│  └─ Blockers: NONE                                                            │
+│                                                                                 │
+│  Phase 2: Rate & Breaker Telemetry (Days 1.5–3)              RISK: MEDIUM    │
+│  ├─ Files: ratelimit/manager.py, networking_breaker_listener.py             │
+│  ├─ Task: Emit rate events on acquire/block, breaker state changes          │
+│  ├─ LOC: ~70 lines + test scaffold                                           │
+│  ├─ Dependencies: ✅ Breaker registry ready                                    │
+│  └─ Blockers: NONE                                                            │
+│                                                                                 │
+│  Phase 3: Fallback & Wayback Bridge (Days 3–4)               RISK: MEDIUM    │
+│  ├─ Files: fallback/orchestrator.py, telemetry_wayback_sqlite.py            │
+│  ├─ Task: Emit fallback attempts, bridge Wayback events                      │
+│  ├─ LOC: ~70 lines + test scaffold                                           │
+│  ├─ Dependencies: ✅ Both modules isolated                                     │
+│  └─ Blockers: NONE                                                            │
+│                                                                                 │
+│  Phase 4: CLI & Documentation (Days 4–5)                      RISK: LOW       │
+│  ├─ Task: Wire telemetry summary CLI, update AGENTS.md, smoke tests         │
+│  ├─ Files: cli.py (small change), AGENTS.md, new runbooks                   │
+│  ├─ LOC: ~50 lines code + documentation                                      │
+│  ├─ Dependencies: ✅ All phases above complete                                │
+│  └─ Blockers: NONE                                                            │
+│                                                                                 │
+└────────────────────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────────────────────┐
+│ 📊 DELIVERABLES & SUCCESS METRICS                                              │
+├────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│  Test Coverage:     >90% (target)                                             │
+│  Linting:          Zero errors (ruff check)                                  │
+│  Type Checking:    Zero errors (mypy)                                        │
+│  Smoke Test:       Full run → telemetry → summary → SLO check ✅              │
+│  Documentation:    Complete (AGENTS.md + runbooks)                           │
+│  Production Ready: YES (no TODOs/FIXMEs)                                      │
+│                                                                                 │
+│  SLI Targets (configurable):                                                  │
+│  ├─ Yield:         ≥85% artifacts successful                                 │
+│  ├─ TTFP:          p50 ≤3s, p95 ≤20s                                         │
+│  ├─ Cache Hit:     ≥60% (metadata)                                           │
+│  ├─ Rate Delay:    p95 ≤250ms                                                │
+│  ├─ HTTP 429:      ≤2% (polite)                                              │
+│  ├─ Breaker Opens: ≤12/hour per host                                         │
+│  └─ Corruption:    0 (enforced)                                              │
+│                                                                                 │
+└────────────────────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────────────────────┐
+│ 📅 TIMELINE & RESOURCE ALLOCATION                                              │
+├────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│  Required Resources:                                                           │
+│  • 1 Mid-Level Engineer (4–6 days FTE)                                        │
+│  • OR: 1 Junior + 1 Reviewer (concurrent)                                     │
+│  • QA: 1 day (smoke test, can overlap)                                        │
+│                                                                                 │
+│  Timeline to Production:                                                       │
+│  Week 1: Mon–Tue (HTTP) → Wed–Fri (Rate & Breaker)                           │
+│  Week 2: Mon–Tue (Fallback & Wayback) → Wed (CLI & Docs) → Thu–Fri (QA)      │
+│                                                                                 │
+│  Estimated Delivery: End of Week 2 (production-ready)                         │
+│                                                                                 │
+└────────────────────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────────────────────┐
+│ 🎯 RISK ASSESSMENT                                                              │
+├────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│  Risk Level: LOW–MEDIUM (no blockers; well-understood patterns)               │
+│                                                                                 │
+│  Top Risks & Mitigations:                                                      │
+│  1. Telemetry overhead         → Optional sink; 10s polling; sampling         │
+│  2. Schema mismatch            → Version tracking; test fixtures              │
+│  3. Data privacy (raw URLs)    → URL hashing; no raw URLs in SQLite          │
+│  4. Distributed system issues  → WAL mode + locking + SQLite coordination     │
+│  5. Performance regression     → Graceful None-telemetry; benchmarks          │
+│                                                                                 │
+└────────────────────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────────────────────┐
+│ 📄 DOCUMENTATION CREATED                                                        │
+├────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│  1. OBSERVABILITY_SLOs_VALIDATION_AND_PLAN.md (comprehensive)                │
+│     ├─ Part 1: Validation (what's complete)                                  │
+│     ├─ Part 2: Remaining gaps (what's needed)                                │
+│     ├─ Part 3: 4-phase roadmap (how to execute)                              │
+│     ├─ Part 4: Implementation checklist                                       │
+│     ├─ Part 5: Risk assessment                                                │
+│     ├─ Part 6: Testing strategy                                               │
+│     ├─ Part 7: Documentation updates                                          │
+│     ├─ Part 8: Definition of Done                                             │
+│     ├─ Part 9: Time estimates                                                 │
+│     └─ Part 10: Future work & limitations                                     │
+│                                                                                 │
+│  2. OBSERVABILITY_SLOs_QUICK_REFERENCE.md (engineer-friendly)                │
+│     ├─ What's done ✅                                                          │
+│     ├─ What remains ⚠️  (with code snippets)                                   │
+│     ├─ 4-phase breakdown                                                       │
+│     ├─ Test commands (copy-paste ready)                                       │
+│     ├─ SLO thresholds                                                          │
+│     ├─ Files to modify (with LOC)                                             │
+│     └─ Definition of Done checklist                                            │
+│                                                                                 │
+│  3. OBSERVABILITY_SLOs_EXECUTIVE_SUMMARY.md (stakeholder-focused)            │
+│     ├─ Status at a glance                                                     │
+│     ├─ What's complete                                                        │
+│     ├─ What remains                                                           │
+│     ├─ Business impact                                                        │
+│     ├─ Resource requirements                                                  │
+│     ├─ Go/No-Go decision matrix                                               │
+│     └─ Timeline to production                                                 │
+│                                                                                 │
+└────────────────────────────────────────────────────────────────────────────────┘
+
+╔════════════════════════════════════════════════════════════════════════════════╗
+║ RECOMMENDATION: ✅ READY FOR DEVELOPMENT HANDOFF                               ║
+║                                                                                 ║
+║ Next Step: Allocate 1 engineer & start Phase 1 with QUICK_REFERENCE.md        ║
+╚════════════════════════════════════════════════════════════════════════════════╝

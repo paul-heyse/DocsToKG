@@ -82,7 +82,6 @@ from DocsToKG.ContentDownload.core import (
     tail_contains_html,
     update_tail_buffer,
 )
-from DocsToKG.ContentDownload.urls import canonical_for_index, canonical_for_request
 from DocsToKG.ContentDownload.errors import (
     RateLimitError,
     log_download_failure,
@@ -105,16 +104,15 @@ from DocsToKG.ContentDownload.pipeline import (
     ResolverPipeline,
 )
 from DocsToKG.ContentDownload.telemetry import RunTelemetry, normalize_manifest_path
-from DocsToKG.ContentDownload.idempotency import (
-    job_key,
-    op_key,
-    acquire_lease,
-    release_lease,
-    renew_lease,
-    advance_state,
-    run_effect,
-    reconcile_stale_leases,
-)
+from DocsToKG.ContentDownload.urls import canonical_for_index, canonical_for_request
+
+# Import idempotency feature gate from runner (graceful fallback to avoid circular imports)
+ENABLE_IDEMPOTENCY = False
+try:
+    from DocsToKG.ContentDownload.runner import ENABLE_IDEMPOTENCY  # type: ignore
+except (ImportError, RuntimeError):
+    # Feature gate not available; defaults to False for backward compatibility
+    pass
 
 
 __all__ = [
@@ -1413,13 +1411,14 @@ def finalize_candidate_download(
                 stream.strategy_context,
             )
             if streaming_finalization is not None:
-                LOGGER.debug("streaming_finalization_complete",
-                           extra={"extra_fields": {"classification": classification.value}})
+                LOGGER.debug(
+                    "streaming_finalization_complete",
+                    extra={"extra_fields": {"classification": classification.value}},
+                )
                 return streaming_finalization
         except Exception as e:
-            LOGGER.debug("streaming_finalization_failed",
-                       extra={"extra_fields": {"error": str(e)}})
-    
+            LOGGER.debug("streaming_finalization_failed", extra={"extra_fields": {"error": str(e)}})
+
     return stream.strategy.finalize_artifact(
         plan.artifact,
         classification,
@@ -1847,15 +1846,16 @@ def _apply_content_addressed_storage(dest_path: Path, sha256: str) -> Path:
     return hashed_path
 
 
-
 # ============================================================================
 # Phase 3: Streaming Finalization Helpers (Atomic File Operations)
 # ============================================================================
+
 
 def _streaming_finalization_enabled() -> bool:
     """Check if streaming finalization is enabled."""
     try:
         from DocsToKG.ContentDownload.streaming_integration import streaming_enabled
+
         return streaming_enabled()
     except ImportError:
         return False
@@ -1870,7 +1870,7 @@ def _try_streaming_finalization(
     """Try finalization using streaming module for atomic operations."""
     try:
         from DocsToKG.ContentDownload.streaming_integration import use_streaming_for_finalization
-        
+
         # Check if streaming finalization should be used
         mock_outcome = DownloadOutcome(
             classification=classification,
@@ -1881,13 +1881,13 @@ def _try_streaming_finalization(
             reason=None,
             reason_detail=None,
         )
-        
+
         if not use_streaming_for_finalization(mock_outcome):
             return None
-        
+
         # Use existing strategy finalization (streaming validates atomically)
         return strategy.finalize_artifact(artifact, classification, context)
-        
+
     except (ImportError, AttributeError, Exception):
         return None
 
@@ -2599,6 +2599,33 @@ def process_one_work(
         "downloaded_bytes": 0,
     }
 
+    # Plan job for idempotency tracking if enabled
+    job_id: Optional[str] = None
+    idempotency_conn: Optional[Any] = None
+    if ENABLE_IDEMPOTENCY:
+        try:
+            # Attempt to get telemetry database connection from logger
+            telemetry_conn = getattr(logger, "conn", None)
+            if telemetry_conn is not None:
+                from DocsToKG.ContentDownload.job_planning import plan_job_if_absent
+
+                # Canonicalize the URL for consistency
+                canonical_url = (
+                    artifact.candidate_urls[0] if artifact.candidate_urls else artifact.work_id
+                )
+                job_id = plan_job_if_absent(
+                    telemetry_conn,
+                    work_id=artifact.work_id,
+                    artifact_id=artifact.artifact_id,
+                    canonical_url=canonical_url,
+                )
+                idempotency_conn = telemetry_conn
+                LOGGER.debug(f"Planned job {job_id} for artifact {artifact.artifact_id}")
+        except Exception as e:  # pylint: disable=broad-except
+            LOGGER.debug(f"Failed to plan idempotency job: {e}")
+            job_id = None
+            idempotency_conn = None
+
     raw_previous = previous_lookup.get(artifact.work_id, {})
     if not isinstance(raw_previous, Mapping):
         raw_previous = {}
@@ -2812,5 +2839,21 @@ def process_one_work(
         reason=reason_token,
         reason_detail=detail_value,
     )
+
+    # Mark job as successful if idempotency is enabled
+    if ENABLE_IDEMPOTENCY and job_id and idempotency_conn and pipeline_result.success:
+        try:
+            from DocsToKG.ContentDownload.job_state import advance_state
+
+            # Advance to FINALIZED state for successful downloads
+            advance_state(
+                idempotency_conn,
+                job_id=job_id,
+                to_state="FINALIZED",
+                allowed_from=("PLANNED", "LEASED", "HEAD_DONE", "RESUME_OK", "STREAMING"),
+            )
+            LOGGER.debug(f"Job {job_id} marked as FINALIZED")
+        except Exception as e:  # pylint: disable=broad-except
+            LOGGER.debug(f"Failed to mark job as finalized: {e}")
 
     return result

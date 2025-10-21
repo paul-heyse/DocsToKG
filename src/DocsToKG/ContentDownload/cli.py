@@ -183,6 +183,23 @@ def main(argv: Optional[Sequence[str]] = None) -> RunResult:
     else:
         logging.basicConfig(level=log_level)
     LOGGER.setLevel(log_level)
+
+    # Handle operational subcommands (telemetry, breaker, etc.)
+    if hasattr(args, "cmd") and args.cmd:
+        # Dispatch to subcommand handler
+        if hasattr(args, "func"):
+            exit_code = args.func(args)
+            import sys
+
+            sys.exit(exit_code or 0)
+        else:
+            # Fallback: show help
+            parser.print_help()
+            import sys
+
+            sys.exit(1)
+
+    # Main download run path (original logic)
     resolved = resolve_config(args, parser, resolver_factory=default_resolvers)
     bootstrap_run_environment(resolved)
 

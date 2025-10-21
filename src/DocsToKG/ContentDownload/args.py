@@ -704,6 +704,15 @@ def build_parser() -> argparse.ArgumentParser:
         help=argparse.SUPPRESS,
     )
 
+    # Install operational subcommands (telemetry, breaker, fallback, etc.)
+    # These are optional and don't require the main download arguments
+    subparsers = parser.add_subparsers(dest="cmd", required=False)
+
+    # Import and register telemetry subcommands
+    from DocsToKG.ContentDownload.cli_telemetry import install_telemetry_cli
+
+    install_telemetry_cli(subparsers)
+
     return parser
 
 

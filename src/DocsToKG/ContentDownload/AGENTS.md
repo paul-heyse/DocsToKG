@@ -1024,6 +1024,322 @@ python -m DocsToKG.ContentDownload.cli --topic "vision" --year-start 2024 --year
 - High-signal suites: `tests/content_download/test_httpx_networking.py`, `test_download_execution.py`, `test_runner_download_run.py`, `tests/cli/test_cli_flows.py`.
 - Maintain golden fakes under `tests/content_download/fakes/` when altering manifest/telemetry fields.
 
+## Observability & SLOs (Phase 4)
+
+The ContentDownload module includes comprehensive telemetry instrumentation to track:
+
+- HTTP request performance (latency, cache hits, retries, 429s)
+- Rate limiter behavior (acquire delays, blocks, backend metrics)
+- Circuit breaker transitions (state changes, reset timeouts)
+- Fallback resolution strategy metrics (success rates, elapsed times per tier)
+- End-to-end SLI tracking (yield, time-to-first-PDF, cache hit rates)
+
+### CLI Commands
+
+#### 1. Evaluate SLOs
+
+```bash
+# Run a download and capture telemetry
+./.venv/bin/python -m DocsToKG.ContentDownload.cli \
+  --topic "machine learning" --max 50 \
+  --out runs/test_run
+
+# Evaluate SLOs from telemetry database
+./.venv/bin/python -m DocsToKG.ContentDownload.cli telemetry summary \
+  --db runs/test_run/manifest.sqlite3 \
+  --run $(jq -r '.run_id' runs/test_run/manifest.summary.json)
+```
+
+Output shows pass/fail for each SLI with configurable thresholds:
+
+```
+Yield:              87.5% (min 85.0%) - ✅ PASS
+TTFP p50:           1250 ms (max 3000) - ✅ PASS
+TTFP p95:           8500 ms (max 20000) - ✅ PASS
+Cache hit:          72.3% (min 60.0%) - ✅ PASS
+Rate delay p95:     125 ms (max 250) - ✅ PASS
+HTTP 429 ratio:     1.2% (max 2.0%) - ✅ PASS
+Corruption count:   0 (max 0) - ✅ PASS
+```
+
+Exit code: 0 if all pass, 1 if any fail (CI-friendly)
+
+#### 2. Export to Parquet
+
+```bash
+# Export telemetry tables for long-term trending
+./.venv/bin/python -m DocsToKG.ContentDownload.cli telemetry export \
+  --db runs/test_run/manifest.sqlite3 \
+  --out runs/test_run/parquet/
+
+# Tables exported: http_events, rate_events, breaker_transitions,
+#                  fallback_attempts, downloads, run_summary
+```
+
+Use with DuckDB/Polars/Pandas for trend analysis:
+
+```bash
+duckdb << 'SQL'
+SELECT host, COUNT(*) as requests,
+       SUM(CASE WHEN status=429 THEN 1 ELSE 0 END) as http_429_count,
+       ROUND(100.0*SUM(CASE WHEN status=429 THEN 1 ELSE 0 END)/COUNT(*),2) as pct_429
+FROM 'parquet/http_events.parquet'
+GROUP BY host
+ORDER BY pct_429 DESC;
+SQL
+```
+
+#### 3. Query Telemetry Database
+
+```bash
+# List all HTTP requests by host
+./.venv/bin/python -m DocsToKG.ContentDownload.cli telemetry query \
+  --db runs/test_run/manifest.sqlite3 \
+  --query "SELECT host, COUNT(*) as count, AVG(elapsed_ms) as avg_ms FROM http_events GROUP BY host" \
+  --format table
+
+# Export to JSON for programmatic use
+./.venv/bin/python -m DocsToKG.ContentDownload.cli telemetry query \
+  --db runs/test_run/manifest.sqlite3 \
+  --query "SELECT * FROM breaker_transitions WHERE event_type='state_change' LIMIT 10" \
+  --format json > breaker_changes.json
+```
+
+### SLI Definitions & Targets
+
+| SLI | Definition | Target | Query |
+|-----|-----------|--------|-------|
+| **Yield** | Successful artifacts / attempted artifacts | ≥85% | `SELECT 100.0*SUM(CASE WHEN sha256 IS NOT NULL THEN 1 ELSE 0 END)/COUNT(*) FROM downloads WHERE run_id=?` |
+| **TTFP p50** | Median time from first attempt to first successful resolution | ≤3s | `SELECT (SELECT ms FROM d ORDER BY ms LIMIT 1 OFFSET (SELECT CAST(COUNT(*)*0.50 AS INT) FROM d)) FROM (...)` |
+| **TTFP p95** | 95th percentile time-to-first-PDF | ≤20s | Same as p50 with offset 0.95 |
+| **Cache Hit** | Metadata cache hit rate | ≥60% | `SELECT 100.0*SUM(CASE WHEN from_cache=1 THEN 1 ELSE 0 END)/COUNT(*) FROM http_events WHERE role='metadata'` |
+| **Rate Delay p95** | 95th percentile limiter wait time | ≤250ms | `SELECT PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY rate_delay_ms) FROM http_events WHERE role='metadata'` |
+| **HTTP 429 Ratio** | Rate limit responses / net requests | ≤2% | `SELECT 100.0*SUM(CASE WHEN status=429 THEN 1 ELSE 0 END)/COUNT(*) FROM http_events WHERE from_cache!=1` |
+| **Corruption** | Artifacts with missing hash/path | 0 | `SELECT COUNT(*) FROM downloads WHERE sha256 IS NULL OR final_path IS NULL` |
+
+### Operational Runbooks
+
+#### Runbook 1: High 429 Ratio (Rate Limiting)
+
+**Symptom:** HTTP 429 ratio > 2%
+
+**Diagnosis:**
+
+```bash
+# Identify affected hosts
+sqlite3 runs/X/manifest.sqlite3 << 'SQL'
+SELECT host,
+       COUNT(*) as requests,
+       SUM(CASE WHEN status=429 THEN 1 ELSE 0 END) as http_429,
+       ROUND(100.0*SUM(CASE WHEN status=429 THEN 1 ELSE 0 END)/COUNT(*),2) as pct
+FROM http_events
+WHERE from_cache!=1
+GROUP BY host
+ORDER BY pct DESC;
+SQL
+
+# Check limiter configuration
+./.venv/bin/python -m DocsToKG.ContentDownload.cli telemetry query \
+  --db runs/X/manifest.sqlite3 \
+  --query "SELECT host, role, action, COUNT(*) FROM rate_events GROUP BY host, role, action"
+```
+
+**Remediation:**
+
+```bash
+# Option A: Reduce request rate globally
+./.venv/bin/python -m DocsToKG.ContentDownload.cli \
+  --resume-from runs/X/manifest.jsonl \
+  --rate api.example.org=3/s,180/h \
+  --out runs/X
+
+# Option B: Enable circuit breaker (Phase 2/3 feature)
+# Breaker will auto-open on sustained 429s
+```
+
+#### Runbook 2: Low Cache Hit Rate
+
+**Symptom:** Cache hit < 60%
+
+**Diagnosis:**
+
+```bash
+# Check cache stats by host
+sqlite3 runs/X/manifest.sqlite3 << 'SQL'
+SELECT host,
+       SUM(CASE WHEN from_cache=1 THEN 1 ELSE 0 END) as cache_hits,
+       SUM(CASE WHEN from_cache=0 THEN 1 ELSE 0 END) as net_requests,
+       ROUND(100.0*SUM(CASE WHEN from_cache=1 THEN 1 ELSE 0 END)
+             /SUM(CASE WHEN from_cache!=1 THEN 1 ELSE 0 END),1) as hit_pct
+FROM http_events
+WHERE role='metadata'
+GROUP BY host
+ORDER BY hit_pct;
+SQL
+
+# Check for stale/revalidated responses
+sqlite3 runs/X/manifest.sqlite3 << 'SQL'
+SELECT COUNT(*) as total,
+       SUM(CASE WHEN stale=1 THEN 1 ELSE 0 END) as stale,
+       SUM(CASE WHEN revalidated=1 THEN 1 ELSE 0 END) as revalidated_304
+FROM http_events WHERE from_cache=1;
+SQL
+```
+
+**Remediation:**
+
+```bash
+# Warm the cache before running
+./.venv/bin/python -m DocsToKG.ContentDownload.cli \
+  --warm-manifest-cache \
+  --topic "X" --max 100 --dry-run
+
+# Or verify cache hasn't staled
+./.venv/bin/python -m DocsToKG.ContentDownload.cli \
+  --verify-cache-digest \
+  --resume-from runs/X/manifest.jsonl \
+  --out runs/X
+```
+
+#### Runbook 3: High TTFP (Slow Resolution)
+
+**Symptom:** TTFP p95 > 20s
+
+**Diagnosis:**
+
+```bash
+# Check resolution attempts by source
+sqlite3 runs/X/manifest.sqlite3 << 'SQL'
+SELECT source, COUNT(*) as attempts,
+       AVG(elapsed_ms) as avg_ms,
+       PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY elapsed_ms) as p95_ms
+FROM fallback_attempts
+GROUP BY source
+ORDER BY p95_ms DESC;
+
+# Check resolver ordering impact
+SELECT tier, COUNT(*) as attempts,
+       SUM(CASE WHEN outcome='success' THEN 1 ELSE 0 END) as successes,
+       AVG(elapsed_ms) as avg_ms
+FROM fallback_attempts
+GROUP BY tier;
+SQL
+```
+
+**Remediation:**
+
+```bash
+# Reduce per-adapter timeouts (Phase 3 feature)
+# Edit config/fallback.yaml:
+# policies:
+#   unpaywall_pdf:
+#     timeout_ms: 3000  # reduce from 6000
+#   arxiv_pdf:
+#     timeout_ms: 5000  # reduce from 8000
+
+# Or increase parallelism
+# budgets:
+#   max_concurrent: 4  # increase from 3
+```
+
+#### Runbook 4: Breaker Keeps Opening
+
+**Symptom:** Multiple breaker transitions to OPEN state
+
+**Diagnosis:**
+
+```bash
+# Check breaker event history
+sqlite3 runs/X/manifest.sqlite3 << 'SQL'
+SELECT host, event_type, details, ts
+FROM breaker_transitions
+WHERE host='api.example.org'
+ORDER BY ts DESC LIMIT 20;
+
+# Count opens per hour
+SELECT host,
+       COUNT(*) as total_opens,
+       ROUND(COUNT()*3600.0/(MAX(ts)-MIN(ts)),2) as opens_per_hour
+FROM breaker_transitions
+WHERE event_type='state_change'
+  AND new_state LIKE '%OPEN%'
+GROUP BY host;
+SQL
+```
+
+**Remediation:**
+
+```bash
+# Option A: Increase reset timeout (breaker recovers slower)
+# Edit config/breakers.yaml:
+# hosts:
+#   api.example.org:
+#     reset_timeout_s: 120  # increase from 60
+
+# Option B: Reduce request rate (prevent trips)
+./.venv/bin/python -m DocsToKG.ContentDownload.cli \
+  --rate api.example.org=2/s,100/h \
+  --resume-from runs/X/manifest.jsonl \
+  --out runs/X
+
+# Option C: Manual cooldown + inspection
+./.venv/bin/python -m DocsToKG.ContentDownload.cli breaker open api.example.org --seconds 600
+sleep 600
+./.venv/bin/python -m DocsToKG.ContentDownload.cli breaker close api.example.org
+```
+
+### Prometheus Metrics (Phase 4)
+
+If using the Prometheus exporter:
+
+```bash
+# Start exporter (background)
+./.venv/bin/python -m DocsToKG.ContentDownload.telemetry_prom_exporter \
+  --db runs/X/manifest.sqlite3 \
+  --port 9108 &
+
+# Query Prometheus
+curl -s http://localhost:9108/metrics | grep docstokg
+
+# Sample metrics:
+# docstokg_run_yield_pct{run_id="abc123"} 87.5
+# docstokg_run_ttfp_ms{run_id="abc123",quantile="p95"} 8500
+# docstokg_host_http429_ratio{run_id="abc123",host="api.crossref.org"} 1.2
+```
+
+### Telemetry Schema Reference
+
+**Telemetry tables in `manifest.sqlite3`:**
+
+- `http_events` (17 columns): Every HTTP request post-cache/limiter
+- `rate_events` (8 columns): Limiter acquisitions and blocks
+- `breaker_transitions` (8 columns): Circuit breaker state changes
+- `fallback_attempts` (12 columns): Fallback strategy resolution attempts
+- `downloads` (existing): Artifacts with dedupe/hash tracking
+- `run_summary` (single row): Aggregated SLI snapshot per run
+
+**Example joins:**
+
+```sql
+-- Find 429s that preceded breaker opens
+SELECT h.ts, h.host, h.status, b.ts as breaker_ts, b.new_state
+FROM http_events h
+LEFT JOIN breaker_transitions b
+  ON h.host=b.host AND h.ts < b.ts AND (b.ts - h.ts) < 10
+WHERE h.status=429 AND b.new_state LIKE '%OPEN%'
+ORDER BY h.ts DESC;
+
+-- Correlate rate delays with slow downloads
+SELECT d.artifact_id, d.elapsed_ms as download_ms,
+       AVG(r.delay_ms) as avg_rate_delay,
+       COUNT(r.*) as rate_acquire_calls
+FROM downloads d
+LEFT JOIN http_events h ON d.artifact_id=h.url_hash
+LEFT JOIN rate_events r ON h.host=r.host AND h.ts BETWEEN r.ts-1 AND r.ts+1
+GROUP BY d.artifact_id
+ORDER BY d.elapsed_ms DESC;
+```
+
 ## Reference Docs
 
 - `src/DocsToKG/ContentDownload/README.md`

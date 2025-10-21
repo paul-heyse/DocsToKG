@@ -114,7 +114,6 @@ from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
     Dict,
     Mapping,
     MutableMapping,
@@ -144,8 +143,10 @@ from DocsToKG.ContentDownload.httpx_transport import (
     get_http_client,
     purge_http_cache,
 )
-from DocsToKG.ContentDownload.ratelimit import DEFAULT_ROLE
 from DocsToKG.ContentDownload.urls import canonical_for_index, canonical_for_request
+
+# Default role for requests
+DEFAULT_ROLE = "metadata"
 
 try:  # pragma: no cover - optional when pybreaker missing in envs
     from DocsToKG.ContentDownload.breakers import (
@@ -604,6 +605,114 @@ def _build_retrying_controller(
     return retrying
 
 
+# --- Telemetry Helpers (Phase 1: HTTP Layer Instrumentation) ---
+
+
+def _compute_url_hash(url: str) -> str:
+    """Hash URL for privacy (SHA256, first 16 chars)."""
+    import hashlib
+
+    try:
+        return hashlib.sha256(url.encode()).hexdigest()[:16]
+    except Exception:
+        return "unknown"
+
+
+def _extract_from_cache(response: httpx.Response) -> Optional[int]:
+    """Extract cache hit status from response extensions."""
+    try:
+        if not hasattr(response, "extensions"):
+            return None
+        extensions = response.extensions or {}
+        # Hishel sets 'from_cache' flag
+        if "from_cache" in extensions:
+            return 1 if extensions.get("from_cache") else 0
+        cache_status = extensions.get("cache_status")
+        if cache_status == "HIT":
+            return 1
+        elif cache_status in ("MISS", "EXPIRED"):
+            return 0
+    except Exception:
+        pass
+    return None
+
+
+def _extract_revalidated(response: httpx.Response) -> Optional[int]:
+    """Return 1 if response was a 304 revalidation, else 0 or None."""
+    try:
+        return 1 if response.status_code == 304 else 0
+    except Exception:
+        pass
+    return None
+
+
+def _extract_stale(response: httpx.Response) -> Optional[int]:
+    """Extract stale flag (SWrV) from response extensions."""
+    try:
+        if not hasattr(response, "extensions"):
+            return None
+        extensions = response.extensions or {}
+        return 1 if extensions.get("stale") else 0
+    except Exception:
+        pass
+    return None
+
+
+def _extract_retry_after(response: httpx.Response) -> Optional[int]:
+    """Extract Retry-After header value in seconds."""
+    try:
+        retry_after_str = response.headers.get("Retry-After")
+        if retry_after_str:
+            return int(float(retry_after_str))
+    except (ValueError, TypeError, AttributeError):
+        pass
+    return None
+
+
+def _extract_rate_delay(network_meta: Dict[str, Any]) -> Optional[int]:
+    """Extract rate limiter wait time from docs_network_meta."""
+    try:
+        if isinstance(network_meta, dict):
+            rate_info = network_meta.get("rate_limiter") or {}
+            if isinstance(rate_info, dict):
+                delay = rate_info.get("wait_ms")
+                if isinstance(delay, (int, float)):
+                    return int(delay)
+    except Exception:
+        pass
+    return None
+
+
+def _extract_breaker_state(breaker_state_info: Dict[str, Any]) -> Optional[str]:
+    """Extract circuit breaker state: closed/half_open/open."""
+    try:
+        if isinstance(breaker_state_info, dict):
+            host_state = breaker_state_info.get("breaker_host_state")
+            if host_state:
+                state_str = str(host_state).lower()
+                if "half" in state_str:
+                    return "half_open"
+                elif "open" in state_str:
+                    return "open"
+                else:
+                    return "closed"
+    except Exception:
+        pass
+    return None
+
+
+def _extract_breaker_recorded(breaker_state_info: Dict[str, Any]) -> Optional[str]:
+    """Extract breaker recorded outcome: success/failure/none."""
+    try:
+        if isinstance(breaker_state_info, dict):
+            recorded = breaker_state_info.get("breaker_recorded")
+            if recorded in ("success", "failure", "none"):
+                return recorded
+    except Exception:
+        pass
+    return None
+
+
 def request_with_retries(
     client: Optional[httpx.Client],
     method: str,
@@ -621,9 +730,14 @@ def request_with_retries(
     max_retry_duration: Optional[float] = None,
     backoff_max: Optional[float] = 60.0,
     resolver: Optional[str] = None,
+    telemetry: Optional[Any] = None,
+    run_id: Optional[str] = None,
     **kwargs: Any,
 ) -> httpx.Response:
     """Execute an HTTP request using a Tenacity-backed retry controller."""
+
+    # Capture start time for telemetry
+    request_start_time = time.time()
 
     http_client = client if isinstance(client, httpx.Client) else None
     if http_client is None:
@@ -753,9 +867,9 @@ def request_with_retries(
 
     # URL normalization instrumentation (Phase 3A integration)
     from DocsToKG.ContentDownload.urls_networking import (
-        record_url_normalization,
-        log_url_change_once,
         apply_role_headers,
+        log_url_change_once,
+        record_url_normalization,
     )
 
     try:
@@ -1027,6 +1141,36 @@ def request_with_retries(
             request_url,
         )
         return response
+
+    # Emit telemetry event (Phase 1: HTTP Layer Instrumentation)
+    try:
+        if telemetry is not None:
+            from DocsToKG.ContentDownload.telemetry_helpers import emit_http_event
+
+            elapsed_ms = int((time.time() - request_start_time) * 1000)
+
+            emit_http_event(
+                telemetry=telemetry,
+                run_id=run_id or "unknown",
+                host=request_host or "unknown",
+                role=policy_role,
+                method=method,
+                status=response.status_code,
+                url_hash=_compute_url_hash(canonical_index),
+                from_cache=_extract_from_cache(response),
+                revalidated=_extract_revalidated(response),
+                stale=_extract_stale(response),
+                retry_count=attempts - 1,
+                retry_after_s=_extract_retry_after(response),
+                rate_delay_ms=_extract_rate_delay(network_meta),
+                breaker_state=_extract_breaker_state(breaker_state_info),
+                breaker_recorded=_extract_breaker_recorded(breaker_state_info),
+                elapsed_ms=elapsed_ms,
+                error=None,
+            )
+    except Exception as exc:
+        # Silently log telemetry errors to avoid breaking requests
+        LOGGER.debug("Telemetry emission failed for %s %s: %s", method, request_url, exc)
 
     return response
 

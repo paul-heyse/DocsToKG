@@ -50,6 +50,7 @@ import contextlib
 import inspect
 import json
 import logging
+import os
 import threading
 import time
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, as_completed, wait
@@ -78,9 +79,12 @@ from DocsToKG.ContentDownload.download import (
     process_one_work,
 )
 from DocsToKG.ContentDownload.httpx_transport import get_http_client
-from DocsToKG.ContentDownload.ratelimit import (
-    get_rate_limiter_manager,
-    serialize_policy,
+from DocsToKG.ContentDownload.networking import (
+    DEFAULT_RETRYABLE_STATUSES,
+    RetryAfterJitterWait,
+    configure_breaker_registry,
+    request_with_retries,
+    reset_breaker_registry,
 )
 from DocsToKG.ContentDownload.pipeline import (
     DownloadOutcome,
@@ -88,15 +92,11 @@ from DocsToKG.ContentDownload.pipeline import (
     ResolverPipeline,
 )
 from DocsToKG.ContentDownload.providers import OpenAlexWorkProvider, WorkProvider
-from DocsToKG.ContentDownload.summary import RunResult, build_summary_record
-from DocsToKG.ContentDownload.networking import (
-    DEFAULT_RETRYABLE_STATUSES,
-    RetryAfterJitterWait,
-    configure_breaker_registry,
-    request_with_retries,
-    reset_breaker_registry,
-    set_breaker_registry,
+from DocsToKG.ContentDownload.ratelimit import (
+    get_rate_limiter_manager,
+    serialize_policy,
 )
+from DocsToKG.ContentDownload.summary import RunResult, build_summary_record
 from DocsToKG.ContentDownload.telemetry import (
     AttemptSink,
     CsvSink,
@@ -118,6 +118,9 @@ from DocsToKG.ContentDownload.telemetry import (
 __all__ = ["DownloadRun", "iterate_openalex", "run"]
 
 LOGGER = logging.getLogger("DocsToKG.ContentDownload")
+
+# Feature gate: Enable idempotency system (disabled by default for backward compatibility)
+ENABLE_IDEMPOTENCY = os.getenv("DOCSTOKG_ENABLE_IDEMPOTENCY", "false").lower() == "true"
 
 
 _OPENALEX_RETRYABLE_EXCEPTIONS = (httpx.HTTPError,)
@@ -503,6 +506,45 @@ class DownloadRun:
             # Legacy pipeline breaker registry call removed - now handled by networking layer
             pass
 
+        # Initialize idempotency system if enabled
+        if ENABLE_IDEMPOTENCY:
+            try:
+                import sqlite3
+
+                from DocsToKG.ContentDownload.idempotency import (
+                    reconcile_abandoned_ops,
+                    reconcile_stale_leases,
+                )
+                from DocsToKG.ContentDownload.schema_migration import apply_migration
+
+                # Connect to telemetry database
+                telemetry_db_path = self.resolved.sqlite_path
+                if telemetry_db_path and telemetry_db_path.exists():
+                    conn = sqlite3.connect(str(telemetry_db_path))
+                    conn.row_factory = sqlite3.Row
+
+                    try:
+                        # Apply schema migration (idempotent)
+                        apply_migration(conn)
+                        LOGGER.info("Idempotency schema migrated successfully")
+
+                        # Reconcile stale leases from crashed workers
+                        stale_count = reconcile_stale_leases(conn)
+                        if stale_count > 0:
+                            LOGGER.info(f"Recovered {stale_count} stale leases")
+
+                        # Mark abandoned operations
+                        abandoned_count = reconcile_abandoned_ops(conn)
+                        if abandoned_count > 0:
+                            LOGGER.info(f"Marked {abandoned_count} abandoned operations")
+
+                    finally:
+                        conn.close()
+                else:
+                    LOGGER.warning("Idempotency enabled but telemetry database path not found")
+            except Exception as e:  # pylint: disable=broad-except
+                LOGGER.warning(f"Failed to initialize idempotency system: {e}")
+
         client = http_client or get_http_client()
         state = DownloadRunState(
             http_client=client,
@@ -554,9 +596,9 @@ class DownloadRun:
         resume_completed: Set[str]
         cleanup_callback: Optional[Callable[[], None]] = None
 
-        def _build_json_lookup() -> Tuple[
-            Mapping[str, Dict[str, Any]], Set[str], Optional[Callable[[], None]]
-        ]:
+        def _build_json_lookup() -> (
+            Tuple[Mapping[str, Dict[str, Any]], Set[str], Optional[Callable[[], None]]]
+        ):
             json_lookup = JsonlResumeLookup(resume_path)
             completed_ids = set(json_lookup.completed_work_ids)
             return json_lookup, completed_ids, getattr(json_lookup, "close", None)
@@ -731,8 +773,8 @@ class DownloadRun:
                 try:
                     from DocsToKG.ContentDownload.breakers_loader import load_breaker_config
                     from DocsToKG.ContentDownload.networking_breaker_listener import (
-                        NetworkBreakerListener,
                         BreakerListenerConfig,
+                        NetworkBreakerListener,
                     )
 
                     breaker_config_obj = getattr(
