@@ -22,6 +22,7 @@
 - [Test Matrix & Diagnostics](#test-matrix-diagnostics)
 - [Reference Docs](#reference-docs)
 - [Coding Standards & Module Organization](#coding-standards-module-organization)
+- [Idempotency & Job Coordination](#idempotency--job-coordination)
 
 # Project Environment — **No-Install** Runbook (for AI agents)
 
@@ -1350,3 +1351,261 @@ ORDER BY d.elapsed_ms DESC;
 
 - Follow the documentation in [CODE_ANNOTATION_STANDARDS.md](../../../docs/CODE_ANNOTATION_STANDARDS.md) when adding or updating inline documentation and NAVMAP headers.
 - Structure modules according to [MODULE_ORGANIZATION_GUIDE.md.txt](../../../docs/html/_sources/MODULE_ORGANIZATION_GUIDE.md.txt), ensuring imports, type aliases, dataclasses, and public API sections remain predictable for downstream agents.
+
+## Idempotency & Job Coordination
+
+### Overview
+
+The idempotency system provides **exactly-once semantics** for artifact downloads across worker crashes, retries, and multi-process coordination. It tracks job state transitions, ensures operations replay safely, and enables safe resumption from arbitrary points in the download pipeline.
+
+**Key modules:**
+
+- `idempotency.py`: Core idempotency key generation, leasing, and state machine.
+- `job_planning.py`: Idempotent job creation from work/artifact/URL.
+- `job_state.py`: Monotonic state transition enforcement.
+- `job_leasing.py`: SQLite-friendly single-worker claims.
+- `job_effects.py`: Exactly-once operation logging and replay.
+- `job_reconciler.py`: Startup crash recovery and stale lease cleanup.
+- `schema_migration.py`: Idempotent SQL schema updates (`artifact_jobs`, `artifact_ops` tables).
+- `idempotency_telemetry.py`: Structured event emission (9 event types).
+- `slo_schema.py`: SLO definitions and thresholds (6 SLOs).
+- `slo_compute.py`: Metric computation and reporting.
+
+### Enabling Idempotency
+
+Idempotency is **disabled by default** for backward compatibility. To enable:
+
+```bash
+# Via environment variable
+export DOCSTOKG_ENABLE_IDEMPOTENCY=true
+
+# Via CLI flag (recommended)
+python -m DocsToKG.ContentDownload.cli \
+  --enable-idempotency \
+  --out runs/content \
+  --workers 4
+
+# Via both (CLI overrides env)
+export DOCSTOKG_ENABLE_IDEMPOTENCY=false
+python -m DocsToKG.ContentDownload.cli --enable-idempotency ...
+# → idempotency IS enabled
+```
+
+On startup, the system:
+
+1. Applies schema migration to telemetry DB (creates `artifact_jobs`, `artifact_ops` tables).
+2. Reconciles stale leases (clears leases from crashed workers).
+3. Marks abandoned operations (ops still in-flight after 10+ minutes).
+
+### Job State Machine
+
+Each artifact download follows a **monotonic state progression**:
+
+```
+PLANNED
+  ↓ (claim)
+LEASED (owned by one worker)
+  ↓ (HEAD request)
+HEAD_DONE
+  ↓ (decide resume)
+RESUME_OK (or skip to STREAMING)
+  ↓ (stream to .part file)
+STREAMING
+  ↓ (atomic rename)
+FINALIZED (promotion + index put)
+  ├→ INDEXED (hash indexed)
+  └→ DEDUPED (link/copy created)
+
+(On failure → FAILED)
+(Before network → SKIPPED_DUPLICATE)
+```
+
+**Safety guarantees:**
+
+- Forward-only transitions (no backward steps).
+- Single owner (lease prevents concurrent work).
+- Replay-safe operations (idempotency keys prevent double-perform).
+
+### Leasing & Multi-Worker Coordination
+
+When `--workers > 1`, workers **lease jobs atomically** from the database:
+
+```
+Worker A:  SELECT job WHERE state='PLANNED' AND lease_until < now LIMIT 1
+           UPDATE job SET state='LEASED', lease_owner='worker-A', lease_until=now+120s
+           ✓ rowcount=1 → I own this job
+
+Worker B:  SELECT job WHERE state='PLANNED' AND lease_until < now LIMIT 1
+           UPDATE job SET state='LEASED', ...
+           ✗ rowcount=0 → This job is owned by another worker, try next one
+```
+
+**Lease TTL**: 120 seconds by default; renewed every 30–60s during long streams.
+
+**Release**: On successful completion or after exponential backoff exhaustion, the lease is cleared (`lease_until=NULL, lease_owner=NULL`).
+
+### Exactly-Once Operation Logging
+
+Each side effect (HTTP HEAD, STREAM, FINALIZE, INDEX, DEDUPE) is recorded with an **operation idempotency key** that encodes the effect type, job ID, and parameters:
+
+```python
+# Replaying the same operation twice
+op_key = op_key("HEAD", job_id="j1", url="https://example.com/paper.pdf")
+
+# First execution
+effect_result = run_effect(
+    conn, job_id="j1", kind="HEAD", opkey=op_key,
+    effect_fn=lambda: http_head(url)
+)
+# → Inserts op row, executes fn(), stores result
+
+# Second execution (e.g., after retry)
+effect_result_2 = run_effect(
+    conn, job_id="j1", kind="HEAD", opkey=op_key,
+    effect_fn=lambda: http_head(url)
+)
+# → Reads stored result, returns without re-executing fn()
+```
+
+### Crash Recovery
+
+**Scenario:** Worker dies mid-stream. On restart:
+
+```
+1. Reconciler scans artifact_jobs for lease_until < now
+2. Clears lease fields (lease_owner, lease_until) but keeps state
+3. If state='STREAMING', another worker can claim and resume
+4. Resume logic checks last STREAM op_key result to skip already-downloaded bytes
+```
+
+**Verification:**
+
+```python
+from DocsToKG.ContentDownload.job_reconciler import (
+    reconcile_stale_leases,
+    reconcile_abandoned_ops,
+)
+
+conn = sqlite3.connect("manifest.sqlite3")
+stale_count = reconcile_stale_leases(conn)
+abandoned_count = reconcile_abandoned_ops(conn)
+print(f"Recovered {stale_count} stale leases, marked {abandoned_count} abandoned ops")
+```
+
+### SLO Monitoring
+
+Six SLOs track system health:
+
+| SLO | Target | Budget | Window |
+|-----|--------|--------|--------|
+| Job Completion Rate | 99.5% | 0.5% | 1 day |
+| Time to Complete (p50) | 30s | ±5s | 1 day |
+| Time to Complete (p95) | 2m | ±20s | 1 day |
+| Crash Recovery Success | 99.9% | 0.1% | 7 days |
+| Lease Acquisition (p99) | 100ms | ±50ms | 1 day |
+| Operation Replay Rate | <5% | ±10% | 7 days |
+
+**Query SLO metrics:**
+
+```python
+from DocsToKG.ContentDownload import slo_compute
+
+conn = sqlite3.connect("manifest.sqlite3")
+metrics = slo_compute.compute_all_slo_metrics(conn)
+for metric_name, metric in metrics.items():
+    print(f"{metric.name}: {metric.status.upper()}")
+    print(f"  Target: {metric.target_value}, Actual: {metric.actual_value}")
+    print(f"  Budget remaining: {metric.details['budget_remaining_pct']}")
+
+# Or generate human-readable report
+report = slo_compute.generate_slo_report(conn)
+print(report)
+```
+
+**Alert thresholds:**
+
+- **Fail status** (actual deviates >2× error budget).
+- **Low budget** (<25% remaining) on any status.
+- Both trigger alerts in monitoring systems.
+
+### Telemetry Events
+
+Nine event types are emitted (DEBUG level, JSON format):
+
+1. **`job_planned`** — Job created with idempotency key.
+2. **`job_leased`** — Worker claimed job.
+3. **`job_state_changed`** — State transition (e.g., `PLANNED→LEASED`).
+4. **`lease_renewed`** — Lease extended during long operations.
+5. **`lease_released`** — Lease cleared on completion/failure.
+6. **`operation_started`** — Side effect started (HTTP HEAD, STREAM, etc.).
+7. **`operation_completed`** — Side effect finished (result stored).
+8. **`crash_recovery_event`** — Stale lease or abandoned op detected/repaired.
+9. **`idempotency_replay`** — Operation re-executed from stored result.
+
+**Example parsing:**
+
+```bash
+grep "job_planned" manifest.log | \
+  python -m json.tool | jq '{job_id, idempotency_key, canonical_url}'
+```
+
+### Troubleshooting
+
+**Q: Job stuck in LEASED state for hours**
+
+A: Check if the worker holding the lease crashed without releasing it. Restart the idempotency reconciler or manually clear the lease:
+
+```python
+import sqlite3
+conn = sqlite3.connect("manifest.sqlite3")
+conn.execute(
+    "UPDATE artifact_jobs SET lease_owner=NULL, lease_until=NULL WHERE lease_owner=?",
+    ("worker-crashed",)
+)
+conn.commit()
+```
+
+**Q: High operation replay rate (>10%)**
+
+A: Indicates frequent retries. Check if:
+- Timeouts are too short (↑ `--openalex-retry-backoff`).
+- Rate limiter is blocking (↑ `--rate` or switch to distributed backend).
+- Network is unstable (check resolver metrics for 5xx/timeout spikes).
+
+**Q: SLO alerts on recovery success rate**
+
+A: Crash recovery is failing. Check:
+
+1. Reconciler logs: `grep "crash_recovery" manifest.log`.
+2. Stale leases: `SELECT COUNT(*) FROM artifact_jobs WHERE lease_until < datetime('now')`.
+3. Orphaned files: `find .staging -name "*.part" -mtime +1` (delete after verifying no active streams).
+
+**Q: Telemetry database locked**
+
+A: Multiple processes trying to write simultaneously. Ensure:
+- Only one `DownloadRun` per manifest database.
+- Rate limiter backend is `sqlite` only for single-process runs; use `multiprocess` or `redis` for `--workers > 1`.
+- If locked, wait for processes to finish, then: `rm -f manifest.sqlite3-wal manifest.sqlite3-shm`.
+
+### CLI Reference for Idempotency
+
+```bash
+# Enable idempotency with custom fallback config
+python -m DocsToKG.ContentDownload.cli \
+  --enable-idempotency \
+  --fallback-total-timeout-ms 90000 \
+  --fallback-max-attempts 15 \
+  --fallback-max-concurrent 2 \
+  --fallback-tier direct_oa:parallel=2 \
+  --fallback-tier landing_scrape:parallel=1 \
+  --disable-wayback-fallback \
+  ...
+```
+
+**Fallback-specific flags** (for Phase 2 Fallback & Resiliency):
+
+- `--fallback-total-timeout-ms`: Total time budget per artifact (default: 120000ms).
+- `--fallback-max-attempts`: Max attempts across all sources (default: 20).
+- `--fallback-max-concurrent`: Parallel attempts (default: 3).
+- `--fallback-tier TIER[:option=value]`: Tier configuration (e.g., `direct_oa:parallel=2`).
+- `--disable-wayback-fallback`: Skip Wayback Machine as fallback.
