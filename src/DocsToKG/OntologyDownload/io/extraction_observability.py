@@ -33,6 +33,7 @@ from typing import Dict, Any, Optional, List
 import libarchive
 
 from ..errors import ConfigError
+from ..observability.events import emit_event
 
 
 # ============================================================================
@@ -362,3 +363,95 @@ class ExtractionEventEmitter:
             "pid": os.getpid(),
         }
         self.logger.info("Libarchive info", extra=log_data)
+
+
+# ============================================================================
+# Observability Event Emission (for event bus)
+# ============================================================================
+
+
+def emit_extract_start_event() -> None:
+    """Emit extract.start event to observability event bus."""
+    try:
+        emit_event(
+            type="extract.start",
+            level="INFO",
+            payload={},
+        )
+    except Exception:
+        pass
+
+
+def emit_extract_done_event(
+    entries_total: int,
+    entries_included: int,
+    bytes_written: int,
+    duration_ms: float,
+) -> None:
+    """Emit extract.done event with extraction metrics.
+
+    Args:
+        entries_total: Total entries in archive
+        entries_included: Entries extracted
+        bytes_written: Bytes written to disk
+        duration_ms: Extraction duration
+    """
+    try:
+        entries_skipped = entries_total - entries_included
+        ratio = bytes_written / max(1, entries_included) if entries_included > 0 else 0
+
+        emit_event(
+            type="extract.done",
+            level="INFO",
+            payload={
+                "entries_total": entries_total,
+                "entries_included": entries_included,
+                "entries_skipped": entries_skipped,
+                "bytes_written": bytes_written,
+                "bytes_per_entry": ratio,
+                "duration_ms": duration_ms,
+            },
+        )
+    except Exception:
+        pass
+
+
+def emit_extract_error_event(
+    error_code: str,
+    message: str,
+    details: Optional[dict] = None,
+) -> None:
+    """Emit extract.error event on extraction failure.
+
+    Args:
+        error_code: Error classification code
+        message: Human-readable error message
+        details: Additional context
+    """
+    try:
+        payload = {
+            "error_code": error_code,
+            "message": message[:200],
+        }
+        if details:
+            payload.update(details)
+
+        emit_event(
+            type="extract.error",
+            level="ERROR",
+            payload=payload,
+        )
+    except Exception:
+        pass
+
+
+__all__ = [
+    "LibarchiveInfo",
+    "ExtractionRunContext",
+    "PreScanMetrics",
+    "ExtractMetrics",
+    "ExtractionAuditor",
+    "emit_extract_start_event",
+    "emit_extract_done_event",
+    "emit_extract_error_event",
+]
