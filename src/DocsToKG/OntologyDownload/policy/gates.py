@@ -12,6 +12,8 @@ Implements access control gates at critical I/O boundaries:
 import time
 from typing import Any, Dict, List, Optional, Union
 
+from prometheus_client import Counter, Gauge, Histogram
+
 from DocsToKG.OntologyDownload.policy.errors import (
     DbBoundaryException,
     ErrorCode,
@@ -34,6 +36,92 @@ except ImportError:
 
     def emit_event(*args: Any, **kwargs: Any) -> None:  # type: ignore[misc]
         """Fallback no-op event emitter."""
+        pass
+
+
+# ============================================================================
+# Prometheus Metrics Registration
+# ============================================================================
+
+# Counter: Total gate invocations (pass/reject)
+_gate_invocations = Counter(
+    'gate_invocations_total',
+    'Total gate invocations by outcome',
+    ['gate', 'outcome']
+)
+
+# Histogram: Gate execution latency (milliseconds)
+_gate_latency = Histogram(
+    'gate_execution_ms',
+    'Gate execution latency in milliseconds',
+    ['gate'],
+    buckets=(0.1, 0.5, 1.0, 2.5, 5.0, 10.0, 50.0, float('inf'))
+)
+
+# Counter: Gate errors by error code
+_gate_errors = Counter(
+    'gate_errors_total',
+    'Total gate errors by error code',
+    ['gate', 'error_code']
+)
+
+# Gauge: Current (latest) gate latency
+_gate_current_latency = Gauge(
+    'gate_current_latency_ms',
+    'Current (latest) gate execution latency in milliseconds',
+    ['gate']
+)
+
+# Gauge: Gate pass rate (percentage)
+_gate_pass_rate = Gauge(
+    'gate_pass_rate_percent',
+    'Gate pass rate as percentage (0-100)',
+    ['gate']
+)
+
+
+# ============================================================================
+# Prometheus Metrics Recording
+# ============================================================================
+
+
+def _record_prometheus_metrics(
+    gate_name: str,
+    passed: bool,
+    elapsed_ms: float,
+    error_code: Optional[ErrorCode] = None,
+) -> None:
+    """Record gate metrics to Prometheus.
+
+    Args:
+        gate_name: Name of the gate
+        passed: Whether gate passed
+        elapsed_ms: Time spent in gate (milliseconds)
+        error_code: Error code if gate rejected
+    """
+    try:
+        # Record invocation count
+        outcome = "ok" if passed else "reject"
+        _gate_invocations.labels(gate=gate_name, outcome=outcome).inc()
+
+        # Record latency histogram
+        _gate_latency.labels(gate=gate_name).observe(elapsed_ms)
+
+        # Record current latency gauge
+        _gate_current_latency.labels(gate=gate_name).set(elapsed_ms)
+
+        # Record error code counter if gate failed
+        if not passed and error_code:
+            _gate_errors.labels(gate=gate_name, error_code=error_code.name).inc()
+
+        # Update pass rate gauge (approximate)
+        # Note: This is approximate since we don't have total counts easily
+        # In production, you'd want a rolling window calculator
+        pass_rate = 100.0 if passed else 0.0
+        _gate_pass_rate.labels(gate=gate_name).set(pass_rate)
+
+    except Exception:
+        # Silently fail - metrics should never break gate logic
         pass
 
 
@@ -101,6 +189,9 @@ def _record_gate_metric(
     except Exception:
         # Silently fail - metrics should never break gate logic
         pass
+
+    # Also record to Prometheus
+    _record_prometheus_metrics(gate_name, passed, elapsed_ms, error_code)
 
 
 # ============================================================================

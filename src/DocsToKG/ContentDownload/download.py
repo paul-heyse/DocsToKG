@@ -2733,12 +2733,12 @@ def process_one_work(
         try:
             from DocsToKG.ContentDownload.fallback.orchestrator import FallbackOrchestrator
             from DocsToKG.ContentDownload.fallback.loader import load_fallback_plan
-            
+
             LOGGER.debug(f"Attempting fallback strategy for {artifact.work_id}")
-            
+
             # Load fallback plan
             fallback_plan = load_fallback_plan()
-            
+
             # Create orchestrator
             orchestrator = FallbackOrchestrator(
                 plan=fallback_plan,
@@ -2746,7 +2746,7 @@ def process_one_work(
                 telemetry=None,  # TODO: Wire fallback telemetry
                 logger=LOGGER,
             )
-            
+
             # Attempt resolution via fallback
             fallback_result = orchestrator.resolve_pdf(
                 context={
@@ -2759,9 +2759,11 @@ def process_one_work(
                 },
                 adapters={},  # TODO: Wire fallback adapters
             )
-            
+
             if fallback_result.is_success() and fallback_result.url:
-                LOGGER.info(f"Fallback strategy succeeded for {artifact.work_id}: {fallback_result.url}")
+                LOGGER.info(
+                    f"Fallback strategy succeeded for {artifact.work_id}: {fallback_result.url}"
+                )
                 # TODO: Download from fallback URL and return result
                 # For now, continue to resolver pipeline as fallback
         except Exception as e:  # pylint: disable=broad-except
