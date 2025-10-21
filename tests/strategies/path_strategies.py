@@ -42,11 +42,13 @@ def valid_path_components(draw, max_length: int = 255) -> str:
     """
     # Valid filename characters (exclude path separators and null)
     valid_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-"
-    return draw(st.text(
-        alphabet=valid_chars,
-        min_size=1,
-        max_size=max_length,
-    ))
+    return draw(
+        st.text(
+            alphabet=valid_chars,
+            min_size=1,
+            max_size=max_length,
+        )
+    )
 
 
 @st.composite
@@ -59,11 +61,13 @@ def valid_relative_paths(draw) -> str:
         - dir/file.txt
         - a/b/c/file.txt
     """
-    components = draw(st.lists(
-        valid_path_components(),
-        min_size=1,
-        max_size=5,
-    ))
+    components = draw(
+        st.lists(
+            valid_path_components(),
+            min_size=1,
+            max_size=5,
+        )
+    )
     return "/".join(components)
 
 
@@ -153,11 +157,13 @@ def unicode_path_components(draw, form: str = "NFC") -> str:
         "ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩαβγδεζηθικλμνξοπρστυφχψω"  # Greek
         "АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдежзийклмнопрстуфхцчшщъыьэюя"  # Cyrillic
     )
-    text = draw(st.text(
-        alphabet=unicode_chars,
-        min_size=1,
-        max_size=20,
-    ))
+    text = draw(
+        st.text(
+            alphabet=unicode_chars,
+            min_size=1,
+            max_size=20,
+        )
+    )
     # Normalize to specified form
     return unicodedata.normalize(form, text)
 
@@ -227,7 +233,11 @@ def windows_reserved_names(draw) -> str:
         - LPT1, LPT9, COM1, COM9
         - CON.txt, PRN.tar.gz
     """
-    reserved = ["CON", "PRN", "AUX", "NUL"] + [f"LPT{i}" for i in range(1, 10)] + [f"COM{i}" for i in range(1, 10)]
+    reserved = (
+        ["CON", "PRN", "AUX", "NUL"]
+        + [f"LPT{i}" for i in range(1, 10)]
+        + [f"COM{i}" for i in range(1, 10)]
+    )
     name = draw(st.sampled_from(reserved))
     # Some have extensions
     if draw(st.booleans()):
@@ -260,11 +270,13 @@ def long_path_components(draw, max_length: int = 255) -> str:
         max_length: Component length limit
     """
     # Generate near-limit and over-limit components
-    length = draw(st.one_of(
-        st.just(max_length - 1),  # Just under limit
-        st.just(max_length),      # At limit
-        st.just(max_length + 10),  # Over limit
-    ))
+    length = draw(
+        st.one_of(
+            st.just(max_length - 1),  # Just under limit
+            st.just(max_length),  # At limit
+            st.just(max_length + 10),  # Over limit
+        )
+    )
     return "a" * length
 
 
@@ -328,8 +340,8 @@ def extraction_size_limits(draw, limit_gb: int = 5) -> tuple[int, int, int]:
     limit_bytes = limit_gb * 1024 * 1024 * 1024
     statuses = [
         ("under", int(limit_bytes * 0.8)),  # Under limit
-        ("at", limit_bytes),                  # At limit
-        ("over", int(limit_bytes * 1.2)),    # Over limit
+        ("at", limit_bytes),  # At limit
+        ("over", int(limit_bytes * 1.2)),  # Over limit
     ]
     status, archive_size = draw(st.sampled_from(statuses))
     entry_size = draw(st.integers(0, archive_size))

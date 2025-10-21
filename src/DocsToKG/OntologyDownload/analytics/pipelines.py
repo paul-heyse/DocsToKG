@@ -300,8 +300,9 @@ def arrow_to_lazy_frame(arrow_table) -> pl.LazyFrame:  # type: ignore
     Returns:
         Polars LazyFrame (lazy)
     """
-    df = pl.from_arrow(arrow_table)
-    return df.lazy()
+    df_or_series = pl.from_arrow(arrow_table)
+    assert isinstance(df_or_series, pl.DataFrame), f"Expected DataFrame, got {type(df_or_series)}"
+    return df_or_series.lazy()
 
 
 def duckdb_to_lazy_frame(conn, sql: str) -> pl.LazyFrame:  # type: ignore

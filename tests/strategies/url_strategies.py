@@ -53,10 +53,12 @@ def high_ports(draw) -> int:
 @st.composite
 def invalid_ports(draw) -> int:
     """Generate invalid port numbers."""
-    return draw(st.one_of(
-        st.integers(max_value=0),  # Below range
-        st.integers(min_value=65536),  # Above range
-    ))
+    return draw(
+        st.one_of(
+            st.integers(max_value=0),  # Below range
+            st.integers(min_value=65536),  # Above range
+        )
+    )
 
 
 # --- Host Strategies ---
@@ -78,20 +80,20 @@ def valid_hostnames(draw, allow_ip: bool = True) -> str:
     """
     if allow_ip and draw(st.booleans()):
         # IPv4 address
-        return draw(st.just(".".join(
-            str(draw(st.integers(0, 255))) for _ in range(4)
-        )))
+        return draw(st.just(".".join(str(draw(st.integers(0, 255))) for _ in range(4))))
 
     # Hostname
-    labels = draw(st.lists(
-        st.text(
-            alphabet="abcdefghijklmnopqrstuvwxyz0123456789",
+    labels = draw(
+        st.lists(
+            st.text(
+                alphabet="abcdefghijklmnopqrstuvwxyz0123456789",
+                min_size=1,
+                max_size=63,
+            ),
             min_size=1,
-            max_size=63,
-        ),
-        min_size=1,
-        max_size=4,
-    ))
+            max_size=4,
+        )
+    )
     return ".".join(labels) or "localhost"
 
 
@@ -175,8 +177,18 @@ def valid_urls(draw, scheme: str | None = None, host: str | None = None) -> str:
     s = scheme or draw(valid_schemes())
     h = host or draw(valid_hostnames(allow_ip=True))
     port = draw(st.just(None) | st.just(f":{draw(valid_ports())}"))
-    path = draw(st.just("") | st.just(f"/{draw(st.text(alphabet='abcdefghijklmnopqrstuvwxyz0123456789-._~', max_size=50))}"))
-    query = draw(st.just("") | st.just(f"?{draw(st.text(alphabet='abcdefghijklmnopqrstuvwxyz0123456789=&', max_size=50))}"))
+    path = draw(
+        st.just("")
+        | st.just(
+            f"/{draw(st.text(alphabet='abcdefghijklmnopqrstuvwxyz0123456789-._~', max_size=50))}"
+        )
+    )
+    query = draw(
+        st.just("")
+        | st.just(
+            f"?{draw(st.text(alphabet='abcdefghijklmnopqrstuvwxyz0123456789=&', max_size=50))}"
+        )
+    )
 
     return f"{s}://{h}{port}{path}{query}"
 

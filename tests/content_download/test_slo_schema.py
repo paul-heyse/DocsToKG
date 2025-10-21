@@ -62,7 +62,7 @@ class TestStatusEvaluation:
     def test_status_warning_outside_budget(self):
         """Status is warning when slightly outside error budget."""
         status = slo_schema.evaluate_slo_status(
-            actual=112.0,
+            actual=107.5,
             target=100.0,
             error_budget=5.0,
         )

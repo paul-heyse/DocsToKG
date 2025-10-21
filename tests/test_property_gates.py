@@ -59,7 +59,9 @@ def test_url_gate_accepts_valid_urls(url):
 
     # For this property test, we just validate structure
     if "://" in url:
-        assert url.startswith(("http://", "https://", "ftp://", "ftps://", "ws://", "wss://", "file://"))
+        assert url.startswith(
+            ("http://", "https://", "ftp://", "ftps://", "ws://", "wss://", "file://")
+        )
 
 
 @pytest.mark.property
