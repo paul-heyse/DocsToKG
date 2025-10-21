@@ -64,7 +64,7 @@ from DocsToKG.DocParsing.logging import (
 
 from .batching import Batcher
 from .cli_utils import CLIOption, build_subcommand, detect_mode
-from .concurrency import ReservedPort, acquire_lock, find_free_port, set_spawn_or_warn
+from .concurrency import ReservedPort, find_free_port, set_spawn_or_warn
 from .discovery import (
     DEFAULT_CAPTION_MARKERS,
     DEFAULT_HEADING_MARKERS,
@@ -142,7 +142,6 @@ __all__ = [
     "make_hasher",
     "resolve_hash_algorithm",
     "load_manifest_index",
-    "acquire_lock",
     "set_spawn_or_warn",
     "derive_doc_id_and_vectors_path",
     "derive_doc_id_and_doctags_path",

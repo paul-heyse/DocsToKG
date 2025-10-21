@@ -340,7 +340,6 @@ from DocsToKG.DocParsing.core import (
     StageOutcome,
     StagePlan,
     WorkItem,
-    acquire_lock,
     build_subcommand,
     derive_doc_id_and_doctags_path,
     find_free_port,
@@ -349,6 +348,7 @@ from DocsToKG.DocParsing.core import (
     run_stage,
     set_spawn_or_warn,
 )
+from DocsToKG.DocParsing.core.concurrency import _acquire_lock
 from DocsToKG.DocParsing.env import (
     PDF_MODEL_SUBDIR,
     data_doctags,
@@ -1951,7 +1951,7 @@ def pdf_convert_one(task: PdfTask) -> PdfConversionResult:
             )
 
         try:
-            with acquire_lock(out_path):
+            with _acquire_lock(out_path):
                 if out_path.exists():
                     return PdfConversionResult(
                         doc_id=task.doc_id,
@@ -2768,7 +2768,7 @@ def html_convert_one(task: HtmlTask) -> HtmlConversionResult:
         tmp_path = out_path.with_suffix(out_path.suffix + ".tmp")
         # Serialize under a lock to avoid partial writes when workers race
         try:
-            with acquire_lock(out_path):
+            with _acquire_lock(out_path):
                 if out_path.exists() and not task.overwrite:
                     return HtmlConversionResult(
                         doc_id=task.relative_id,

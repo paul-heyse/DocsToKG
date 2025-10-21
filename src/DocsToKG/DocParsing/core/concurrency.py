@@ -22,7 +22,6 @@ from filelock import FileLock, Timeout
 from DocsToKG.DocParsing.logging import get_logger, log_event
 
 __all__ = [
-    "acquire_lock",
     "ReservedPort",
     "find_free_port",
     "set_spawn_or_warn",
@@ -33,22 +32,12 @@ LOGGER = get_logger(__name__, base_fields={"stage": "core"})
 
 
 @contextlib.contextmanager
-def acquire_lock(path: Path, timeout: float = 60.0) -> Iterator[bool]:
-    """Acquire an advisory lock using :mod:`filelock` primitives.
-
-    ⚠️ Note: This context manager is **not** recommended for manifest/attempts writes.
-    For manifest/attempts JSONL appends, use the injected, lock-aware writer
-    (DEFAULT_JSONL_WRITER) in DocsToKG.DocParsing.io and accessible via TelemetrySink.
+def _acquire_lock(path: Path, timeout: float = 60.0) -> Iterator[bool]:
+    """INTERNAL ONLY: Acquire an advisory lock using :mod:`filelock` primitives.
+    
+    This is a private function used internally by doctags and embedding modules.
+    Not for public use. Subject to change without notice.
     """
-    # Gentle nudge when someone tries to lock a manifest/attempts JSONL
-    if str(path).endswith(".jsonl"):
-        warnings.warn(
-            "acquire_lock(): discouraged for manifest/attempts JSONL writes; "
-            "use DEFAULT_JSONL_WRITER via TelemetrySink/StageTelemetry instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
     lock_path = path.with_suffix(path.suffix + ".lock")
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     file_lock = FileLock(str(lock_path))

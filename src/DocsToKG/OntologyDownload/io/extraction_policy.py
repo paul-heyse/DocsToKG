@@ -431,7 +431,7 @@ class ExtractionSettings(BaseModel):
 
     def is_valid(self) -> bool:
         """Check if policy is valid (backward compatibility with old API).
-        
+
         In Pydantic v2, validation happens automatically on initialization,
         so if the object exists, it's always valid.
         """
@@ -439,56 +439,58 @@ class ExtractionSettings(BaseModel):
 
     def validate(self) -> list[str]:
         """Validate policy configuration (backward compatibility with old API).
-        
+
         In Pydantic v2, validation happens automatically on initialization,
         so this returns an empty list (all valid). However, for tests that
         modify fields and then call validate(), we check the current state.
-        
+
         Returns:
             Empty list if valid, list of error messages if invalid
         """
         errors: list[str] = []
-        
+
         # Check encapsulation_name
         if self.encapsulation_name not in ("sha256", "basename"):
-            errors.append(f"encapsulation_name must be 'sha256' or 'basename', got '{self.encapsulation_name}'")
-        
+            errors.append(
+                f"encapsulation_name must be 'sha256' or 'basename', got '{self.encapsulation_name}'"
+            )
+
         # Check max_depth
         if self.max_depth < 1:
             errors.append(f"max_depth must be >= 1, got {self.max_depth}")
-        
+
         # Check max_components_len
         if self.max_components_len < 1:
             errors.append(f"max_components_len must be >= 1, got {self.max_components_len}")
-        
+
         # Check max_path_len
         if self.max_path_len < 1:
             errors.append(f"max_path_len must be >= 1, got {self.max_path_len}")
-        
+
         # Check max_path_len >= max_components_len
         if self.max_path_len < self.max_components_len:
             errors.append(
                 f"max_path_len ({self.max_path_len}) must be >= max_components_len ({self.max_components_len})"
             )
-        
+
         # Check dir_mode
         if self.dir_mode <= 0 or self.dir_mode > 0o777:
             errors.append(f"dir_mode must be in range [0o001, 0o777], got {oct(self.dir_mode)}")
-        
+
         # Check file_mode
         if self.file_mode <= 0 or self.file_mode > 0o777:
             errors.append(f"file_mode must be in range [0o001, 0o777], got {oct(self.file_mode)}")
-        
+
         # Check copy_buffer_max >= copy_buffer_min
         if self.copy_buffer_max < self.copy_buffer_min:
             errors.append(
                 f"copy_buffer_max ({self.copy_buffer_max}) must be >= copy_buffer_min ({self.copy_buffer_min})"
             )
-        
+
         # Check use_dirfd requires encapsulate
         if self.use_dirfd and not self.encapsulate:
             errors.append("use_dirfd requires encapsulate=True")
-        
+
         return errors
 
     def summary(self) -> dict[str, str]:
