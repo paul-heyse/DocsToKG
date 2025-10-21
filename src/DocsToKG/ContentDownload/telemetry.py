@@ -1649,7 +1649,15 @@ class SummarySink:
 
 
 class SqliteSink:
-    """Persist attempts, manifests, and summary records to a SQLite database."""
+    """Persist attempts, manifests, and summary records to a SQLite database.
+
+    Internal Implementation Notes:
+    - This sink includes backward-compatibility code to create symlinks/copies from
+      .sqlite3 files to .sqlite files when closing. This supports migration of existing
+      resumption caches and should not be used in new code.
+    - Legacy alias creation happens only on close() and is purely for resume compatibility.
+    - The canonical telemetry model does not expose or depend on this legacy behavior.
+    """
 
     def __init__(self, path: Path) -> None:
         _ensure_parent_exists(path)

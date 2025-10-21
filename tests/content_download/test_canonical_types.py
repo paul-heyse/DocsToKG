@@ -24,13 +24,6 @@ from DocsToKG.ContentDownload.api import (
     AttemptRecord,
 )
 from DocsToKG.ContentDownload.api.exceptions import SkipDownload, DownloadError
-from DocsToKG.ContentDownload.api.adapters import (
-    to_download_plan,
-    to_outcome_success,
-    to_outcome_skip,
-    to_outcome_error,
-    to_resolver_result,
-)
 from DocsToKG.ContentDownload.download_execution import (
     prepare_candidate_download,
     stream_candidate_payload,
@@ -177,55 +170,6 @@ class TestDownloadErrorException:
         """DownloadError stores message."""
         exc = DownloadError("timeout", "Request timed out")  # type: ignore
         assert "Request timed out" in str(exc)
-
-
-# ============================================================================
-# Adapter Tests: Legacy Compatibility
-# ============================================================================
-
-
-class TestAdapters:
-    """Test legacy adapter functions."""
-
-    def test_to_download_plan(self):
-        """Adapter to_download_plan creates canonical plan."""
-        plan = to_download_plan(
-            url="https://example.com/file.pdf",
-            resolver_name="test",
-            expected_mime="application/pdf",
-        )
-        assert plan.url == "https://example.com/file.pdf"
-        assert plan.resolver_name == "test"
-        assert plan.expected_mime == "application/pdf"
-
-    def test_to_outcome_success(self):
-        """Adapter to_outcome_success creates success outcome."""
-        outcome = to_outcome_success("/tmp/file.pdf", sha256="abc123")
-        assert outcome.ok is True
-        assert outcome.classification == "success"
-        assert outcome.path == "/tmp/file.pdf"
-        assert outcome.meta["sha256"] == "abc123"
-
-    def test_to_outcome_skip(self):
-        """Adapter to_outcome_skip creates skip outcome."""
-        outcome = to_outcome_skip("robots", reason_detail="robots.txt")  # type: ignore
-        assert outcome.ok is False
-        assert outcome.classification == "skip"
-        assert outcome.reason == "robots"
-
-    def test_to_outcome_error(self):
-        """Adapter to_outcome_error creates error outcome."""
-        outcome = to_outcome_error("timeout", message="Timed out")  # type: ignore
-        assert outcome.ok is False
-        assert outcome.classification == "error"
-        assert outcome.reason == "timeout"
-
-    def test_to_resolver_result(self):
-        """Adapter to_resolver_result creates result."""
-        plan = to_download_plan("https://example.com/file.pdf", "test")
-        result = to_resolver_result(plans=[plan], notes_value="test")
-        assert len(result.plans) == 1
-        assert result.notes["notes_value"] == "test"
 
 
 # ============================================================================

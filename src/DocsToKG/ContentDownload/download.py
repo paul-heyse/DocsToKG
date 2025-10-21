@@ -2728,47 +2728,6 @@ def process_one_work(
         result["skipped"] = True
         return result
 
-    # Try fallback strategy first if enabled (feature gate)
-    if ENABLE_FALLBACK_STRATEGY and not dry_run and not list_only:
-        try:
-            from DocsToKG.ContentDownload.fallback.orchestrator import FallbackOrchestrator
-            from DocsToKG.ContentDownload.fallback.loader import load_fallback_plan
-
-            LOGGER.debug(f"Attempting fallback strategy for {artifact.work_id}")
-
-            # Load fallback plan
-            fallback_plan = load_fallback_plan()
-
-            # Create orchestrator
-            orchestrator = FallbackOrchestrator(
-                plan=fallback_plan,
-                clients={"http": active_client},
-                telemetry=None,  # TODO: Wire fallback telemetry
-                logger=LOGGER,
-            )
-
-            # Attempt resolution via fallback
-            fallback_result = orchestrator.resolve_pdf(
-                context={
-                    "work_id": artifact.work_id,
-                    "artifact_id": artifact.artifact_id,
-                    "doi": artifact.doi,
-                    "pmid": artifact.pmid,
-                    "pmcid": artifact.pmcid,
-                    "arxiv_id": artifact.arxiv_id,
-                },
-                adapters={},  # TODO: Wire fallback adapters
-            )
-
-            if fallback_result.is_success() and fallback_result.url:
-                LOGGER.info(
-                    f"Fallback strategy succeeded for {artifact.work_id}: {fallback_result.url}"
-                )
-                # TODO: Download from fallback URL and return result
-                # For now, continue to resolver pipeline as fallback
-        except Exception as e:  # pylint: disable=broad-except
-            LOGGER.debug(f"Fallback strategy failed or disabled: {e}")
-            # Fall through to resolver pipeline
 
     pipeline_result = pipeline.run(
         active_client,

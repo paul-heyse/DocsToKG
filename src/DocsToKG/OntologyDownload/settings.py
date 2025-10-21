@@ -588,6 +588,70 @@ _VALID_RESOLVERS = {
 }
 
 
+
+class DuckDBSettings(BaseModel):
+    """DuckDB catalog database configuration.
+    
+    Controls the DuckDB catalog (brain) that tracks ontology versions,
+    artifacts, extracted files, and validations.
+    """
+    
+    path: Path = Field(
+        default_factory=lambda: Path.home() / ".data" / ".catalog" / "ontofetch.duckdb",
+        description="Path to DuckDB file"
+    )
+    threads: int = Field(
+        default=8,
+        gt=0,
+        le=256,
+        description="Number of threads for DuckDB query execution"
+    )
+    readonly: bool = Field(default=False, description="Open in read-only mode")
+    writer_lock: bool = Field(default=True, description="Use writer lock")
+    
+    @field_validator("path", mode="before")
+    @classmethod
+    def normalize_path(cls, v: Any) -> Path:
+        """Normalize to absolute path."""
+        if isinstance(v, str):
+            return Path(v).expanduser().resolve()
+        if isinstance(v, Path):
+            return v.expanduser().resolve()
+        raise ValueError("path must be string or Path")
+    
+    model_config = {"validate_assignment": True, "extra": "forbid"}
+
+
+class StorageSettings(BaseModel):
+    """Storage backend configuration for ontology files."""
+    
+    root: Path = Field(default_factory=lambda: Path.home() / "ontologies", description="Root directory")
+    latest_name: str = Field(default="LATEST.json", description="Latest marker filename")
+    write_latest_mirror: bool = Field(default=True, description="Write JSON mirror")
+    
+    @field_validator("root", mode="before")
+    @classmethod
+    def normalize_root(cls, v: Any) -> Path:
+        """Normalize root to absolute path."""
+        if isinstance(v, str):
+            return Path(v).expanduser().resolve()
+        if isinstance(v, Path):
+            return v.expanduser().resolve()
+        raise ValueError("root must be string or Path")
+    
+    @field_validator("latest_name")
+    @classmethod
+    def validate_latest_name(cls, v: str) -> str:
+        """Ensure latest_name is a valid filename."""
+        if "/" in v or "\" in v:
+            raise ValueError("latest_name must be a filename, not a path")
+        if not v.strip():
+            raise ValueError("latest_name cannot be empty")
+        return v.strip()
+    
+    model_config = {"validate_assignment": True, "extra": "forbid"}
+
+
 class DefaultsConfig(BaseModel):
     """Composite configuration applied when no per-spec overrides exist."""
 
@@ -600,6 +664,14 @@ class DefaultsConfig(BaseModel):
     planner: PlannerConfig = Field(default_factory=PlannerConfig)
     validation: ValidationConfig = Field(default_factory=ValidationConfig)
     logging: LoggingConfiguration = Field(default_factory=LoggingConfiguration)
+    db: DuckDBSettings = Field(
+        default_factory=DuckDBSettings,
+        description="DuckDB catalog (brain) configuration"
+    )
+    storage: StorageSettings = Field(
+        default_factory=StorageSettings,
+        description="Storage backend configuration for ontology files"
+    )
     continue_on_error: bool = Field(default=True)
     resolver_fallback_enabled: bool = Field(default=True)
     enable_cas_mirror: bool = Field(
@@ -2104,322 +2176,3 @@ class ExtractionSettings(BaseModel):
         """Validate extraction policies."""
         return v.lower()
 
-
-class StorageSettings(BaseModel):
-    """Storage backend configuration for ontology files.
-
-    Controls where downloaded and extracted ontology files are stored,
-    and how the "latest" version pointer is managed.
-
-    Attributes:
-        root: Base directory for storing ontology files (nested by service/version).
-        latest_name: Filename for JSON mirror of latest version pointer.
-        write_latest_mirror: Write JSON mirror of latest pointer for convenience.
-    """
-
-    root: Path = Field(
-        default_factory=lambda: LOCAL_ONTOLOGY_DIR,
-        description="Root directory for ontology storage",
-    )
-    latest_name: str = Field(
-        default="LATEST.json", description="Filename for JSON mirror of latest version pointer"
-    )
-    write_latest_mirror: bool = Field(
-        default=True,
-        description="Write JSON mirror of latest pointer for convenience (DB is authoritative)",
-    )
-
-    @field_validator("root", mode="before")
-    @classmethod
-    def normalize_root(cls, v: Any) -> Path:
-        """Normalize to absolute POSIX path."""
-        if isinstance(v, str):
-            v = Path(v)
-        if isinstance(v, Path):
-            return v.expanduser().resolve()
-        raise ValueError(f"root must be string or Path, got {type(v)}")
-
-    @field_validator("latest_name")
-    @classmethod
-    def validate_latest_name(cls, v: str) -> str:
-        """Ensure latest_name is a valid filename (no path separators)."""
-        if "/" in v or "\\" in v:
-            raise ValueError("latest_name must be a filename, not a path")
-        if not v.strip():
-            raise ValueError("latest_name cannot be empty")
-        return v.strip()
-
-    model_config = {
-        "validate_assignment": True,
-        "extra": "forbid",
-    }
-
-
-class DuckDBSettings(BaseModel):
-    """DuckDB catalog database configuration.
-
-    Controls the DuckDB catalog (brain) that tracks ontology versions,
-    artifacts, extracted files, and validations.
-
-    Attributes:
-        path: Path to DuckDB database file. Parent directory is created if missing.
-        threads: Number of DuckDB worker threads (recommend CPU count).
-        readonly: Open database in read-only mode (disables writes).
-        writer_lock: Use file-based writer lock to serialize concurrent writers.
-    """
-
-    path: Path = Field(
-        default_factory=lambda: LOCAL_ONTOLOGY_DIR.parent / ".catalog" / "ontofetch.duckdb",
-        description="Path to DuckDB file (will be created if missing)",
-    )
-    threads: int = Field(
-        default=8, gt=0, le=256, description="Number of threads for DuckDB query execution"
-    )
-    readonly: bool = Field(default=False, description="Open database in read-only mode")
-    writer_lock: bool = Field(
-        default=True, description="Use file-based writer lock to serialize writes"
-    )
-
-    @field_validator("path", mode="before")
-    @classmethod
-    def normalize_path(cls, v: Any) -> Path:
-        """Normalize to absolute POSIX path."""
-        if isinstance(v, str):
-            v = Path(v)
-        if isinstance(v, Path):
-            return v.expanduser().resolve()
-        raise ValueError(f"path must be string or Path, got {type(v)}")
-
-    model_config = {
-        "validate_assignment": True,
-        "extra": "forbid",
-    }
-
-
-# ============================================================================
-# PHASE 5.3: ROOT SETTINGS INTEGRATION
-# ============================================================================
-# Phase 5.3: Root Settings Composition with Environment Integration
-# Implements: OntologyDownloadSettings (composes all 10 domain models)
-# Status: In Progress (Phase 5.3)
-# ============================================================================
-
-
-class OntologyDownloadSettings(BaseModel):
-    """Root settings for OntologyDownload module.
-
-    Composes all 10 domain models with environment variable support.
-    Uses pydantic-settings for .env file and environment variable integration.
-
-    Composition:
-    - Foundation (5 models): HTTP, Cache, Retry, Logging, Telemetry
-    - Complex (5 models): Security, RateLimit, Extraction, Storage, DuckDB
-
-    Environment Variable Prefix: ONTOFETCH_
-    Example: ONTOFETCH_HTTP__TIMEOUT_READ=30
-
-    Source Precedence (highest to lowest):
-    1. CLI arguments (passed to constructor)
-    2. .env.ontofetch file
-    3. .env file
-    4. Environment variables (ONTOFETCH_*)
-    5. Defaults (baked-in)
-    """
-
-    model_config = ConfigDict(
-        frozen=True,
-        validate_assignment=False,
-        extra="ignore",  # Ignore unknown fields from env vars
-    )
-
-    # Foundation Domain Models (Phase 5.1)
-    http: HttpSettings = Field(
-        default_factory=HttpSettings,
-        description="HTTP client settings (HTTPX + Hishel)",
-    )
-    cache: CacheSettings = Field(
-        default_factory=CacheSettings,
-        description="Cache settings (Hishel RFC-9111)",
-    )
-    retry: RetrySettings = Field(
-        default_factory=RetrySettings,
-        description="Retry settings (exponential backoff)",
-    )
-    logging: LoggingSettings = Field(
-        default_factory=LoggingSettings,
-        description="Logging configuration",
-    )
-    telemetry: TelemetrySettings = Field(
-        default_factory=TelemetrySettings,
-        description="Telemetry and observability",
-    )
-
-    # Complex Domain Models (Phase 5.2)
-    security: SecuritySettings = Field(
-        default_factory=SecuritySettings,
-        description="URL security and DNS settings",
-    )
-    ratelimit: RateLimitSettings = Field(
-        default_factory=RateLimitSettings,
-        description="Rate limiting configuration",
-    )
-    extraction: ExtractionSettings = Field(
-        default_factory=ExtractionSettings,
-        description="Archive extraction policies",
-    )
-    storage: StorageSettings = Field(
-        default_factory=StorageSettings,
-        description="Storage configuration",
-    )
-    db: DuckDBSettings = Field(
-        default_factory=DuckDBSettings,
-        description="DuckDB catalog configuration",
-    )
-
-    def config_hash(self) -> str:
-        """Compute SHA-256 hash of normalized configuration for provenance tracking."""
-        import hashlib
-
-        # Serialize non-secret config
-        config_dict = self.model_dump()
-        config_json = json.dumps(config_dict, sort_keys=True, default=str)
-        return hashlib.sha256(config_json.encode()).hexdigest()
-
-    @property
-    def source_fingerprint(self) -> Dict[str, str]:
-        """Return mapping of field names to their configuration sources.
-
-        This property exposes the source attribution map built by TracingSettingsSource
-        during settings initialization. It shows which source (CLI, environment,
-        config file, .env, or default) provided each field value.
-
-        Returns:
-            Dictionary where keys are field names and values are source names:
-            - "cli": provided via CLI/programmatic arguments
-            - "env": provided via ONTOFETCH_* environment variables
-            - "config:/path/to/file": provided via config file
-            - ".env.ontofetch": provided via .env.ontofetch file
-            - ".env": provided via .env file
-            - "default": using built-in default value
-
-        Example:
-            >>> settings = get_settings()
-            >>> fp = settings.source_fingerprint
-            >>> print(fp)
-            {'http__timeout_read': 'env', 'security__allowed_hosts': 'cli', 'db__path': 'default'}
-
-        Note:
-            The fingerprint is populated during settings initialization only.
-            Use get_source_fingerprint() directly to access the context.
-        """
-        from .settings_sources import get_source_fingerprint
-
-        return get_source_fingerprint()
-
-
-# Global settings instance cache
-_settings_instance: Optional[OntologyDownloadSettings] = None
-_settings_lock = __import__("threading").Lock()
-
-
-def get_settings(
-    *,
-    force_reload: bool = False,
-) -> OntologyDownloadSettings:
-    """Get or create singleton settings instance with caching.
-
-    Args:
-        force_reload: Force reload from environment (bypass cache)
-
-    Returns:
-        OntologyDownloadSettings: Cached or new instance
-
-    Environment Variables:
-        ONTOFETCH_HTTP__TIMEOUT_READ=30
-        ONTOFETCH_SECURITY__ALLOWED_HOSTS=example.com,*.other.org
-        ONTOFETCH_EXTRACT__MAX_DEPTH=64
-        etc.
-
-    Example:
-        >>> settings = get_settings()
-        >>> print(settings.http.timeout_read)
-        30.0
-        >>> print(settings.config_hash())
-        a1b2c3...
-    """
-    global _settings_instance
-
-    if _settings_instance is not None and not force_reload:
-        return _settings_instance
-
-    with _settings_lock:
-        if _settings_instance is not None and not force_reload:
-            return _settings_instance
-
-        # Create new instance from defaults
-        # Phase 5.3 enhancement: Add environment variable parsing here
-        _settings_instance = OntologyDownloadSettings()
-        return _settings_instance
-
-
-def clear_settings_cache() -> None:
-    """Clear the settings cache (useful for testing)."""
-    global _settings_instance
-    with _settings_lock:
-        _settings_instance = None
-
-
-__all__ = [
-    "UserConfigError",
-    "OntologyDownloadError",
-    "ResolverError",
-    "ValidationError",
-    "PolicyError",
-    "DownloadFailure",
-    "ConfigError",
-    "DefaultsConfig",
-    "DownloadConfiguration",
-    "LoggingConfiguration",
-    "ValidationConfig",
-    "PlannerConfig",
-    "ResolvedConfig",
-    "EnvironmentOverrides",
-    "build_resolved_config",
-    "ensure_python_version",
-    "get_env_overrides",
-    "load_config",
-    "load_raw_yaml",
-    "normalize_config_path",
-    "parse_rate_limit_to_rps",
-    "validate_config",
-    "get_pystow",
-    "get_rdflib",
-    "get_pronto",
-    "get_owlready2",
-    "DATA_ROOT",
-    "CONFIG_DIR",
-    "CACHE_DIR",
-    "LOG_DIR",
-    "LOCAL_ONTOLOGY_DIR",
-    "StorageBackend",
-    "LocalStorageBackend",
-    "FsspecStorageBackend",
-    "get_storage_backend",
-    "STORAGE",
-    # Phase 5.1: Domain Models Foundation
-    "HttpSettings",
-    "CacheSettings",
-    "RetrySettings",
-    "LoggingSettings",
-    "TelemetrySettings",
-    # Phase 5.2: Complex Domain Models
-    "SecuritySettings",
-    "RateLimitSettings",
-    "ExtractionSettings",
-    "StorageSettings",
-    "DuckDBSettings",
-    # Phase 5.3: Root Settings Integration
-    "OntologyDownloadSettings",
-    "get_settings",
-    "clear_settings_cache",
-]

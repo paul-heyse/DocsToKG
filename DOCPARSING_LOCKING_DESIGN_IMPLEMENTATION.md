@@ -48,6 +48,7 @@ class JsonlWriter:
 ```
 
 **Features:**
+
 - Per-file FileLock prevents concurrent writes
 - Delegates to existing `jsonl_append_iter(..., atomic=True)` for safety
 - Timeout configuration (default: 120s)
@@ -55,6 +56,7 @@ class JsonlWriter:
 - Best-effort lock release in finally block
 
 **Default Instance:**
+
 ```python
 DEFAULT_JSONL_WRITER: JsonlWriter = JsonlWriter()
 ```
@@ -64,6 +66,7 @@ DEFAULT_JSONL_WRITER: JsonlWriter = JsonlWriter()
 ### 2. TelemetrySink Integration (`src/DocsToKG/DocParsing/telemetry.py`)
 
 **Updated `_default_writer()`:**
+
 ```python
 def _default_writer(path: Path, rows: Iterable[Dict[str, Any]]) -> int:
     """Append rows using the lock-aware JsonlWriter."""
@@ -74,12 +77,14 @@ def _default_writer(path: Path, rows: Iterable[Dict[str, Any]]) -> int:
 **Benefits:** Centralized lock management, improved clarity
 
 **TelemetrySink Constructor:**
+
 - Now accepts optional `writer` parameter
 - Defaults to `_default_writer` (which uses DEFAULT_JSONL_WRITER)
 - Enables test injection of mock writers
 - Fully backward compatible
 
 **StageTelemetry Constructor:**
+
 - Accepts optional `writer` parameter
 - Cascades through to TelemetrySink
 - Documentation clarifies lock-aware behavior
@@ -89,6 +94,7 @@ def _default_writer(path: Path, rows: Iterable[Dict[str, Any]]) -> int:
 ### 3. Deprecation Guidance (`src/DocsToKG/DocParsing/core/concurrency.py`)
 
 **Updated `acquire_lock()`:**
+
 ```python
 @contextlib.contextmanager
 def acquire_lock(path: Path, timeout: float = 60.0) -> Iterator[bool]:
@@ -109,6 +115,7 @@ def acquire_lock(path: Path, timeout: float = 60.0) -> Iterator[bool]:
 ```
 
 **Behavior:**
+
 - Continues to work for non-.jsonl files (backward compatible)
 - Emits `DeprecationWarning` for `.jsonl` targets
 - Provides clear guidance toward unified writer path
@@ -120,6 +127,7 @@ def acquire_lock(path: Path, timeout: float = 60.0) -> Iterator[bool]:
 **14 comprehensive tests** validating:
 
 #### JsonlWriter Tests (7)
+
 ✅ Basic append
 ✅ Sequential appends
 ✅ Empty rows handling
@@ -129,19 +137,23 @@ def acquire_lock(path: Path, timeout: float = 60.0) -> Iterator[bool]:
 ✅ DEFAULT_JSONL_WRITER instance check
 
 #### TelemetrySink Integration (2)
+
 ✅ Lock-aware writer usage
 ✅ Custom writer injection
 
 #### StageTelemetry Integration (3)
+
 ✅ Writer usage in record_attempt
 ✅ log_success writes both attempt and manifest
 ✅ Concurrent logging from 3 threads (30 total docs)
 
 #### Deprecation Warning Tests (2)
+
 ✅ Warning emitted for `.jsonl` files
 ✅ No warning for non-.jsonl files
 
 **Test Results:**
+
 ```
 ======================== 14 passed in 3.10s =========================
 ```
@@ -151,21 +163,25 @@ def acquire_lock(path: Path, timeout: float = 60.0) -> Iterator[bool]:
 ## Benefits
 
 ### Safety
+
 - **Race-Free**: FileLock serializes concurrent writers
 - **Atomic**: jsonl_append_iter ensures write atomicity
 - **Timeout Aware**: Detects stalled writers (120s default)
 
 ### Clarity
+
 - **Single Point of Truth**: One writer path for all manifest/attempt appends
 - **Clear Deprecation**: Developers guided away from incorrect patterns
 - **Injectable**: Tests can mock writer behavior
 
 ### Maintainability
+
 - **Encapsulated**: Lock logic isolated in JsonlWriter
 - **Testable**: 14 tests validate all scenarios
 - **Backward Compatible**: Zero breaking changes
 
 ### Performance
+
 - **Minimal Overhead**: Per-file locks, not global
 - **Scalable**: Works with process pools and threading
 - **Efficient**: Reuses existing atomic_write infrastructure
@@ -174,7 +190,7 @@ def acquire_lock(path: Path, timeout: float = 60.0) -> Iterator[bool]:
 
 ## Alignment with Design Specification
 
-### From `Parsing Telemetry revisit detailed difference.md`:
+### From `Parsing Telemetry revisit detailed difference.md`
 
 ✅ **Section 1**: Added lock-aware writer to io.py
 ✅ **Section 2**: Injected writer into telemetry.py, removed internal lock usage
@@ -188,9 +204,10 @@ def acquire_lock(path: Path, timeout: float = 60.0) -> Iterator[bool]:
 
 ## Migration Path for Existing Code
 
-### If you have existing code using `acquire_lock()` for JSONL:
+### If you have existing code using `acquire_lock()` for JSONL
 
 **Before:**
+
 ```python
 from DocsToKG.DocParsing.core.concurrency import acquire_lock
 
@@ -199,13 +216,15 @@ with acquire_lock(manifest_path, timeout=60):
 ```
 
 **After:**
+
 ```python
 from DocsToKG.DocParsing.io import DEFAULT_JSONL_WRITER
 
 DEFAULT_JSONL_WRITER(manifest_path, rows)
 ```
 
-### Or use via TelemetrySink:
+### Or use via TelemetrySink
+
 ```python
 sink = TelemetrySink(attempts_path, manifest_path)
 telemetry = StageTelemetry(sink, run_id="run1", stage="chunk")
