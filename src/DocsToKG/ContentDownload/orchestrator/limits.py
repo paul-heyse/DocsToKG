@@ -48,7 +48,9 @@ call acquire/release concurrently without data races.
 from __future__ import annotations
 
 import logging
+import random
 import threading
+import time
 from typing import Optional
 from urllib.parse import urlsplit
 
@@ -58,38 +60,27 @@ logger = logging.getLogger(__name__)
 
 
 def host_key(url: str) -> str:
-    """Extract normalized host key from URL.
-
-    Returns host:port pair, excluding default ports (80 for http, 443 for https).
-    Used as concurrency limit key for per-host fairness.
-
+    """Extract normalized host from URL for keying.
+    
+    Returns the hostname with port if present.
+    Handles punycode (IDN) domains.
+    
     Args:
         url: Full URL (e.g., "https://api.example.com:8080/path")
-
+    
     Returns:
-        Normalized host key (e.g., "api.example.com:8080" or "example.com")
-
-    Examples:
-        >>> host_key("https://api.crossref.org/works")
-        'api.crossref.org'
-
-        >>> host_key("http://example.com:8080/data")
-        'example.com:8080'
+        Host key (e.g., "api.example.com:8080")
     """
     try:
-        parts = urlsplit(url)
-        hostname = parts.hostname or ""
-        port = parts.port
-
-        # Exclude default ports
-        if (parts.scheme == "http" and port == 80) or (parts.scheme == "https" and port == 443):
-            port = None
-
-        if port:
-            return f"{hostname}:{port}"
-        return hostname
+        parsed = urlsplit(url)
+        host = parsed.netloc
+        if not host:
+            logger.warning(f"Failed to extract host key from {url}: empty netloc")
+            return url
+        return host
     except Exception as e:
-        logger.warning(f"Failed to extract host key from {url}: {e}")
+        logger.warning(
+f"Failed to extract host key from {url}: {e}")
         return url  # Fallback to full URL
 
 
@@ -98,6 +89,9 @@ class KeyedLimiter:
 
     Provides fine-grained concurrency control by key (e.g., resolver name, host).
     Each key gets its own semaphore with configurable limit.
+    
+    Implements TTL-based semaphore eviction to prevent unbounded memory growth
+    when dealing with many dynamic keys (e.g., CDN edge servers with distinct IPs).
 
     Example:
         >>> limiter = KeyedLimiter(default_limit=2, per_key={"unpaywall": 1})
@@ -110,28 +104,63 @@ class KeyedLimiter:
         self,
         default_limit: int,
         per_key: Optional[dict[str, int]] = None,
+        semaphore_ttl_sec: Optional[int] = 3600,
     ) -> None:
         """Initialize keyed limiter.
 
         Args:
             default_limit: Default concurrency limit for unknown keys
             per_key: Optional per-key overrides (e.g., {"unpaywall": 1, "crossref": 2})
+            semaphore_ttl_sec: TTL for unused semaphores (default 3600s = 1 hour).
+                              Set to None to disable TTL-based eviction.
         """
         self.default_limit = max(1, default_limit)
         self.per_key = per_key or {}
-        self._locks: dict[str, threading.Semaphore] = {}
+        self.semaphore_ttl_sec = semaphore_ttl_sec
+        # Store (semaphore, last_access_time) tuples
+        self._locks: dict[str, tuple[threading.Semaphore, float]] = {}
         self._mutex = threading.Lock()
 
     def _get_semaphore(self, key: str) -> threading.Semaphore:
         """Get or create semaphore for key.
 
         Thread-safe creation of semaphores on first access.
+        Implements lazy TTL-based eviction of stale semaphores.
+        
+        Args:
+            key: Concurrency key
+            
+        Returns:
+            Semaphore for the key
         """
         with self._mutex:
+            now = time.time()
+            
+            # Lazy eviction: clear stale entries every ~100 accesses (1% probability)
+            if (
+                self.semaphore_ttl_sec is not None
+                and len(self._locks) > 10000
+                and random.random() < 0.01
+            ):
+                self._locks = {
+                    k: (sem, ts)
+                    for k, (sem, ts) in self._locks.items()
+                    if now - ts < self.semaphore_ttl_sec
+                }
+                logger.debug(
+                    f"Evicted stale semaphores; remaining: {len(self._locks)}"
+                )
+            
             if key not in self._locks:
                 limit = self.per_key.get(key, self.default_limit)
-                self._locks[key] = threading.Semaphore(limit)
-            return self._locks[key]
+                self._locks[key] = (threading.Semaphore(limit), now)
+            else:
+                # Update last-access time
+                sem, _ = self._locks[key]
+                self._locks[key] = (sem, now)
+            
+            sem, _ = self._locks[key]
+            return sem
 
     def acquire(self, key: str) -> None:
         """Acquire concurrency slot for key.

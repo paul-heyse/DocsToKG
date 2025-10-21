@@ -246,7 +246,7 @@ class TelemetryConfig(BaseModel):
 
 class HishelConfig(BaseModel):
     """Configuration for Hishel HTTP caching (RFC 9111 compliant).
-    
+
     Hishel is an HTTP caching library that follows RFC 9111 standards for
     cache control, validation, and expiration. This config controls cache
     backend, TTL, and RFC 9111 compliance options.
@@ -726,9 +726,7 @@ class ContentDownloadConfig(BaseModel):
     hishel: HishelConfig = Field(
         default_factory=HishelConfig, description="Hishel HTTP caching configuration (RFC 9111)"
     )
-    queue: QueueConfig = Field(
-        default_factory=QueueConfig, description="Work queue configuration"
-    )
+    queue: QueueConfig = Field(default_factory=QueueConfig, description="Work queue configuration")
     orchestrator: OrchestratorConfig = Field(
         default_factory=OrchestratorConfig, description="Work orchestrator configuration"
     )

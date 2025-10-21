@@ -243,16 +243,16 @@ class TestDevelopmentProvider:
     def test_dev_provider_context_manager(self) -> None:
         """Provider can be used with context manager."""
         connector = CatalogConnector("development", {})
-        
+
         # Initially not opened
         with pytest.raises(RuntimeError):
             connector.stats()
-        
+
         # Open with context manager
         with connector as cat:
             stats = cat.stats()
             assert isinstance(stats, dict)
-        
+
         # After exiting, connection is closed
         with pytest.raises(RuntimeError):
             connector.stats()
@@ -289,10 +289,7 @@ class TestDevelopmentProvider:
         """WAL mode is enabled for better concurrency."""
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = str(Path(tmpdir) / "test.sqlite")
-            with CatalogConnector("development", {
-                "db_path": db_path,
-                "enable_wal": True
-            }) as cat:
+            with CatalogConnector("development", {"db_path": db_path, "enable_wal": True}) as cat:
                 # WAL files should exist
                 wal_file = Path(db_path + "-wal")
                 assert wal_file.exists()

@@ -19,7 +19,14 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from .base import DocumentRecord, HealthCheck, HealthStatus, ProviderConfigError, ProviderConnectionError, ProviderOperationError
+from .base import (
+    DocumentRecord,
+    HealthCheck,
+    HealthStatus,
+    ProviderConfigError,
+    ProviderConnectionError,
+    ProviderOperationError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -117,15 +124,9 @@ class DevelopmentProvider:
         """)
 
         # Create lookup indexes
-        self.conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_documents_sha ON documents(sha256)"
-        )
-        self.conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_documents_ct ON documents(content_type)"
-        )
-        self.conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_documents_run ON documents(run_id)"
-        )
+        self.conn.execute("CREATE INDEX IF NOT EXISTS idx_documents_sha ON documents(sha256)")
+        self.conn.execute("CREATE INDEX IF NOT EXISTS idx_documents_ct ON documents(content_type)")
+        self.conn.execute("CREATE INDEX IF NOT EXISTS idx_documents_run ON documents(run_id)")
         self.conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_documents_artifact ON documents(artifact_id)"
         )
@@ -152,9 +153,7 @@ class DevelopmentProvider:
             CREATE UNIQUE INDEX IF NOT EXISTS idx_variants_unique
             ON variants(document_id, variant)
         """)
-        self.conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_variants_sha ON variants(sha256)"
-        )
+        self.conn.execute("CREATE INDEX IF NOT EXISTS idx_variants_sha ON variants(sha256)")
 
         self.conn.commit()
 
@@ -215,17 +214,13 @@ class DevelopmentProvider:
 
                 # Fetch and return the inserted record
                 record_id = cursor.lastrowid
-                cursor = self.conn.execute(
-                    "SELECT * FROM documents WHERE id = ?", (record_id,)
-                )
+                cursor = self.conn.execute("SELECT * FROM documents WHERE id = ?", (record_id,))
                 row = cursor.fetchone()
 
                 if row:
                     return self._row_to_record(row)
 
-                raise ProviderOperationError(
-                    "Failed to retrieve inserted record"
-                )
+                raise ProviderOperationError("Failed to retrieve inserted record")
 
             except sqlite3.IntegrityError as e:
                 # Unique constraint violation - fetch the existing record
@@ -341,14 +336,10 @@ class DevelopmentProvider:
 
         with self._lock:
             try:
-                cursor = self.conn.execute(
-                    "SELECT COUNT(*) FROM documents"
-                )
+                cursor = self.conn.execute("SELECT COUNT(*) FROM documents")
                 total_records = cursor.fetchone()[0]
 
-                cursor = self.conn.execute(
-                    "SELECT SUM(bytes) FROM documents WHERE bytes > 0"
-                )
+                cursor = self.conn.execute("SELECT SUM(bytes) FROM documents WHERE bytes > 0")
                 total_bytes = cursor.fetchone()[0] or 0
 
                 cursor = self.conn.execute(
@@ -358,9 +349,7 @@ class DevelopmentProvider:
 
                 duplicates = len(self.find_duplicates())
 
-                cursor = self.conn.execute(
-                    "SELECT DISTINCT resolver FROM documents"
-                )
+                cursor = self.conn.execute("SELECT DISTINCT resolver FROM documents")
                 resolvers = [row[0] for row in cursor.fetchall()]
 
                 cursor = self.conn.execute(

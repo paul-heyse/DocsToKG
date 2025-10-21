@@ -64,15 +64,15 @@ class TestCatalogBoundaryRecording:
         """Test download_boundary as context manager."""
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = Path(tmpdir) / "test.duckdb"
-            
+
             # Mock connection
             mock_conn = MagicMock()
             mock_conn.begin = MagicMock()
             mock_conn.commit = MagicMock()
             mock_conn.rollback = MagicMock()
-            
+
             from DocsToKG.OntologyDownload.catalog.boundaries import download_boundary
-            
+
             # Use boundary as context manager
             with patch('DocsToKG.OntologyDownload.catalog.boundaries.emit_boundary_begin'):
                 with patch('DocsToKG.OntologyDownload.catalog.boundaries.emit_boundary_success'):
@@ -274,25 +274,25 @@ class TestCoreIntegrationSummary:
         # Phase 1: Boundaries
         from DocsToKG.OntologyDownload.catalog.boundaries import download_boundary
         assert download_boundary is not None
-        
+
         # Phase 1: Observability
         from DocsToKG.OntologyDownload.catalog.observability_instrumentation import (
             emit_boundary_begin,
         )
         assert emit_boundary_begin is not None
-        
+
         # Phase 1: Policy gates
         from DocsToKG.OntologyDownload.policy.gates import db_boundary_gate
         assert db_boundary_gate is not None
-        
+
         # Phase 2: Storage
         from DocsToKG.OntologyDownload.storage.localfs_duckdb import LocalDuckDBStorage
         assert LocalDuckDBStorage is not None
-        
+
         # Phase 2: Query API
         from DocsToKG.OntologyDownload.catalog.queries_api import CatalogQueries
         assert CatalogQueries is not None
-        
+
         # Phase 2: Profiler & Schema
         from DocsToKG.OntologyDownload.catalog.profiler import CatalogProfiler
         from DocsToKG.OntologyDownload.catalog.schema_inspector import CatalogSchema
