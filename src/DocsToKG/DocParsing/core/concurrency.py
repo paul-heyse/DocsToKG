@@ -34,7 +34,7 @@ LOGGER = get_logger(__name__, base_fields={"stage": "core"})
 @contextlib.contextmanager
 def _acquire_lock(path: Path, timeout: float = 60.0) -> Iterator[bool]:
     """INTERNAL ONLY: Acquire an advisory lock using :mod:`filelock` primitives.
-    
+
     This is a private function used internally by doctags and embedding modules.
     Not for public use. Subject to change without notice.
     """

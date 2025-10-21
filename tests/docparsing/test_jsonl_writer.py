@@ -294,27 +294,3 @@ class TestStageTelemetryWithWriter:
         with open(attempts_path) as f:
             lines = f.readlines()
             assert len(lines) == 30  # 3 threads * 10 docs
-
-
-class TestDeprecationWarning:
-    """Tests for deprecation warning on acquire_lock with .jsonl files."""
-
-    def test_acquire_lock_warns_on_jsonl(self, tmp_path: Path) -> None:
-        """Test that acquire_lock emits deprecation warning for .jsonl files."""
-        from DocsToKG.DocParsing.core.concurrency import acquire_lock
-
-        jsonl_path = tmp_path / "test.jsonl"
-
-        with pytest.warns(DeprecationWarning, match="discouraged for manifest"):
-            with acquire_lock(jsonl_path, timeout=1.0):
-                pass
-
-    def test_acquire_lock_no_warn_for_non_jsonl(self, tmp_path: Path) -> None:
-        """Test that acquire_lock does not warn for non-.jsonl files."""
-        from DocsToKG.DocParsing.core.concurrency import acquire_lock
-
-        other_path = tmp_path / "test.txt"
-
-        # Should not raise a warning
-        with acquire_lock(other_path, timeout=1.0):
-            pass
