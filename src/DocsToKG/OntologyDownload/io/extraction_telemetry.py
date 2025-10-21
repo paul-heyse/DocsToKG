@@ -68,6 +68,17 @@ class ExtractionErrorCode(str, Enum):
 
     # Space Budgeting
     SPACE = "E_SPACE"  # Insufficient disk space
+    
+    # Format & Filter Validation
+    FORMAT_NOT_ALLOWED = "E_FORMAT_NOT_ALLOWED"  # Archive format/filter not in allow-list
+    
+    # Windows Portability
+    PORTABILITY = "E_PORTABILITY"  # Windows reserved name or portability violation
+    
+    # Archive Corruption
+    EXTRACT_CORRUPT = "E_EXTRACT_CORRUPT"  # Archive is corrupted or truncated
+    EXTRACT_IO = "E_EXTRACT_IO"  # I/O error during extraction
+    BOMB_RATIO = "E_BOMB_RATIO"  # Global compression ratio exceeded (zip bomb)
 
 
 # ============================================================================
@@ -144,6 +155,11 @@ class ExtractionTelemetryEvent:
     partial: bool = False
 
     duration_ms: float = 0.0
+    
+    # Provenance & reproducibility
+    run_id: str = field(default_factory=lambda: str(__import__('uuid').uuid4()))
+    config_hash: str = ""
+    format_name: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert event to dictionary for JSON logging."""
@@ -204,6 +220,11 @@ def error_message(code: ExtractionErrorCode, detail: str = "") -> str:
         ExtractionErrorCode.FILE_SIZE_STREAM: "Streamed file size exceeds limit",
         ExtractionErrorCode.ENTRY_RATIO: "Entry compression ratio exceeds limit",
         ExtractionErrorCode.SPACE: "Insufficient disk space",
+        ExtractionErrorCode.FORMAT_NOT_ALLOWED: "Archive format or filter not in allow-list",
+        ExtractionErrorCode.PORTABILITY: "Windows portability violation",
+        ExtractionErrorCode.EXTRACT_CORRUPT: "Archive is corrupted or truncated",
+        ExtractionErrorCode.EXTRACT_IO: "I/O error during extraction",
+        ExtractionErrorCode.BOMB_RATIO: "Compression ratio indicates zip bomb",
     }
     msg = messages.get(code, str(code))
     if detail:

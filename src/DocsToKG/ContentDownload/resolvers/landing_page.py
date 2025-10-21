@@ -51,7 +51,7 @@ class LandingPageResolver(RegisteredResolver):
     """Attempt to scrape landing pages for PDF links when metadata fails."""
 
     name = "landing_page"
-    
+
     def __init__(self) -> None:
         """Initialize resolver with robots cache."""
         super().__init__()
@@ -92,17 +92,17 @@ class LandingPageResolver(RegisteredResolver):
                 event_reason=ResolverEventReason.NO_BEAUTIFULSOUP,
             )
             return
-        
+
         # Get robots configuration from pipeline (default: enabled)
         robots_enabled = True
         if hasattr(config, "extra") and isinstance(config.extra, Mapping):
             robots_enabled = config.extra.get("robots_enabled", True)
-        
+
         # Get user-agent for robots check
         user_agent = "DocsToKG/ContentDownload"
         if config.polite_headers and isinstance(config.polite_headers, Mapping):
             user_agent = config.polite_headers.get("User-Agent", user_agent)
-        
+
         for landing in artifact.landing_urls:
             # Phase 3: Check robots.txt before landing page fetch (if enabled)
             if robots_enabled:
@@ -119,7 +119,7 @@ class LandingPageResolver(RegisteredResolver):
                 except Exception:
                     # Fail-open: if robots check fails, continue anyway
                     pass
-            
+
             try:
                 resp = request_with_retries(
                     client,

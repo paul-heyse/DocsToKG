@@ -409,11 +409,22 @@ class PreScanValidator:
         # 4. Check for case-fold collisions
         self.collision_detector.check_collision(normalized)
 
-        # 5. Validate per-file size limits (for non-directories)
+        # 5. Validate Windows portability (if policy enables it)
+        from .extraction_integrity import check_windows_portability
+        is_valid, error_msg = check_windows_portability(normalized, self.policy)
+        if not is_valid:
+            raise ConfigError(
+                error_message(
+                    ExtractionErrorCode.PORTABILITY,
+                    f"Windows portability violation: {error_msg}",
+                )
+            )
+
+        # 6. Validate per-file size limits (for non-directories)
         if not is_dir and uncompressed_size is not None:
             validate_file_size(uncompressed_size, self.policy, original_path)
 
-        # 6. Validate per-entry compression ratio (if sizes available)
+        # 7. Validate per-entry compression ratio (if sizes available)
         if not is_dir and compressed_size is not None and compressed_size > 0:
             if uncompressed_size is not None:
                 validate_entry_compression_ratio(

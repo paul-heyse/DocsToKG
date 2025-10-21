@@ -25,11 +25,13 @@ backend.
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import os
 import re
 import shutil
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Dict, List, Optional
 
@@ -47,6 +49,121 @@ from .extraction_telemetry import (
 )
 
 _MAX_COMPRESSION_RATIO = 10.0
+
+
+def _compute_config_hash(policy: ExtractionPolicy) -> str:
+    """Compute a deterministic hash of extraction policy for provenance tracking."""
+    policy_str = json.dumps(
+        {
+            "encapsulate": policy.encapsulate,
+            "encapsulation_name": policy.encapsulation_name,
+            "max_depth": policy.max_depth,
+            "max_components_len": policy.max_components_len,
+            "max_path_len": policy.max_path_len,
+            "normalize_unicode": policy.normalize_unicode,
+            "casefold_collision_policy": policy.casefold_collision_policy,
+            "max_entries": policy.max_entries,
+            "max_file_size_bytes": policy.max_file_size_bytes,
+            "max_entry_ratio": policy.max_entry_ratio,
+            "allow_symlinks": policy.allow_symlinks,
+            "allow_hardlinks": policy.allow_hardlinks,
+        },
+        sort_keys=True,
+    )
+    return hashlib.sha256(policy_str.encode("utf-8")).hexdigest()[:16]
+
+
+def _write_audit_manifest(
+    extract_root: Path,
+    archive_path: Path,
+    policy: ExtractionPolicy,
+    entries_metadata: List[tuple[str, Path, int, Optional[str]]],  # (orig_path, normalized_path, size, sha256)
+    telemetry: "ExtractionTelemetryEvent",
+    metrics: "ExtractionMetrics",
+) -> None:
+    """Write deterministic audit JSON manifest for extraction.
+    
+    Args:
+        extract_root: Root directory where files were extracted
+        archive_path: Path to the source archive
+        policy: ExtractionPolicy used for extraction
+        entries_metadata: List of (original_path, normalized_path, size, sha256_hash)
+        telemetry: Telemetry event with extraction metadata
+        metrics: Extraction metrics with duration and counts
+    """
+    try:
+        import libarchive as la
+        
+        # Compute archive SHA256
+        archive_sha256 = hashlib.sha256()
+        with open(archive_path, "rb") as f:
+            for chunk in iter(lambda: f.read(65536), b""):
+                archive_sha256.update(chunk)
+        
+        # Build manifest
+        manifest = {
+            "schema_version": "1.0",
+            "run_id": telemetry.run_id,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "archive_path": str(archive_path),
+            "archive_sha256": archive_sha256.hexdigest(),
+            "archive_size_bytes": archive_path.stat().st_size,
+            "encapsulation_root": str(extract_root),
+            "config_hash": _compute_config_hash(policy),
+            "policy": {
+                "encapsulate": policy.encapsulate,
+                "encapsulation_name": policy.encapsulation_name,
+                "max_depth": policy.max_depth,
+                "max_components_len": policy.max_components_len,
+                "max_path_len": policy.max_path_len,
+                "normalize_unicode": policy.normalize_unicode,
+                "casefold_collision_policy": policy.casefold_collision_policy,
+                "max_entries": policy.max_entries,
+                "max_file_size_bytes": policy.max_file_size_bytes,
+                "max_entry_ratio": policy.max_entry_ratio,
+            },
+            "metrics": {
+                "entries_total": metrics.total_entries,
+                "entries_allowed": metrics.entries_allowed,
+                "entries_extracted": metrics.entries_extracted,
+                "bytes_declared": metrics.total_bytes,
+                "bytes_written": telemetry.bytes_written,
+                "duration_ms": round(metrics.duration_ms, 2),
+                "format": telemetry.format_name or "unknown",
+                "filters": telemetry.filters or [],
+            },
+            "entries": [
+                {
+                    "path_rel": str(norm_path.relative_to(extract_root)),
+                    "path_original": orig_path,
+                    "size": size,
+                    "sha256": sha256 if sha256 else "",
+                    "scan_index": idx,
+                }
+                for idx, (orig_path, norm_path, size, sha256) in enumerate(entries_metadata)
+            ],
+        }
+        
+        # Write atomically
+        manifest_path = extract_root / policy.manifest_filename
+        manifest_tmp = manifest_path.with_suffix(".tmp")
+        
+        with open(manifest_tmp, "w", encoding="utf-8") as f:
+            json.dump(manifest, f, indent=2, sort_keys=True)
+        
+        manifest_tmp.replace(manifest_path)
+        
+    except Exception as e:
+        # Log but don't fail extraction if audit manifest fails
+        logger = logging.getLogger("DocsToKG.OntologyDownload")
+        logger.warning(
+            "failed to write audit manifest",
+            extra={
+                "stage": "extract",
+                "error": str(e),
+                "manifest_path": str(extract_root / policy.manifest_filename),
+            },
+        )
 
 
 def _resolve_max_uncompressed_bytes(limit: Optional[int]) -> Optional[int]:
@@ -349,6 +466,9 @@ def extract_archive_safe(
                 )
 
         extract_root.mkdir(parents=True, exist_ok=True)
+        
+        # Compute and store config hash for provenance
+        telemetry.config_hash = _compute_config_hash(policy)
 
         # Phase 1: Pre-scan validation without writing
         entries_to_extract: List[tuple[str, Path, bool]] = []  # (orig_name, validated_path, is_dir)
@@ -366,6 +486,29 @@ def extract_archive_safe(
                 orig_pathname = entry.pathname
                 is_dir = entry.isdir
                 entry_size = entry.size if entry.size is not None else 0
+
+                # Phase 1: Validate format and filters (right after opening)
+                if telemetry.format_name is None:  # First iteration
+                    from .extraction_integrity import validate_archive_format
+                    
+                    format_name = getattr(archive, "format_name", None)
+                    filters = getattr(archive, "filters", None) or []
+                    
+                    # Convert bytes to string if necessary
+                    if isinstance(format_name, bytes):
+                        format_name = format_name.decode("utf-8", errors="replace")
+                    if isinstance(filters, (list, tuple)):
+                        filters = [f.decode("utf-8", errors="replace") if isinstance(f, bytes) else f for f in filters]
+                    
+                    telemetry.format_name = format_name
+                    telemetry.filters = filters if isinstance(filters, list) else []
+                    
+                    is_valid, error_msg = validate_archive_format(format_name, filters, policy)
+                    if not is_valid:
+                        raise ConfigError(error_message(
+                            ExtractionErrorCode.FORMAT_NOT_ALLOWED,
+                            f"Archive format/filter validation failed: {error_msg}",
+                        ))
 
                 # Phase 2: Validate against all security policies (via PreScanValidator)
                 # This includes:
@@ -425,6 +568,7 @@ def extract_archive_safe(
         # Phase 4: Extract (only if pre-scan passed)
         extracted_files: List[Path] = []
         extracted_dirs: List[Path] = []
+        entries_metadata: List[tuple[str, Path, int, Optional[str]]] = []  # For audit manifest
 
         with libarchive.file_reader(str(archive_path)) as archive:
             for entry, (orig_pathname, validated_path, is_dir) in zip(
@@ -439,14 +583,60 @@ def extract_archive_safe(
                     # Ensure parent directory exists
                     target_path.parent.mkdir(parents=True, exist_ok=True)
 
-                    # Stream the file content to the target
-                    with target_path.open("wb") as target_file:
-                        bytes_written = 0
-                        for block in entry.get_blocks():
-                            target_file.write(block)
-                            bytes_written += len(block)
-                        telemetry.bytes_written += bytes_written
-
+                    # Stream the file content to the target using atomic write discipline
+                    # (temp file → write → fsync → rename → mtime → periodic dirfsync)
+                    temp_path = target_path.with_suffix(f".tmp-{os.getpid()}-{uuid.uuid4().hex[:8]}")
+                    file_hasher = hashlib.sha256() if policy.hash_enable else None
+                    
+                    try:
+                        with temp_path.open("wb") as temp_file:
+                            bytes_written = 0
+                            for block in entry.get_blocks():
+                                temp_file.write(block)
+                                bytes_written += len(block)
+                                if file_hasher:
+                                    file_hasher.update(block)
+                            
+                            # Sync file to disk before rename
+                            if policy.atomic and hasattr(temp_file, 'fileno'):
+                                try:
+                                    os.fsync(temp_file.fileno())
+                                except (OSError, AttributeError):
+                                    pass  # fsync not supported on this platform
+                            
+                            telemetry.bytes_written += bytes_written
+                        
+                        # Atomic rename
+                        temp_path.replace(target_path)
+                        
+                        # Set mtime per policy
+                        if policy.timestamp_mode == "preserve" and hasattr(entry, 'mtime'):
+                            try:
+                                if entry.mtime is not None:
+                                    os.utime(str(target_path), (entry.mtime, entry.mtime))
+                            except (OSError, TypeError):
+                                pass  # mtime not available or not supported
+                        
+                        # Periodic directory fsync for durability
+                        if policy.atomic and len(extracted_files) % policy.group_fsync == 0:
+                            try:
+                                parent_fd = os.open(str(target_path.parent), os.O_DIRECTORY)
+                                try:
+                                    os.fsync(parent_fd)
+                                finally:
+                                    os.close(parent_fd)
+                            except (OSError, AttributeError):
+                                pass  # fsync not supported
+                    
+                    except Exception:
+                        # Clean up temp file on error
+                        if temp_path.exists():
+                            temp_path.unlink()
+                        raise
+                    
+                    # Record metadata for audit manifest
+                    file_hash = file_hasher.hexdigest() if file_hasher else None
+                    entries_metadata.append((orig_pathname, target_path, bytes_written, file_hash))
                     extracted_files.append(target_path)
 
         metrics.entries_extracted = len(extracted_files)
@@ -458,6 +648,17 @@ def extract_archive_safe(
             extracted_files=extracted_files,
             extracted_dirs=extracted_dirs,
         )
+
+        # Write audit JSON manifest (after successful extraction)
+        if policy.manifest_emit:
+            _write_audit_manifest(
+                extract_root=extract_root,
+                archive_path=archive_path,
+                policy=policy,
+                entries_metadata=entries_metadata,
+                telemetry=telemetry,
+                metrics=metrics,
+            )
 
         if logger:
             logger.info(

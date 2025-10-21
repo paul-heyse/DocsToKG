@@ -133,6 +133,13 @@ class ExtractionPolicy:
     - "reject": Fail extraction if collision detected
     - "allow": Allow both (first wins on case-insensitive filesystems)
     """
+    
+    windows_portability_strict: bool = True
+    """Enforce Windows portability checks (default: True).
+    
+    When True, blocks Windows reserved names (CON, NUL, LPT1-9, COM1-9)
+    and files with trailing spaces/dots.
+    """
 
     # ========================================================================
     # PHASE 3: Resource Budgets

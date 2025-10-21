@@ -176,7 +176,9 @@ Disallow: /admin/
         session.get.side_effect = lambda url, timeout: (
             MockResponse(200, robots1)
             if "example.com" in url
-            else MockResponse(200, robots2) if "other.com" in url else MockResponse(404)
+            else MockResponse(200, robots2)
+            if "other.com" in url
+            else MockResponse(404)
         )
 
         cache = RobotsCache()
