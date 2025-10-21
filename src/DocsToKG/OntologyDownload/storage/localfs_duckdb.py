@@ -23,6 +23,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional
 
+from ..observability.events import emit_event
 from .base import StorageBackend, StoredObject, StoredStat
 
 if TYPE_CHECKING:
@@ -75,9 +76,7 @@ class LocalDuckDBStorage(StorageBackend):
             raise ValueError(msg)
         return (self.root / Path(rel)).resolve()
 
-    def put_file(
-        self, local: Path, remote_rel: str, *, meta: dict | None = None
-    ) -> StoredObject:
+    def put_file(self, local: Path, remote_rel: str, *, meta: dict | None = None) -> StoredObject:
         """Upload local file to storage with atomic write.
 
         Args:
@@ -121,13 +120,23 @@ class LocalDuckDBStorage(StorageBackend):
             os.close(fd)
 
         st = os.stat(dest)
-        return StoredObject(
-            path_rel=remote_rel, size=st.st_size, etag=None, url=str(dest)
+        result = StoredObject(path_rel=remote_rel, size=st.st_size, etag=None, url=str(dest))
+
+        # Emit storage.put event per acceptance criteria
+        emit_event(
+            type="storage.put",
+            level="INFO",
+            payload={
+                "operation": "put_file",
+                "path_rel": remote_rel,
+                "size_bytes": result.size,
+                "source": str(local),
+            },
         )
 
-    def put_bytes(
-        self, data: bytes, remote_rel: str, *, meta: dict | None = None
-    ) -> StoredObject:
+        return result
+
+    def put_bytes(self, data: bytes, remote_rel: str, *, meta: dict | None = None) -> StoredObject:
         """Write bytes to storage with atomic write.
 
         Args:
@@ -167,9 +176,20 @@ class LocalDuckDBStorage(StorageBackend):
             os.close(fd)
 
         st = os.stat(dest)
-        return StoredObject(
-            path_rel=remote_rel, size=st.st_size, etag=None, url=str(dest)
+        result = StoredObject(path_rel=remote_rel, size=st.st_size, etag=None, url=str(dest))
+
+        # Emit storage.put event per acceptance criteria
+        emit_event(
+            type="storage.put",
+            level="INFO",
+            payload={
+                "operation": "put_bytes",
+                "path_rel": remote_rel,
+                "size_bytes": result.size,
+            },
         )
+
+        return result
 
     def rename(self, src_rel: str, dst_rel: str) -> None:
         """Atomically rename/move stored object.
@@ -199,6 +219,16 @@ class LocalDuckDBStorage(StorageBackend):
         finally:
             os.close(fd)
 
+        # Emit storage.mv event per acceptance criteria
+        emit_event(
+            type="storage.mv",
+            level="INFO",
+            payload={
+                "src_rel": src_rel,
+                "dst_rel": dst_rel,
+            },
+        )
+
     def delete(self, path_rel_or_list: str | list[str]) -> None:
         """Delete object(s) from storage (safe - missing files ignored).
 
@@ -208,18 +238,27 @@ class LocalDuckDBStorage(StorageBackend):
         Raises:
             ValueError: If any path is unsafe
         """
-        rels = (
-            [path_rel_or_list]
-            if isinstance(path_rel_or_list, str)
-            else path_rel_or_list
-        )
+        rels = [path_rel_or_list] if isinstance(path_rel_or_list, str) else path_rel_or_list
 
+        deleted_count = 0
         for rel in rels:
             p = self._abs(rel)
             try:
                 p.unlink()
+                deleted_count += 1
             except FileNotFoundError:
                 pass
+
+        # Emit storage.delete event per acceptance criteria
+        if deleted_count > 0:
+            emit_event(
+                type="storage.delete",
+                level="INFO",
+                payload={
+                    "count": deleted_count,
+                    "paths": rels if isinstance(path_rel_or_list, str) else None,
+                },
+            )
 
     def exists(self, remote_rel: str) -> bool:
         """Check if object exists in storage.
@@ -292,9 +331,7 @@ class LocalDuckDBStorage(StorageBackend):
         """
         return str(self._abs(remote_rel))
 
-    def set_latest_version(
-        self, version: str, extra: dict | None = None
-    ) -> None:
+    def set_latest_version(self, version: str, extra: dict | None = None) -> None:
         """Set latest version pointer.
 
         Updates DB-authoritative pointer via Repo, and optionally
@@ -342,6 +379,18 @@ class LocalDuckDBStorage(StorageBackend):
                 os.fsync(fd)
             finally:
                 os.close(fd)
+
+        # Emit storage.latest.set event per acceptance criteria
+        emit_event(
+            type="storage.latest.set",
+            level="INFO",
+            payload={
+                "version_id": version,
+                "mirror_written": self.write_latest_mirror,
+                "by": extra.get("by") if extra else None,
+            },
+            version_id=version,
+        )
 
     def get_latest_version(self) -> Optional[str]:
         """Get latest version pointer from DB.

@@ -38,6 +38,7 @@ from typing import Dict, List, Optional
 import libarchive
 
 from ..errors import ConfigError
+from ..observability.events import emit_event
 from ..settings import get_default_config
 from .extraction_constraints import ExtractionGuardian, PreScanValidator
 from .extraction_policy import ExtractionSettings, safe_defaults
@@ -687,11 +688,49 @@ def extract_archive_safe(
                 },
             )
 
+            # Emit extract.done event per acceptance criteria
+            emit_event(
+                type="extract.done",
+                level="INFO",
+                payload={
+                    "archive_path": str(archive_path),
+                    "destination": str(destination),
+                    "files_extracted": len(extracted_files),
+                    "total_size_bytes": sum(
+                        f.stat().st_size for f in extracted_files if f.is_file()
+                    ),
+                    "duration_ms": round(telemetry.duration_ms, 2),
+                    "policy_encapsulate": policy.encapsulate,
+                },
+            )
+
         return extracted_files
 
     except libarchive.ArchiveError as exc:
+        # Emit extract.error event per acceptance criteria
+        emit_event(
+            type="extract.error",
+            level="ERROR",
+            payload={
+                "archive_path": str(archive_path),
+                "destination": str(destination),
+                "error": str(exc),
+                "error_type": "libarchive",
+            },
+        )
         raise ConfigError(f"Failed to extract archive {archive_path}: {exc}") from exc
-    except ConfigError:
+    except ConfigError as config_exc:
+        # Emit extract.error event for config errors
+        emit_event(
+            type="extract.error",
+            level="ERROR",
+            payload={
+                "archive_path": str(archive_path),
+                "destination": str(destination),
+                "error": str(config_exc),
+                "error_type": "config",
+            },
+        )
         metrics.finalize()
         raise
 

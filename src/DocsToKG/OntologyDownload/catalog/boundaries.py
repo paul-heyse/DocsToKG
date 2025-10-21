@@ -41,6 +41,7 @@ except ImportError as exc:  # pragma: no cover
         "duckdb is required for catalog boundaries. Ensure .venv is initialized."
     ) from exc
 
+from ..observability.events import emit_event
 from ..policy.errors import PolicyReject
 from ..policy.gates import db_boundary_gate
 from .observability_instrumentation import (
@@ -48,7 +49,6 @@ from .observability_instrumentation import (
     emit_boundary_error,
     emit_boundary_success,
 )
-from ..observability.events import emit_event
 
 logger = logging.getLogger(__name__)
 

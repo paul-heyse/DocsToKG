@@ -539,3 +539,97 @@ def get_validation_stats(conn: duckdb.DuckDBPyConnection, version_id: str) -> Di
             "timeout": int(result[3]) if result[3] else 0,
         }
     return {"total_validations": 0, "passed": 0, "failed": 0, "timeout": 0}
+
+
+# ============================================================================
+# ORPHAN DETECTION QUERIES (ORP)
+# ============================================================================
+
+
+def detect_orphans(
+    conn: duckdb.DuckDBPyConnection, fs_entries: List[tuple]
+) -> List[tuple]:
+    """Detect files on disk not referenced in the database.
+
+    Scans filesystem entries (relpath, size, mtime) and compares against
+    database artifacts/files. Returns orphaned entries not tracked by DB.
+
+    Args:
+        conn: DuckDB connection (read-only safe)
+        fs_entries: List of (relpath: str, size: int, mtime: float) tuples
+                   from filesystem scan
+
+    Returns:
+        List of (relpath: str, size: int) tuples for orphaned files
+    """
+    if not fs_entries:
+        return []
+
+    # Create temporary table from filesystem entries
+    conn.execute("CREATE TEMP TABLE fs_scan (relpath VARCHAR, size INTEGER, mtime DOUBLE)")
+
+    try:
+        # Insert filesystem entries
+        for relpath, size, mtime in fs_entries:
+            conn.execute(
+                "INSERT INTO fs_scan (relpath, size, mtime) VALUES (?, ?, ?)",
+                [relpath, size, mtime],
+            )
+
+        # Check if artifacts and extracted_files tables exist
+        artifacts_exist = bool(
+            conn.execute(
+                "SELECT 1 FROM information_schema.tables WHERE table_name = 'artifacts'"
+            ).fetchone()
+        )
+        files_exist = bool(
+            conn.execute(
+                "SELECT 1 FROM information_schema.tables WHERE table_name = 'extracted_files'"
+            ).fetchone()
+        )
+
+        # Build query based on what tables exist
+        if artifacts_exist and files_exist:
+            query = """
+                SELECT DISTINCT fs.relpath, fs.size
+                FROM fs_scan fs
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM artifacts a
+                    WHERE a.fs_relpath = fs.relpath
+                )
+                AND NOT EXISTS (
+                    SELECT 1 FROM extracted_files f
+                    WHERE f.relpath_in_version = fs.relpath
+                )
+                ORDER BY fs.relpath ASC
+            """
+        elif artifacts_exist:
+            query = """
+                SELECT DISTINCT fs.relpath, fs.size
+                FROM fs_scan fs
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM artifacts a
+                    WHERE a.fs_relpath = fs.relpath
+                )
+                ORDER BY fs.relpath ASC
+            """
+        elif files_exist:
+            query = """
+                SELECT DISTINCT fs.relpath, fs.size
+                FROM fs_scan fs
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM extracted_files f
+                    WHERE f.relpath_in_version = fs.relpath
+                )
+                ORDER BY fs.relpath ASC
+            """
+        else:
+            # No database tables yet, all filesystem entries are orphans
+            return [(relpath, size) for relpath, size, _ in fs_entries]
+
+        result = conn.execute(query).fetchall()
+        return list(result)
+
+    finally:
+        # Clean up temporary table
+        conn.execute("DROP TABLE IF EXISTS fs_scan")

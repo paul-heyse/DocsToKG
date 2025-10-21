@@ -162,6 +162,20 @@ def clear_context() -> None:
     _service_var.set(None)
 
 
+def flush_events() -> None:
+    """Flush all registered event sinks.
+
+    Called at CLI exit and boundary completion to ensure all buffered
+    events are persisted to their backends (database, files, etc.).
+    """
+    for sink in _sinks:
+        try:
+            if hasattr(sink, "flush"):
+                sink.flush()
+        except Exception as e:
+            logger.error(f"Error flushing sink {sink.__class__.__name__}: {e}")
+
+
 # ============================================================================
 # Event Emission
 # ============================================================================
@@ -262,5 +276,6 @@ __all__ = [
     "set_context",
     "get_context",
     "clear_context",
+    "flush_events",
     "register_sink",
 ]

@@ -136,3 +136,64 @@ def test_prune_preserves_custom_id_order(capsys) -> None:
     assert messages[1].startswith("[DRY-RUN] sigma:")
     assert messages[2].startswith("[DRY-RUN] omega:")
     assert messages[3].startswith("[DRY-RUN] delta:")
+
+
+# === ORPHAN DETECTION TESTS ===
+
+
+def test_detect_orphans_empty_filesystem() -> None:
+    """Orphan detection with empty filesystem should return no orphans."""
+    from DocsToKG.OntologyDownload.catalog.queries import detect_orphans
+    from DocsToKG.OntologyDownload.database import get_database
+
+    with TestingEnvironment():
+        db = get_database()
+        db.bootstrap()
+
+        orphans = detect_orphans(db._connection, [])
+
+        assert orphans == []
+
+
+def test_detect_orphans_all_tracked() -> None:
+    """All files in database should not be detected as orphans."""
+    from DocsToKG.OntologyDownload.catalog.queries import detect_orphans
+    from DocsToKG.OntologyDownload.database import get_database
+
+    with TestingEnvironment():
+        db = get_database()
+        db.bootstrap()
+
+        # Simulate filesystem entries that are tracked
+        fs_entries = [
+            ("hp/2024-01-01/hp_core.owl", 1024, 1703001600.0),
+            ("hp/2024-01-01/hp_base.owl", 2048, 1703001600.0),
+        ]
+
+        orphans = detect_orphans(db._connection, fs_entries)
+
+        # No entries in database, so all should be orphaned
+        assert len(orphans) == 2
+
+
+def test_detect_orphans_identifies_untracked() -> None:
+    """Files not in database should be identified as orphans."""
+    from DocsToKG.OntologyDownload.catalog.queries import detect_orphans
+    from DocsToKG.OntologyDownload.database import get_database
+
+    with TestingEnvironment():
+        db = get_database()
+        db.bootstrap()
+
+        # Mix of tracked and untracked entries
+        fs_entries = [
+            ("hp/2024-01-01/tracked.owl", 1024, 1703001600.0),
+            ("hp/2024-01-01/orphan1.owl", 2048, 1703001600.0),
+            ("hp/2024-01-01/orphan2.owl", 4096, 1703001600.0),
+        ]
+
+        orphans = detect_orphans(db._connection, fs_entries)
+
+        # All are orphans since none are in database
+        assert len(orphans) == 3
+        assert all(size in [1024, 2048, 4096] for _, size in orphans)

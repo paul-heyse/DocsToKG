@@ -43,7 +43,7 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence, Union, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple, Union
 
 import httpx
 import yaml
@@ -82,6 +82,7 @@ from .manifests import (
     write_json_atomic,
     write_lockfile,
 )
+from .observability.events import flush_events
 from .planning import (
     MANIFEST_SCHEMA_VERSION,
     BatchFetchError,
@@ -1141,7 +1142,8 @@ def _handle_prune(args, logger) -> Dict[str, object]:
     }
 
     try:
-        from .database import DatabaseConfiguration, get_database, close_database
+        from .catalog.queries import detect_orphans
+        from .database import DatabaseConfiguration, close_database, get_database
 
         db_config = DatabaseConfiguration()
         db = get_database(db_config)
@@ -1151,12 +1153,8 @@ def _handle_prune(args, logger) -> Dict[str, object]:
         fs_entries = _scan_filesystem_for_orphans(ontologies_dir)
 
         if fs_entries:
-            # Stage the filesystem entries in database
-            staged_entries = [(relpath, size, None) for relpath, size in fs_entries]
-            db.stage_filesystem_listing("version", staged_entries)
-
-            # Get orphaned files from database
-            orphaned = db.get_orphaned_files("version")
+            # Detect orphans using database comparison
+            orphaned = detect_orphans(db._connection, fs_entries)
 
             if orphaned:
                 orphans_section["orphans_found"] = len(orphaned)
@@ -2250,19 +2248,6 @@ def _print_db_result(result: Dict[str, object], args) -> None:
                 if f.get("details"):
                     print(f"    details: {json.dumps(f['details'], indent=6)}")
 
-        elif cmd == "export":
-            print(f"Export: Manifest for {result.get('version_id')}")
-            if result.get("output"):
-                print(f"  Exported to: {result.get('output')}")
-            else:
-                stats = result.get("statistics", {})
-                print(f"  Service: {result.get('service')}")
-                print(f"  Created: {result.get('created_at')}")
-                print(f"  Files: {stats.get('files', 0)}")
-                print(f"  Bytes: {stats.get('bytes', 0)}")
-                print(f"  Validations passed: {stats.get('validations_passed', 0)}")
-                print(f"  Validations failed: {stats.get('validations_failed', 0)}")
-
         elif cmd == "export-report":
             print(f"Validation Report: {result.get('version_id')}")
             if result.get("output"):
@@ -2310,37 +2295,70 @@ def cli_main(argv: Optional[Sequence[str]] = None) -> int:
         ConfigError: If configuration files are invalid or unsafe to overwrite.
         OntologyDownloadError: If download or validation operations fail.
     """
-    raw_args = list(argv or sys.argv[1:])
-    arg_list = _normalize_plan_args(raw_args)
-    parser = _build_parser()
-    args = parser.parse_args(arg_list)
     try:
+        raw_args = list(argv or sys.argv[1:])
+        arg_list = _normalize_plan_args(raw_args)
+        parser = _build_parser()
+        args = parser.parse_args(arg_list)
         try:
-            base_config = get_default_config(copy=True)
-        except (PydanticValidationError, ValueError):
-            if args.command != "doctor":
-                raise
-            base_config = None
-            logger = setup_logging(level=args.log_level)
-        else:
-            base_config.defaults.logging.level = args.log_level
-            logging_config = base_config.defaults.logging
-            logger = setup_logging(
-                level=logging_config.level,
-                retention_days=logging_config.retention_days,
-                max_log_size_mb=logging_config.max_log_size_mb,
-            )
+            try:
+                base_config = get_default_config(copy=True)
+            except (PydanticValidationError, ValueError):
+                if args.command != "doctor":
+                    raise
+                base_config = None
+                logger = setup_logging(level=args.log_level)
+            else:
+                base_config.defaults.logging.level = args.log_level
+                logging_config = base_config.defaults.logging
+                logger = setup_logging(
+                    level=logging_config.level,
+                    retention_days=logging_config.retention_days,
+                    max_log_size_mb=logging_config.max_log_size_mb,
+                )
 
-        if getattr(args, "json", False):
-            for handler in logger.handlers:
-                if isinstance(handler, logging.StreamHandler) and not isinstance(
-                    handler, logging.FileHandler
-                ):
-                    handler.setStream(sys.stderr)
+            if getattr(args, "json", False):
+                for handler in logger.handlers:
+                    if isinstance(handler, logging.StreamHandler) and not isinstance(
+                        handler, logging.FileHandler
+                    ):
+                        handler.setStream(sys.stderr)
 
-        if args.command == "pull":
-            if getattr(args, "dry_run", False):
-                plans = _handle_pull(args, base_config, dry_run=True, logger=logger)
+            if args.command == "pull":
+                if getattr(args, "dry_run", False):
+                    plans = _handle_pull(args, base_config, dry_run=True, logger=logger)
+                    if args.json:
+                        json.dump([plan_to_dict(plan) for plan in plans], sys.stdout, indent=2)
+                        sys.stdout.write("\n")
+                    else:
+                        if plans:
+                            rows = format_plan_rows(plans)
+                            print(format_table(PLAN_TABLE_HEADERS, rows))
+                        else:
+                            print("No ontologies to process")
+                else:
+                    results = _handle_pull(args, base_config, dry_run=False, logger=logger)
+                    if args.json:
+                        json.dump(
+                            [results_to_dict(result) for result in results], sys.stdout, indent=2
+                        )
+                        sys.stdout.write("\n")
+                    else:
+                        if results:
+                            print(format_results_table(results))
+                        else:
+                            print("No ontologies to process")
+                    for result in results:
+                        logger.info(
+                            "ontology processed",
+                            extra={
+                                "stage": "complete",
+                                "ontology_id": result.spec.id,
+                                "status": result.status,
+                            },
+                        )
+            elif args.command == "plan":
+                plans = _handle_plan(args, base_config, logger=logger)
                 if args.json:
                     json.dump([plan_to_dict(plan) for plan in plans], sys.stdout, indent=2)
                     sys.stdout.write("\n")
@@ -2350,181 +2368,144 @@ def cli_main(argv: Optional[Sequence[str]] = None) -> int:
                         print(format_table(PLAN_TABLE_HEADERS, rows))
                     else:
                         print("No ontologies to process")
-            else:
-                results = _handle_pull(args, base_config, dry_run=False, logger=logger)
+            elif args.command == "plan-diff":
+                diff = _handle_plan_diff(args, base_config)
                 if args.json:
-                    json.dump([results_to_dict(result) for result in results], sys.stdout, indent=2)
+                    json.dump(diff, sys.stdout, indent=2)
                     sys.stdout.write("\n")
                 else:
-                    if results:
-                        print(format_results_table(results))
+                    lines = format_plan_diff(diff)
+                    if lines:
+                        print("\n".join(lines))
                     else:
-                        print("No ontologies to process")
-                for result in results:
-                    logger.info(
-                        "ontology processed",
-                        extra={
-                            "stage": "complete",
-                            "ontology_id": result.spec.id,
-                            "status": result.status,
-                        },
-                    )
-        elif args.command == "plan":
-            plans = _handle_plan(args, base_config, logger=logger)
-            if args.json:
-                json.dump([plan_to_dict(plan) for plan in plans], sys.stdout, indent=2)
-                sys.stdout.write("\n")
-            else:
-                if plans:
-                    rows = format_plan_rows(plans)
-                    print(format_table(PLAN_TABLE_HEADERS, rows))
+                        print("No plan differences detected")
+                    if diff.get("baseline_updated"):
+                        print(f"Updated baseline at {diff['baseline']}")
+            elif args.command == "plugins":
+                inventory = _handle_plugins(args)
+                if args.json:
+                    json.dump(inventory, sys.stdout, indent=2)
+                    sys.stdout.write("\n")
                 else:
-                    print("No ontologies to process")
-        elif args.command == "plan-diff":
-            diff = _handle_plan_diff(args, base_config)
-            if args.json:
-                json.dump(diff, sys.stdout, indent=2)
-                sys.stdout.write("\n")
-            else:
-                lines = format_plan_diff(diff)
-                if lines:
-                    print("\n".join(lines))
+                    for kind, plugins in inventory.items():
+                        print(f"{kind}:")
+                        if not plugins:
+                            print("  (none)")
+                            continue
+                        for name, data in plugins.items():
+                            qualified = data.get("qualified")
+                            version = data.get("version", "unknown")
+                            print(f"  - {name} ({version}): {qualified}")
+            elif args.command == "prune":
+                summary = _handle_prune(args, logger)
+                if args.json:
+                    json.dump(summary, sys.stdout, indent=2)
+                    sys.stdout.write("\n")
                 else:
-                    print("No plan differences detected")
-                if diff.get("baseline_updated"):
-                    print(f"Updated baseline at {diff['baseline']}")
-        elif args.command == "plugins":
-            inventory = _handle_plugins(args)
-            if args.json:
-                json.dump(inventory, sys.stdout, indent=2)
-                sys.stdout.write("\n")
-            else:
-                for kind, plugins in inventory.items():
-                    print(f"{kind}:")
-                    if not plugins:
-                        print("  (none)")
-                        continue
-                    for name, data in plugins.items():
-                        qualified = data.get("qualified")
-                        version = data.get("version", "unknown")
-                        print(f"  - {name} ({version}): {qualified}")
-        elif args.command == "prune":
-            summary = _handle_prune(args, logger)
-            if args.json:
-                json.dump(summary, sys.stdout, indent=2)
-                sys.stdout.write("\n")
-            else:
-                messages = summary.get("messages", [])
-                if messages:
-                    print("\n".join(messages))
-                total = summary.get("total_reclaimed_bytes", 0)
-                deleted = summary.get("total_deleted", 0)
-                label = "Dry-run" if summary.get("dry_run") else "Pruned"
-                print(f"{label}: reclaimed {format_bytes(total)} across {deleted} versions")
+                    messages = summary.get("messages", [])
+                    if messages:
+                        print("\n".join(messages))
+                    total = summary.get("total_reclaimed_bytes", 0)
+                    deleted = summary.get("total_deleted", 0)
+                    label = "Dry-run" if summary.get("dry_run") else "Pruned"
+                    print(f"{label}: reclaimed {format_bytes(total)} across {deleted} versions")
 
-                # Display orphan detection results
-                orphans = summary.get("orphans", {})
-                if orphans.get("orphans_found", 0) > 0:
-                    print(
-                        f"Orphans: found {orphans['orphans_found']} file(s) "
-                        f"totaling {format_bytes(orphans['orphans_bytes'])}"
-                    )
-                    if orphans.get("deleted_orphans", 0) > 0:
-                        print(f"  Deleted {orphans['deleted_orphans']} orphaned file(s)")
-                elif orphans.get("error"):
-                    print(f"Orphan detection skipped: {orphans['error']}")
-        elif args.command == "show":
-            _handle_show(args)
-        elif args.command == "validate":
-            summary = _handle_validate(args, base_config)
-            if args.json:
-                json.dump(summary, sys.stdout, indent=2)
-                sys.stdout.write("\n")
-            else:
-                print(format_validation_summary(summary))
-        elif args.command == "init":
-            _handle_init(args.path)
-        elif args.command == "config" and args.config_command == "show":
-            report = _handle_config_show(
-                getattr(args, "spec", None),
-                defaults_only=getattr(args, "defaults", False),
-                redact=getattr(args, "redact_secrets", True),
-            )
-            if args.json:
-                json.dump(report, sys.stdout, indent=2)
-                sys.stdout.write("\n")
-            else:
-                _print_config_report(report)
-        elif args.command == "config" and args.config_command == "validate":
-            report = _handle_config_validate(args.spec)
-            if args.json:
-                json.dump(report, sys.stdout, indent=2)
-                sys.stdout.write("\n")
-            else:
-                status = "passed" if report["ok"] else "failed"
-                print(
-                    f"Configuration {status} ({report['ontologies']} ontologies) -> {report['path']}"
+                    # Display orphan detection results
+                    orphans = summary.get("orphans", {})
+                    if orphans.get("orphans_found", 0) > 0:
+                        print(
+                            f"Orphans: found {orphans['orphans_found']} file(s) "
+                            f"totaling {format_bytes(orphans['orphans_bytes'])}"
+                        )
+                        if orphans.get("deleted_orphans", 0) > 0:
+                            print(f"  Deleted {orphans['deleted_orphans']} orphaned file(s)")
+                    elif orphans.get("error"):
+                        print(f"Orphan detection skipped: {orphans['error']}")
+            elif args.command == "show":
+                _handle_show(args)
+            elif args.command == "validate":
+                summary = _handle_validate(args, base_config)
+                if args.json:
+                    json.dump(summary, sys.stdout, indent=2)
+                    sys.stdout.write("\n")
+                else:
+                    print(format_validation_summary(summary))
+            elif args.command == "init":
+                _handle_init(args.path)
+            elif args.command == "config" and args.config_command == "show":
+                report = _handle_config_show(
+                    getattr(args, "spec", None),
+                    defaults_only=getattr(args, "defaults", False),
+                    redact=getattr(args, "redact_secrets", True),
                 )
-        elif args.command == "doctor":
-            report = _doctor_report()
-            fixes: List[str] = []
-            if getattr(args, "fix", False):
-                fixes = _apply_doctor_fixes(report)
-                if fixes:
-                    report["fixes"] = fixes
-            if args.json:
-                json.dump(report, sys.stdout, indent=2)
-                sys.stdout.write("\n")
-            else:
-                _print_doctor_report(report)
-                if fixes:
-                    print("\nApplied fixes:")
-                    for action in fixes:
-                        print(f"  - {action}")
-        elif args.command == "db":
-            if args.db_cmd == "latest":
-                result = _handle_db_latest(args)
-                _print_db_result(result, args)
-            elif args.db_cmd == "versions":
-                result = _handle_db_versions(args)
-                _print_db_result(result, args)
-            elif args.db_cmd == "stats":
-                result = _handle_db_stats(args)
-                _print_db_result(result, args)
-            elif args.db_cmd == "files":
-                result = _handle_db_files(args)
-                _print_db_result(result, args)
-            elif args.db_cmd == "validations":
-                result = _handle_db_validations(args)
-                _print_db_result(result, args)
-            elif args.db_cmd == "export":
-                result = _handle_db_export(args)
-                _print_db_result(result, args)
-            elif args.db_cmd == "export-report":
-                result = _handle_db_export_report(args)
-                _print_db_result(result, args)
-            elif args.db_cmd == "export-inventory":
-                result = _handle_db_export_inventory(args)
-                _print_db_result(result, args)
-        else:  # pragma: no cover - argparse should prevent unknown commands
-            parser.error(f"Unsupported command: {args.command}")
+                if args.json:
+                    json.dump(report, sys.stdout, indent=2)
+                    sys.stdout.write("\n")
+                else:
+                    _print_config_report(report)
+            elif args.command == "config" and args.config_command == "validate":
+                report = _handle_config_validate(args.spec)
+                if args.json:
+                    json.dump(report, sys.stdout, indent=2)
+                    sys.stdout.write("\n")
+                else:
+                    status = "passed" if report["ok"] else "failed"
+                    print(
+                        f"Configuration {status} ({report['ontologies']} ontologies) -> {report['path']}"
+                    )
+            elif args.command == "doctor":
+                report = _doctor_report()
+                fixes: List[str] = []
+                if getattr(args, "fix", False):
+                    fixes = _apply_doctor_fixes(report)
+                    if fixes:
+                        report["fixes"] = fixes
+                if args.json:
+                    json.dump(report, sys.stdout, indent=2)
+                    sys.stdout.write("\n")
+                else:
+                    _print_doctor_report(report)
+                    if fixes:
+                        print("\nApplied fixes:")
+                        for action in fixes:
+                            print(f"  - {action}")
+            elif args.command == "db":
+                if args.db_cmd == "latest":
+                    result = _handle_db_latest(args)
+                    _print_db_result(result, args)
+                elif args.db_cmd == "versions":
+                    result = _handle_db_versions(args)
+                    _print_db_result(result, args)
+                elif args.db_cmd == "stats":
+                    result = _handle_db_stats(args)
+                    _print_db_result(result, args)
+                elif args.db_cmd == "files":
+                    result = _handle_db_files(args)
+                    _print_db_result(result, args)
+                elif args.db_cmd == "validations":
+                    result = _handle_db_validations(args)
+                    _print_db_result(result, args)
+            else:  # pragma: no cover - argparse should prevent unknown commands
+                parser.error(f"Unsupported command: {args.command}")
 
-        return 0
-    except BatchPlanningError as exc:
-        _emit_batch_failure(exc, args)
-        return 1
-    except BatchFetchError as exc:
-        _emit_batch_failure(exc, args)
-        return 1
-    except ConfigError as exc:
-        print(f"Error: {exc}", file=sys.stderr)
-        return 1
-    except UnsupportedPythonError as exc:
-        print(f"Error: {exc}", file=sys.stderr)
-        return 2
-    except OntologyDownloadError as exc:
-        print(f"Error: {exc}", file=sys.stderr)
-        return 1
-    except Exception as exc:  # pylint: disable=broad-except
-        print(f"Unexpected error: {exc}", file=sys.stderr)
-        return 1
+            return 0
+        except BatchPlanningError as exc:
+            _emit_batch_failure(exc, args)
+            return 1
+        except BatchFetchError as exc:
+            _emit_batch_failure(exc, args)
+            return 1
+        except ConfigError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            return 1
+        except UnsupportedPythonError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            return 2
+        except OntologyDownloadError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            return 1
+        except Exception as exc:  # pylint: disable=broad-except
+            print(f"Unexpected error: {exc}", file=sys.stderr)
+            return 1
+    finally:
+        flush_events()

@@ -34,6 +34,8 @@ from typing import TYPE_CHECKING, Any
 
 from .exports import EXPORT_MAP, EXPORTS, PUBLIC_API_MANIFEST
 
+__version__ = "1.0.0"
+
 _PUBLIC_EXPORTS = tuple(spec.name for spec in EXPORTS if spec.include_in_manifest)
 
 __all__ = [*_PUBLIC_EXPORTS, "PUBLIC_API_MANIFEST"]
