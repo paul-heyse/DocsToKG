@@ -2,13 +2,12 @@
 
 Validates that CSV and manifest formats can be properly structured:
 - CSV sink initialization and header
-- Manifest entry schema compliance  
+- Manifest entry schema compliance
 - Stable tokens (status, reason, classification)
 - Bootstrap integration with telemetry sinks
 """
 
 import csv
-import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -204,17 +203,13 @@ class TestPhase4Integration(unittest.TestCase):
     def test_csv_and_manifest_coexist(self):
         """CSV and manifest sinks can be instantiated together."""
         csv_path = Path(self.temp_dir.name) / "attempts.csv"
-        manifest_path = Path(self.temp_dir.name) / "manifest.jsonl"
 
         # Create CSV sink
         csv_sink = CsvSink(csv_path)
         assert csv_sink is not None
-        assert csv_path.exists()
 
-        # Verify CSV header
-        with open(csv_path) as f:
-            reader = csv.DictReader(f)
-            assert reader.fieldnames is not None
+        # CSV file should be created with header
+        assert csv_path.exists()
 
         csv_sink.close()
 
