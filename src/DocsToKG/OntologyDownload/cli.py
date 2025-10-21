@@ -82,6 +82,7 @@ from .manifests import (
     write_json_atomic,
     write_lockfile,
 )
+from .observability import initialize_events, set_context
 from .observability.events import flush_events
 from .planning import (
     MANIFEST_SCHEMA_VERSION,
@@ -2323,6 +2324,21 @@ def cli_main(argv: Optional[Sequence[str]] = None) -> int:
                         handler, logging.FileHandler
                     ):
                         handler.setStream(sys.stderr)
+
+            # Initialize event sinks for observability
+            import uuid
+
+            run_id = str(uuid.uuid4())
+            config_hash = base_config.config_hash if base_config else "unknown"
+
+            initialize_events(
+                enable_stdout=True,
+                enable_duckdb=base_config.db.path if base_config else None,
+                db_path=base_config.db.path if base_config else None,
+            )
+
+            # Set context for all events
+            set_context(run_id=run_id, config_hash=config_hash)
 
             if args.command == "pull":
                 if getattr(args, "dry_run", False):

@@ -85,8 +85,7 @@ def test_prune_deduplicates_ids_preserving_order(capsys) -> None:
 
     messages = payload["messages"]
     assert messages[0] == (
-        "[DRY-RUN] Requested ontologies (duplicates ignored, order preserved): "
-        "beta, alpha, gamma"
+        "[DRY-RUN] Requested ontologies (duplicates ignored, order preserved): beta, alpha, gamma"
     )
     assert messages[1].startswith("[DRY-RUN] beta:")
     assert messages[2].startswith("[DRY-RUN] alpha:")
@@ -130,9 +129,7 @@ def test_prune_preserves_custom_id_order(capsys) -> None:
     assert [entry["id"] for entry in payload["ontologies"]] == ["sigma", "omega", "delta"]
 
     messages = payload["messages"]
-    assert messages[0] == (
-        "[DRY-RUN] Requested ontologies (order preserved): " "sigma, omega, delta"
-    )
+    assert messages[0] == ("[DRY-RUN] Requested ontologies (order preserved): sigma, omega, delta")
     assert messages[1].startswith("[DRY-RUN] sigma:")
     assert messages[2].startswith("[DRY-RUN] omega:")
     assert messages[3].startswith("[DRY-RUN] delta:")

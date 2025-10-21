@@ -62,6 +62,7 @@ try:
         get_feature_flags,
         FeatureFlag,
     )
+
     FEATURE_FLAGS_AVAILABLE = True
 except ImportError:
     FEATURE_FLAGS_AVAILABLE = False
@@ -73,6 +74,7 @@ if FEATURE_FLAGS_AVAILABLE:
             build_http_client,
             build_telemetry_sinks,
         )
+
         BOOTSTRAP_HELPERS_AVAILABLE = True
     except ImportError:
         BOOTSTRAP_HELPERS_AVAILABLE = False
@@ -84,16 +86,16 @@ LOGGER = logging.getLogger(__name__)
 
 def _should_use_new_bootstrap() -> bool:
     """Check if new bootstrap helpers should be used.
-    
+
     Checks the DTKG_FEATURE_UNIFIED_BOOTSTRAP environment variable.
     Defaults to False for backward compatibility.
-    
+
     Returns:
         True if unified bootstrap feature is enabled
     """
     if not FEATURE_FLAGS_AVAILABLE or not BOOTSTRAP_HELPERS_AVAILABLE:
         return False
-    
+
     try:
         flags = get_feature_flags()
         return flags.is_enabled(FeatureFlag.UNIFIED_BOOTSTRAP)
@@ -241,19 +243,17 @@ def _build_telemetry(paths: Optional[Mapping[str, Path]], run_id: str) -> RunTel
                     ContentDownloadConfig,
                 )
                 from DocsToKG.ContentDownload.config.loader import load_config
-                
+
                 # Load config and use new telemetry builder
                 cfg = load_config()
                 telemetry = build_telemetry_sinks(cfg.telemetry, run_id)
                 return telemetry
             except (ImportError, Exception) as e:
-                LOGGER.debug(
-                    f"Pydantic v2 config not available, falling back to legacy: {e}"
-                )
+                LOGGER.debug(f"Pydantic v2 config not available, falling back to legacy: {e}")
                 # Fall through to legacy code below
         except Exception as e:
             LOGGER.debug(f"Unified bootstrap failed, falling back to legacy: {e}")
-    
+
     # Legacy telemetry building code (always works)
     if not paths:
         raise ValueError(

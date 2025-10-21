@@ -104,6 +104,7 @@ class TestComputeConfigHash:
 
         try:
             from DocsToKG.ContentDownload.config.audit import compute_config_hash
+
             result = compute_config_hash(cfg)
             assert isinstance(result, str)
             assert len(result) == 64  # SHA256 hex digest is 64 chars
@@ -117,6 +118,7 @@ class TestComputeConfigHash:
 
         try:
             from DocsToKG.ContentDownload.config.audit import compute_config_hash
+
             hash1 = compute_config_hash(cfg1)
             hash2 = compute_config_hash(cfg2)
             assert hash1 == hash2
@@ -128,12 +130,11 @@ class TestComputeConfigHash:
         from DocsToKG.ContentDownload.config.models import HttpClientConfig
 
         cfg1 = ContentDownloadConfig()
-        cfg2 = ContentDownloadConfig(
-            http=HttpClientConfig(timeout_read_s=120.0)
-        )
+        cfg2 = ContentDownloadConfig(http=HttpClientConfig(timeout_read_s=120.0))
 
         try:
             from DocsToKG.ContentDownload.config.audit import compute_config_hash
+
             hash1 = compute_config_hash(cfg1)
             hash2 = compute_config_hash(cfg2)
             assert hash1 != hash2
@@ -146,6 +147,7 @@ class TestComputeConfigHash:
 
         try:
             from DocsToKG.ContentDownload.config.audit import compute_config_hash
+
             result = compute_config_hash(cfg)
             # Verify it's hex
             try:
@@ -164,6 +166,7 @@ class TestLoadConfigWithAudit:
         """Verify audit tracks when no file is provided."""
         try:
             from DocsToKG.ContentDownload.config.audit import load_config_with_audit
+
             cfg, audit = load_config_with_audit(path=None)
             assert audit.loaded_from_file is False
             assert audit.file_path is None
@@ -174,6 +177,7 @@ class TestLoadConfigWithAudit:
         """Verify audit tracks when file is provided."""
         try:
             from DocsToKG.ContentDownload.config.audit import load_config_with_audit
+
             cfg, audit = load_config_with_audit(path="config.yaml")
             assert audit.loaded_from_file is True
             assert audit.file_path == "config.yaml"
@@ -187,6 +191,7 @@ class TestLoadConfigWithAudit:
 
         try:
             from DocsToKG.ContentDownload.config.audit import load_config_with_audit
+
             cfg, audit = load_config_with_audit()
             assert "DTKG_TEST_VAR" in audit.env_overrides
             assert audit.env_overrides["DTKG_TEST_VAR"] == "test_value"
@@ -203,6 +208,7 @@ class TestLoadConfigWithAudit:
 
         try:
             from DocsToKG.ContentDownload.config.audit import load_config_with_audit
+
             cfg, audit = load_config_with_audit(cli_overrides=cli_overrides)
             assert audit.cli_overrides == cli_overrides
         except Exception:
@@ -212,6 +218,7 @@ class TestLoadConfigWithAudit:
         """Verify audit computes config hash."""
         try:
             from DocsToKG.ContentDownload.config.audit import load_config_with_audit
+
             cfg, audit = load_config_with_audit()
             assert audit.config_hash != ""
             assert len(audit.config_hash) == 64

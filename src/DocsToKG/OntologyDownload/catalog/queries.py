@@ -546,9 +546,7 @@ def get_validation_stats(conn: duckdb.DuckDBPyConnection, version_id: str) -> Di
 # ============================================================================
 
 
-def detect_orphans(
-    conn: duckdb.DuckDBPyConnection, fs_entries: List[tuple]
-) -> List[tuple]:
+def detect_orphans(conn: duckdb.DuckDBPyConnection, fs_entries: List[tuple]) -> List[tuple]:
     """Detect files on disk not referenced in the database.
 
     Scans filesystem entries (relpath, size, mtime) and compares against
@@ -633,3 +631,146 @@ def detect_orphans(
     finally:
         # Clean up temporary table
         conn.execute("DROP TABLE IF EXISTS fs_scan")
+
+
+# ============================================================================
+# PLAN CACHING QUERIES (PLAN)
+# ============================================================================
+
+
+@dataclass(frozen=True)
+class CachedPlanRow:
+    """Cached plan metadata row."""
+
+    plan_id: str
+    service: str
+    resolver: str
+    url: str
+    version_id: str
+    checksum: Optional[str]
+    cached_at: datetime
+
+    @classmethod
+    def from_tuple(cls, row: tuple) -> "CachedPlanRow":
+        """Create from database tuple."""
+        return cls(
+            plan_id=row[0],
+            service=row[1],
+            resolver=row[2],
+            url=row[3],
+            version_id=row[4],
+            checksum=row[5],
+            cached_at=row[6] if isinstance(row[6], datetime) else datetime.fromisoformat(str(row[6])),
+        )
+
+
+def cache_plan(
+    conn: duckdb.DuckDBPyConnection,
+    plan_id: str,
+    service: str,
+    resolver: str,
+    url: str,
+    version_id: str,
+    checksum: Optional[str] = None,
+) -> None:
+    """Cache a planning decision for later replay.
+
+    Args:
+        conn: DuckDB connection (write mode)
+        plan_id: Unique identifier for this plan
+        service: Service/ontology ID (e.g., 'hp', 'chebi')
+        resolver: Resolver used (e.g., 'obo', 'ols')
+        url: Source URL for the plan
+        version_id: Version identifier (timestamp or semver)
+        checksum: Optional checksum (SHA256 or similar)
+    """
+    # Check if plans table exists; create if not
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS plans (
+            plan_id VARCHAR PRIMARY KEY,
+            service VARCHAR NOT NULL,
+            resolver VARCHAR NOT NULL,
+            url VARCHAR NOT NULL,
+            version_id VARCHAR NOT NULL,
+            checksum VARCHAR,
+            cached_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """
+    )
+
+    # Upsert plan (replace if exists)
+    conn.execute(
+        """
+        INSERT OR REPLACE INTO plans
+        (plan_id, service, resolver, url, version_id, checksum, cached_at)
+        VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    """,
+        [plan_id, service, resolver, url, version_id, checksum],
+    )
+
+
+def get_cached_plan(
+    conn: duckdb.DuckDBPyConnection, plan_id: str
+) -> Optional[CachedPlanRow]:
+    """Retrieve a cached plan by ID.
+
+    Args:
+        conn: DuckDB connection
+        plan_id: Plan identifier
+
+    Returns:
+        CachedPlanRow or None if not found
+    """
+    # Check if plans table exists
+    tables = conn.execute(
+        "SELECT table_name FROM information_schema.tables WHERE table_name = 'plans'"
+    ).fetchone()
+
+    if not tables:
+        return None
+
+    result = conn.execute(
+        """
+        SELECT plan_id, service, resolver, url, version_id, checksum, cached_at
+        FROM plans
+        WHERE plan_id = ?
+    """,
+        [plan_id],
+    ).fetchone()
+
+    return CachedPlanRow.from_tuple(result) if result else None
+
+
+def get_cached_plan_by_service(
+    conn: duckdb.DuckDBPyConnection, service: str
+) -> Optional[CachedPlanRow]:
+    """Retrieve most recent cached plan for a service.
+
+    Args:
+        conn: DuckDB connection
+        service: Service/ontology ID
+
+    Returns:
+        Most recent CachedPlanRow or None if not found
+    """
+    # Check if plans table exists
+    tables = conn.execute(
+        "SELECT table_name FROM information_schema.tables WHERE table_name = 'plans'"
+    ).fetchone()
+
+    if not tables:
+        return None
+
+    result = conn.execute(
+        """
+        SELECT plan_id, service, resolver, url, version_id, checksum, cached_at
+        FROM plans
+        WHERE service = ?
+        ORDER BY cached_at DESC
+        LIMIT 1
+    """,
+        [service],
+    ).fetchone()
+
+    return CachedPlanRow.from_tuple(result) if result else None

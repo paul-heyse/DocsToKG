@@ -47,8 +47,7 @@ EXPORTS: list[ExportSpec] = _CORE_SPECS
 
 # Export map: module name -> exported symbols
 EXPORT_MAP: dict[str, list[str]] = {
-    spec.module: [spec.name for spec in EXPORTS if spec.module == spec.module]
-    for spec in EXPORTS
+    spec.module: [spec.name for spec in EXPORTS if spec.module == spec.module] for spec in EXPORTS
 }
 
 # Public API manifest

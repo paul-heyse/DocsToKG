@@ -26,6 +26,7 @@ try:
         get_feature_flags,
         FeatureFlag,
     )
+
     FEATURE_FLAGS_AVAILABLE = True
 except ImportError:
     FEATURE_FLAGS_AVAILABLE = False
@@ -34,6 +35,7 @@ except ImportError:
 if FEATURE_FLAGS_AVAILABLE:
     try:
         from DocsToKG.ContentDownload.cli_config import register_config_commands
+
         CLI_CONFIG_AVAILABLE = True
     except ImportError:
         CLI_CONFIG_AVAILABLE = False
@@ -232,13 +234,13 @@ def schema(
 
 def _register_optional_commands() -> None:
     """Register optional commands based on feature flags.
-    
+
     When DTKG_FEATURE_CLI_CONFIG_COMMANDS=1, registers config inspection
     subcommands. When disabled, this has no effect.
     """
     if not FEATURE_FLAGS_AVAILABLE or not CLI_CONFIG_AVAILABLE:
         return
-    
+
     try:
         flags = get_feature_flags()
         if flags.is_enabled(FeatureFlag.CLI_CONFIG_COMMANDS):
@@ -247,9 +249,7 @@ def _register_optional_commands() -> None:
                 "[yellow]ℹ Config commands registered (DTKG_FEATURE_CLI_CONFIG_COMMANDS=1)[/yellow]"
             )
     except Exception as e:
-        console.print(
-            f"[yellow]⚠ Could not register config commands: {e}[/yellow]"
-        )
+        console.print(f"[yellow]⚠ Could not register config commands: {e}[/yellow]")
 
 
 # Register optional commands when CLI is loaded

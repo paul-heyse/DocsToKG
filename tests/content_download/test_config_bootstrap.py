@@ -28,6 +28,7 @@ class TestBuildHttpClient:
         # Build should work or gracefully handle missing dependencies
         try:
             from DocsToKG.ContentDownload.config.bootstrap import build_http_client
+
             result = build_http_client(http_config, hishel_config)
             # If it works, result should be something
             assert result is not None or result is None
@@ -46,6 +47,7 @@ class TestBuildHttpClient:
 
         try:
             from DocsToKG.ContentDownload.config.bootstrap import build_http_client
+
             result = build_http_client(http_config, hishel_config)
             assert result is not None or result is None
         except ImportError:
@@ -58,6 +60,7 @@ class TestBuildHttpClient:
 
         try:
             from DocsToKG.ContentDownload.config.bootstrap import build_http_client
+
             result = build_http_client(http_config, hishel_config)
             assert result is not None or result is None
         except ImportError:
@@ -70,6 +73,7 @@ class TestBuildHttpClient:
 
         try:
             from DocsToKG.ContentDownload.config.bootstrap import build_http_client
+
             result = build_http_client(http_config, hishel_config)
             assert result is not None or result is None
         except ImportError:
@@ -86,6 +90,7 @@ class TestBuildTelemetrySinks:
 
         try:
             from DocsToKG.ContentDownload.config.bootstrap import build_telemetry_sinks
+
             result = build_telemetry_sinks(telemetry_config, run_id)
             assert result is not None or result is None
         except (ImportError, Exception):
@@ -98,6 +103,7 @@ class TestBuildTelemetrySinks:
 
         try:
             from DocsToKG.ContentDownload.config.bootstrap import build_telemetry_sinks
+
             result = build_telemetry_sinks(telemetry_config, run_id)
             assert result is not None or result is None
         except (ImportError, Exception):
@@ -110,6 +116,7 @@ class TestBuildTelemetrySinks:
 
         try:
             from DocsToKG.ContentDownload.config.bootstrap import build_telemetry_sinks
+
             result = build_telemetry_sinks(telemetry_config, run_id)
             assert result is not None or result is None
         except (ImportError, Exception):
@@ -122,6 +129,7 @@ class TestBuildTelemetrySinks:
 
         try:
             from DocsToKG.ContentDownload.config.bootstrap import build_telemetry_sinks
+
             build_telemetry_sinks(telemetry_config, run_id)
             assert True
         except (ImportError, Exception):
@@ -138,6 +146,7 @@ class TestBuildOrchestrator:
 
         try:
             from DocsToKG.ContentDownload.config.bootstrap import build_orchestrator
+
             result = build_orchestrator(orch_config, queue_config)
             assert result is None or result is not None
         except (ImportError, Exception):
@@ -154,6 +163,7 @@ class TestBuildOrchestrator:
 
         try:
             from DocsToKG.ContentDownload.config.bootstrap import build_orchestrator
+
             result = build_orchestrator(orch_config, queue_config)
             assert True
         except (ImportError, Exception):
@@ -166,6 +176,7 @@ class TestBuildOrchestrator:
 
         try:
             from DocsToKG.ContentDownload.config.bootstrap import build_orchestrator
+
             result = build_orchestrator(orch_config, queue_config)
             assert result is None or result is not None
         except Exception:
@@ -184,6 +195,7 @@ class TestBootstrapIntegration:
                 build_http_client,
                 build_telemetry_sinks,
             )
+
             http_client = build_http_client(cfg.http, cfg.hishel)
             telemetry = build_telemetry_sinks(cfg.telemetry, "test-run")
             assert http_client is not None or http_client is None
@@ -205,6 +217,7 @@ class TestBootstrapIntegration:
                 build_http_client,
                 build_telemetry_sinks,
             )
+
             http_client = build_http_client(cfg.http, cfg.hishel)
             telemetry = build_telemetry_sinks(cfg.telemetry, "custom-run")
             assert http_client is not None or http_client is None
