@@ -12,7 +12,7 @@ Covers all emitter implementations:
 import json
 import tempfile
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 import pytest
 
@@ -214,25 +214,40 @@ class TestFileJsonlEmitter:
 
 
 class TestDuckDBEmitter:
-    """Test DuckDB emitter (stub)."""
+    """Test DuckDB emitter."""
 
-    def test_initialization_logs_warning(self):
-        """Initialization logs stub warning."""
-        with patch("DocsToKG.OntologyDownload.observability.emitters.logger") as mock_logger:
-            emitter = DuckDBEmitter("test.db")
-            mock_logger.warning.assert_called()
+    def test_initialization_creates_connection(self, tmp_path):
+        """Initialization creates DuckDB connection."""
+        db_path = tmp_path / "test.db"
+        emitter = DuckDBEmitter(str(db_path))
+        assert emitter.conn is not None
 
-    def test_emit_is_noop(self, sample_event):
-        """emit() is a no-op for stub."""
-        emitter = DuckDBEmitter("test.db")
-        # Should not raise
+    def test_emit_buffers_events(self, tmp_path, sample_event):
+        """emit() buffers events."""
+        db_path = tmp_path / "test.db"
+        emitter = DuckDBEmitter(str(db_path), batch_size=10)
         emitter.emit(sample_event)
-        emitter.emit(sample_event)
+        assert len(emitter._batch_buffer) == 1
 
-    def test_close_is_safe(self):
-        """close() is safe."""
-        emitter = DuckDBEmitter("test.db")
+    def test_flush_on_batch_size(self, tmp_path, sample_event):
+        """Events are flushed when batch size reached."""
+        db_path = tmp_path / "test.db"
+        emitter = DuckDBEmitter(str(db_path), batch_size=2)
+        emitter.emit(sample_event)
+        assert len(emitter._batch_buffer) == 1
+        emitter.emit(sample_event)
+        # Should have flushed and cleared buffer
+        assert len(emitter._batch_buffer) == 0
+
+    def test_close_flushes_and_closes(self, tmp_path, sample_event):
+        """close() flushes pending and closes connection."""
+        db_path = tmp_path / "test.db"
+        emitter = DuckDBEmitter(str(db_path))
+        emitter.emit(sample_event)
+        initial_conn = emitter.conn
         emitter.close()
+        # After close, connection is None or the object was closed
+        assert emitter.conn is None or emitter.conn != initial_conn
 
 
 # ============================================================================
@@ -241,23 +256,39 @@ class TestDuckDBEmitter:
 
 
 class TestParquetEmitter:
-    """Test Parquet emitter (stub)."""
+    """Test Parquet emitter."""
 
-    def test_initialization_logs_warning(self):
-        """Initialization logs stub warning."""
-        with patch("DocsToKG.OntologyDownload.observability.emitters.logger") as mock_logger:
-            emitter = ParquetEmitter("test.parquet")
-            mock_logger.warning.assert_called()
+    def test_initialization_creates_directory(self, tmp_path):
+        """Initialization creates parent directory."""
+        file_path = tmp_path / "subdir" / "test.parquet"
+        ParquetEmitter(str(file_path))
+        assert file_path.parent.exists()
 
-    def test_emit_is_noop(self, sample_event):
-        """emit() is a no-op for stub."""
-        emitter = ParquetEmitter("test.parquet")
+    def test_emit_buffers_events(self, tmp_path, sample_event):
+        """emit() buffers events."""
+        file_path = tmp_path / "test.parquet"
+        emitter = ParquetEmitter(str(file_path), batch_size=10)
         emitter.emit(sample_event)
+        assert len(emitter._batch_buffer) == 1
 
-    def test_close_is_safe(self):
-        """close() is safe."""
-        emitter = ParquetEmitter("test.parquet")
+    def test_flush_on_batch_size(self, tmp_path, sample_event):
+        """Events are flushed when batch size reached."""
+        file_path = tmp_path / "test.parquet"
+        emitter = ParquetEmitter(str(file_path), batch_size=2)
+        emitter.emit(sample_event)
+        assert len(emitter._batch_buffer) == 1
+        emitter.emit(sample_event)
+        # Should have flushed and cleared buffer
+        assert len(emitter._batch_buffer) == 0
+
+    def test_close_flushes(self, tmp_path, sample_event):
+        """close() flushes pending events."""
+        file_path = tmp_path / "test.parquet"
+        emitter = ParquetEmitter(str(file_path))
+        emitter.emit(sample_event)
         emitter.close()
+        # Buffer should be empty
+        assert len(emitter._batch_buffer) == 0
 
 
 # ============================================================================

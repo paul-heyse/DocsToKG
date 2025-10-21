@@ -254,14 +254,13 @@ def compute_version_delta(
         removed_collected = removed.select(["size"])
 
     if isinstance(common, pl.LazyFrame):
-        common_collected = common.select(["size"]).collect(streaming=True)
+        common.select(["size"]).collect(streaming=True)
     else:
-        common_collected = common.select(["size"])
+        common.select(["size"])
 
     # Counts
     added_files = added_collected.height
     removed_files = removed_collected.height
-    common_files = common_collected.height
 
     # Sizes
     added_bytes = added_collected.select(pl.sum("size")).item() or 0
