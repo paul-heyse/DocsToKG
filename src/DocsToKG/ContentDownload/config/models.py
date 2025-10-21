@@ -151,6 +151,12 @@ class HttpClientConfig(BaseModel):
     timeout_read_s: float = Field(default=60.0, description="Read timeout in seconds")
     verify_tls: bool = Field(default=True, description="Verify TLS certificates")
     proxies: Dict[str, str] = Field(default_factory=dict, description="Proxy configuration")
+    polite_headers: Dict[str, str] = Field(
+        default_factory=lambda: {
+            "User-Agent": "DocsToKG/ContentDownload (+mailto:research@example.com)"
+        },
+        description="Polite HTTP headers (User-Agent, referer, etc.)",
+    )
 
     @field_validator("timeout_connect_s", "timeout_read_s")
     @classmethod
@@ -254,8 +260,8 @@ class WaybackConfig(ResolverCommonConfig):
     pass
 
 
-class PmcConfig(ResolverCommonConfig):
-    """PMC resolver configuration."""
+class OpenAlexConfig(ResolverCommonConfig):
+    """OpenAlex resolver configuration."""
 
     pass
 
@@ -311,7 +317,7 @@ class ResolversConfig(BaseModel):
             "semantic_scholar",
             "landing_page",
             "wayback",
-            "pmc",
+            "openalex",
             "zenodo",
             "osf",
             "openaire",
@@ -337,7 +343,7 @@ class ResolversConfig(BaseModel):
         default_factory=LandingPageConfig, description="Landing page config"
     )
     wayback: WaybackConfig = Field(default_factory=WaybackConfig, description="Wayback config")
-    pmc: PmcConfig = Field(default_factory=PmcConfig, description="PMC config")
+    openalex: OpenAlexConfig = Field(default_factory=OpenAlexConfig, description="OpenAlex config")
     zenodo: ZenodoConfig = Field(default_factory=ZenodoConfig, description="Zenodo config")
     osf: OsfsConfig = Field(default_factory=OsfsConfig, description="OSF config")
     openaire: OpenAireConfig = Field(default_factory=OpenAireConfig, description="OpenAIRE config")

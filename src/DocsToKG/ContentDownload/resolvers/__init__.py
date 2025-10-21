@@ -35,7 +35,6 @@ from .landing_page import LandingPageResolver  # noqa: E402,F401
 from .openaire import OpenAireResolver  # noqa: E402,F401
 from .openalex import OpenAlexResolver  # noqa: E402,F401
 from .osf import OsfResolver  # noqa: E402,F401
-from .pmc import PmcResolver  # noqa: E402,F401
 
 # ============================================================================
 # Registry API (modern system)
@@ -65,7 +64,6 @@ __all__ = [
     "OpenAireResolver",
     "OpenAlexResolver",
     "OsfResolver",
-    "PmcResolver",
     "SemanticScholarResolver",
     "UnpaywallResolver",
     "WaybackResolver",
