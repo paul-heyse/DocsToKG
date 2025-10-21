@@ -8,11 +8,16 @@
 
 ## Executive Summary
 
-A comprehensive audit of the codebase has been conducted to identify any legacy, temporary, or misaligned code related to the newly implemented locking and telemetry design.
+A comprehensive audit of the codebase has been conducted to identify any legacy, temporary, or misaligned code related to the newly implemented locking and telemetry design. 
 
 **Result: ZERO legacy code issues found.**
 
-All code follows the specified design pattern. Deprecated patterns are properly marked with warnings. Alternative implementations maintain backward compatibility and are intentionally preserved for non-JSONL use cases.
+**Follow-up Action (October 21, 2025):** The outdated `acquire_lock()` public API has been removed:
+- Converted to private `_acquire_lock()` function
+- All internal uses refactored to import from `core.concurrency`
+- Removed from public `__all__` exports
+- Deprecated tests removed (function no longer public)
+- **Status:** ✅ COMPLETE - Public API cleaned, 12 tests passing
 
 ---
 

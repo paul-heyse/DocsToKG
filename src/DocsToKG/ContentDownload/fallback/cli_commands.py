@@ -1,35 +1,34 @@
 """
-Extended CLI Commands for Fallback & Resiliency Strategy
+Extended CLI Commands - UPDATED with Telemetry Storage Integration
 
-Provides 4 operational commands:
-  1. fallback stats - Telemetry analysis and performance metrics
-  2. fallback tune - Configuration recommendations and tuning
-  3. fallback explain - Strategy documentation and diagrams
-  4. fallback config - Configuration introspection and validation
+Provides 4 operational commands with real telemetry loading:
+  1. fallback stats - Telemetry analysis
+  2. fallback tune - Configuration recommendations
+  3. fallback explain - Strategy documentation
+  4. fallback config - Configuration introspection
 """
 
 from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, timedelta
-from pathlib import Path
 from typing import Any, Dict, List, Optional
 from collections import defaultdict
 
 from DocsToKG.ContentDownload.fallback.loader import load_fallback_plan
 from DocsToKG.ContentDownload.fallback.types import FallbackPlan
+from DocsToKG.ContentDownload.fallback.telemetry_storage import get_telemetry_storage
 
 logger = logging.getLogger(__name__)
 
 
 # ============================================================================
-# COMMAND 1: fallback stats - Telemetry Analysis
+# COMMAND 1: fallback stats - Telemetry Analysis (UPDATED)
 # ============================================================================
 
 
 class TelemetryAnalyzer:
-    """Analyzes fallback strategy telemetry data."""
+    """Analyzes fallback strategy telemetry data from real storage."""
 
     def __init__(self, records: List[Dict[str, Any]]):
         """Initialize analyzer with telemetry records."""
@@ -52,6 +51,9 @@ class TelemetryAnalyzer:
             "success_count": success_count,
             "success_rate": round(success_rate, 3),
             "avg_elapsed_ms": round(avg_elapsed, 1),
+            "p50_elapsed_ms": round(sorted(elapsed_times)[len(elapsed_times)//2], 1) if elapsed_times else 0,
+            "p95_elapsed_ms": round(sorted(elapsed_times)[int(len(elapsed_times)*0.95)], 1) if elapsed_times else 0,
+            "p99_elapsed_ms": round(sorted(elapsed_times)[int(len(elapsed_times)*0.99)], 1) if elapsed_times else 0,
         }
 
     def get_tier_stats(self) -> Dict[str, Dict[str, Any]]:
@@ -75,6 +77,7 @@ class TelemetryAnalyzer:
                 "attempts": data["attempts"],
                 "success_rate": round(success_rate, 3),
                 "avg_elapsed_ms": round(avg_elapsed, 1),
+                "success_count": data["successes"],
             }
 
         return result
@@ -100,6 +103,7 @@ class TelemetryAnalyzer:
                 "success_rate": round(data["successes"] / data["attempts"] if data["attempts"] > 0 else 0, 3),
                 "error_rate": round(data["errors"] / data["attempts"] if data["attempts"] > 0 else 0, 3),
                 "timeout_rate": round(data["timeouts"] / data["attempts"] if data["attempts"] > 0 else 0, 3),
+                "success_count": data["successes"],
             }
 
         return result
@@ -116,14 +120,16 @@ class TelemetryAnalyzer:
 
 
 def cmd_fallback_stats(args: Any) -> None:
-    """Display fallback strategy statistics from telemetry."""
+    """Display fallback strategy statistics from telemetry (UPDATED)."""
     manifest_path = getattr(args, "manifest", None) or "Data/Manifests/manifest.sqlite3"
     period = getattr(args, "period", "24h") or "24h"
     output_format = getattr(args, "format", "text") or "text"
+    tier_filter = getattr(args, "tier", None)
+    source_filter = getattr(args, "source", None)
 
-    # TODO: Load records from manifest path
-    # For now, use empty records
-    records: List[Dict[str, Any]] = []
+    # Load records from storage (NEW)
+    storage = get_telemetry_storage(manifest_path)
+    records = storage.load_records(period, tier_filter, source_filter)
 
     if not records:
         print("No telemetry records found. Run fallback strategy first.")
@@ -133,6 +139,11 @@ def cmd_fallback_stats(args: Any) -> None:
 
     if output_format == "json":
         stats = {
+            "period": period,
+            "filters": {
+                "tier": tier_filter,
+                "source": source_filter,
+            },
             "overall": analyzer.get_overall_stats(),
             "by_tier": analyzer.get_tier_stats(),
             "by_source": analyzer.get_source_stats(),
@@ -146,9 +157,16 @@ def cmd_fallback_stats(args: Any) -> None:
 
         overall = analyzer.get_overall_stats()
         print(f"\nPeriod: Last {period}")
+        if tier_filter:
+            print(f"Tier Filter: {tier_filter}")
+        if source_filter:
+            print(f"Source Filter: {source_filter}")
         print(f"Total Attempts: {overall.get('total_attempts', 0)}")
         print(f"Success Rate: {overall.get('success_rate', 0) * 100:.1f}%")
         print(f"Avg Latency: {overall.get('avg_elapsed_ms', 0):.0f}ms")
+        print(f"P50 Latency: {overall.get('p50_elapsed_ms', 0):.0f}ms")
+        print(f"P95 Latency: {overall.get('p95_elapsed_ms', 0):.0f}ms")
+        print(f"P99 Latency: {overall.get('p99_elapsed_ms', 0):.0f}ms")
 
         print("\nTIER PERFORMANCE:")
         for tier, stats in analyzer.get_tier_stats().items():
@@ -156,6 +174,13 @@ def cmd_fallback_stats(args: Any) -> None:
             print(f"    Attempts: {stats['attempts']}")
             print(f"    Success Rate: {stats['success_rate'] * 100:.1f}%")
             print(f"    Avg Latency: {stats['avg_elapsed_ms']:.0f}ms")
+
+        print("\nSOURCE PERFORMANCE:")
+        for source, stats in analyzer.get_source_stats().items():
+            print(f"  {source}:")
+            print(f"    Success Rate: {stats['success_rate'] * 100:.1f}%")
+            print(f"    Error Rate: {stats['error_rate'] * 100:.1f}%")
+            print(f"    Timeout Rate: {stats['timeout_rate'] * 100:.1f}%")
 
         print("\nTOP FAILURE REASONS:")
         for reason, count in analyzer.get_failure_reasons().items():
@@ -194,9 +219,6 @@ class ConfigurationTuner:
                     "impact": "Consider moving to separate tier or disabling",
                 })
 
-        # Analyze budget usage
-        # (In real implementation, would track budget consumption)
-
         return recommendations
 
     def get_projections(self, recommendations: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -204,9 +226,9 @@ class ConfigurationTuner:
         current_stats = self.analyzer.get_overall_stats()
         projected = {
             "current_success_rate": current_stats.get("success_rate", 0),
-            "projected_success_rate": current_stats.get("success_rate", 0) + 0.05,  # Conservative +5%
+            "projected_success_rate": min(current_stats.get("success_rate", 0) + 0.05, 1.0),
             "current_avg_latency_ms": current_stats.get("avg_elapsed_ms", 0),
-            "projected_avg_latency_ms": current_stats.get("avg_elapsed_ms", 0) * 0.9,  # 10% improvement
+            "projected_avg_latency_ms": current_stats.get("avg_elapsed_ms", 0) * 0.9,
         }
         return projected
 
@@ -215,8 +237,8 @@ def cmd_fallback_tune(args: Any) -> None:
     """Analyze telemetry and recommend configuration improvements."""
     manifest_path = getattr(args, "manifest", None) or "Data/Manifests/manifest.sqlite3"
 
-    # TODO: Load records from manifest
-    records: List[Dict[str, Any]] = []
+    storage = get_telemetry_storage(manifest_path)
+    records = storage.load_records()
 
     if not records:
         print("No telemetry records found. Run fallback strategy first.")
@@ -352,7 +374,7 @@ def cmd_fallback_config(args: Any) -> None:
 
 
 # ============================================================================
-# Command Registration
+# Command Registration (UPDATED)
 # ============================================================================
 
 
