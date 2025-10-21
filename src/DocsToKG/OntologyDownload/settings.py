@@ -726,6 +726,30 @@ class ResolvedConfig(BaseModel):
         _apply_env_overrides(defaults)
         return cls(defaults=defaults, specs=[])
 
+
+    def config_hash(self) -> str:
+        """Compute a deterministic hash of all configuration for provenance tracking."""
+        import hashlib
+        config_dict = {
+            "http": self.defaults.http.model_dump(mode="json"),
+            "planner": self.defaults.planner.model_dump(mode="json"),
+            "validation": self.defaults.validation.model_dump(mode="json"),
+            "logging": self.defaults.logging.model_dump(mode="json"),
+            "db": {
+                "path": str(self.defaults.db.path),
+                "threads": self.defaults.db.threads,
+                "readonly": self.defaults.db.readonly,
+                "writer_lock": self.defaults.db.writer_lock,
+            },
+            "storage": {
+                "root": str(self.defaults.storage.root),
+                "latest_name": self.defaults.storage.latest_name,
+                "write_latest_mirror": self.defaults.storage.write_latest_mirror,
+            },
+        }
+        config_str = json.dumps(config_dict, sort_keys=True, default=str)
+        return hashlib.sha256(config_str.encode("utf-8")).hexdigest()[:16]
+
     model_config = {
         "validate_assignment": True,
         "arbitrary_types_allowed": True,
