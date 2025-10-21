@@ -273,6 +273,8 @@ from DocsToKG.DocParsing.logging import (
     telemetry_scope,
 )
 from DocsToKG.DocParsing.telemetry import StageTelemetry, TelemetrySink
+from DocsToKG.DocParsing.storage.chunks_writer import ParquetChunksWriter
+from DocsToKG.DocParsing.storage import paths as storage_paths
 
 from .cli import build_parser, parse_args
 from .config import CHUNK_PROFILE_PRESETS, ChunkerCfg
@@ -1880,6 +1882,78 @@ def _run_validate_only(
         input_relpath=relative_path(in_dir, data_root),
         output_relpath=relative_path(out_dir, data_root),
     )
+
+
+def _write_chunks_atomic(
+    output_path: Path,
+    chunk_rows: List[Dict[str, Any]],
+    format: str,
+    doc_id: str,
+    data_root: Optional[Path],
+    cfg_hash: str,
+) -> None:
+    """
+    Write chunk rows to output path in specified format.
+
+    Supports both JSONL (legacy) and Parquet (default) formats.
+
+    Args:
+        output_path: Path for output file.
+        chunk_rows: List of chunk row dictionaries.
+        format: Output format ("parquet" or "jsonl").
+        doc_id: Document ID for error messages.
+        data_root: Data root directory (for Parquet output).
+        cfg_hash: Configuration hash for Parquet footer.
+
+    Raises:
+        ValueError: If format is unsupported.
+    """
+    if format == "parquet":
+        # Use Parquet writer with partitioned layout
+        if data_root is None:
+            raise ValueError("data_root is required for Parquet output")
+
+        # Normalize rel_id from output_path
+        rel_id = storage_paths.normalize_rel_id(output_path.stem)
+
+        # Convert ChunkRow format to Parquet format
+        parquet_rows = []
+        for row in chunk_rows:
+            parquet_row = {
+                "doc_id": row.get("doc_id", doc_id),
+                "chunk_id": row.get("chunk_id", 0),
+                "text": row.get("text", ""),
+                "tokens": row.get("num_tokens", 0),
+                "span": {
+                    "start": row.get("start_offset", 0),
+                    "end": row.get("start_offset", 0) + len(row.get("text", "")),
+                },
+                "created_at": {"ts": "now"},  # Will be replaced by writer
+                "schema_version": "docparse/chunks/1.0.0",
+            }
+            # Optional fields
+            if "meta" in row or row.get("provenance"):
+                parquet_row["meta"] = row.get("meta", {})
+            parquet_rows.append(parquet_row)
+
+        writer = ParquetChunksWriter()
+        writer.write(
+            parquet_rows,
+            data_root=data_root,
+            rel_id=rel_id,
+            cfg_hash=cfg_hash,
+            created_by="DocsToKG-DocParsing",
+        )
+    elif format == "jsonl":
+        # Legacy JSONL format
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        with atomic_write(output_path) as handle:
+            for row in chunk_rows:
+                validate_chunk_row(row)
+                handle.write(json.dumps(row, ensure_ascii=False))
+                handle.write("\n")
+    else:
+        raise ValueError(f"Unsupported chunk format: {format}")
 
 
 def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = None) -> int:

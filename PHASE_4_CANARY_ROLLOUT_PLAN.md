@@ -17,22 +17,26 @@ This phase deploys the **idempotency system** from Phase 3 to production via a *
 ## Phase 4 Stages (4 tasks, 1-2 days total)
 
 ### P4.1: Canary Rollout Setup (4-8 hours)
+
 - Deploy to 5% of traffic (canary fleet)
 - Monitor for 1-2 hours
 - Collect baseline metrics
 
 ### P4.2: Monitoring & Dashboards (4-6 hours)
+
 - Create Grafana dashboards
 - Set up alert rules
 - Configure SLO tracking
 
 ### P4.3: SLO Verification & Full Rollout (8-12 hours)
+
 - Verify all 6 SLOs passing
 - Ramp to 50% traffic
 - Final verification
 - Full 100% rollout
 
 ### P4.4: Post-Deployment Validation (24-48 hours)
+
 - Monitor production SLOs
 - Verify exact-once semantics
 - Document results
@@ -101,22 +105,26 @@ python -m DocsToKG.ContentDownload.cli \
 **Key Metrics to Track:**
 
 1. **Job Planning Success** (should be 100%)
+
    ```sql
    SELECT COUNT(*) FROM artifact_jobs WHERE state='PLANNED';
    ```
 
 2. **State Transitions** (forward-only)
+
    ```sql
    SELECT state, COUNT(*) FROM artifact_jobs GROUP BY state;
    ```
 
 3. **Lease Health** (no stale leases)
+
    ```sql
    SELECT COUNT(*) FROM artifact_jobs
    WHERE lease_until < datetime('now') AND lease_owner IS NOT NULL;
    ```
 
 4. **Operation Replay Rate** (should be <5%)
+
    ```python
    from DocsToKG.ContentDownload import slo_compute
    import sqlite3
@@ -126,6 +134,7 @@ python -m DocsToKG.ContentDownload.cli \
    ```
 
 5. **Telemetry Events** (9 event types flowing)
+
    ```bash
    grep "job_planned\|job_leased\|crash_recovery" runs/canary/deployment.log | head -20
    ```
@@ -188,6 +197,7 @@ Create dashboard at: `dashboards/idempotency_system.json`
 **Dashboard Panels:**
 
 #### Panel 1: Job Completion Rate (Gauge)
+
 ```
 Query: SELECT COUNT(*) / (SELECT COUNT(*) FROM artifact_jobs)
 Target: 99.5%
@@ -196,6 +206,7 @@ Alert: < 99.0% = warning, < 98.5% = critical
 ```
 
 #### Panel 2: Time to Complete Distribution (Histogram)
+
 ```
 Query: SELECT duration_ms FROM (
   SELECT (updated_at - created_at) * 1000 as duration_ms
@@ -207,6 +218,7 @@ P99 target: 300s
 ```
 
 #### Panel 3: Lease Health (Counter)
+
 ```
 Query: SELECT COUNT(*) FROM artifact_jobs
   WHERE lease_until < datetime('now') AND lease_owner IS NOT NULL
@@ -214,6 +226,7 @@ Alert: > 0 = warning
 ```
 
 #### Panel 4: Operation Replay Rate (Percentage)
+
 ```
 Query: (SELECT COUNT(*) FROM artifact_ops WHERE result_json IS NOT NULL
         ON INSERT) / (SELECT COUNT(*) FROM artifact_ops)
@@ -222,6 +235,7 @@ Alert: > 10% = warning, > 20% = critical
 ```
 
 #### Panel 5: Crash Recovery Events (Counter)
+
 ```
 Query: SELECT COUNT(*) FROM artifact_jobs
   WHERE state IN ('STREAMING', 'FINALIZED')
@@ -230,6 +244,7 @@ Indicates: Successfully recovered from crash
 ```
 
 #### Panel 6: SLO Budget Remaining (Gauge)
+
 ```
 For each SLO:
   - Job Completion: 100% available budget

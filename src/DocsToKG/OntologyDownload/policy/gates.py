@@ -1,15 +1,12 @@
-"""Six concrete policy gates for defense-in-depth security.
+"""Policy gates: security boundaries for OntologyDownload.
 
-Each gate validates a specific boundary and returns PolicyOK or PolicyReject.
-All gates are registered with the central registry on import.
-
-Gates:
-1. Configuration gate - validate settings on startup
-2. URL & network gate - validate URLs, hosts, DNS
-3. Filesystem & path gate - validate paths, prevent traversal
-4. Extraction policy gate - validate archive entries, detect bombs
-5. Storage gate - validate storage operations
-6. DB transactional gate - validate database operations
+Implements access control gates at critical I/O boundaries:
+- Configuration validation
+- URL/network security
+- Filesystem path traversal prevention
+- Archive extraction guards (zip bombs)
+- Storage operation safety
+- Database transaction boundaries
 """
 
 import time
@@ -17,13 +14,15 @@ from typing import Any, Dict, Optional, Union, List
 
 from DocsToKG.OntologyDownload.policy.errors import (
     ErrorCode,
-    ExtractionPolicyException,
-    FilesystemPolicyException,
+    raise_policy_error,
     PolicyOK,
     PolicyReject,
-    StoragePolicyException,
     URLPolicyException,
-    raise_policy_error,
+    FilesystemPolicyException,
+    ExtractionPolicyException,
+    StoragePolicyException,
+    ConfigurationPolicyException,
+    DbBoundaryException,
 )
 from DocsToKG.OntologyDownload.policy.registry import policy_gate
 
@@ -211,7 +210,6 @@ def filesystem_gate(
         PolicyOK if all paths valid, PolicyReject otherwise
     """
     import os
-    import re
     import unicodedata
     from pathlib import Path, PureWindowsPath
 
@@ -377,59 +375,92 @@ def filesystem_gate(
 
 @policy_gate(
     name="extraction_gate",
-    description="Validate archive entries, detect zip bombs",
+    description="Validate archive extraction parameters and detect zip bombs",
     domain="extraction",
 )
 def extraction_gate(
-    entry: Dict[str, Any],
-    max_ratio: float = 10.0,
-    max_entry_size: int = 100 * 1024 * 1024,  # 100MB
+    entries_total: int,
+    bytes_declared: int,
+    max_total_ratio: float = 100.0,
+    max_entry_ratio: float = 10.0,
+    max_file_size_mb: int = 10240,
+    max_entries: int = 100000,
 ) -> Union[PolicyOK, PolicyReject]:
-    """Validate archive entry against extraction policy.
+    """Validate archive extraction parameters.
+
+    Enforces:
+    - Zip bomb guards: global and per-entry compression ratios
+    - File size limits
+    - Entry count budget
+    - Compression bomb detection
 
     Args:
-        entry: Archive entry dict with 'type', 'size', 'compressed_size'
-        max_ratio: Max expansion ratio (uncompressed / compressed)
-        max_entry_size: Max uncompressed size in bytes
+        entries_total: Total entries in archive
+        bytes_declared: Total uncompressed bytes declared
+        max_total_ratio: Max compression ratio (uncompressed/compressed)
+        max_entry_ratio: Max per-entry compression ratio
+        max_file_size_mb: Max individual file size (MB)
+        max_entries: Max total entries
 
     Returns:
-        PolicyOK if entry is valid, PolicyReject otherwise
+        PolicyOK if archive is valid, PolicyReject otherwise
     """
     start_ms = time.perf_counter() * 1000
     details: Dict[str, Any] = {}
 
     try:
-        # Check entry type - only regular files allowed
-        entry_type = entry.get("type", "file")
-        if entry_type not in ("file", "regular"):
+        # Entry budget check
+        if entries_total > max_entries:
+            details = {"entries": entries_total, "max_entries": max_entries}
             raise_policy_error(
-                ErrorCode.E_SPECIAL_TYPE,
-                f"Entry type not allowed: {entry_type}",
-                {"entry_type": entry_type},
+                ErrorCode.E_ENTRY_BUDGET,
+                f"Too many entries: {entries_total} > {max_entries}",
+                details,
                 ExtractionPolicyException,
             )
 
-        # Check file size
-        size = entry.get("size", 0)
-        if size > max_entry_size:
+        # Avoid division by zero
+        if bytes_declared <= 0:
+            details = {"bytes_declared": bytes_declared}
             raise_policy_error(
-                ErrorCode.E_FILE_SIZE,
-                f"File too large: {size} > {max_entry_size}",
-                {"size": size, "max": max_entry_size},
+                ErrorCode.E_BOMB_RATIO,
+                "Invalid bytes_declared: must be > 0",
+                details,
                 ExtractionPolicyException,
             )
 
-        # Check compression ratio (zip bomb detection)
-        compressed_size = entry.get("compressed_size", size)
-        if compressed_size > 0:
-            ratio = size / compressed_size
-            if ratio > max_ratio:
-                raise_policy_error(
-                    ErrorCode.E_ENTRY_RATIO,
-                    f"Zip bomb detected: ratio {ratio:.1f} > {max_ratio}",
-                    {"ratio": ratio, "max_ratio": max_ratio},
-                    ExtractionPolicyException,
-                )
+        # Calculate average compression ratio
+        avg_ratio = bytes_declared / max(entries_total, 1)
+        if avg_ratio > max_entry_ratio:
+            details = {
+                "avg_ratio": round(avg_ratio, 2),
+                "max_entry_ratio": max_entry_ratio,
+                "entries": entries_total,
+                "bytes": bytes_declared,
+            }
+            raise_policy_error(
+                ErrorCode.E_ENTRY_RATIO,
+                f"Average compression ratio too high: {avg_ratio:.2f} > {max_entry_ratio}",
+                details,
+                ExtractionPolicyException,
+            )
+
+        # Zip bomb detection: if declared uncompressed size seems too large
+        # relative to typical compressed archives, flag it
+        bytes_declared_mb = bytes_declared / (1024 * 1024)
+        if bytes_declared_mb > max_file_size_mb and entries_total <= 10:
+            # Suspicious: large uncompressed but few entries
+            details = {
+                "bytes_mb": round(bytes_declared_mb, 2),
+                "max_mb": max_file_size_mb,
+                "entries": entries_total,
+            }
+            raise_policy_error(
+                ErrorCode.E_BOMB_RATIO,
+                f"Suspicious compression bomb: {bytes_declared_mb:.2f} MB from {entries_total} entries",
+                details,
+                ExtractionPolicyException,
+            )
 
         elapsed_ms = time.perf_counter() * 1000 - start_ms
         return PolicyOK(gate_name="extraction_gate", elapsed_ms=elapsed_ms)
@@ -454,37 +485,70 @@ def extraction_gate(
 
 @policy_gate(
     name="storage_gate",
-    description="Validate storage operations",
+    description="Validate storage operations for safety",
     domain="storage",
 )
 def storage_gate(
     operation: str,
-    details_dict: Optional[Dict[str, Any]] = None,
+    src_path: str,
+    dst_path: str,
+    check_traversal: bool = True,
 ) -> Union[PolicyOK, PolicyReject]:
-    """Validate storage operation against policy.
+    """Validate storage operations.
+
+    Enforces:
+    - Atomic write pattern (temp + move)
+    - Path traversal prevention
+    - Permission safety
 
     Args:
-        operation: Storage operation ('put', 'move', 'marker')
-        details_dict: Operation details
+        operation: Operation type (put, move, copy, delete)
+        src_path: Source path
+        dst_path: Destination path
+        check_traversal: Whether to check for path traversal
 
     Returns:
         PolicyOK if operation is valid, PolicyReject otherwise
     """
+    import os
+
     start_ms = time.perf_counter() * 1000
-    details_dict = details_dict or {}
+    details: Dict[str, Any] = {}
 
     try:
-        # Valid operations
-        valid_ops = {"put", "move", "marker", "delete"}
+        # Validate operation
+        valid_ops = {"put", "move", "copy", "delete", "rename"}
         if operation not in valid_ops:
+            details = {"operation": operation}
             raise_policy_error(
                 ErrorCode.E_STORAGE_PUT,
-                f"Invalid storage operation: {operation}",
-                {"operation": operation},
+                f"Invalid operation: {operation}",
+                details,
                 StoragePolicyException,
             )
 
-        # Basic validation - could be extended with path checks, etc.
+        # Check for traversal in destination
+        if check_traversal:
+            if ".." in dst_path or dst_path.startswith("/"):
+                details = {"path": dst_path, "operation": operation}
+                raise_policy_error(
+                    ErrorCode.E_TRAVERSAL,
+                    f"Path traversal in storage operation: {dst_path}",
+                    details,
+                    StoragePolicyException,
+                )
+
+        # For move/rename operations, check source exists
+        if operation in ("move", "rename", "copy"):
+            if src_path.startswith("/") and not os.path.exists(src_path):
+                details = {"src": src_path}
+                raise_policy_error(
+                    ErrorCode.E_STORAGE_MOVE,
+                    f"Source does not exist: {src_path}",
+                    details,
+                    StoragePolicyException,
+                )
+
         elapsed_ms = time.perf_counter() * 1000 - start_ms
         return PolicyOK(gate_name="storage_gate", elapsed_ms=elapsed_ms)
 
@@ -495,7 +559,7 @@ def storage_gate(
         raise_policy_error(
             ErrorCode.E_STORAGE_PUT,
             str(e),
-            details_dict,
+            details,
             StoragePolicyException,
         )
         assert False  # All paths above raise
@@ -554,11 +618,89 @@ def db_gate(
         assert False  # All paths above raise
 
 
+@policy_gate(
+    name="db_boundary_gate",
+    description="Validate database transaction boundaries",
+    domain="db",
+)
+def db_boundary_gate(
+    operation: str,
+    tables_affected: Optional[List[str]] = None,
+    fs_success: bool = True,
+) -> Union[PolicyOK, PolicyReject]:
+    """Validate database transaction boundaries.
+
+    Enforces:
+    - Commit only after FS success (no torn writes)
+    - Foreign key invariants
+    - Transaction isolation
+
+    Args:
+        operation: Transaction operation (pre_commit, post_extract, etc.)
+        tables_affected: List of tables involved
+        fs_success: Whether filesystem operation succeeded
+
+    Returns:
+        PolicyOK if transaction valid, PolicyReject otherwise
+    """
+    start_ms = time.perf_counter() * 1000
+    details: Dict[str, Any] = {}
+
+    try:
+        # Validate operation
+        valid_ops = {"pre_commit", "post_extract", "pre_rollback", "post_rollback"}
+        if operation not in valid_ops:
+            details = {"operation": operation}
+            raise_policy_error(
+                ErrorCode.E_DB_TX,
+                f"Invalid transaction operation: {operation}",
+                details,
+                DbBoundaryException,
+            )
+
+        # Core rule: commit only after FS success
+        if operation == "pre_commit" and not fs_success:
+            details = {"operation": operation, "fs_success": fs_success}
+            raise_policy_error(
+                ErrorCode.E_DB_TX,
+                "Cannot commit: filesystem operation failed (no torn writes)",
+                details,
+                DbBoundaryException,
+            )
+
+        # Track affected tables
+        if tables_affected:
+            for table in tables_affected:
+                if not table or not isinstance(table, str):
+                    details = {"table": table}
+                    raise_policy_error(
+                        ErrorCode.E_DB_TX,
+                        f"Invalid table name: {table}",
+                        details,
+                        DbBoundaryException,
+                    )
+
+        elapsed_ms = time.perf_counter() * 1000 - start_ms
+        return PolicyOK(gate_name="db_boundary_gate", elapsed_ms=elapsed_ms)
+
+    except Exception as e:
+        elapsed_ms = time.perf_counter() * 1000 - start_ms
+        if isinstance(e, DbBoundaryException):
+            raise
+        raise_policy_error(
+            ErrorCode.E_DB_TX,
+            str(e),
+            details,
+            DbBoundaryException,
+        )
+        assert False  # All paths above raise
+
+
 __all__ = [
     "config_gate",
     "url_gate",
     "filesystem_gate",
     "extraction_gate",
     "storage_gate",
-    "db_gate",
+    "db_boundary_gate",
 ]

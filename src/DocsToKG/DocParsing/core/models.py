@@ -81,6 +81,7 @@ class ChunkWorkerConfig:
     serializer_provider_spec: str = DEFAULT_SERIALIZER_PROVIDER
     inject_anchors: bool = False
     data_root: Optional[Path] = None
+    format: str = "parquet"
 
 
 @dataclass(slots=True)

@@ -154,6 +154,12 @@ class ConfigurationPolicyException(PolicyException):
     pass
 
 
+class DbBoundaryException(PolicyException):
+    """Database transaction boundary violation."""
+
+    pass
+
+
 # ============================================================================
 # Error Emission Helpers
 # ============================================================================
@@ -254,5 +260,6 @@ __all__ = [
     "ExtractionPolicyException",
     "StoragePolicyException",
     "ConfigurationPolicyException",
+    "DbBoundaryException",
     "raise_policy_error",
 ]
