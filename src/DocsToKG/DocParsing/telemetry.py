@@ -12,9 +12,12 @@ from __future__ import annotations
 import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, Optional
+from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, Optional
 
-from DocsToKG.DocParsing.io import jsonl_append_iter, DEFAULT_JSONL_WRITER
+from DocsToKG.DocParsing.io import DEFAULT_JSONL_WRITER
+
+if TYPE_CHECKING:
+    from DocsToKG.DocParsing.embedding.backends.base import ProviderIdentity
 
 __all__ = [
     "Attempt",

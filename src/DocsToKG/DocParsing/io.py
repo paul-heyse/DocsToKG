@@ -439,9 +439,7 @@ def _iter_jsonl_stream(
                             )
                             break
                         continue
-                    raise ValueError(
-                        f"Invalid JSON in {path} at byte offset {pos}: {exc}"
-                    ) from exc
+                    raise ValueError(f"Invalid JSON in {path} at byte offset {pos}: {exc}") from exc
 
                 if record is None:
                     break

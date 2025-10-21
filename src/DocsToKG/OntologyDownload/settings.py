@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import importlib
 import ipaddress
+import json
 import logging
 import os
 import re
@@ -53,7 +54,6 @@ from typing import (
 )
 
 import httpx
-import json
 
 try:  # pragma: no cover - dependency check
     import yaml  # type: ignore
@@ -65,7 +65,7 @@ except ModuleNotFoundError as exc:  # pragma: no cover - explicit guidance for u
         "instead of installing packages directly."
     ) from exc
 
-from pydantic import BaseModel, Field, PrivateAttr, field_validator, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, field_validator
 from pydantic import ValidationError as PydanticValidationError
 from pydantic_core import ValidationError as CoreValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -2106,57 +2106,94 @@ class ExtractionSettings(BaseModel):
 
 
 class StorageSettings(BaseModel):
-    """Local storage configuration."""
+    """Storage backend configuration for ontology files.
 
-    model_config = ConfigDict(frozen=True, validate_assignment=False)
+    Controls where downloaded and extracted ontology files are stored,
+    and how the "latest" version pointer is managed.
+
+    Attributes:
+        root: Base directory for storing ontology files (nested by service/version).
+        latest_name: Filename for JSON mirror of latest version pointer.
+        write_latest_mirror: Write JSON mirror of latest pointer for convenience.
+    """
 
     root: Path = Field(
-        default_factory=lambda: Path.home() / "ontologies",
-        description="Blob storage root",
+        default_factory=lambda: LOCAL_ONTOLOGY_DIR,
+        description="Root directory for ontology storage",
     )
-    latest_name: str = Field(default="LATEST.json", description="Latest marker filename")
-    url: Optional[str] = Field(default=None, description="Optional remote backend URL (fsspec)")
+    latest_name: str = Field(
+        default="LATEST.json", description="Filename for JSON mirror of latest version pointer"
+    )
+    write_latest_mirror: bool = Field(
+        default=True,
+        description="Write JSON mirror of latest pointer for convenience (DB is authoritative)",
+    )
 
     @field_validator("root", mode="before")
     @classmethod
     def normalize_root(cls, v: Any) -> Path:
-        """Normalize storage root to absolute path."""
+        """Normalize to absolute POSIX path."""
         if isinstance(v, str):
-            p = Path(v).expanduser()
-        elif isinstance(v, Path):
-            p = v.expanduser()
-        else:
-            p = Path(v).expanduser()
-        return p.resolve()
+            v = Path(v)
+        if isinstance(v, Path):
+            return v.expanduser().resolve()
+        raise ValueError(f"root must be string or Path, got {type(v)}")
+
+    @field_validator("latest_name")
+    @classmethod
+    def validate_latest_name(cls, v: str) -> str:
+        """Ensure latest_name is a valid filename (no path separators)."""
+        if "/" in v or "\\" in v:
+            raise ValueError("latest_name must be a filename, not a path")
+        if not v.strip():
+            raise ValueError("latest_name cannot be empty")
+        return v.strip()
+
+    model_config = {
+        "validate_assignment": True,
+        "extra": "forbid",
+    }
 
 
 class DuckDBSettings(BaseModel):
-    """DuckDB catalog configuration."""
+    """DuckDB catalog database configuration.
 
-    model_config = ConfigDict(frozen=True, validate_assignment=False)
+    Controls the DuckDB catalog (brain) that tracks ontology versions,
+    artifacts, extracted files, and validations.
+
+    Attributes:
+        path: Path to DuckDB database file. Parent directory is created if missing.
+        threads: Number of DuckDB worker threads (recommend CPU count).
+        readonly: Open database in read-only mode (disables writes).
+        writer_lock: Use file-based writer lock to serialize concurrent writers.
+    """
 
     path: Path = Field(
-        default_factory=lambda: Path.home() / ".data" / "ontofetch.duckdb",
-        description="DuckDB file path",
+        default_factory=lambda: LOCAL_ONTOLOGY_DIR.parent / ".catalog" / "ontofetch.duckdb",
+        description="Path to DuckDB file (will be created if missing)",
     )
-    threads: Optional[int] = Field(
-        default=None, ge=1, description="Query execution threads (auto-detect if None)"
+    threads: int = Field(
+        default=8, gt=0, le=256, description="Number of threads for DuckDB query execution"
     )
-    readonly: bool = Field(default=False, description="Open database read-only")
-    wlock: bool = Field(default=True, description="Enable writer file-lock for serialization")
-    parquet_events: bool = Field(default=False, description="Store events as Parquet files")
+    readonly: bool = Field(default=False, description="Open database in read-only mode")
+    writer_lock: bool = Field(
+        default=True, description="Use file-based writer lock to serialize writes"
+    )
 
     @field_validator("path", mode="before")
     @classmethod
     def normalize_path(cls, v: Any) -> Path:
-        """Normalize DuckDB path to absolute."""
+        """Normalize to absolute POSIX path."""
         if isinstance(v, str):
-            p = Path(v).expanduser()
-        elif isinstance(v, Path):
-            p = v.expanduser()
-        else:
-            p = Path(v).expanduser()
-        return p.resolve()
+            v = Path(v)
+        if isinstance(v, Path):
+            return v.expanduser().resolve()
+        raise ValueError(f"path must be string or Path, got {type(v)}")
+
+    model_config = {
+        "validate_assignment": True,
+        "extra": "forbid",
+    }
 
 
 # ============================================================================
@@ -2251,11 +2288,11 @@ class OntologyDownloadSettings(BaseModel):
     @property
     def source_fingerprint(self) -> Dict[str, str]:
         """Return mapping of field names to their configuration sources.
-        
+
         This property exposes the source attribution map built by TracingSettingsSource
         during settings initialization. It shows which source (CLI, environment,
         config file, .env, or default) provided each field value.
-        
+
         Returns:
             Dictionary where keys are field names and values are source names:
             - "cli": provided via CLI/programmatic arguments
@@ -2264,21 +2301,20 @@ class OntologyDownloadSettings(BaseModel):
             - ".env.ontofetch": provided via .env.ontofetch file
             - ".env": provided via .env file
             - "default": using built-in default value
-        
+
         Example:
             >>> settings = get_settings()
             >>> fp = settings.source_fingerprint
             >>> print(fp)
             {'http__timeout_read': 'env', 'security__allowed_hosts': 'cli', 'db__path': 'default'}
-        
+
         Note:
             The fingerprint is populated during settings initialization only.
             Use get_source_fingerprint() directly to access the context.
         """
         from .settings_sources import get_source_fingerprint
-        
-        return get_source_fingerprint()
 
+        return get_source_fingerprint()
 
 
 # Global settings instance cache
