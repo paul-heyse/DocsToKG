@@ -101,10 +101,7 @@ from DocsToKG.ContentDownload.networking import (
     parse_retry_after_header,
     request_with_retries,
 )
-from DocsToKG.ContentDownload.pipeline import (
-    ResolverMetrics,
-    ResolverPipeline,
-)
+
 from DocsToKG.ContentDownload.telemetry import RunTelemetry, normalize_manifest_path
 from DocsToKG.ContentDownload.urls import canonical_for_index, canonical_for_request
 
