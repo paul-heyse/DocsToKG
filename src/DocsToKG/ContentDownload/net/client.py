@@ -77,8 +77,7 @@ def get_http_client(config: Any) -> httpx.Client:
     # Settings changed mid-process → warn once but keep current client
     elif _BIND_HASH != config.config_hash():
         logger.warning(
-            "HTTP client settings changed after binding. "
-            "No hot reload; existing client unchanged."
+            "HTTP client settings changed after binding. No hot reload; existing client unchanged."
         )
         _BIND_HASH = config.config_hash()
 

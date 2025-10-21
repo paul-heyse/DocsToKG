@@ -231,6 +231,16 @@ def extraction_boundary(
     Yields:
         ExtractionBoundaryResult (populated by caller)
     """
+    # Emit observability begin event
+    emit_boundary_begin(
+        boundary="extraction",
+        artifact_id=artifact_id,
+        version_id="unknown",
+        service="unknown",
+        extra_payload={},
+    )
+    start_time = time.time()
+    
     # Placeholder result; caller will update
     result = ExtractionBoundaryResult(
         artifact_id=artifact_id,
@@ -266,12 +276,35 @@ def extraction_boundary(
                 f"Extraction boundary: inserted {result.files_inserted} files "
                 f"for artifact {artifact_id}"
             )
+            
+            # Emit observability success event
+            duration_ms = (time.time() - start_time) * 1000
+            emit_boundary_success(
+                boundary="extraction",
+                artifact_id=artifact_id,
+                version_id="unknown",
+                duration_ms=duration_ms,
+                extra_payload={
+                    "files_inserted": result.files_inserted,
+                    "total_size": result.total_size,
+                },
+            )
         else:
             conn.rollback()
 
     except duckdb.Error as exc:
         conn.rollback()
         logger.error(f"Extraction boundary failed: {exc}")
+        
+        # Emit observability error event
+        duration_ms = (time.time() - start_time) * 1000
+        emit_boundary_error(
+            boundary="extraction",
+            artifact_id=artifact_id,
+            version_id="unknown",
+            error=exc,
+            duration_ms=duration_ms,
+        )
         raise
 
 
@@ -308,6 +341,16 @@ def validation_boundary(
     Raises:
         duckdb.Error: If insert fails (triggers rollback)
     """
+    # Emit observability begin event
+    emit_boundary_begin(
+        boundary="validation",
+        artifact_id="unknown",
+        version_id="unknown",
+        service="unknown",
+        extra_payload={"file_id": file_id, "validator": validator},
+    )
+    start_time = time.time()
+    
     result = ValidationBoundaryResult(
         file_id=file_id,
         validator=validator,
@@ -344,10 +387,30 @@ def validation_boundary(
 
         conn.commit()
         logger.info(f"Validation boundary: recorded {validator}:{status} for {file_id}")
+        
+        # Emit observability success event
+        duration_ms = (time.time() - start_time) * 1000
+        emit_boundary_success(
+            boundary="validation",
+            artifact_id="unknown",
+            version_id="unknown",
+            duration_ms=duration_ms,
+            extra_payload={"validator": validator, "status": status},
+        )
 
     except duckdb.Error as exc:
         conn.rollback()
         logger.error(f"Validation boundary failed: {exc}")
+        
+        # Emit observability error event
+        duration_ms = (time.time() - start_time) * 1000
+        emit_boundary_error(
+            boundary="validation",
+            artifact_id="unknown",
+            version_id="unknown",
+            error=exc,
+            duration_ms=duration_ms,
+        )
         raise
 
     yield result

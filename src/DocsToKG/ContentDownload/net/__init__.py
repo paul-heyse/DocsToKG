@@ -20,10 +20,28 @@ from .client import (
     request_with_redirect_audit,
     reset_http_client,
 )
+from .instrumentation import (
+    CacheStatus,
+    NetRequestEmitter,
+    NetRequestEvent,
+    NetRequestEventBuilder,
+    RequestStatus,
+    get_net_request_emitter,
+    reset_net_request_emitter,
+)
 
 __all__ = [
+    # Client factory
     "get_http_client",
     "close_http_client",
     "reset_http_client",
     "request_with_redirect_audit",
+    # Telemetry
+    "CacheStatus",
+    "RequestStatus",
+    "NetRequestEvent",
+    "NetRequestEventBuilder",
+    "NetRequestEmitter",
+    "get_net_request_emitter",
+    "reset_net_request_emitter",
 ]
