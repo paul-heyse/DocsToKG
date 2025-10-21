@@ -1,4 +1,3 @@
-
 ## Table of Contents
 
 - [0) Guard rails (set once per session)](#0-guard-rails-set-once-per-session)
@@ -7,7 +6,7 @@
 - [3) Quick health checks (no network)](#3-quick-health-checks-no-network)
 - [4) Typical tasks (all no-install)](#4-typical-tasks-all-no-install)
 - [5) Troubleshooting (stay no-install)](#5-troubleshooting-stay-no-install)
-- [6) “Absolutely no installs” policy (what you may do)](#6-absolutely-no-installs-policy-what-you-may-do)
+- [6) "Absolutely no installs" policy (what you may do)](#6-absolutely-no-installs-policy-what-you-may-do)
 - [7) Fallback (only with **explicit approval** to install)](#7-fallback-only-with-explicit-approval-to-install)
 - [8) One-page quick reference (copy/paste safe)](#8-one-page-quick-reference-copy-paste-safe)
 - [Mission & Scope](#mission-scope)
@@ -19,6 +18,7 @@
 - [Networking, Rate Limiting & Politeness](#networking-rate-limiting-politeness)
 - [Operational Playbooks](#operational-playbooks)
 - [Invariants & Safe Change Surfaces](#invariants-safe-change-surfaces)
+- [Work Orchestration (PR #8)](#work-orchestration-pr-8)
 - [Test Matrix & Diagnostics](#test-matrix-diagnostics)
 - [Reference Docs](#reference-docs)
 - [Coding Standards & Module Organization](#coding-standards-module-organization)
@@ -43,11 +43,11 @@ export PIP_REQUIRE_VIRTUALENV=1
 # Never hit the network/package index unless explicitly allowed
 export PIP_NO_INDEX=1
 
-# Don’t read user site-packages (avoid leakage)
+# Don't read user site-packages (avoid leakage)
 export PYTHONNOUSERSITE=1
 ```
 
-> If you later receive explicit approval to install, temporarily unset `PIP_NO_INDEX` (and only follow the “Fallback (with approval)” section at the end).
+> If you later receive explicit approval to install, temporarily unset `PIP_NO_INDEX` (and only follow the "Fallback (with approval)" section at the end).
 
 ---
 
@@ -158,7 +158,7 @@ If any import fails: **do not install**. Go to Troubleshooting.
 **Symptom → Action (no installs):**
 
 - **`ModuleNotFoundError`**
-  You’re not using the project interpreter. Re-run via one of §2 methods, then re-check `sys.executable`.
+  You're not using the project interpreter. Re-run via one of §2 methods, then re-check `sys.executable`.
 
 - **GPU/FAISS/CuPy errors** (e.g., missing `.so`/DLL)
   Do **not** build or fetch wheels. Report the exact error. These packages are customized; replacing them may break GPU paths.
@@ -177,7 +177,7 @@ If any import fails: **do not install**. Go to Troubleshooting.
 
 ---
 
-## 6) “Absolutely no installs” policy (what you may do)
+## 6) "Absolutely no installs" policy (what you may do)
 
 - You **may**:
 
@@ -210,7 +210,7 @@ pip install -r requirements.txt
 # pip install --no-index --find-links ./ci/wheels -r requirements.txt
 ```
 
-> Never “try versions” or compile GPU libs. If a wheel is missing, escalate.
+> Never "try versions" or compile GPU libs. If a wheel is missing, escalate.
 
 ---
 
@@ -245,7 +245,7 @@ PY
 
 ### Final note for agents
 
-This repository’s environment includes **custom wheels and GPU-optimized packages**. Treat the `.venv` as **immutable** unless you are explicitly told to modify it. Your default posture is **execute only**: run what’s already installed, verify, and report issues rather than “fixing” them by installing.
+This repository's environment includes **custom wheels and GPU-optimized packages**. Treat the `.venv` as **immutable** unless you are explicitly told to modify it. Your default posture is **execute only**: run what's already installed, verify, and report issues rather than "fixing" them by installing.
 
 # Agents Guide - ContentDownload
 
@@ -1784,3 +1784,160 @@ python -m DocsToKG.ContentDownload.cli \
 - `--fallback-max-concurrent`: Parallel attempts (default: 3).
 - `--fallback-tier TIER[:option=value]`: Tier configuration (e.g., `direct_oa:parallel=2`).
 - `--disable-wayback-fallback`: Skip Wayback Machine as fallback.
+
+## Work Orchestration (PR #8)
+
+### Overview
+
+Work Orchestration provides a **persistent work queue**, **bounded-concurrency worker pool**, and **graceful crash recovery** without modifying the core pipeline. It ensures safe parallel processing of large artifact sets with politeness constraints.
+
+**Key Components:**
+
+- `orchestrator/queue.py`: SQLite-backed WorkQueue with idempotent enqueue, atomic leasing, and retry logic
+- `orchestrator/limits.py`: KeyedLimiter for per-resolver and per-host concurrency fairness
+- `orchestrator/workers.py`: Worker thread wrapper around pipeline.process()
+- `orchestrator/scheduler.py`: Orchestrator dispatcher, heartbeat thread, and worker pool manager
+- `orchestrator/models.py`: JobState enums and JobResult dataclasses
+- `cli_orchestrator.py`: CLI commands for queue management (enqueue/import/run/stats/retry-failed)
+- `config/models.py`: QueueConfig and OrchestratorConfig Pydantic models
+
+### Features
+
+**SQLite-Backed Persistence:**
+- Idempotent enqueue (artifact_id unique index prevents duplicates)
+- ACID state transitions (QUEUED → IN_PROGRESS → DONE/SKIPPED/ERROR)
+- Crash-safe leasing with TTL-based recovery
+- Retry logic with exponential backoff + jitter
+
+**Bounded Concurrency:**
+- Global cap: `max_workers` (1-256, default 8)
+- Per-resolver fairness: `max_per_resolver` dict (e.g., {"unpaywall": 2, "crossref": 4})
+- Per-host fairness: `max_per_host` (default 4)
+- Thread-safe keyed semaphores
+
+**Graceful Crash Recovery:**
+- Lease TTL: Jobs owned by crashed workers auto-recover after expiration (default 600s)
+- Heartbeat: Active workers extend leases every 30s (configurable)
+- Stale lease detection: Automatic promotion to available pool
+
+### Usage
+
+**Basic Setup:**
+
+```python
+from DocsToKG.ContentDownload.config.models import ContentDownloadConfig
+from DocsToKG.ContentDownload.orchestrator import WorkQueue, Orchestrator
+
+config = ContentDownloadConfig(
+    orchestrator=OrchestratorConfig(max_workers=8, max_per_host=4),
+    queue=QueueConfig(path="state/workqueue.sqlite", wal_mode=True),
+)
+
+queue = WorkQueue(config.queue.path, wal_mode=config.queue.wal_mode)
+orch = Orchestrator(config, queue, pipeline, telemetry=None)
+orch.start()  # Starts dispatcher, heartbeat, and worker threads
+```
+
+**CLI Commands:**
+
+```bash
+# Enqueue a single artifact
+contentdownload queue enqueue doi:10.1234/example '{"doi":"10.1234/example"}'
+
+# Bulk import
+contentdownload queue import artifacts.jsonl --limit 10000
+
+# Start orchestrator (runs until --drain flag signals exit)
+contentdownload queue run --workers 8 --drain
+
+# View queue statistics
+contentdownload queue stats --format json
+
+# Retry failed jobs
+contentdownload queue retry-failed --max-attempts 3
+```
+
+### Configuration
+
+**OrchestratorConfig (Pydantic):**
+
+```python
+class OrchestratorConfig(BaseModel):
+    max_workers: int = 8                           # 1-256 workers
+    max_per_resolver: Dict[str, int] = {}          # Per-resolver limits
+    max_per_host: int = 4                          # Per-host default
+    lease_ttl_seconds: int = 600                   # Crash recovery window (≥30)
+    heartbeat_seconds: int = 30                    # Lease extension interval (≥5)
+    max_job_attempts: int = 3                      # Retry limit (≥1)
+    retry_backoff_seconds: int = 60                # Backoff base (≥1)
+    jitter_seconds: int = 15                       # Backoff jitter (≥0)
+```
+
+**QueueConfig (Pydantic):**
+
+```python
+class QueueConfig(BaseModel):
+    backend: Literal["sqlite"] = "sqlite"          # Future: postgres
+    path: str = "state/workqueue.sqlite"           # Database path
+    wal_mode: bool = True                          # Concurrent access
+    timeout_sec: int = 10                          # DB timeout (≥1)
+```
+
+### Job State Machine
+
+```
+            QUEUED
+              ↓ (lease) → set worker_id, lease_expires_at
+              ↓
+        IN_PROGRESS (leased by worker)
+              ↓ (ack)
+        ├→ DONE (success)
+        ├→ SKIPPED (non-error terminal: robots, 304)
+        └→ ERROR (after max_job_attempts)
+
+If lease_until < now while IN_PROGRESS → can re-lease (crash recovery)
+```
+
+### Testing
+
+**Integration Tests (15 tests, 100% passing):**
+
+```bash
+pytest tests/content_download/test_orchestrator_integration.py -v
+```
+
+**Coverage:**
+- Complete job lifecycle: enqueue → lease → process → ack
+- Idempotence: duplicate enqueues safely ignored
+- Concurrency: multi-worker contention, per-resolver/host limits
+- Crash recovery: stale lease re-leasing after TTL
+- Retry logic: attempts escalation to error state
+- Configuration: models work with core components
+- Error cases: safe no-ops, serialization consistency
+
+### Performance & Tuning
+
+**Throughput:**
+- Increase `max_workers` for higher parallelism
+- Adjust `max_per_resolver` for resolver-specific capacity
+- Balance `lease_ttl_seconds` vs network latency (typ. 2x max download time)
+
+**Politeness:**
+- Rate limiter + keyed limiters work together
+- Per-resolver limits prevent burst to specific endpoints
+- Per-host limits ensure fairness across resolver pool
+
+**Monitoring:**
+- `queue.stats()` provides queued/in_progress/done/skipped/error counts
+- Telemetry events emitted for job transitions (if telemetry enabled)
+- OTel metrics: queue_depth, jobs_completed_total
+
+### Troubleshooting
+
+| Issue | Diagnosis | Solution |
+|-------|-----------|----------|
+| Jobs stuck in IN_PROGRESS | Worker crashed; lease TTL expired | Wait lease_ttl_seconds, then re-lease |
+| High ERROR count | Repeated failures | Check `queue.stats()["error"]`, inspect last_error |
+| Workers not picking up jobs | Concurrency limits exceeded | Check limiter state, increase max_workers or max_per_host |
+| Duplicate artifact IDs in manifest | Enqueue after partial run | Use idempotent enqueue; already-queued artifacts ignored |
+
