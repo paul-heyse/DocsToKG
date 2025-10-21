@@ -224,7 +224,7 @@ def test_get_ci_is_nightly_default():
     """Test nightly detection defaults to False."""
     # Without env vars set, should be False
     import os
-    
+
     # Clear potential env vars
     os.environ.pop("CI_NIGHTLY", None)
     os.environ.pop("GITHUB_EVENT_NAME", None)

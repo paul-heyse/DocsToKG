@@ -1763,9 +1763,7 @@ def fetch_one(
 
         config_result = config_gate(active_config)
         if not config_result.passed:
-            raise ConfigError(
-                f"Configuration validation failed: {config_result.error_code}"
-            )
+            raise ConfigError(f"Configuration validation failed: {config_result.error_code}")
     except Exception as e:
         adapter.error(
             "config gate rejected",

@@ -102,7 +102,11 @@ class BaselineStore:
         baseline_file.write_text(json.dumps(data, indent=2, sort_keys=True))
 
     def update_entry(
-        self, runner_class: str, entry_name: str, value_ms: float, metadata: dict[str, str] | None = None
+        self,
+        runner_class: str,
+        entry_name: str,
+        value_ms: float,
+        metadata: dict[str, str] | None = None,
     ) -> None:
         """
         Update single baseline entry.

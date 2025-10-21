@@ -1,7 +1,7 @@
 # Phase 8.3: Gate Integration into Core Flows - IMPLEMENTATION GUIDE
 
-**Status**: ✅ READY FOR INTEGRATION  
-**Date**: October 21, 2025  
+**Status**: ✅ READY FOR INTEGRATION
+**Date**: October 21, 2025
 **Scope**: Wire all 6 gates into 4 core OntologyDownload flows
 
 ---
@@ -77,6 +77,7 @@ except ImportError:
 ### Where: `fetch_one()` function, line 1746
 
 **Current Code**:
+
 ```python
 def fetch_one(spec, *, config=None, ...):
     ensure_python_version()
@@ -86,16 +87,17 @@ def fetch_one(spec, *, config=None, ...):
 ```
 
 **Integration**:
+
 ```python
     adapter.info("planning fetch", extra={"stage": "plan"})
-    
+
     # GATE 1: Validate configuration
     from DocsToKG.OntologyDownload.policy.gates import config_gate
     config_result = config_gate(active_config)
     if isinstance(config_result, PolicyReject):
         adapter.error("config gate rejected", extra={"stage": "plan", "error_code": config_result.error_code})
         raise ConfigError(f"Configuration validation failed: {config_result.error_code}")
-    
+
     adapter.debug(f"config gate passed ({config_result.elapsed_ms:.2f}ms)")
 ```
 
@@ -108,6 +110,7 @@ def fetch_one(spec, *, config=None, ...):
 ### Where: `_populate_plan_metadata()` function, line 1159
 
 **Current Code**:
+
 ```python
 try:
     secure_url = validate_url_security(planned.plan.url, http_config)
@@ -117,10 +120,11 @@ except (ConfigError, PolicyError) as exc:
 ```
 
 **Integration**:
+
 ```python
 try:
     secure_url = validate_url_security(planned.plan.url, http_config)
-    
+
     # GATE 2: Validate URL against network policy
     from DocsToKG.OntologyDownload.policy.gates import url_gate
     url_result = url_gate(
@@ -131,7 +135,7 @@ try:
     if isinstance(url_result, PolicyReject):
         adapter.error("url gate rejected", extra={"url": secure_url, "error_code": url_result.error_code})
         raise PolicyError(f"URL policy violation: {url_result.error_code}")
-    
+
 except (ConfigError, PolicyError) as exc:
     adapter.error("metadata probe blocked by URL policy", ...)
     raise
@@ -146,6 +150,7 @@ except (ConfigError, PolicyError) as exc:
 ### Where: Pre-scan validation before archive extraction
 
 **Current Pattern**:
+
 ```python
 def extract_archive(archive_path, destination, max_ratio=100.0, ...):
     # Validation logic here
@@ -154,16 +159,17 @@ def extract_archive(archive_path, destination, max_ratio=100.0, ...):
 ```
 
 **Integration**:
+
 ```python
 def extract_archive(archive_path, destination, max_ratio=100.0, ...):
     # GATE 3: Validate extraction parameters (zip bomb detection)
     from DocsToKG.OntologyDownload.policy.gates import extraction_gate
-    
+
     # Get archive stats before extraction
     with zipfile.ZipFile(archive_path) as zf:
         entries_total = len(zf.filelist)
         bytes_declared = sum(info.file_size for info in zf.filelist)
-    
+
     # Gate validation
     extraction_result = extraction_gate(
         entries_total=entries_total,
@@ -173,9 +179,9 @@ def extract_archive(archive_path, destination, max_ratio=100.0, ...):
     if isinstance(extraction_result, PolicyReject):
         logger.error(f"extraction gate rejected: {extraction_result.error_code}")
         raise ExtractionError(f"Archive policy violation: {extraction_result.error_code}")
-    
+
     logger.debug(f"extraction gate passed ({extraction_result.elapsed_ms:.2f}ms)")
-    
+
     # Proceed with extraction
     with zipfile.ZipFile(archive_path) as zf:
         # Process entries
@@ -190,6 +196,7 @@ def extract_archive(archive_path, destination, max_ratio=100.0, ...):
 ### Where: Before extracting entries to disk
 
 **Current Pattern**:
+
 ```python
 def extract_entries(archive_path, destination, entries, ...):
     for entry in entries:
@@ -197,14 +204,15 @@ def extract_entries(archive_path, destination, entries, ...):
 ```
 
 **Integration**:
+
 ```python
 def extract_entries(archive_path, destination, entries, ...):
     # GATE 4: Validate filesystem paths (traversal prevention)
     from DocsToKG.OntologyDownload.policy.gates import filesystem_gate
-    
+
     # Collect entry paths
     entry_paths = [entry.filename for entry in entries]
-    
+
     # Gate validation
     fs_result = filesystem_gate(
         root_path=str(destination),
@@ -214,9 +222,9 @@ def extract_entries(archive_path, destination, entries, ...):
     if isinstance(fs_result, PolicyReject):
         logger.error(f"filesystem gate rejected: {fs_result.error_code}")
         raise IOError(f"Filesystem policy violation: {fs_result.error_code}")
-    
+
     logger.debug(f"filesystem gate passed ({fs_result.elapsed_ms:.2f}ms)")
-    
+
     # Proceed with extraction
     for entry in entries:
         # Write entry to disk
@@ -231,6 +239,7 @@ def extract_entries(archive_path, destination, entries, ...):
 ### Where: Before committing extracted files to database
 
 **Current Pattern**:
+
 ```python
 def commit_manifest(manifest, connection):
     # Insert manifest records
@@ -238,11 +247,12 @@ def commit_manifest(manifest, connection):
 ```
 
 **Integration**:
+
 ```python
 def commit_manifest(manifest, connection, fs_success=True):
     # GATE 6: Validate transaction boundaries (no torn writes)
     from DocsToKG.OntologyDownload.policy.gates import db_boundary_gate
-    
+
     # Gate validation
     db_result = db_boundary_gate(
         operation="pre_commit",
@@ -253,9 +263,9 @@ def commit_manifest(manifest, connection, fs_success=True):
         logger.error(f"db_boundary gate rejected: {db_result.error_code}")
         connection.rollback()
         raise DBError(f"Transaction boundary violation: {db_result.error_code}")
-    
+
     logger.debug(f"db_boundary gate passed ({db_result.elapsed_ms:.2f}ms)")
-    
+
     # Proceed with commit
     connection.commit()
 ```
@@ -269,11 +279,12 @@ def commit_manifest(manifest, connection, fs_success=True):
 ### Where: In `settings.STORAGE.mirror_cas_artifact()` or similar
 
 **Integration Pattern**:
+
 ```python
 def mirror_cas_artifact(src, dst, operation="move"):
     # GATE 5: Validate storage operation
     from DocsToKG.OntologyDownload.policy.gates import storage_gate
-    
+
     storage_result = storage_gate(
         operation=operation,
         src_path=src,
@@ -283,9 +294,9 @@ def mirror_cas_artifact(src, dst, operation="move"):
     if isinstance(storage_result, PolicyReject):
         logger.error(f"storage gate rejected: {storage_result.error_code}")
         raise StorageError(f"Storage policy violation: {storage_result.error_code}")
-    
+
     logger.debug(f"storage gate passed ({storage_result.elapsed_ms:.2f}ms)")
-    
+
     # Proceed with operation
     if operation == "move":
         shutil.move(src, dst)
@@ -417,8 +428,9 @@ After integration, implement comprehensive tests:
 **Integration Points**: 5 critical points + 1 optional (storage)
 
 **Next Steps**:
+
 1. Wire config_gate into fetch_one (✅ done)
-2. Wire url_gate into _populate_plan_metadata
+2. Wire url_gate into_populate_plan_metadata
 3. Wire extraction_gate into extract_archive
 4. Wire filesystem_gate into extract_entries
 5. Wire db_boundary_gate into commit_manifest

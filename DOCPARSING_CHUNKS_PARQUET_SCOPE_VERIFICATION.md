@@ -117,7 +117,9 @@ All scope items from `DocParsing-DB-Followup.md` Item #1 have been delivered and
 ### Deprecated But Still Present (For Backward Compatibility)
 
 #### 1. **schemas.py** (Shim Module)
+
 **Status:** ⚠️ **Deprecated, scheduled for removal in DocsToKG 0.3.0**
+
 - Location: `src/DocsToKG/DocParsing/schemas.py`
 - Purpose: Re-exports from `formats.py` with deprecation warning
 - Impact: Low - only affects old imports
@@ -125,7 +127,9 @@ All scope items from `DocParsing-DB-Followup.md` Item #1 have been delivered and
 - Recommendation: Remove in next major version
 
 #### 2. **ChunksParquetWriter** (in storage/writers.py)
+
 **Status:** ✅ **SAFE** - Used by UnifiedVectorWriter pattern
+
 - Location: `src/DocsToKG/DocParsing/storage/writers.py` lines 142-195
 - Purpose: Generic Parquet writer for any dataset type
 - Status: Active and healthy (not replaced, coexists)
@@ -133,14 +137,18 @@ All scope items from `DocParsing-DB-Followup.md` Item #1 have been delivered and
 - No changes needed
 
 #### 3. **ParquetWriter Base Class**
+
 **Status:** ✅ **ACTIVE** - Used by multiple writers
+
 - Location: `src/DocsToKG/DocParsing/storage/writers.py` lines 30-140
 - Purpose: Abstract base for atomic Parquet writes
 - Relationship: ChunksParquetWriter inherits from this
 - Status: No deprecation warranted - solid foundation
 
-#### 4. **Legacy Chunk Exports** (chunking/__init__.py)
+#### 4. **Legacy Chunk Exports** (chunking/**init**.py)
+
 **Status:** ✅ **SAFE** - Compatibility shims only
+
 - Location: `src/DocsToKG/DocParsing/chunking/__init__.py` lines 44-60
 - Purpose: Re-exports for backward compatibility in tests
 - Examples: HybridChunker, ChunkRow, ProvenanceMetadata
@@ -148,7 +156,9 @@ All scope items from `DocParsing-DB-Followup.md` Item #1 have been delivered and
 - Action: Keep as-is for compatibility
 
 #### 5. **atomic_write() in io.py**
+
 **Status:** ✅ **ACTIVE** - Used for JSONL fallback
+
 - Location: `src/DocsToKG/DocParsing/io.py`
 - Purpose: Atomic JSONL writing for chunks (fallback mode)
 - Usage: `chunking/runtime.py` line 700 (JSONL path)
@@ -157,11 +167,13 @@ All scope items from `DocParsing-DB-Followup.md` Item #1 have been delivered and
 ### Code That Was NOT Created (Not Needed)
 
 ❌ **Not created - already existed:**
+
 - `embedding_integration.py` - UnifiedVectorWriter already handles Parquet
 - `readers.py` - Dataset readers already support Parquet
 - Vector schema helpers - Already implemented in parquet_schemas.py
 
 ❌ **Not needed - manifest logging already flexible:**
+
 - No changes to manifest_log_success() - Already accepts **extra kwargs
 - No new manifest fields forced - Application code adds chunks_format freely
 
@@ -181,17 +193,20 @@ All scope items from `DocParsing-DB-Followup.md` Item #1 have been delivered and
 ## Quality Assurance Checklist
 
 ### Type Safety ✅
+
 - [x] 100% type hints (no `Any` escapes)
 - [x] mypy passes with strict mode
 - [x] No dynamic attribute access
 
 ### Testing ✅
+
 - [x] 32/32 tests passing (100%)
 - [x] Unit tests for all public APIs
 - [x] Integration tests for format routing
 - [x] Error handling tests
 
 ### Code Quality ✅
+
 - [x] Zero ruff violations
 - [x] Zero mypy violations
 - [x] All imports organized
@@ -199,12 +214,14 @@ All scope items from `DocParsing-DB-Followup.md` Item #1 have been delivered and
 - [x] NAVMAP headers complete
 
 ### Backward Compatibility ✅
+
 - [x] JSONL fallback available (--format jsonl)
 - [x] No breaking changes to existing APIs
 - [x] No schema migrations forced
 - [x] Existing code paths unchanged
 
 ### Documentation ✅
+
 - [x] Inline code documentation complete
 - [x] Class and function docstrings present
 - [x] AGENTS.md up-to-date
@@ -229,6 +246,7 @@ All scope items from `DocParsing-DB-Followup.md` Item #1 have been delivered and
 ## Zero Breaking Changes Verification
 
 ✅ **No changes to:**
+
 - DocTags output format (still JSONL)
 - Chunk reading logic
 - Vector storage layer
@@ -237,6 +255,7 @@ All scope items from `DocParsing-DB-Followup.md` Item #1 have been delivered and
 - Existing test suite
 
 ✅ **Fully backward compatible:**
+
 - Old JSONL chunks still work
 - `--format jsonl` preserves legacy behavior
 - Manifest entries optional for format field
@@ -274,16 +293,19 @@ All scope items from `DocParsing-DB-Followup.md` Item #1 have been delivered and
 ## Legacy Code Summary
 
 ### What to Keep ✅
+
 1. **schemas.py** - Continue with deprecation warning (scheduled for 0.3.0 removal)
 2. **ParquetWriter base class** - Solid foundation, actively used
 3. **atomic_write()** - Used for JSONL fallback path
 4. **Compatibility shims** - Maintain for test suite health
 
 ### What to Monitor 📋
+
 - **schemas.py deprecation** - Plan removal in DocsToKG 0.3.0
 - **JSONL fallback usage** - Track if anyone uses --format jsonl
 
 ### What NOT to Do ❌
+
 - Don't remove JSONL support (backward compat)
 - Don't modify vector Parquet layer (already solid)
 - Don't force manifest schema changes

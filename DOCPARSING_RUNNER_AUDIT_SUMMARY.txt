@@ -1,0 +1,205 @@
+================================================================================
+DOCPARSING RUNNER SCOPE AUDIT — EXECUTIVE SUMMARY
+================================================================================
+Date: October 21, 2025
+Status: 75-80% Complete
+
+================================================================================
+IMPLEMENTATION STATUS BY COMMIT
+================================================================================
+
+Commit A: Core Runner Module
+  Status: ✅ 100% COMPLETE (713 LOC)
+  - All contracts defined (StagePlan, WorkItem, StageOptions, etc.)
+  - run_stage() fully functional with pools, retries, timeouts, resume/force
+  - No action required
+
+Commit B: Manifest & Telemetry Integration
+  Status: ⚠️ 85% COMPLETE
+  - Core infrastructure present (StageTelemetry, atomic JSONL)
+  - Gap: No unified manifest_sink.py abstraction; scattered writing
+  - Action: Create manifest_sink.py (4 hrs, LOW risk)
+
+Commit C: Progress & Diagnostics Aggregator
+  Status: ✅ 95% COMPLETE
+  - Diagnostics logged every 30s by default
+  - p50/p95 computed
+  - Gap: No verbose mode for slowest items
+  - Action: Minor enhancement (optional)
+
+Commit D: DocTags → Runner
+  Status: ❌ 20% COMPLETE (CRITICAL)
+  - StagePlan created in _build_pdf_plan() ✅
+  - Worker adapter _pdf_stage_worker() defined ✅
+  - Hooks defined in _make_pdf_stage_hooks() ✅
+  - MISSING: pdf_main() and html_main() DO NOT CALL run_stage()
+  - Still uses legacy ProcessPoolExecutor loop
+  - Action: Replace loop with run_stage() call (6 hrs, MEDIUM risk)
+
+Commit E: Chunk → Runner
+  Status: ✅ 95% COMPLETE
+  - Fully integrated with run_stage() call (line 1773)
+  - Resume/force working
+  - Action: Minor - add explicit SJF support (optional)
+
+Commit F: Embed → Runner
+  Status: ✅ 95% COMPLETE
+  - Fully integrated with run_stage() call (line 2885)
+  - Provider hooks in place
+  - Action: Minor - clean up embedded batching logic (optional)
+
+Commit G: CLI Wiring & Options Mapping
+  Status: ⚠️ 80% COMPLETE
+  - Flags present: --workers, --policy, --resume, --force
+  - MISSING flags: --retries, --timeout-s, --error-budget, --max-queue, --schedule
+  - Action: Add missing flags (3 hrs, LOW risk)
+
+Commit H: Tests (Runner + Stages)
+  Status: ⚠️ 40% COMPLETE
+  - Per-stage integration tests exist ✅
+  - MISSING: Dedicated runner unit tests (timeout, retries, SJF, cancellation)
+  - MISSING: End-to-end runner tests
+  - Action: Add comprehensive test suite (8 hrs, LOW risk)
+
+Commit I: Docs & Migration Guide
+  Status: ⚠️ 20% COMPLETE
+  - README mentions runner ✅
+  - MISSING: Architecture guide, "author new stage" guide, migration notes
+  - Action: Add comprehensive docs (6 hrs, LOW risk)
+
+================================================================================
+GAPS & IMPLEMENTATION PLAN
+================================================================================
+
+Gap #1: Manifest Sink Abstraction
+  Effort: 4 hrs | Risk: LOW
+  Task: Extract ManifestSink protocol + JsonlManifestSink implementation
+  Impact: Unifies manifest writing across stages
+
+Gap #2: DocTags Runner Integration [BLOCKING]
+  Effort: 6 hrs | Risk: MEDIUM
+  Task: Replace legacy loop in pdf_main() and html_main() with run_stage()
+  Impact: All three stages now use unified runner
+  Validation: Corpus parity test required
+
+Gap #3: Missing CLI Flags
+  Effort: 3 hrs | Risk: LOW
+  Task: Add --retries, --timeout-s, --error-budget, --max-queue, --schedule
+  Impact: Users can tune runner behavior from CLI
+
+Gap #4: Runner Unit Tests
+  Effort: 8 hrs | Risk: LOW
+  Task: test_runner_semantics.py (300 LOC), test_runner_e2e.py (200 LOC)
+  Impact: 95%+ test coverage for runner
+
+Gap #5: Documentation
+  Effort: 6 hrs | Risk: LOW
+  Task: Architecture guide, new stage guide, CLI reference, migration notes
+  Impact: Clear guidance for operators and future developers
+
+TOTAL EFFORT: ~27 hours
+CRITICAL PATH: Gap #1 → Gap #2 → Gaps #3-4-5 (parallel possible)
+
+================================================================================
+ROADMAP (5 PHASES)
+================================================================================
+
+Phase 1: Foundation (Days 1-2, 7 hrs)
+  - Gap #1: Manifest sink
+  - Gap #3: CLI flags
+  - Verify existing tests pass
+
+Phase 2: DocTags Integration (Days 3-4, 6 hrs)
+  - Gap #2: DocTags runner integration
+  - Validation: Full corpus test
+  - Behavioral parity verification
+
+Phase 3: Testing & Hardening (Days 5-6, 8 hrs)
+  - Gap #4: Runner unit tests
+  - Performance regression baseline
+  - Edge case fixes
+
+Phase 4: Documentation (Day 7, 6 hrs)
+  - Gap #5: All docs
+  - CHANGELOG update
+  - README updates
+
+Phase 5: Integration & Rollout (Day 8+)
+  - All tests passing
+  - Code review & merge
+  - Deprecation notice for legacy loops
+
+================================================================================
+ACCEPTANCE CRITERIA (DEFINITION OF DONE)
+================================================================================
+
+Functional:
+  ✓ All three stages (doctags, chunk, embed) use run_stage()
+  ✓ Manifest rows have consistent base fields
+  ✓ Resume/force/timeout/retries/error-budget work identically
+
+Quality:
+  ✓ 100% type-safe (mypy clean)
+  ✓ 0 ruff violations
+  ✓ ≥95% test coverage
+  ✓ All existing tests still pass
+
+Performance:
+  ✓ Throughput ≥ legacy
+  ✓ p95 latency ≤ legacy (with SJF)
+
+Documentation:
+  ✓ Architecture guide
+  ✓ "New Stage" authoring guide
+  ✓ CLI reference
+  ✓ CHANGELOG updated
+
+Operational:
+  ✓ End-to-end pipeline (doctags→chunk→embed) passes
+  ✓ No breaking changes to CLI/config
+
+================================================================================
+RISK ASSESSMENT
+================================================================================
+
+Gap #1 (Manifest Sink):     LOW — Backward-compatible wrapper, tests verify
+Gap #2 (DocTags Runner):    MEDIUM — Needs extensive parity testing, corpus validation
+Gap #3 (CLI Flags):         LOW — Additive only
+Gap #4 (Tests):             LOW — Isolated unit tests
+Gap #5 (Docs):              LOW — Living documentation
+
+Mitigations:
+  - Corpus-level parity test for Gap #2 before merge
+  - Escape hatch (DOCSTOKG_RUNNER=legacy) if needed
+  - Environment variable fallbacks for CLI flags
+
+================================================================================
+KEY FILES & REFERENCES
+================================================================================
+
+Current Implementation:
+  ✓ src/DocsToKG/DocParsing/core/runner.py (713 LOC) — COMPLETE
+  ✓ src/DocsToKG/DocParsing/chunking/runtime.py (line 1773) — USING RUNNER
+  ✓ src/DocsToKG/DocParsing/embedding/runtime.py (line 2885) — USING RUNNER
+  ✗ src/DocsToKG/DocParsing/doctags.py (pdf_main, html_main) — NOT USING RUNNER
+
+Original Design:
+  - DO NOT DELETE docs-instruct/.../DocParsing-Runner-config-review.md (635 LOC)
+
+Documentation Created:
+  - DOCPARSING_RUNNER_SCOPE_AUDIT.md (detailed audit with all gaps)
+
+================================================================================
+NEXT STEPS
+================================================================================
+
+1. Review this audit with stakeholders
+2. Prioritize gaps 1-5 (recommend: all for complete unification)
+3. Assign implementation work
+4. Execute roadmap (phases 1-5)
+5. Validation & merge
+
+Estimated Timeline: 7-10 days (with one full-time engineer)
+Target Completion: End of October 2025
+
+================================================================================

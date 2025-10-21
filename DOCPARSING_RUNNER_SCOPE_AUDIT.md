@@ -1,7 +1,7 @@
 # DocParsing Runner Scope Audit & Implementation Plan
 
-**Date**: October 21, 2025  
-**Status**: Audit Complete — Gap Analysis Underway  
+**Date**: October 21, 2025
+**Status**: Audit Complete — Gap Analysis Underway
 **Document Purpose**: Validate runner implementation against the DocParsing-Runner-config-review.md scope document and identify gaps.
 
 ---
@@ -11,6 +11,7 @@
 The DocParsing module has **75-80% of the runner scope implemented**:
 
 ✅ **COMPLETE (Implemented)**:
+
 - Core runner module (`core/runner.py`) with full contract definitions
 - Manifest & telemetry integration (via `telemetry.py` and `io.py`)
 - Progress & diagnostics aggregator (built into runner)
@@ -21,12 +22,14 @@ The DocParsing module has **75-80% of the runner scope implemented**:
 - Error handling & categorization
 
 ⚠️ **PARTIAL / INCOMPLETE**:
+
 - DocTags stage: Creates `StagePlan` but **does NOT use `run_stage()`** — still uses legacy execution loop
 - Manifest sink abstraction: Exists but not fully unified across stages
 - Progress reporting: Implemented in runner but not optimized for multi-stage pipelines
 - Configuration harmonization: Stages map CLI options but no central standardization doc
 
 ❌ **NOT YET ADDRESSED**:
+
 - CLI options documentation for unified runner flags (--workers, --policy, --retries, --timeout-s, --error-budget)
 - Comprehensive test suite for runner semantics (only per-stage integration tests exist)
 - Reference documentation for "authoring a new stage"
@@ -43,6 +46,7 @@ The DocParsing module has **75-80% of the runner scope implemented**:
 **Status**: 100% Complete
 
 **Deliverables**:
+
 - ✅ `StagePlan` dataclass (stage_name, items, total_items)
 - ✅ `WorkItem` frozen dataclass (item_id, inputs, outputs, cfg_hash, cost_hint, metadata, fingerprint)
 - ✅ `ItemFingerprint` for resume tracking
@@ -68,7 +72,8 @@ The DocParsing module has **75-80% of the runner scope implemented**:
 
 ### Commit B: Manifest & Telemetry Integration ⚠️ PARTIAL
 
-**Files**: 
+**Files**:
+
 - `src/DocsToKG/DocParsing/telemetry.py` (450+ LOC)
 - `src/DocsToKG/DocParsing/io.py` (200+ LOC)
 - `src/DocsToKG/DocParsing/core/manifest.py` (103 LOC)
@@ -76,6 +81,7 @@ The DocParsing module has **75-80% of the runner scope implemented**:
 **Status**: 85% Complete — Core present but needs unification
 
 **What exists**:
+
 - ✅ `StageTelemetry` class with append-only JSONL writer (uses FileLock for atomicity)
 - ✅ Manifest helper functions: `manifest_log_success()`, `manifest_log_skip()`, `manifest_log_failure()`
 - ✅ Atomic JSONL append with FileLock
@@ -83,6 +89,7 @@ The DocParsing module has **75-80% of the runner scope implemented**:
 - ✅ Per-stage manifest extras (chunk counts, vector dims, etc.)
 
 **Gaps**:
+
 - ⚠️ No unified `manifest_sink.py` module as proposed
 - ⚠️ Manifest writing is scattered: some in `telemetry.py`, some in hooks, some in stage-specific code
 - ⚠️ Base field consistency not enforced (stage, doc_id, status, duration_s, input_path, output_path, schema_version, attempts)
@@ -98,6 +105,7 @@ The DocParsing module has **75-80% of the runner scope implemented**:
 **Status**: 95% Complete
 
 **What exists**:
+
 - ✅ Diagnostics logged every `diagnostics_interval_s` (default 30s)
 - ✅ Progress fields: scheduled, completed, total, succeeded, failed, skipped, pending
 - ✅ One-line format via `log_event()` with structured fields
@@ -105,6 +113,7 @@ The DocParsing module has **75-80% of the runner scope implemented**:
 - ✅ ETA derivable from items_per_s
 
 **Gaps**:
+
 - ⚠️ No verbose mode for slowest items or error categories
 - ⚠️ No TTY-aware progress bar (single-line logging only)
 
@@ -112,18 +121,21 @@ The DocParsing module has **75-80% of the runner scope implemented**:
 
 ### Commit D: DocTags → Runner ❌ INCOMPLETE
 
-**Files**: 
+**Files**:
+
 - `src/DocsToKG/DocParsing/doctags.py` (3300+ LOC)
 
 **Status**: 20% — Creates plan but does NOT use runner
 
 **What exists**:
+
 - ✅ `_build_pdf_plan()` creates `StagePlan` with WorkItems (lines 460–562)
 - ✅ `_pdf_stage_worker()` adapter function to normalize results (lines 565–617)
 - ✅ `_make_pdf_stage_hooks()` constructs StageHooks (lines 620–680)
 - ✅ Plan structure is correct: item_id, inputs, outputs, cfg_hash, cost_hint, metadata, fingerprint
 
 **Critical Gap**:
+
 - ❌ `pdf_main()` **does NOT call `run_stage()`** — still uses legacy loop (lines 2230–2400 approx)
 - ❌ Legacy pattern: Manual ProcessPoolExecutor or ThreadPoolExecutor invocation
 - ❌ Manifest writing in loop, not via runner hooks
@@ -141,6 +153,7 @@ The DocParsing module has **75-80% of the runner scope implemented**:
 **Status**: 95% Complete
 
 **What exists**:
+
 - ✅ Plan builder creates `StagePlan` from discovered chunk files
 - ✅ `_chunk_stage_worker()` adapter wraps chunking logic
 - ✅ `StageHooks` for corpus summary & per-item telemetry
@@ -148,6 +161,7 @@ The DocParsing module has **75-80% of the runner scope implemented**:
 - ✅ Resume/force semantics via StageOptions
 
 **Minor Gaps**:
+
 - ⚠️ No explicit SJF scheduling (always FIFO)
 - ⚠️ Limited error categorization (mostly "runtime")
 
@@ -160,6 +174,7 @@ The DocParsing module has **75-80% of the runner scope implemented**:
 **Status**: 95% Complete
 
 **What exists**:
+
 - ✅ Plan builder creates `StagePlan` from chunk files
 - ✅ Per-family (dense/sparse/lexical) job dispatch
 - ✅ `_embedding_stage_worker()` adapter
@@ -168,6 +183,7 @@ The DocParsing module has **75-80% of the runner scope implemented**:
 - ✅ Resume/force semantics
 
 **Minor Gaps**:
+
 - ⚠️ Complex embedded loop for batching (pre-runner legacy code)
 - ⚠️ Provider initialization in hooks could be cleaner
 
@@ -176,18 +192,21 @@ The DocParsing module has **75-80% of the runner scope implemented**:
 ### Commit G: CLI Wiring & Options Mapping ⚠️ PARTIAL
 
 **Files**:
+
 - `src/DocsToKG/DocParsing/cli_unified.py` (600+ LOC)
 - Stage-specific CLI modules (doctags.py, chunking/cli.py, embedding/cli.py)
 
 **Status**: 80% Complete
 
 **What exists**:
+
 - ✅ CLI commands map options to StageOptions (workers, policy, resume, force)
 - ✅ ConfigurationAdapter bridges CLI → stage config
 - ✅ Stage commands accept --workers, --policy flags
 - ✅ Resume/force flags wired
 
 **Gaps**:
+
 - ⚠️ Missing CLI flags: `--retries`, `--retry-backoff-s`, `--timeout-s`, `--error-budget`, `--max-queue`, `--schedule`
 - ⚠️ No unified help text across stages
 - ⚠️ Per-stage config still separate (DoctagsCfg, ChunkerCfg, EmbedCfg) — no central StandardOptions
@@ -199,16 +218,19 @@ The DocParsing module has **75-80% of the runner scope implemented**:
 ### Commit H: Tests (Runner + Stages) ⚠️ PARTIAL
 
 **Files**:
+
 - `tests/docparsing/test_runner.py` (if exists)
 - `tests/docparsing/test_*.py` (integration tests)
 
 **Status**: 40% Complete
 
 **What exists**:
+
 - ✅ Per-stage integration tests (chunk manifest resume, embed validation)
 - ✅ Doctags conversion tests (unit level)
 
 **Major Gaps**:
+
 - ❌ No dedicated runner unit tests (timeout, retries, error budget, cancellation, SJF)
 - ❌ No end-to-end runner scenario tests (all three stages via runner)
 - ❌ No performance regression suite for runner semantics
@@ -220,16 +242,19 @@ The DocParsing module has **75-80% of the runner scope implemented**:
 ### Commit I: Docs & Migration Note ⚠️ MINIMAL
 
 **Files**:
+
 - `src/DocsToKG/DocParsing/README.md` (mentions runner in overview)
 - `src/DocsToKG/DocParsing/AGENTS.md` (agent guide, no runner-specific section)
 
 **Status**: 20% Complete
 
 **What exists**:
+
 - ✅ Brief README mentions runner in core capabilities
 - ✅ AGENTS guide covers mission/scope
 
 **Gaps**:
+
 - ❌ No "Authoring a New Stage" guide
 - ❌ No runner semantics documentation (timeouts, retries, budgets, SJF)
 - ❌ No CLI reference for unified runner flags
@@ -249,6 +274,7 @@ The DocParsing module has **75-80% of the runner scope implemented**:
 **Proposed Solution**: Extract `core/manifest_sink.py` (80–120 LOC)
 
 **Tasks**:
+
 1. Create `ManifestSink` protocol with three methods:
    - `log_success(stage, item_id, input_path, output_paths, duration, extras)`
    - `log_skip(stage, item_id, input_path, output_path, reason, duration, extras)`
@@ -260,6 +286,7 @@ The DocParsing module has **75-80% of the runner scope implemented**:
 **Effort**: 4 hours | **Risk**: LOW
 
 **Files to modify**:
+
 - Create: `src/DocsToKG/DocParsing/core/manifest_sink.py` (new)
 - Modify: `src/DocsToKG/DocParsing/doctags.py` (hooks)
 - Modify: `src/DocsToKG/DocParsing/chunking/runtime.py` (hooks)
@@ -275,6 +302,7 @@ The DocParsing module has **75-80% of the runner scope implemented**:
 **Proposed Solution**: Replace execution loop with `run_stage()` call
 
 **Tasks**:
+
 1. Extract worker payload extraction from legacy loop into `_pdf_stage_worker()` and `_html_stage_worker()`
 2. Replace manual pool/loop with `run_stage(plan, worker, options, hooks)` call
 3. Build StageOptions from config (workers, policy, resume, force)
@@ -284,11 +312,13 @@ The DocParsing module has **75-80% of the runner scope implemented**:
 **Effort**: 6 hours | **Risk**: MEDIUM (behavioral parity must be verified)
 
 **Validation**:
+
 - Run full doctags pipeline on reference corpus
 - Compare manifest rows with legacy output (should be identical except manifest format)
 - Verify error counts match
 
 **Files to modify**:
+
 - `src/DocsToKG/DocParsing/doctags.py` (pdf_main, html_main)
 
 ---
@@ -300,6 +330,7 @@ The DocParsing module has **75-80% of the runner scope implemented**:
 **Proposed Solution**: Extend CLI to expose full runner knobs
 
 **Tasks**:
+
 1. Define `RunnerCliOptions` dataclass with fields:
    - `workers: int` (default 4)
    - `policy: str` (default "io", choices: io/cpu/gpu)
@@ -318,6 +349,7 @@ The DocParsing module has **75-80% of the runner scope implemented**:
 **Effort**: 3 hours | **Risk**: LOW
 
 **Files to modify**:
+
 - Modify: `src/DocsToKG/DocParsing/cli_unified.py` (add flags)
 - Modify: `src/DocsToKG/DocParsing/core/runner.py` (add SJF sort logic if not present)
 - Create: Reference doc for runner CLI flags (or add to README)
@@ -331,6 +363,7 @@ The DocParsing module has **75-80% of the runner scope implemented**:
 **Proposed Solution**: Add comprehensive runner tests
 
 **Tasks**:
+
 1. **Runner Unit Tests** (test_runner_semantics.py, ~300 LOC):
    - FIFO vs SJF (verify p95 improvement with mixed costs)
    - Timeout behavior (task exceeds deadline, error recorded)
@@ -354,6 +387,7 @@ The DocParsing module has **75-80% of the runner scope implemented**:
 **Effort**: 8 hours | **Risk**: LOW
 
 **Files to create**:
+
 - `tests/docparsing/test_runner_semantics.py` (unit)
 - `tests/docparsing/test_runner_e2e.py` (integration)
 - `tests/docparsing/test_runner_benchmark.py` (perf)
@@ -367,6 +401,7 @@ The DocParsing module has **75-80% of the runner scope implemented**:
 **Proposed Solution**: Add comprehensive docs
 
 **Tasks**:
+
 1. **Runner Architecture Guide** (runner_architecture.md, ~400 LOC):
    - System map (CLI → runner → executor → worker → stage deps)
    - Contract definitions (StagePlan, WorkItem, StageOptions, etc.)
@@ -398,6 +433,7 @@ The DocParsing module has **75-80% of the runner scope implemented**:
 **Effort**: 6 hours | **Risk**: LOW
 
 **Files to create/modify**:
+
 - Create: `docs/docparsing/runner_architecture.md`
 - Create: `docs/docparsing/new_stage_guide.md`
 - Modify: `src/DocsToKG/DocParsing/README.md` (add CLI reference section)
@@ -409,26 +445,31 @@ The DocParsing module has **75-80% of the runner scope implemented**:
 ## Implementation Roadmap
 
 ### Phase 1: Foundation (Days 1–2)
+
 - [ ] Gap #1: Manifest sink abstraction (4 hrs)
 - [ ] Gap #3: CLI flags & runner options (3 hrs)
 - [ ] Test: Ensure existing stage tests still pass
 
 ### Phase 2: DocTags Integration (Days 3–4)
+
 - [ ] Gap #2: Integrate DocTags with runner (6 hrs)
 - [ ] Validation: Full corpus test with parity checks
 - [ ] Test: Update or add doctags-specific runner tests
 
 ### Phase 3: Testing & Hardening (Days 5–6)
+
 - [ ] Gap #4: Runner unit & integration tests (8 hrs)
 - [ ] Performance regression baseline
 - [ ] Fix any edge cases discovered
 
 ### Phase 4: Documentation (Day 7)
+
 - [ ] Gap #5: Comprehensive docs (6 hrs)
 - [ ] README updates
 - [ ] CHANGELOG entry
 
 ### Phase 5: Integration & Rollout (Days 8+)
+
 - [ ] All tests passing (100%)
 - [ ] Performance parity or better
 - [ ] Code review & merge
@@ -439,23 +480,27 @@ The DocParsing module has **75-80% of the runner scope implemented**:
 ## Acceptance Criteria (Definition of Done)
 
 ✅ **Functional**:
+
 - [ ] DocTags stage calls `run_stage()` with plan, worker, options, hooks
 - [ ] All three stages (doctags, chunk, embed) use unified runner
 - [ ] Manifest rows have consistent base fields across stages
 - [ ] Resume/force/timeout/retries/error-budget work identically across stages
 
 ✅ **Quality**:
+
 - [ ] 100% type-safe (mypy clean)
 - [ ] 0 ruff lint violations
 - [ ] ≥95% test coverage for runner
 - [ ] All 3 stage integration tests passing
 
 ✅ **Performance**:
+
 - [ ] Throughput ≥ legacy (items/s)
 - [ ] p95 latency ≤ legacy with SJF enabled
 - [ ] Memory footprint stable under concurrency
 
 ✅ **Documentation**:
+
 - [ ] Runner architecture guide complete
 - [ ] "New Stage" authoring guide complete
 - [ ] CLI reference with examples
@@ -463,6 +508,7 @@ The DocParsing module has **75-80% of the runner scope implemented**:
 - [ ] CHANGELOG updated
 
 ✅ **Operational**:
+
 - [ ] End-to-end pipeline (doctags → chunk → embed) passes
 - [ ] Manifest diffs minimal (only format/field additions)
 - [ ] No breaking changes to CLI or configuration
