@@ -21,9 +21,9 @@ from DocsToKG.OntologyDownload.policy.errors import (
 )
 from DocsToKG.OntologyDownload.policy.gates import (
     config_gate,
-    db_gate,
+    db_boundary_gate,
     extraction_gate,
-    path_gate,
+    filesystem_gate,
     storage_gate,
     url_gate,
 )
@@ -151,54 +151,54 @@ class TestPathGate:
 
     def test_path_gate_valid(self):
         """Valid path passes."""
-        result = path_gate("data/file.txt")
+        result = filesystem_gate("data/file.txt")
         assert isinstance(result, PolicyOK)
         assert result.gate_name == "path_gate"
 
     def test_path_gate_absolute_rejected(self):
         """Absolute path rejected."""
         with pytest.raises(FilesystemPolicyException) as exc_info:
-            path_gate("/etc/passwd")
+            filesystem_gate("/etc/passwd")
         assert exc_info.value.error_code == ErrorCode.E_TRAVERSAL
 
     def test_path_gate_traversal_rejected(self):
         """Path traversal (..) rejected."""
         with pytest.raises(FilesystemPolicyException) as exc_info:
-            path_gate("data/../../../etc/passwd")
+            filesystem_gate("data/../../../etc/passwd")
         assert exc_info.value.error_code == ErrorCode.E_TRAVERSAL
 
     def test_path_gate_leading_slash_rejected(self):
         """Path starting with / rejected."""
         with pytest.raises(FilesystemPolicyException) as exc_info:
-            path_gate("/data/file.txt")
+            filesystem_gate("/data/file.txt")
         assert exc_info.value.error_code == ErrorCode.E_TRAVERSAL
 
     def test_path_gate_too_deep(self):
         """Path too deep rejected."""
         deep_path = "/".join(["dir"] * 15)
         with pytest.raises(FilesystemPolicyException) as exc_info:
-            path_gate(deep_path, max_depth=5)
+            filesystem_gate(deep_path, max_depth=5)
         assert exc_info.value.error_code == ErrorCode.E_DEPTH
 
     def test_path_gate_segment_too_long(self):
         """Path segment too long rejected."""
         long_segment = "a" * 300
         with pytest.raises(FilesystemPolicyException) as exc_info:
-            path_gate(f"data/{long_segment}")
+            filesystem_gate(f"data/{long_segment}")
         assert exc_info.value.error_code == ErrorCode.E_SEGMENT_LEN
 
     def test_path_gate_path_too_long(self):
         """Path too long rejected."""
         long_path = "/".join(["dir"] * 100)
         with pytest.raises(FilesystemPolicyException) as exc_info:
-            path_gate(long_path)
+            filesystem_gate(long_path)
         # Note: depth is checked before path length, so we'll get E_DEPTH first
         assert exc_info.value.error_code == ErrorCode.E_DEPTH
 
     def test_path_gate_windows_reserved(self):
         """Windows reserved names rejected."""
         with pytest.raises(FilesystemPolicyException) as exc_info:
-            path_gate("data/CON/file.txt")
+            filesystem_gate("data/CON/file.txt")
         assert exc_info.value.error_code == ErrorCode.E_PORTABILITY
 
 
@@ -326,23 +326,23 @@ class TestDbGate:
 
     def test_db_gate_commit_valid(self):
         """Valid commit operation passes."""
-        result = db_gate("commit")
+        result = db_boundary_gate("commit")
         assert isinstance(result, PolicyOK)
 
     def test_db_gate_rollback_valid(self):
         """Valid rollback operation passes."""
-        result = db_gate("rollback")
+        result = db_boundary_gate("rollback")
         assert isinstance(result, PolicyOK)
 
     def test_db_gate_migrate_valid(self):
         """Valid migrate operation passes."""
-        result = db_gate("migrate")
+        result = db_boundary_gate("migrate")
         assert isinstance(result, PolicyOK)
 
     def test_db_gate_invalid_operation(self):
         """Invalid operation rejected."""
         with pytest.raises(StoragePolicyException) as exc_info:
-            db_gate("invalid_op")
+            db_boundary_gate("invalid_op")
         assert exc_info.value.error_code == ErrorCode.E_DB_TX
 
 
