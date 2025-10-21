@@ -211,7 +211,6 @@ def filesystem_gate(
     """
     import os
     import unicodedata
-    from pathlib import Path, PureWindowsPath
 
     start_ms = time.perf_counter() * 1000
     details: Dict[str, Any] = {}
