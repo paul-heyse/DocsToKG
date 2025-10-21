@@ -3,6 +3,7 @@
 Core modules:
 - pipelines: Lazy Polars pipelines (latest summary, version delta)
 - reports: High-level report generation (latest, growth, validation)
+- cli_commands: CLI command wrappers and output formatters
 """
 
 from __future__ import annotations
@@ -25,4 +26,10 @@ __all__ = [
     "generate_validation_report",
     "report_to_dict",
     "report_to_table",
+    "cmd_report_latest",
+    "cmd_report_growth",
+    "cmd_report_validation",
+    "format_latest_report",
+    "format_growth_report",
+    "format_validation_report",
 ]

@@ -11,7 +11,6 @@ except ImportError:  # pragma: no cover
 
 from DocsToKG.OntologyDownload.analytics.pipelines import (
     LatestSummary,
-    VersionDelta,
     arrow_to_lazy_frame,
     build_latest_summary_pipeline,
     build_version_delta_pipeline,
@@ -52,7 +51,7 @@ class TestLatestSummaryPipeline:
     def test_build_latest_summary_pipeline(self, sample_files_df: pl.LazyFrame) -> None:
         """Test pipeline construction."""
         pipeline = build_latest_summary_pipeline(sample_files_df)
-        
+
         assert isinstance(pipeline, pl.LazyFrame)
         # Pipeline should include key columns
         collected = pipeline.collect()
@@ -63,7 +62,7 @@ class TestLatestSummaryPipeline:
     def test_compute_latest_summary_basic(self, sample_files_df: pl.LazyFrame) -> None:
         """Test latest summary computation."""
         summary = compute_latest_summary(sample_files_df)
-        
+
         assert isinstance(summary, LatestSummary)
         assert summary.total_files == 5
         assert summary.total_bytes == 1024 + 2048 + 512 + 4096 + 256
@@ -71,7 +70,7 @@ class TestLatestSummaryPipeline:
     def test_compute_latest_summary_format_breakdown(self, sample_files_df: pl.LazyFrame) -> None:
         """Test format-based aggregation."""
         summary = compute_latest_summary(sample_files_df)
-        
+
         assert "ttl" in summary.files_by_format
         assert summary.files_by_format["ttl"] == 1
         assert "rdf" in summary.files_by_format
@@ -80,7 +79,7 @@ class TestLatestSummaryPipeline:
     def test_compute_latest_summary_top_files(self, sample_files_df: pl.LazyFrame) -> None:
         """Test top N files identification."""
         summary = compute_latest_summary(sample_files_df, top_n=3)
-        
+
         assert len(summary.top_files) == 3
         # First should be largest (4096)
         assert summary.top_files[0][1] == 4096
@@ -90,7 +89,7 @@ class TestLatestSummaryPipeline:
     ) -> None:
         """Test validation summary integration."""
         summary = compute_latest_summary(sample_files_df, sample_validations_df)
-        
+
         assert len(summary.validation_summary) > 0
         assert "pass" in summary.validation_summary
         assert "fail" in summary.validation_summary
@@ -179,9 +178,9 @@ class TestPipelineInterop:
         # Create a Polars DF, convert to Arrow, then back to LazyFrame
         df = pl.DataFrame({"a": [1, 2, 3], "b": [4, 5, 6]})
         arrow = df.to_arrow()
-        
+
         lazy = arrow_to_lazy_frame(arrow)
-        
+
         assert isinstance(lazy, pl.LazyFrame)
         collected = lazy.collect()
         assert collected.height == 3
@@ -190,8 +189,8 @@ class TestPipelineInterop:
     def test_lazy_frame_to_arrow(self) -> None:
         """Test LazyFrame to Arrow conversion."""
         lf = pl.DataFrame({"x": [1, 2, 3]}).lazy()
-        
+
         arrow = lazy_frame_to_arrow(lf)
-        
+
         assert arrow.num_rows == 3
         assert "x" in arrow.column_names

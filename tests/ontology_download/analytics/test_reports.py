@@ -10,7 +10,6 @@ except ImportError:  # pragma: no cover
     pytest.skip("polars not installed", allow_module_level=True)
 
 from DocsToKG.OntologyDownload.analytics.reports import (
-    GrowthReport,
     LatestVersionReport,
     ValidationReport,
     generate_growth_report,
@@ -24,23 +23,27 @@ from DocsToKG.OntologyDownload.analytics.reports import (
 @pytest.fixture
 def sample_files() -> pl.DataFrame:
     """Create sample files data."""
-    return pl.DataFrame({
-        "file_id": ["f1", "f2", "f3", "f4", "f5"],
-        "relpath": ["a.ttl", "b.rdf", "c.txt", "d.owl", "e.jsonld"],
-        "size": [1024, 2048, 512, 4096, 256],
-        "format": ["ttl", "rdf", "txt", "owl", "jsonld"],
-    })
+    return pl.DataFrame(
+        {
+            "file_id": ["f1", "f2", "f3", "f4", "f5"],
+            "relpath": ["a.ttl", "b.rdf", "c.txt", "d.owl", "e.jsonld"],
+            "size": [1024, 2048, 512, 4096, 256],
+            "format": ["ttl", "rdf", "txt", "owl", "jsonld"],
+        }
+    )
 
 
 @pytest.fixture
 def sample_validations() -> pl.DataFrame:
     """Create sample validations data."""
-    return pl.DataFrame({
-        "validation_id": ["v1", "v2", "v3", "v4", "v5"],
-        "file_id": ["f1", "f2", "f3", "f4", "f5"],
-        "validator": ["rdflib", "owlready2", "rdflib", "owlready2", "rdflib"],
-        "status": ["pass", "pass", "fail", "pass", "fail"],
-    })
+    return pl.DataFrame(
+        {
+            "validation_id": ["v1", "v2", "v3", "v4", "v5"],
+            "file_id": ["f1", "f2", "f3", "f4", "f5"],
+            "validator": ["rdflib", "owlready2", "rdflib", "owlready2", "rdflib"],
+            "status": ["pass", "pass", "fail", "pass", "fail"],
+        }
+    )
 
 
 class TestLatestVersionReport:

@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime
 from typing import Optional
 
 try:  # pragma: no cover
@@ -87,12 +86,14 @@ def build_latest_summary_pipeline(
         LazyFrame with aggregated summary (collect to execute)
     """
     # Start with files, project early to reduce width
-    pipeline = files_df.select([
-        pl.col("relpath"),
-        pl.col("size"),
-        pl.col("format"),
-        pl.col("file_id"),
-    ])
+    pipeline = files_df.select(
+        [
+            pl.col("relpath"),
+            pl.col("size"),
+            pl.col("format"),
+            pl.col("file_id"),
+        ]
+    )
 
     # Filter on collection later via caller
     return pipeline
@@ -124,10 +125,12 @@ def compute_latest_summary(
     total_bytes = files_collected.select(pl.sum("size")).item() or 0
 
     # Group by format
-    format_stats = files_collected.group_by("format").agg([
-        pl.len().alias("count"),
-        pl.sum("size").alias("total_size"),
-    ])
+    format_stats = files_collected.group_by("format").agg(
+        [
+            pl.len().alias("count"),
+            pl.sum("size").alias("total_size"),
+        ]
+    )
 
     files_by_format = dict(
         zip(
@@ -144,15 +147,14 @@ def compute_latest_summary(
 
     # Top N largest files
     top_files_df = (
-        files_collected
-        .sort("size", descending=True)
-        .limit(top_n)
-        .select(["relpath", "size"])
+        files_collected.sort("size", descending=True).limit(top_n).select(["relpath", "size"])
     )
-    top_files = list(zip(
-        top_files_df.select("relpath").to_series().to_list(),
-        top_files_df.select("size").to_series().to_list(),
-    ))
+    top_files = list(
+        zip(
+            top_files_df.select("relpath").to_series().to_list(),
+            top_files_df.select("size").to_series().to_list(),
+        )
+    )
 
     # Validation summary
     validation_summary: dict[str, int] = {}
@@ -161,10 +163,8 @@ def compute_latest_summary(
             val_collected = validations_df.select("status").collect(streaming=True)
         else:
             val_collected = validations_df.select("status")
-        
-        status_counts = val_collected.group_by("status").agg(
-            pl.len().alias("count")
-        )
+
+        status_counts = val_collected.group_by("status").agg(pl.len().alias("count"))
         validation_summary = dict(
             zip(
                 status_counts.select("status").to_series().to_list(),
@@ -205,7 +205,7 @@ def build_version_delta_pipeline(
         v1_df = v1_files.collect()
     else:
         v1_df = v1_files
-    
+
     if isinstance(v2_files, pl.LazyFrame):
         v2_df = v2_files.collect()
     else:
@@ -247,12 +247,12 @@ def compute_version_delta(
         added_collected = added.select(["size"]).collect(streaming=True)
     else:
         added_collected = added.select(["size"])
-    
+
     if isinstance(removed, pl.LazyFrame):
         removed_collected = removed.select(["size"]).collect(streaming=True)
     else:
         removed_collected = removed.select(["size"])
-    
+
     if isinstance(common, pl.LazyFrame):
         common_collected = common.select(["size"]).collect(streaming=True)
     else:

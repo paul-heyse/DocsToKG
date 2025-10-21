@@ -173,53 +173,148 @@ class FileJsonlEmitter(EventEmitter):
 
 
 # ============================================================================
-# DuckDB Emitter (Stub)
+# DuckDB Emitter (Full Implementation)
 # ============================================================================
 
 
 class DuckDBEmitter(EventEmitter):
-    """Write events to DuckDB events table (stub for Phase 2).
+    """Write events to DuckDB events table with batch collection."""
 
-    This is a placeholder that logs a warning. Full implementation
-    requires DuckDB database integration in Phase 2.
-    """
-
-    def __init__(self, db_path: str):
+    def __init__(self, db_path: str, batch_size: int = 100):
         """Initialize DuckDB emitter.
 
         Args:
             db_path: Path to DuckDB database file
+            batch_size: Number of events to batch before flushing
         """
-        self.db_path = db_path
-        logger.warning(
-            f"DuckDBEmitter is a stub (Phase 2). Events logged to {db_path} "
-            "but not persisted to database."
-        )
+        try:
+            import duckdb
+        except ImportError:
+            logger.warning("duckdb not installed; DuckDBEmitter will not persist events")
+            self.conn = None
+            return
 
-    def emit(self, event) -> None:
-        """Emit event (no-op stub)."""
-        # Phase 2 will implement:
-        # - CREATE TABLE IF NOT EXISTS events (schema matching Event)
-        # - INSERT event as row
-        # - Batch inserts for performance
-        pass
+        self.db_path = db_path
+        self.batch_size = batch_size
+        self._batch_buffer: list[Event] = []
+        self._lock = threading.Lock()
+
+        try:
+            self.conn = duckdb.connect(str(db_path))
+            self._create_table()
+        except Exception as e:
+            logger.error(f"Failed to initialize DuckDB connection to {db_path}: {e}")
+            self.conn = None
+
+    def _create_table(self) -> None:
+        """Create events table if not exists."""
+        if not self.conn:
+            return
+
+        try:
+            self.conn.execute("""
+                CREATE TABLE IF NOT EXISTS events (
+                    ts TIMESTAMP,
+                    type VARCHAR,
+                    level VARCHAR,
+                    run_id VARCHAR,
+                    config_hash VARCHAR,
+                    service VARCHAR,
+                    app_version VARCHAR,
+                    os_name VARCHAR,
+                    python_version VARCHAR,
+                    libarchive_version VARCHAR,
+                    hostname VARCHAR,
+                    pid INTEGER,
+                    version_id VARCHAR,
+                    artifact_id VARCHAR,
+                    file_id VARCHAR,
+                    request_id VARCHAR,
+                    payload JSON
+                )
+            """)
+            logger.debug("Created events table in DuckDB")
+        except Exception as e:
+            logger.error(f"Failed to create events table: {e}")
+
+    def emit(self, event: Event) -> None:
+        """Buffer event and flush when batch size reached."""
+        if not self.conn:
+            return
+
+        try:
+            with self._lock:
+                self._batch_buffer.append(event)
+
+                if len(self._batch_buffer) >= self.batch_size:
+                    self._flush()
+
+        except Exception as e:
+            logger.error(f"Error buffering event: {e}")
+
+    def _flush(self) -> None:
+        """Flush buffered events to DuckDB."""
+        if not self.conn or not self._batch_buffer:
+            return
+
+        try:
+            for event in self._batch_buffer:
+                self.conn.execute(
+                    """
+                    INSERT INTO events (
+                        ts, type, level, run_id, config_hash, service,
+                        app_version, os_name, python_version, libarchive_version,
+                        hostname, pid, version_id, artifact_id, file_id, request_id, payload
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    [
+                        event.ts,
+                        event.type,
+                        event.level,
+                        event.run_id,
+                        event.config_hash,
+                        event.service,
+                        event.context.app_version,
+                        event.context.os_name,
+                        event.context.python_version,
+                        event.context.libarchive_version,
+                        event.context.hostname,
+                        event.context.pid,
+                        event.ids.version_id,
+                        event.ids.artifact_id,
+                        event.ids.file_id,
+                        event.ids.request_id,
+                        event.payload,
+                    ],
+                )
+
+            self.conn.commit()
+            self._batch_buffer.clear()
+
+        except Exception as e:
+            logger.error(f"Error flushing events to DuckDB: {e}")
+            self._batch_buffer.clear()
 
     def close(self) -> None:
-        """Close database connection."""
-        pass
+        """Flush pending events and close connection."""
+        if not self.conn:
+            return
+
+        try:
+            with self._lock:
+                self._flush()
+                self.conn.close()
+        except Exception as e:
+            logger.error(f"Error closing DuckDB connection: {e}")
 
 
 # ============================================================================
-# Parquet Emitter (Stub)
+# Parquet Emitter (Full Implementation)
 # ============================================================================
 
 
 class ParquetEmitter(EventEmitter):
-    """Write events to Parquet file (stub for Phase 2).
-
-    This is a placeholder. Full implementation requires Parquet
-    serialization and batching in Phase 2.
-    """
+    """Write events to Parquet file with batch collection."""
 
     def __init__(self, filepath: str, batch_size: int = 1000):
         """Initialize Parquet emitter.
@@ -228,23 +323,83 @@ class ParquetEmitter(EventEmitter):
             filepath: Path to output Parquet file
             batch_size: Number of events to batch before writing
         """
-        self.filepath = filepath
-        self.batch_size = batch_size
-        logger.warning(
-            f"ParquetEmitter is a stub (Phase 2). Events logged but not persisted to {filepath}."
-        )
+        try:
+            import pyarrow as pa
+        except ImportError:
+            logger.warning("pyarrow not installed; ParquetEmitter will not persist events")
+            self.pa = None
+            return
 
-    def emit(self, event) -> None:
-        """Emit event (no-op stub)."""
-        # Phase 2 will implement:
-        # - Batch events in memory
-        # - Convert to PyArrow Table periodically
-        # - Write to Parquet with schema validation
-        pass
+        self.pa = pa
+        self.filepath = Path(filepath)
+        self.batch_size = batch_size
+        self._batch_buffer: list[dict] = []
+        self._lock = threading.Lock()
+        self._row_count = 0
+
+        # Create parent directory if needed
+        self.filepath.parent.mkdir(parents=True, exist_ok=True)
+
+    def emit(self, event: Event) -> None:
+        """Buffer event and flush when batch size reached."""
+        if not self.pa:
+            return
+
+        try:
+            event_dict = event.to_dict()
+            # Flatten context and ids for Parquet
+            event_dict.update({
+                f"context_{k}": v for k, v in event_dict.pop("context", {}).items()
+            })
+            event_dict.update({
+                f"ids_{k}": v for k, v in event_dict.pop("ids", {}).items()
+            })
+
+            with self._lock:
+                self._batch_buffer.append(event_dict)
+
+                if len(self._batch_buffer) >= self.batch_size:
+                    self._flush()
+
+        except Exception as e:
+            logger.error(f"Error buffering event for Parquet: {e}")
+
+    def _flush(self) -> None:
+        """Flush buffered events to Parquet."""
+        if not self.pa or not self._batch_buffer:
+            return
+
+        try:
+            # Convert batch to PyArrow Table
+            table = self.pa.Table.from_pylist(self._batch_buffer)
+
+            # Write or append to Parquet
+            if self.filepath.exists():
+                # Append mode: read existing and append
+                existing_table = self.pa.parquet.read_table(str(self.filepath))
+                combined_table = self.pa.concat_tables([existing_table, table])
+                self.pa.parquet.write_table(combined_table, str(self.filepath))
+            else:
+                # Write new file
+                self.pa.parquet.write_table(table, str(self.filepath))
+
+            self._row_count += len(self._batch_buffer)
+            self._batch_buffer.clear()
+
+        except Exception as e:
+            logger.error(f"Error flushing events to Parquet: {e}")
+            self._batch_buffer.clear()
 
     def close(self) -> None:
-        """Flush pending events and close file."""
-        pass
+        """Flush remaining events and close."""
+        if not self.pa:
+            return
+
+        try:
+            with self._lock:
+                self._flush()
+        except Exception as e:
+            logger.error(f"Error closing Parquet emitter: {e}")
 
 
 # ============================================================================
