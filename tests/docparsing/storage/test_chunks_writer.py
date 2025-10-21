@@ -6,17 +6,13 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
 from DocsToKG.DocParsing.storage.chunks_writer import ParquetChunksWriter, WriteResult
 from DocsToKG.DocParsing.storage.parquet_schemas import (
-    SCHEMA_VERSION_CHUNKS,
     chunks_schema,
-    validate_parquet_file,
 )
-from DocsToKG.DocParsing.storage import paths
 
 
 class TestParquetChunksWriter:

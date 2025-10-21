@@ -36,8 +36,6 @@ from typing import Dict, List, Optional
 import pyarrow as pa
 import pyarrow.dataset as ds
 
-from . import paths
-
 # ============================================================
 # Types
 # ============================================================
@@ -95,11 +93,11 @@ def open_chunks(
     chunks_dir = Path(data_root) / "Chunks" / "fmt=parquet"
     if not chunks_dir.exists():
         raise FileNotFoundError(f"Chunks directory not found: {chunks_dir}")
-    
+
     parquet_files = list(chunks_dir.glob("**/*.parquet"))
     if not parquet_files:
         raise FileNotFoundError(f"No Chunks Parquet files found in {chunks_dir}")
-    
+
     # Create dataset from the files
     dataset = ds.dataset([str(f) for f in parquet_files], format="parquet")
 
@@ -138,11 +136,11 @@ def open_vectors(
     vectors_dir = Path(data_root) / "Vectors" / f"family={family}" / "fmt=parquet"
     if not vectors_dir.exists():
         raise FileNotFoundError(f"Vectors directory not found: {vectors_dir}")
-    
+
     parquet_files = list(vectors_dir.glob("**/*.parquet"))
     if not parquet_files:
         raise FileNotFoundError(f"No Vectors ({family}) Parquet files found in {vectors_dir}")
-    
+
     # Create dataset from the files
     dataset = ds.dataset([str(f) for f in parquet_files], format="parquet")
 

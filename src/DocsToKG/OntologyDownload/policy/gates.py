@@ -10,20 +10,98 @@ Implements access control gates at critical I/O boundaries:
 """
 
 import time
-from typing import Any, Dict, Optional, Union, List
+from typing import Any, Dict, List, Optional, Union
 
 from DocsToKG.OntologyDownload.policy.errors import (
+    DbBoundaryException,
     ErrorCode,
-    raise_policy_error,
+    ExtractionPolicyException,
+    FilesystemPolicyException,
     PolicyOK,
     PolicyReject,
-    URLPolicyException,
-    FilesystemPolicyException,
-    ExtractionPolicyException,
     StoragePolicyException,
-    DbBoundaryException,
+    URLPolicyException,
+    raise_policy_error,
 )
+from DocsToKG.OntologyDownload.policy.metrics import GateMetric, MetricsCollector
 from DocsToKG.OntologyDownload.policy.registry import policy_gate
+
+# Import observability (optional, may not be available during initialization)
+try:
+    from DocsToKG.OntologyDownload.observability.events import emit_event
+except ImportError:
+    # Fallback if observability not yet initialized
+
+    def emit_event(*args: Any, **kwargs: Any) -> None:  # type: ignore[misc]
+        """Fallback no-op event emitter."""
+        pass
+
+
+# ============================================================================
+# Telemetry Helpers
+# ============================================================================
+
+
+def _emit_gate_event(
+    gate_name: str,
+    outcome: str,  # "ok" or "reject"
+    elapsed_ms: float,
+    error_code: Optional[ErrorCode] = None,
+    details: Optional[Dict[str, Any]] = None,
+) -> None:
+    """Emit a structured policy.gate event.
+
+    Args:
+        gate_name: Name of the gate
+        outcome: "ok" or "reject"
+        elapsed_ms: Time spent in gate (milliseconds)
+        error_code: Error code if rejected
+        details: Additional context
+    """
+    try:
+        emit_event(
+            type="policy.gate",
+            level="ERROR" if outcome == "reject" else "INFO",
+            payload={
+                "gate": gate_name,
+                "outcome": outcome,
+                "elapsed_ms": round(elapsed_ms, 2),
+                "error_code": error_code.name if error_code else None,
+                "details": details or {},
+            },
+        )
+    except Exception:
+        # Silently fail - telemetry should never break gate logic
+        pass
+
+
+def _record_gate_metric(
+    gate_name: str,
+    passed: bool,
+    elapsed_ms: float,
+    error_code: Optional[ErrorCode] = None,
+) -> None:
+    """Record a metric for this gate.
+
+    Args:
+        gate_name: Name of the gate
+        passed: Whether gate passed
+        elapsed_ms: Time spent
+        error_code: Error code if failed
+    """
+    try:
+        collector = MetricsCollector.instance()
+        metric = GateMetric(
+            gate_name=gate_name,
+            passed=passed,
+            elapsed_ms=elapsed_ms,
+            error_code=error_code,
+        )
+        collector.record_metric(metric)
+    except Exception:
+        # Silently fail - metrics should never break gate logic
+        pass
+
 
 # ============================================================================
 # Gate 1: Configuration Gate
@@ -565,12 +643,18 @@ def storage_gate(
                 )
 
         elapsed_ms = time.perf_counter() * 1000 - start_ms
+        _emit_gate_event("storage_gate", "ok", elapsed_ms)
+        _record_gate_metric("storage_gate", True, elapsed_ms)
         return PolicyOK(gate_name="storage_gate", elapsed_ms=elapsed_ms)
 
     except Exception as e:
         elapsed_ms = time.perf_counter() * 1000 - start_ms
         if isinstance(e, StoragePolicyException):
+            error_code = getattr(e, "error_code", None)
+            _emit_gate_event("storage_gate", "reject", elapsed_ms, error_code, details)
+            _record_gate_metric("storage_gate", False, elapsed_ms, error_code)
             raise
+        _record_gate_metric("storage_gate", False, elapsed_ms, ErrorCode.E_STORAGE_PUT)
         raise_policy_error(
             ErrorCode.E_STORAGE_PUT,
             str(e),
@@ -696,12 +780,18 @@ def db_boundary_gate(
                     )
 
         elapsed_ms = time.perf_counter() * 1000 - start_ms
+        _emit_gate_event("db_boundary_gate", "ok", elapsed_ms)
+        _record_gate_metric("db_boundary_gate", True, elapsed_ms)
         return PolicyOK(gate_name="db_boundary_gate", elapsed_ms=elapsed_ms)
 
     except Exception as e:
         elapsed_ms = time.perf_counter() * 1000 - start_ms
         if isinstance(e, DbBoundaryException):
+            error_code = getattr(e, "error_code", None)
+            _emit_gate_event("db_boundary_gate", "reject", elapsed_ms, error_code, details)
+            _record_gate_metric("db_boundary_gate", False, elapsed_ms, error_code)
             raise
+        _record_gate_metric("db_boundary_gate", False, elapsed_ms, ErrorCode.E_DB_TX)
         raise_policy_error(
             ErrorCode.E_DB_TX,
             str(e),

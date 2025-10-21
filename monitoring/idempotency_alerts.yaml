@@ -216,7 +216,7 @@ groups:
             3. Review application logs for errors
             4. Verify database connectivity
 
-# SLO Rules (for Grafana SLO Dashboard)
+  # SLO Rules (for Grafana SLO Dashboard)
   - name: idempotency_slo_rules
     interval: 30s
     rules:
