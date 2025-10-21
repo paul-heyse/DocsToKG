@@ -1064,6 +1064,7 @@ written = atomic_write_stream(
 ```
 
 **Safety guarantees:**
+
 - Writes to temporary file in same directory (atomic rename)
 - Calls fsync on both file descriptor and directory
 - Uses os.replace for atomic rename
@@ -1084,6 +1085,7 @@ else:
 ```
 
 **Features:**
+
 - Per-host caching with TTL
 - Thread-safe operations
 - Fail-open semantics (errors don't block)
@@ -1110,6 +1112,7 @@ telemetry.log_io_attempt(record)
 ```
 
 **Taxonomy (40+ tokens):**
+
 - Status tokens: http-head, http-get, http-200, http-304, robots-fetch, robots-disallowed, retry, size-mismatch, download-error
 - Reason tokens: ok, robots, size-mismatch, timeout, conn-error, tls-error, not-modified, policy-type, policy-size, backoff, retry-after
 
@@ -1123,6 +1126,7 @@ if verify_content_length and expected_total is not None:
 ```
 
 **Configuration:**
+
 - Flag: `DownloadPolicy.verify_content_length` (default: True)
 - Propagated through: download_pdf() → stream_to_part()
 - Raises: SizeMismatchError on mismatch
@@ -1130,6 +1134,7 @@ if verify_content_length and expected_total is not None:
 #### 5. Manifest Unification
 
 All pipeline outcomes route through `RunTelemetry.record_pipeline_result()`:
+
 - Guarantees run_id attachment
 - Normalizes reason codes
 - Consistent shape with HTTP attempts
@@ -1163,6 +1168,7 @@ robots:
 ```
 
 **Test Coverage: 60/61 passing (98%)**
+
 - Atomic writes: 19/19 tests ✓
 - Content-Length verification: 6/6 tests ✓
 - HTTP telemetry: 16/16 tests ✓

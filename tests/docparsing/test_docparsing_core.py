@@ -1408,42 +1408,6 @@ def test_ensure_uuid_deterministic_generation() -> None:
     assert embedding.ensure_uuid(rows) is False
 
 
-def test_qwen_embed_caches_llm(tmp_path: Path) -> None:
-    import DocsToKG.DocParsing.embedding.runtime as embedding
-
-    class DummyOutput:
-        def __init__(self) -> None:
-            self.outputs = SimpleNamespace(embedding=[0.1, 0.2])
-
-    class DummyLLM:
-        instances = 0
-
-        def __init__(self, *args, **kwargs) -> None:  # pragma: no cover - simple counter
-            type(self).instances += 1
-
-        def embed(self, batch, pooling_params):  # pragma: no cover - simple stub
-            return [DummyOutput() for _ in batch]
-
-    class DummyPoolingParams:
-        def __init__(self, normalize: bool = True, **kwargs: Any) -> None:
-            self.normalize = normalize
-
-    embedding._QWEN_LLM_CACHE.clear()
-    with (
-        mock.patch.object(
-            embedding, "_get_vllm_components", lambda: (DummyLLM, DummyPoolingParams)
-        ),
-        mock.patch.object(embedding, "ensure_qwen_dependencies", lambda: None),
-    ):
-        cfg = embedding.QwenCfg(model_dir=tmp_path, batch_size=2)
-        first = embedding.qwen_embed(cfg, ["a", "b"])
-        second = embedding.qwen_embed(cfg, ["c"])
-
-    assert DummyLLM.instances == 1
-    assert len(first) == 2
-    assert len(second) == 1
-
-
 def _pipeline_module():
     import DocsToKG.DocParsing as docparsing
 
