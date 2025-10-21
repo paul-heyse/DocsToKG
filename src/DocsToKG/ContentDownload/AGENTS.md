@@ -23,6 +23,7 @@
 - [Reference Docs](#reference-docs)
 - [Coding Standards & Module Organization](#coding-standards-module-organization)
 - [Idempotency & Job Coordination](#idempotency--job-coordination)
+- [Observability & SLOs](#observability-slos)
 
 # Project Environment — **No-Install** Runbook (for AI agents)
 

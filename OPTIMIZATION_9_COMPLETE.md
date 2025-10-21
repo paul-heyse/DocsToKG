@@ -1,16 +1,16 @@
 # Optimization 9: Deterministic & Fast Test Matrix — 100% COMPLETE ✅
 
-**Status:** Production Ready | **Date:** 2025-10-21  
+**Status:** Production Ready | **Date:** 2025-10-21
 **All Phases:** 4/4 Complete | **Total Tests:** 71/71 passing | **Total LOC:** 5,000+ | **Duration:** <2 seconds
 
 ---
 
 ## 🎯 Mission: Hermetic, Reproducible, Fast Tests with Clear Strata
 
-✅ Tests are **hermetic, reproducible, and fast**, with **clear strata** (unit → component → e2e → property).  
-✅ **No real network**; HTTP is mocked or in-process only.  
-✅ **Cross-platform** safety (Linux/macOS/Windows) and **seeded randomness**.  
-✅ A **single test vocabulary** (markers, fixtures, corpora, golden files) across commands.  
+✅ Tests are **hermetic, reproducible, and fast**, with **clear strata** (unit → component → e2e → property).
+✅ **No real network**; HTTP is mocked or in-process only.
+✅ **Cross-platform** safety (Linux/macOS/Windows) and **seeded randomness**.
+✅ A **single test vocabulary** (markers, fixtures, corpora, golden files) across commands.
 ✅ CI shows **stable runtimes**; flakes are treated as bugs, not "reruns".
 
 ---
@@ -54,19 +54,22 @@ tests/
 ## ✨ Phase 1: Foundation (10 Tests, 1,200 LOC)
 
 ### Deliverables
+
 - **pytest.ini**: Comprehensive config with markers, coverage, Hypothesis settings
 - **conftest.py**: Global determinism controls (`PYTHONHASHSEED`, TZ, locale, seeds)
 - **tests/fixtures/determinism.py**: 6 core fixtures for environment freezing
 - **tests/test_determinism_fixtures.py**: 10 unit tests validating determinism
 
 ### Key Features
-✅ Global seed control (Python `random`, NumPy)  
-✅ Time/locale freezing (`TZ=UTC`, `C.UTF-8`)  
-✅ Environment isolation (`HOME`, proxy vars)  
-✅ Markers: `@pytest.mark.unit`, `component`, `e2e`, `property`, `slow`, `platform`  
+
+✅ Global seed control (Python `random`, NumPy)
+✅ Time/locale freezing (`TZ=UTC`, `C.UTF-8`)
+✅ Environment isolation (`HOME`, proxy vars)
+✅ Markers: `@pytest.mark.unit`, `component`, `e2e`, `property`, `slow`, `platform`
 ✅ Coverage thresholds per layer (95% unit, 85% component, 70% e2e)
 
 ### Tests (10/10)
+
 ```python
 @pytest.mark.unit
 def test_deterministic_env_freezing(deterministic_env):
@@ -91,6 +94,7 @@ def test_environment_isolation(env_snapshot):
 ## 🔧 Phase 2: Core Fixtures (25 Tests, 1,800 LOC)
 
 ### Deliverables
+
 - **tests/fixtures/http_mocking.py** (200 LOC): HTTPX MockTransport wrapper
 - **tests/fixtures/duckdb_fixtures.py** (200 LOC): Ephemeral DuckDB + test data
 - **tests/fixtures/telemetry_fixtures.py** (250 LOC): Event sink + registry
@@ -99,6 +103,7 @@ def test_environment_isolation(env_snapshot):
 ### Key Features
 
 **HTTP Mocking:**
+
 ```python
 @pytest.fixture
 def mocked_http_client():
@@ -108,6 +113,7 @@ def mocked_http_client():
 ```
 
 **DuckDB Fixtures:**
+
 ```python
 @pytest.fixture
 def ephemeral_duckdb():
@@ -120,6 +126,7 @@ def duckdb_with_test_data():
 ```
 
 **Telemetry:**
+
 ```python
 @pytest.fixture
 def event_sink():
@@ -129,6 +136,7 @@ def event_sink():
 ```
 
 ### Tests (25/25)
+
 - 7 HTTP mock tests (registration, pattern matching, fallback)
 - 6 DuckDB tests (ephemeral, schemas, migrations)
 - 10 telemetry tests (event emission, filtering, assertions)
@@ -139,14 +147,16 @@ def event_sink():
 ## 🎲 Phase 3: Property-Based Testing (15 Tests, 1,300 LOC)
 
 ### Deliverables
+
 - **tests/strategies/url_strategies.py** (350 LOC): 15+ URL generation strategies
 - **tests/strategies/path_strategies.py** (400 LOC): 20+ path generation strategies
 - **tests/test_property_gates.py** (350 LOC): 15 property-based tests
-- **tests/strategies/__init__.py** (20 LOC): Package documentation
+- **tests/strategies/**init**.py** (20 LOC): Package documentation
 
 ### Strategies Implemented
 
 **URL Strategies (15):**
+
 ```python
 valid_schemes()              # http, https, ftp, ftps
 valid_ports()                # 1-65535
@@ -159,6 +169,7 @@ url_normalization_pairs()    # URL equivalence pairs
 ```
 
 **Path Strategies (20+):**
+
 ```python
 valid_path_components()         # a-z, 0-9, dots
 valid_relative_paths()          # a/b/c/file.txt
@@ -176,12 +187,13 @@ high_compression_ratios()       # Zip bomb detection
 ### Property Tests (15/15)
 
 **URL Gates (5):**
+
 ```python
 @pytest.mark.property
 @given(valid_urls())
 def test_url_gate_accepts_valid_urls(url):
     # Assert: public URLs always accepted
-    
+
 @pytest.mark.property
 @given(private_network_urls())
 def test_url_gate_rejects_private_networks(url):
@@ -189,12 +201,13 @@ def test_url_gate_rejects_private_networks(url):
 ```
 
 **Path Gates (5):**
+
 ```python
 @pytest.mark.property
 @given(path_traversal_attempts())
 def test_path_gate_rejects_traversal(path):
     # Assert: traversal attempts always rejected
-    
+
 @pytest.mark.property
 @given(unicode_path_components())
 def test_unicode_path_valid(path):
@@ -202,6 +215,7 @@ def test_unicode_path_valid(path):
 ```
 
 **Extraction (5):**
+
 ```python
 @pytest.mark.property
 @given(high_compression_ratios())
@@ -214,6 +228,7 @@ def test_extraction_ratio_bomb_detection(ratio):
 ## 📸 Phase 4: Golden & Snapshots (21 Tests, 700 LOC)
 
 ### Deliverables
+
 - **tests/fixtures/snapshot_fixtures.py** (200 LOC): SnapshotManager class
 - **tests/fixtures/snapshot_assertions.py** (300 LOC): Canonicalization + 6 assertions
 - **tests/test_golden_snapshots.py** (250 LOC): 21 comprehensive tests
@@ -221,28 +236,31 @@ def test_extraction_ratio_bomb_detection(ratio):
 ### Key Classes
 
 **SnapshotManager:**
+
 ```python
 class SnapshotManager:
     def capture(data, name="output") -> str
         # Canonicalize and store
-    
+
     def compare(data, name="output") -> (bool, str, str)
         # Compare to stored, return (matches, expected, actual)
-    
+
     def update(data, name="output") -> None
         # Update with new data
-    
+
     def load(name="output") -> dict | list | str
         # Load from disk
 ```
 
 **JSON Canonicalization:**
+
 ```python
 canonicalize_json({"z": 1, "a": 2})
 # Output: '{"a": 1, "z": 2}' (sorted keys)
 ```
 
 **Assertion Helpers (6):**
+
 ```python
 SnapshotAssertions.assert_json_equal(actual, expected)
     # Ignore key order
@@ -264,6 +282,7 @@ SnapshotAssertions.assert_snapshot_diff(prev, curr, allowed={})
 ```
 
 ### Tests (21/21)
+
 - 6 snapshot manager tests
 - 4 canonicalization tests
 - 10 assertion tests
@@ -274,6 +293,7 @@ SnapshotAssertions.assert_snapshot_diff(prev, curr, allowed={})
 ## 🚀 Capabilities Enabled
 
 ### 1. Golden Testing (CLI Outputs)
+
 ```python
 @pytest.mark.unit
 def test_cli_help(snapshot_manager):
@@ -283,6 +303,7 @@ def test_cli_help(snapshot_manager):
 ```
 
 ### 2. Regression Detection
+
 ```python
 @pytest.mark.component
 def test_output_stability(snapshot_manager):
@@ -295,6 +316,7 @@ def test_output_stability(snapshot_manager):
 ```
 
 ### 3. Deterministic Comparisons (Order-Independent)
+
 ```python
 @pytest.mark.unit
 def test_json_equality():
@@ -306,6 +328,7 @@ def test_json_equality():
 ```
 
 ### 4. Security Validation
+
 ```python
 @pytest.mark.unit
 def test_no_secrets_leaked(snapshot_manager):
@@ -314,6 +337,7 @@ def test_no_secrets_leaked(snapshot_manager):
 ```
 
 ### 5. Structure Validation
+
 ```python
 @pytest.mark.unit
 def test_output_schema():
@@ -345,6 +369,7 @@ def test_output_schema():
 ### Global Fixtures (via `tests/conftest.py`)
 
 **Phase 1:**
+
 - `deterministic_env` — Frozen TZ, locale, seeds
 - `seed_state` — Random reproducibility
 - `env_snapshot` — Environment capture/restore
@@ -352,21 +377,25 @@ def test_output_schema():
 - `hypothesis_settings` — Hypothesis configuration
 
 **Phase 2:**
+
 - `mocked_http_client` — HTTP mocking
 - `ephemeral_duckdb` — In-memory DuckDB
 - `event_sink` — Telemetry capture
 - `ratelimit_registry_reset` — Rate limiter isolation
 
 **Phase 3:**
+
 - `valid_urls()` strategy → 15+ URL generations
 - `valid_paths()` strategy → 20+ path generations
 
 **Phase 4:**
+
 - `snapshot_manager` — Snapshot capture/compare
 - `SnapshotAssertions` — Static assertion helpers
 - `canonicalize_json()` — JSON canonicalization
 
 ### Markers
+
 ```
 @pytest.mark.unit          # No I/O (71 tests)
 @pytest.mark.component     # One subsystem (21 tests)
@@ -382,6 +411,7 @@ def test_output_schema():
 ## 📁 File Manifest
 
 ### Fixtures (5 modules, 700 LOC)
+
 ```
 tests/fixtures/
   ├── determinism.py           # 200 LOC (Phase 1)
@@ -393,6 +423,7 @@ tests/fixtures/
 ```
 
 ### Strategies (2 modules, 750 LOC)
+
 ```
 tests/strategies/
   ├── __init__.py              #  20 LOC
@@ -401,6 +432,7 @@ tests/strategies/
 ```
 
 ### Tests (4 modules, 800 LOC)
+
 ```
 tests/
   ├── test_determinism_fixtures.py   # 200 LOC, 10 tests (Phase 1)
@@ -410,6 +442,7 @@ tests/
 ```
 
 ### Configuration (2 files)
+
 ```
 tests/
   ├── conftest.py              # Global fixture imports + determinism
@@ -437,12 +470,14 @@ tests/
 **Optimization 9 is 100% Production Ready.**
 
 All 71 tests passing, 5,000+ LOC of infrastructure ready:
+
 - ✅ Deterministic test foundation
 - ✅ Hermetic fixtures (HTTP, DuckDB, telemetry)
 - ✅ Property-based testing suites
 - ✅ Golden & regression detection
 
 **Next:** Optimization 10 (Performance Playbook)
+
 - Micro-benchmarks (pytest-benchmark)
 - Macro e2e performance (smoke + nightly)
 - Profiling hooks (CPU, memory, time)

@@ -1,10 +1,73 @@
-"""Helper utilities for emitting telemetry events.
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.telemetry_helpers",
+#   "purpose": "Convenience functions for structured event emission across HTTP, rate limiting, circuit breaker, and fallback layers",
+#   "sections": [
+#     {"id": "emit-http-event", "name": "emit_http_event", "anchor": "function-emit-http-event", "kind": "function"},
+#     {"id": "emit-rate-event", "name": "emit_rate_event", "anchor": "function-emit-rate-event", "kind": "function"},
+#     {"id": "emit-fallback-attempt", "name": "emit_fallback_attempt", "anchor": "function-emit-fallback-attempt", "kind": "function"}
+#   ]
+# }
+# === /NAVMAP ===
 
-Provides convenience functions for emitting structured events from various
-layers (HTTP, rate limiting, circuit breaker, fallback) to the telemetry bus.
+"""Telemetry event emission helpers for observability instrumentation.
 
-This module abstracts away the event schema and telemetry integration details
-so that callers can simply call emit_* functions with semantic parameters.
+**Purpose**
+-----------
+This module provides high-level convenience functions for emitting structured telemetry
+events from throughout the ContentDownload pipeline. These helpers abstract away the
+details of event schema and sink coordination, allowing layers (HTTP, rate limiter,
+circuit breaker, fallback) to emit rich, queryable events without tight coupling to
+the telemetry backend.
+
+**Responsibilities**
+--------------------
+- Define canonical event emitters for HTTP requests (:func:`emit_http_event`),
+  rate limiter interactions (:func:`emit_rate_event`), and fallback resolution
+  attempts (:func:`emit_fallback_attempt`).
+- Normalize and validate event payloads before delegation to sinks.
+- Handle ``None`` telemetry gracefully (no-op when telemetry is disabled).
+- Provide type hints and docstrings for easy discovery and integration.
+
+**Key Functions**
+-----------------
+
+:func:`emit_http_event`
+  Records HTTP request/response metadata after cache and limiter decisions.
+  Captures: host, role, method, status, URL hash, cache metadata, retry info,
+  rate delay, circuit breaker state, elapsed time, and errors.
+
+:func:`emit_rate_event`
+  Records rate limiter acquisitions and blocks.
+  Captures: host, role, action (acquire/block/head_skip), delay, max delay.
+
+:func:`emit_fallback_attempt`
+  Records fallback adapter resolution attempts.
+  Captures: artifact ID, tier, source, outcome, reason, status, elapsed time.
+
+**Integration Points**
+----------------------
+- Called from :mod:`networking` after request completion.
+- Called from :mod:`ratelimit` on limiter operations.
+- Called from :mod:`fallback.orchestrator` for each adapter attempt.
+
+**Privacy & Performance**
+-------------------------
+- All URL data is hashed (SHA256, first 16 chars) before emission.
+- Emission is best-effort; errors are logged but do not break requests.
+- Telemetry parameter is optional; None signals disabled telemetry (no-op).
+
+**Design Pattern**
+------------------
+Each emitter follows the same pattern:
+
+    1. Check if telemetry is enabled (None → skip).
+    2. Validate/normalize input values.
+    3. Construct event dict with required fields.
+    4. Call telemetry sink method (e.g., log_http_event).
+    5. Catch and log any errors (never break the request).
+
+This ensures telemetry is **non-breaking** and **optional** throughout the pipeline.
 """
 
 from __future__ import annotations

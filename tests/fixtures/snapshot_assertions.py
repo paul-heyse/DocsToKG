@@ -71,9 +71,9 @@ class SnapshotAssertions:
         """
         actual_canonical = canonicalize_json(actual)
         expected_canonical = canonicalize_json(expected)
-        assert (
-            actual_canonical == expected_canonical
-        ), f"{message}\nExpected:\n{expected_canonical}\n\nActual:\n{actual_canonical}"
+        assert actual_canonical == expected_canonical, (
+            f"{message}\nExpected:\n{expected_canonical}\n\nActual:\n{actual_canonical}"
+        )
 
     @staticmethod
     def assert_json_contains(actual: Any, substring: str, message: str = "") -> None:
@@ -86,9 +86,9 @@ class SnapshotAssertions:
             message: Optional assertion message
         """
         canonical = canonicalize_json(actual)
-        assert (
-            substring in canonical
-        ), f"{message}\nSubstring '{substring}' not found in:\n{canonical}"
+        assert substring in canonical, (
+            f"{message}\nSubstring '{substring}' not found in:\n{canonical}"
+        )
 
     @staticmethod
     def assert_json_keys(actual: dict[str, Any], expected_keys: list[str]) -> None:
@@ -101,9 +101,9 @@ class SnapshotAssertions:
         """
         actual_keys = set(actual.keys())
         expected_set = set(expected_keys)
-        assert (
-            actual_keys == expected_set
-        ), f"Key mismatch.\nExpected: {expected_set}\nActual: {actual_keys}"
+        assert actual_keys == expected_set, (
+            f"Key mismatch.\nExpected: {expected_set}\nActual: {actual_keys}"
+        )
 
     @staticmethod
     def assert_json_structure(actual: Any, template: type | dict[str, type]) -> None:
@@ -121,9 +121,9 @@ class SnapshotAssertions:
             ... )
         """
         if isinstance(template, type):
-            assert isinstance(
-                actual, template
-            ), f"Type mismatch. Expected {template}, got {type(actual)}"
+            assert isinstance(actual, template), (
+                f"Type mismatch. Expected {template}, got {type(actual)}"
+            )
         elif isinstance(template, dict):
             assert isinstance(actual, dict), f"Expected dict, got {type(actual)}"
             for key, expected_type in template.items():
@@ -145,9 +145,9 @@ class SnapshotAssertions:
             forbidden: Forbidden string that should not appear
         """
         canonical = canonicalize_json(data)
-        assert (
-            forbidden not in canonical
-        ), f"Forbidden string '{forbidden}' found in snapshot:\n{canonical}"
+        assert forbidden not in canonical, (
+            f"Forbidden string '{forbidden}' found in snapshot:\n{canonical}"
+        )
 
     @staticmethod
     def assert_snapshot_diff(

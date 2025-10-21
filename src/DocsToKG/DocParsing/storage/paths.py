@@ -179,10 +179,10 @@ def chunk_file_glob_pattern(data_root: str | Path, family: Optional[str] = None)
     Return a glob pattern to discover Chunks or Vectors Parquet files.
 
     Patterns:
-    - Chunks: `{data_root}/Chunks/fmt=parquet/*/*.parquet`
-    - Vectors/dense: `{data_root}/Vectors/family=dense/fmt=parquet/*/*.parquet`
-    - Vectors/sparse: `{data_root}/Vectors/family=sparse/fmt=parquet/*/*.parquet`
-    - Vectors/lexical: `{data_root}/Vectors/family=lexical/fmt=parquet/*/*.parquet`
+    - Chunks: `{data_root}/Chunks/fmt=parquet/**/*.parquet`
+    - Vectors/dense: `{data_root}/Vectors/family=dense/fmt=parquet/**/*.parquet`
+    - Vectors/sparse: `{data_root}/Vectors/family=sparse/fmt=parquet/**/*.parquet`
+    - Vectors/lexical: `{data_root}/Vectors/family=lexical/fmt=parquet/**/*.parquet`
 
     Args:
         data_root: Data root directory.
@@ -193,9 +193,9 @@ def chunk_file_glob_pattern(data_root: str | Path, family: Optional[str] = None)
     """
     root = Path(data_root)
     if family is None:
-        return str(root / "Chunks" / "fmt=parquet" / "*" / "*" / "*.parquet")
+        return str(root / "Chunks" / "fmt=parquet" / "**" / "*.parquet")
     elif family in ("dense", "sparse", "lexical"):
-        return str(root / "Vectors" / f"family={family}" / "fmt=parquet" / "*" / "*" / "*.parquet")
+        return str(root / "Vectors" / f"family={family}" / "fmt=parquet" / "**" / "*.parquet")
     else:
         raise ValueError(f"Invalid family: {family}")
 

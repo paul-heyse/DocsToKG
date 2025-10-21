@@ -107,11 +107,9 @@ class TestDatasetSummary:
 class TestOpenChunks:
     """Tests for open_chunks function."""
 
-    @pytest.fixture
-    def chunks_dataset(self):
-        """Create a temporary chunks dataset."""
+    def test_open_chunks_success(self):
+        """Test opening chunks dataset successfully."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            # Create sample Chunks Parquet files
             temp_root = Path(tmpdir)
             writer = ParquetChunksWriter()
 
@@ -135,18 +133,37 @@ class TestOpenChunks:
                 dt_utc=datetime(2025, 10, 21, 12, 0, 0, tzinfo=timezone.utc),
             )
 
-            yield temp_root
+            dataset = open_chunks(temp_root)
+            assert dataset is not None
+            # Dataset should be lazy and ready for operations
 
-    def test_open_chunks_success(self, chunks_dataset):
-        """Test opening chunks dataset successfully."""
-        dataset = open_chunks(chunks_dataset)
-        assert dataset is not None
-        # Dataset should be lazy and ready for operations
-
-    def test_open_chunks_with_columns(self, chunks_dataset):
+    def test_open_chunks_with_columns(self):
         """Test opening chunks with specific columns."""
-        dataset = open_chunks(chunks_dataset, columns=["doc_id", "text"])
-        assert dataset is not None
+        with tempfile.TemporaryDirectory() as tmpdir:
+            temp_root = Path(tmpdir)
+            writer = ParquetChunksWriter()
+
+            rows = [
+                {
+                    "doc_id": "doc1",
+                    "chunk_id": 0,
+                    "text": "Content",
+                    "tokens": 1,
+                    "span": {"start": 0, "end": 7},
+                    "created_at": datetime(2025, 10, 21, 12, 0, 0, tzinfo=timezone.utc),
+                    "schema_version": "docparse/chunks/1.0.0",
+                },
+            ]
+
+            writer.write(
+                rows,
+                data_root=temp_root,
+                rel_id="doc1",
+                cfg_hash="cfg123",
+            )
+
+            dataset = open_chunks(temp_root, columns=["doc_id", "text"])
+            assert dataset is not None
 
     def test_open_chunks_nonexistent(self):
         """Test opening non-existent chunks raises error."""
@@ -175,9 +192,8 @@ class TestOpenVectors:
 class TestSummarize:
     """Tests for summarize function."""
 
-    @pytest.fixture
-    def sample_dataset(self):
-        """Create a sample dataset for summarization."""
+    def test_summarize_chunks_dataset(self):
+        """Test summarizing a chunks dataset."""
         with tempfile.TemporaryDirectory() as tmpdir:
             temp_root = Path(tmpdir)
             writer = ParquetChunksWriter()
@@ -204,31 +220,76 @@ class TestSummarize:
             )
 
             dataset = open_chunks(temp_root)
-            yield dataset, temp_root
+            summary = summarize(dataset, dataset_type="chunks")
 
-    def test_summarize_chunks_dataset(self, sample_dataset):
-        """Test summarizing a chunks dataset."""
-        dataset, _ = sample_dataset
-        summary = summarize(dataset, dataset_type="chunks")
+            assert summary.dataset_type == "chunks"
+            assert summary.file_count > 0
+            assert summary.total_bytes > 0
+            assert len(summary.sample_doc_ids) > 0
 
-        assert summary.dataset_type == "chunks"
-        assert summary.file_count > 0
-        assert summary.total_bytes > 0
-        assert len(summary.sample_doc_ids) > 0
-
-    def test_summarize_contains_schema(self, sample_dataset):
+    def test_summarize_contains_schema(self):
         """Test that summary includes schema."""
-        dataset, _ = sample_dataset
-        summary = summarize(dataset)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            temp_root = Path(tmpdir)
+            writer = ParquetChunksWriter()
 
-        assert summary.schema is not None
-        assert len(summary.schema.names) > 0
+            rows = [
+                {
+                    "doc_id": f"doc{i}",
+                    "chunk_id": 0,
+                    "text": f"Content {i}",
+                    "tokens": i,
+                    "span": {"start": 0, "end": len(f"Content {i}")},
+                    "created_at": datetime(2025, 10, 21, 12, 0, 0, tzinfo=timezone.utc),
+                    "schema_version": "docparse/chunks/1.0.0",
+                }
+                for i in range(3)
+            ]
 
-    def test_summarize_partitions(self, sample_dataset):
+            writer.write(
+                rows,
+                data_root=temp_root,
+                rel_id="test",
+                cfg_hash="cfg123",
+                dt_utc=datetime(2025, 10, 21, 12, 0, 0, tzinfo=timezone.utc),
+            )
+
+            dataset = open_chunks(temp_root)
+            summary = summarize(dataset)
+
+            assert summary.schema is not None
+            assert len(summary.schema.names) > 0
+
+    def test_summarize_partitions(self):
         """Test that summary captures partitions."""
-        dataset, _ = sample_dataset
-        summary = summarize(dataset)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            temp_root = Path(tmpdir)
+            writer = ParquetChunksWriter()
 
-        # Should have partition info for 2025-10
-        assert len(summary.partitions) > 0
-        assert any("2025-10" in key for key in summary.partitions.keys())
+            rows = [
+                {
+                    "doc_id": f"doc{i}",
+                    "chunk_id": 0,
+                    "text": f"Content {i}",
+                    "tokens": i,
+                    "span": {"start": 0, "end": len(f"Content {i}")},
+                    "created_at": datetime(2025, 10, 21, 12, 0, 0, tzinfo=timezone.utc),
+                    "schema_version": "docparse/chunks/1.0.0",
+                }
+                for i in range(3)
+            ]
+
+            writer.write(
+                rows,
+                data_root=temp_root,
+                rel_id="test",
+                cfg_hash="cfg123",
+                dt_utc=datetime(2025, 10, 21, 12, 0, 0, tzinfo=timezone.utc),
+            )
+
+            dataset = open_chunks(temp_root)
+            summary = summarize(dataset)
+
+            # Should have partition info for 2025-10
+            assert len(summary.partitions) > 0
+            assert any("2025-10" in key for key in summary.partitions.keys())

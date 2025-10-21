@@ -272,6 +272,116 @@ Policies are frozen after initialization; tests should reset them between cases 
 - **Limiter/Breaker** both use `canonical_host(url)` to derive consistent host keys; this prevents rate-limit quota splitting across case variants or port representations.
 - **Resume hydration** (`ManifestUrlIndex`) indexes by canonical URL, so resumes correctly skip already-downloaded items even if source provides URLs with different casing/params.
 
+## Observability & SLOs
+
+ContentDownload includes comprehensive telemetry instrumentation for monitoring service health, diagnosing failures, and evaluating Service Level Objectives (SLOs). The system captures events from HTTP, rate limiting, circuit breaker, and fallback layers, emitting them to SQLite, JSONL, Prometheus, and Parquet sinks.
+
+### Telemetry Architecture
+
+**Structured Event Emission**
+
+- `emit_http_event()` – Records HTTP requests post-cache/limiter with status, latency, cache metadata, retry counts, rate delays, circuit breaker state, and errors.
+- `emit_rate_event()` – Records rate limiter acquisitions, blocks, and delays per host/role.
+- `emit_fallback_attempt()` – Records fallback adapter attempts with tier, source, outcome, and elapsed time.
+
+**Privacy-First Design**
+
+- All URLs are hashed (SHA256, first 16 chars) before storage; no raw URLs in telemetry.
+- Events include role-based metadata (metadata/landing/artifact) to correlate behavior across request types.
+- Telemetry emission is **best-effort** and **non-breaking**; errors are logged but never cause request failures.
+
+### Telemetry Sinks & Data Flow
+
+```
+HTTP / Rate Limiter / Breaker / Fallback Events
+    ↓
+    ├─→ SQLite (6 tables: http_events, rate_events, breaker_transitions, fallback_attempts, downloads, run_summary)
+    ├─→ JSONL (human review, rotation-friendly)
+    ├─→ Prometheus Exporter (Grafana dashboards)
+    └─→ Parquet Export (DuckDB, long-term trending)
+```
+
+**SQLite Schema** (primary operational database):
+
+- `http_events` – HTTP request/response pairs; indexed by run_id, host, role.
+- `rate_events` – Rate limiter interactions; indexed by run_id, host/role.
+- `breaker_transitions` – Circuit breaker state changes; indexed by run_id, host.
+- `fallback_attempts` – Fallback adapter attempts; indexed by run_id, source.
+- `downloads` – Final download outcomes; includes SHA-256, dedupe action, final path.
+- `run_summary` – Single aggregated row per run with SLI snapshot (yield %, TTFP, cache hit %, etc.).
+
+### CLI Telemetry Commands
+
+```bash
+# Evaluate SLOs from a run's telemetry database
+./.venv/bin/python -m DocsToKG.ContentDownload.cli telemetry summary \
+  --db runs/my_run/manifest.sqlite3 \
+  --run $(jq -r '.run_id' runs/my_run/manifest.summary.json)
+# Outputs pass/fail for each SLI; exits with code 0 (pass) or 1 (SLO violation)
+
+# Export telemetry tables to Parquet for trending
+./.venv/bin/python -m DocsToKG.ContentDownload.cli telemetry export \
+  --db runs/my_run/manifest.sqlite3 \
+  --out runs/my_run/parquet/
+
+# Query telemetry database directly
+./.venv/bin/python -m DocsToKG.ContentDownload.cli telemetry query \
+  --db runs/my_run/manifest.sqlite3 \
+  --query "SELECT host, COUNT(*) FROM http_events GROUP BY host" \
+  --format table
+```
+
+### Service Level Indicators (SLIs)
+
+ContentDownload tracks 8 key SLIs with configurable targets:
+
+| SLI | Definition | Target | Query |
+|-----|-----------|--------|-------|
+| **Yield** | (successful / attempted) × 100% | ≥85% | `COUNT(sha256 IS NOT NULL) / COUNT(*)` from downloads |
+| **TTFP p50** | Median time to first PDF | ≤3s | 50th percentile from fallback_attempts timestamps |
+| **TTFP p95** | 95th percentile time to PDF | ≤20s | 95th percentile from fallback_attempts timestamps |
+| **Cache Hit %** | (cache hits / total) × 100% for metadata | ≥60% | `SUM(from_cache=1) / COUNT(*)` where role='metadata' |
+| **Rate Delay p95** | 95th percentile limiter wait time | ≤250ms | 95th percentile of `rate_delay_ms` from http_events |
+| **HTTP 429 Ratio** | (429 responses / net requests) × 100% | ≤2% | `SUM(status=429) / SUM(from_cache!=1)` from http_events |
+| **Breaker Opens** | Circuit breaker transitions to OPEN per hour | ≤12 | `COUNT(*) FROM breaker_transitions WHERE new_state LIKE '%OPEN%'` |
+| **Corruption** | Artifacts missing hash or path | 0 | `COUNT(*) WHERE sha256 IS NULL OR final_path IS NULL` |
+
+### Production Deployment
+
+**3-Phase Rollout**
+
+- **Week 1–2 (Pilot)**: Enable `DOCSTOKG_ENABLE_TELEMETRY=1` on 10% of runs; validate zero overhead, privacy compliance, CLI commands.
+- **Week 3–4 (Ramp)**: Expand to 50%; verify Prometheus metrics, tune SLO thresholds from observed baselines.
+- **Week 5+ (Production)**: Deploy to 100%; activate Grafana dashboards, SLO alerting, and operational runbooks.
+
+**Prometheus Metrics** (8 metrics for Grafana):
+
+```
+docstokg_run_yield_pct{run_id}
+docstokg_run_ttfp_ms{run_id,quantile="p50"|"p95"}
+docstokg_run_cache_hit_pct{run_id}
+docstokg_run_rate_delay_p95_ms{run_id,role="metadata"|"artifact"}
+docstokg_host_http429_ratio{run_id,host}
+docstokg_breaker_open_events_total{run_id,host}
+docstokg_run_dedupe_saved_mb{run_id}
+docstokg_run_corruption_count{run_id}
+```
+
+**Operational Runbooks**
+
+- **High 429 Ratio**: Reduce rate limiter RPS via `--rate host=3/s,180/h`; check for rate-limiting escalations.
+- **Low Cache Hit %**: Verify Hishel cache policy; run `--warm-manifest-cache` or `--verify-cache-digest`.
+- **High TTFP p95**: Check per-resolver TTFP; reorder resolvers or increase timeout.
+- **Breaker Repeatedly Opening**: If 429s, reduce rate; if 5xx, contact endpoint operator; adjust `fail_max` in breaker config.
+
+**Rollback**: If telemetry causes issues, set `DOCSTOKG_ENABLE_TELEMETRY=0` to disable (no code changes needed).
+
+### References
+
+- Comprehensive guide: `PRODUCTION_DEPLOYMENT_GUIDE.md` (3-phase rollout, alerts, runbooks, backup).
+- Completion report: `OBSERVABILITY_INITIATIVE_FINAL_REPORT.md` (architecture, metrics, risk assessment).
+- Status: `OBSERVABILITY_SLOs_COMPLETION_STATUS.md` (phase-by-phase deliverables, 39 tests, 100% pass).
+
 ## Interactions with Other Packages
 
 - Downstream ingestion relies on `manifest.jsonl`, `manifest.sqlite3`, and artifact directories under `runs/content/**`; avoid manual edits that desynchronise these surfaces.

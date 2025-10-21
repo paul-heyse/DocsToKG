@@ -50,7 +50,7 @@ def test_snapshot_manager_compare_match(snapshot_manager):
     """Test comparing matching snapshots."""
     data = {"result": "success", "code": 200}
     snapshot_manager.capture(data)
-    
+
     matches, _, _ = snapshot_manager.compare(data)
     assert matches
 
@@ -60,7 +60,7 @@ def test_snapshot_manager_compare_mismatch(snapshot_manager):
     """Test comparing non-matching snapshots."""
     original = {"result": "success"}
     snapshot_manager.capture(original)
-    
+
     modified = {"result": "failed"}
     matches, expected, actual = snapshot_manager.compare(modified)
     assert not matches
@@ -73,10 +73,10 @@ def test_snapshot_manager_update(snapshot_manager):
     """Test updating snapshot."""
     original = {"version": 1}
     snapshot_manager.capture(original)
-    
+
     updated = {"version": 2}
     snapshot_manager.update(updated)
-    
+
     matches, _, _ = snapshot_manager.compare(updated)
     assert matches
 
@@ -86,7 +86,7 @@ def test_snapshot_manager_load(snapshot_manager):
     """Test loading snapshot from disk."""
     data = {"key": "value"}
     snapshot_manager.capture(data)
-    
+
     loaded = snapshot_manager.load()
     assert loaded == data
 
@@ -136,7 +136,7 @@ def test_assert_json_equal_identical():
     """Test JSON equality assertion for identical objects."""
     data1 = {"a": 1, "b": 2}
     data2 = {"b": 2, "a": 1}  # Different order, same content
-    
+
     # Should not raise
     SnapshotAssertions.assert_json_equal(data1, data2)
 
@@ -146,7 +146,7 @@ def test_assert_json_equal_different():
     """Test JSON equality assertion for different objects."""
     data1 = {"a": 1}
     data2 = {"a": 2}
-    
+
     with pytest.raises(AssertionError):
         SnapshotAssertions.assert_json_equal(data1, data2)
 
@@ -155,10 +155,10 @@ def test_assert_json_equal_different():
 def test_assert_json_contains():
     """Test JSON contains assertion."""
     data = {"name": "test", "value": 42}
-    
+
     # Should not raise
     SnapshotAssertions.assert_json_contains(data, "test")
-    
+
     with pytest.raises(AssertionError):
         SnapshotAssertions.assert_json_contains(data, "missing")
 
@@ -167,10 +167,10 @@ def test_assert_json_contains():
 def test_assert_json_keys():
     """Test JSON keys assertion."""
     data = {"a": 1, "b": 2}
-    
+
     # Should not raise
     SnapshotAssertions.assert_json_keys(data, ["a", "b"])
-    
+
     with pytest.raises(AssertionError):
         SnapshotAssertions.assert_json_keys(data, ["a", "c"])
 
@@ -179,10 +179,10 @@ def test_assert_json_keys():
 def test_assert_json_structure_type():
     """Test JSON structure assertion for types."""
     data = [1, 2, 3]
-    
+
     # Should not raise
     SnapshotAssertions.assert_json_structure(data, list)
-    
+
     with pytest.raises(AssertionError):
         SnapshotAssertions.assert_json_structure(data, dict)
 
@@ -192,7 +192,7 @@ def test_assert_json_structure_template():
     """Test JSON structure assertion for template."""
     data = {"id": 1, "name": "test"}
     template = {"id": int, "name": str}
-    
+
     # Should not raise
     SnapshotAssertions.assert_json_structure(data, template)
 
@@ -201,10 +201,10 @@ def test_assert_json_structure_template():
 def test_assert_not_in_snapshot():
     """Test forbidden content assertion."""
     data = {"user": "alice", "role": "admin"}
-    
+
     # Should not raise
     SnapshotAssertions.assert_not_in_snapshot(data, "secret")
-    
+
     with pytest.raises(AssertionError):
         SnapshotAssertions.assert_not_in_snapshot(data, "alice")
 
@@ -214,7 +214,7 @@ def test_assert_snapshot_diff_no_changes():
     """Test diff assertion with no changes."""
     previous = {"version": 1, "name": "test"}
     current = {"name": "test", "version": 1}
-    
+
     # Should not raise (order doesn't matter)
     SnapshotAssertions.assert_snapshot_diff(previous, current)
 
@@ -224,11 +224,9 @@ def test_assert_snapshot_diff_allowed_changes():
     """Test diff assertion with allowed changes."""
     previous = {"version": 1, "name": "test"}
     current = {"version": 2, "name": "test"}
-    
+
     # Should not raise - version change is allowed
-    SnapshotAssertions.assert_snapshot_diff(
-        previous, current, allowed_changes={"version"}
-    )
+    SnapshotAssertions.assert_snapshot_diff(previous, current, allowed_changes={"version"})
 
 
 @pytest.mark.unit
@@ -236,11 +234,9 @@ def test_assert_snapshot_diff_unexpected_changes():
     """Test diff assertion with unexpected changes."""
     previous = {"version": 1, "name": "test"}
     current = {"version": 2, "name": "changed"}
-    
+
     with pytest.raises(AssertionError):
-        SnapshotAssertions.assert_snapshot_diff(
-            previous, current, allowed_changes={"version"}
-        )
+        SnapshotAssertions.assert_snapshot_diff(previous, current, allowed_changes={"version"})
 
 
 # --- Integration Tests ---
@@ -252,11 +248,11 @@ def test_snapshot_full_workflow(snapshot_manager):
     # Initial capture
     data = {"status": "ok", "count": 5}
     snapshot_manager.capture(data)
-    
+
     # Compare (should match)
     matches, _, _ = snapshot_manager.compare(data)
     assert matches
-    
+
     # Use assertions
     SnapshotAssertions.assert_json_equal(data, data)
     SnapshotAssertions.assert_json_contains(data, "ok")

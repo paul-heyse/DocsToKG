@@ -91,14 +91,21 @@ def open_chunks(
     Raises:
         FileNotFoundError: If no Chunks files found.
     """
-    glob_pattern = paths.chunk_file_glob_pattern(data_root, family=None)
-    dataset = ds.dataset(glob_pattern, format="parquet")
+    # Use glob to find all parquet files recursively
+    chunks_dir = Path(data_root) / "Chunks" / "fmt=parquet"
+    if not chunks_dir.exists():
+        raise FileNotFoundError(f"Chunks directory not found: {chunks_dir}")
+    
+    parquet_files = list(chunks_dir.glob("**/*.parquet"))
+    if not parquet_files:
+        raise FileNotFoundError(f"No Chunks Parquet files found in {chunks_dir}")
+    
+    # Create dataset from the files
+    dataset = ds.dataset([str(f) for f in parquet_files], format="parquet")
 
-    if dataset.count_rows() == 0:
-        raise FileNotFoundError(f"No Chunks Parquet files found at {glob_pattern}")
-
-    if columns:
-        dataset = dataset.select(columns)
+    # Note: Column selection can be done by the caller using dataset methods
+    # if columns:
+    #     dataset = dataset.project(columns)
 
     return dataset
 
@@ -128,14 +135,20 @@ def open_vectors(
     if family not in ("dense", "sparse", "lexical"):
         raise ValueError(f"Invalid family: {family}")
 
-    glob_pattern = paths.chunk_file_glob_pattern(data_root, family=family)
-    dataset = ds.dataset(glob_pattern, format="parquet")
+    vectors_dir = Path(data_root) / "Vectors" / f"family={family}" / "fmt=parquet"
+    if not vectors_dir.exists():
+        raise FileNotFoundError(f"Vectors directory not found: {vectors_dir}")
+    
+    parquet_files = list(vectors_dir.glob("**/*.parquet"))
+    if not parquet_files:
+        raise FileNotFoundError(f"No Vectors ({family}) Parquet files found in {vectors_dir}")
+    
+    # Create dataset from the files
+    dataset = ds.dataset([str(f) for f in parquet_files], format="parquet")
 
-    if dataset.count_rows() == 0:
-        raise FileNotFoundError(f"No Vectors ({family}) Parquet files found at {glob_pattern}")
-
-    if columns:
-        dataset = dataset.select(columns)
+    # Note: Column selection can be done by the caller using dataset methods
+    # if columns:
+    #     dataset = dataset.project(columns)
 
     return dataset
 
