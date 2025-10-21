@@ -17,7 +17,12 @@ from typing import Optional
 
 try:
     from prometheus_client import generate_latest, REGISTRY
-    from prometheus_client.exposition import start_http_server, make_wsgi_app, ThreadingWSGIServer, WSGIRequestHandler
+    from prometheus_client.exposition import (
+        start_http_server,
+        make_wsgi_app,
+        ThreadingWSGIServer,
+        WSGIRequestHandler,
+    )
 except ImportError:
     # Fallback if prometheus_client not available
     REGISTRY = None  # type: ignore
@@ -97,7 +102,7 @@ def get_metrics() -> str:
         return "# Prometheus not available\n"
 
     try:
-        return generate_latest(REGISTRY).decode('utf-8')
+        return generate_latest(REGISTRY).decode("utf-8")
     except Exception as e:
         logger.error(f"Error generating metrics: {e}")
         return f"# Error generating metrics: {e}\n"

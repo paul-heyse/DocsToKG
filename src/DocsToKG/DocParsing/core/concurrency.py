@@ -13,6 +13,7 @@ import contextlib
 import logging
 import socket
 import time
+import warnings
 from pathlib import Path
 from typing import Iterator, Optional
 
@@ -33,7 +34,20 @@ LOGGER = get_logger(__name__, base_fields={"stage": "core"})
 
 @contextlib.contextmanager
 def acquire_lock(path: Path, timeout: float = 60.0) -> Iterator[bool]:
-    """Acquire an advisory lock using :mod:`filelock` primitives."""
+    """Acquire an advisory lock using :mod:`filelock` primitives.
+
+    ⚠️ Note: This context manager is **not** recommended for manifest/attempts writes.
+    For manifest/attempts JSONL appends, use the injected, lock-aware writer
+    (DEFAULT_JSONL_WRITER) in DocsToKG.DocParsing.io and accessible via TelemetrySink.
+    """
+    # Gentle nudge when someone tries to lock a manifest/attempts JSONL
+    if str(path).endswith(".jsonl"):
+        warnings.warn(
+            "acquire_lock(): discouraged for manifest/attempts JSONL writes; "
+            "use DEFAULT_JSONL_WRITER via TelemetrySink/StageTelemetry instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
     lock_path = path.with_suffix(path.suffix + ".lock")
     lock_path.parent.mkdir(parents=True, exist_ok=True)

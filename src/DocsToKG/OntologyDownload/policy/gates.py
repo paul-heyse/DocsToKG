@@ -45,39 +45,29 @@ except ImportError:
 
 # Counter: Total gate invocations (pass/reject)
 _gate_invocations = Counter(
-    'gate_invocations_total',
-    'Total gate invocations by outcome',
-    ['gate', 'outcome']
+    "gate_invocations_total", "Total gate invocations by outcome", ["gate", "outcome"]
 )
 
 # Histogram: Gate execution latency (milliseconds)
 _gate_latency = Histogram(
-    'gate_execution_ms',
-    'Gate execution latency in milliseconds',
-    ['gate'],
-    buckets=(0.1, 0.5, 1.0, 2.5, 5.0, 10.0, 50.0, float('inf'))
+    "gate_execution_ms",
+    "Gate execution latency in milliseconds",
+    ["gate"],
+    buckets=(0.1, 0.5, 1.0, 2.5, 5.0, 10.0, 50.0, float("inf")),
 )
 
 # Counter: Gate errors by error code
 _gate_errors = Counter(
-    'gate_errors_total',
-    'Total gate errors by error code',
-    ['gate', 'error_code']
+    "gate_errors_total", "Total gate errors by error code", ["gate", "error_code"]
 )
 
 # Gauge: Current (latest) gate latency
 _gate_current_latency = Gauge(
-    'gate_current_latency_ms',
-    'Current (latest) gate execution latency in milliseconds',
-    ['gate']
+    "gate_current_latency_ms", "Current (latest) gate execution latency in milliseconds", ["gate"]
 )
 
 # Gauge: Gate pass rate (percentage)
-_gate_pass_rate = Gauge(
-    'gate_pass_rate_percent',
-    'Gate pass rate as percentage (0-100)',
-    ['gate']
-)
+_gate_pass_rate = Gauge("gate_pass_rate_percent", "Gate pass rate as percentage (0-100)", ["gate"])
 
 
 # ============================================================================
@@ -329,10 +319,10 @@ def url_gate(
             )
 
         elapsed_ms = time.perf_counter() * 1000 - start_ms
-        
+
         # Record success metrics
         _record_gate_metric("url_gate", True, elapsed_ms)
-        
+
         return PolicyOK(gate_name="url_gate", elapsed_ms=elapsed_ms)
 
     except Exception as e:

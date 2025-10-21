@@ -37,6 +37,7 @@ from typing import (
 )
 
 import jsonlines
+from filelock import FileLock, Timeout
 
 from .env import data_manifests
 
@@ -51,6 +52,58 @@ _HASH_ALGORITHMS_AVAILABLE: Optional[frozenset[str]] = None
 _HASH_ALGORITHM_SELECTION_CACHE: Dict[
     Tuple[Optional[str], Optional[str]], Tuple[Optional[str], str]
 ] = {}
+
+
+class JsonlWriter:
+    """Lock-aware JSONL append writer.
+
+    Uses a per-file FileLock (path + '.lock') to serialize concurrent writers,
+    then delegates to jsonl_append_iter(..., atomic=True) for the actual write.
+    This ensures safe concurrent appends to manifest and attempt telemetry files.
+    """
+
+    def __init__(self, lock_timeout_s: float = 120.0) -> None:
+        """Initialize the JSONL writer with a lock timeout.
+
+        Args:
+            lock_timeout_s: Timeout in seconds for acquiring the lock.
+        """
+        self.lock_timeout_s = float(lock_timeout_s)
+
+    def __call__(self, path: Path, rows: Iterable[Mapping]) -> int:
+        """Append rows to a JSONL file under FileLock.
+
+        Args:
+            path: Target JSONL file path.
+            rows: Iterable of dictionaries to append.
+
+        Returns:
+            Number of rows appended.
+
+        Raises:
+            TimeoutError: If lock cannot be acquired within lock_timeout_s.
+        """
+        lock_path = Path(f"{path}.lock")
+        lock = FileLock(str(lock_path))
+        try:
+            lock.acquire(timeout=self.lock_timeout_s)
+            # Delegate to the existing atomic append path.
+            return jsonl_append_iter(path, rows, atomic=True)
+        except Timeout as e:
+            raise TimeoutError(
+                f"Timed out acquiring lock {lock_path} after {self.lock_timeout_s}s "
+                f"while appending to {path}. Another writer may be stalled."
+            ) from e
+        finally:
+            try:
+                lock.release()
+            except Exception:
+                # Best-effort; FileLock cleans up on process exit as well.
+                pass
+
+
+# Default instance used by telemetry/manifest sinks
+DEFAULT_JSONL_WRITER: JsonlWriter = JsonlWriter()
 
 
 def _partition_normalisation_buffer(buffer: str) -> tuple[str, str]:

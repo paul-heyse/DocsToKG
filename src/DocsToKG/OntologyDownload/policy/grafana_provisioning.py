@@ -24,7 +24,9 @@ except ImportError:
     yaml = None  # type: ignore
 
 
-def get_prometheus_datasource_config(prometheus_url: str = "http://localhost:9090") -> Dict[str, Any]:
+def get_prometheus_datasource_config(
+    prometheus_url: str = "http://localhost:9090",
+) -> Dict[str, Any]:
     """Get Prometheus data source configuration for Grafana.
 
     Args:
@@ -43,9 +45,7 @@ def get_prometheus_datasource_config(prometheus_url: str = "http://localhost:909
                 "type": "file",
                 "disableDeletion": False,
                 "editable": True,
-                "options": {
-                    "path": "/etc/grafana/provisioning/datasources"
-                }
+                "options": {"path": "/etc/grafana/provisioning/datasources"},
             }
         ],
         "datasources": [
@@ -56,11 +56,9 @@ def get_prometheus_datasource_config(prometheus_url: str = "http://localhost:909
                 "url": prometheus_url,
                 "isDefault": True,
                 "editable": True,
-                "jsonData": {
-                    "timeInterval": "5s"
-                }
+                "jsonData": {"timeInterval": "5s"},
             }
-        ]
+        ],
     }
 
 
@@ -87,9 +85,9 @@ def get_gates_dashboard_config() -> Dict[str, Any]:
                     "targets": [
                         {
                             "expr": "rate(gate_invocations_total[5m])",
-                            "legendFormat": "{{ gate }} - {{ outcome }}"
+                            "legendFormat": "{{ gate }} - {{ outcome }}",
                         }
-                    ]
+                    ],
                 },
                 {
                     "id": 2,
@@ -99,52 +97,31 @@ def get_gates_dashboard_config() -> Dict[str, Any]:
                     "targets": [
                         {
                             "expr": "histogram_quantile(0.95, rate(gate_execution_ms_bucket[5m]))",
-                            "legendFormat": "{{ gate }}"
+                            "legendFormat": "{{ gate }}",
                         }
-                    ]
+                    ],
                 },
                 {
                     "id": 3,
                     "title": "Gate Pass Rate (%)",
                     "type": "stat",
                     "gridPos": {"h": 4, "w": 6, "x": 0, "y": 8},
-                    "targets": [
-                        {
-                            "expr": "gate_pass_rate_percent",
-                            "legendFormat": "{{ gate }}"
-                        }
-                    ]
+                    "targets": [{"expr": "gate_pass_rate_percent", "legendFormat": "{{ gate }}"}],
                 },
                 {
                     "id": 4,
                     "title": "Total Errors by Code",
                     "type": "piechart",
                     "gridPos": {"h": 8, "w": 12, "x": 6, "y": 8},
-                    "targets": [
-                        {
-                            "expr": "gate_errors_total",
-                            "legendFormat": "{{ error_code }}"
-                        }
-                    ]
+                    "targets": [{"expr": "gate_errors_total", "legendFormat": "{{ error_code }}"}],
                 },
                 {
                     "id": 5,
                     "title": "Current Gate Latency (ms)",
                     "type": "gauge",
                     "gridPos": {"h": 4, "w": 6, "x": 0, "y": 12},
-                    "targets": [
-                        {
-                            "expr": "gate_current_latency_ms",
-                            "legendFormat": "{{ gate }}"
-                        }
-                    ],
-                    "fieldConfig": {
-                        "defaults": {
-                            "max": 50,
-                            "min": 0,
-                            "unit": "ms"
-                        }
-                    }
+                    "targets": [{"expr": "gate_current_latency_ms", "legendFormat": "{{ gate }}"}],
+                    "fieldConfig": {"defaults": {"max": 50, "min": 0, "unit": "ms"}},
                 },
                 {
                     "id": 6,
@@ -154,9 +131,9 @@ def get_gates_dashboard_config() -> Dict[str, Any]:
                     "targets": [
                         {
                             "expr": "rate(gate_invocations_total{outcome='reject'}[5m]) / rate(gate_invocations_total[5m])",
-                            "legendFormat": "{{ gate }}"
+                            "legendFormat": "{{ gate }}",
                         }
-                    ]
+                    ],
                 },
                 {
                     "id": 7,
@@ -166,11 +143,11 @@ def get_gates_dashboard_config() -> Dict[str, Any]:
                     "targets": [
                         {
                             "expr": "rate(gate_execution_ms_bucket[5m])",
-                            "legendFormat": "{{ gate }}: {{ le }}"
+                            "legendFormat": "{{ gate }}: {{ le }}",
                         }
-                    ]
-                }
-            ]
+                    ],
+                },
+            ],
         }
     }
 
@@ -194,8 +171,8 @@ def get_alert_rules_config() -> Dict[str, Any]:
                         "labels": {"severity": "warning"},
                         "annotations": {
                             "summary": "High rejection rate on {{ $labels.gate }}",
-                            "description": "{{ $labels.gate }} rejection rate is {{ $value | humanizePercentage }}"
-                        }
+                            "description": "{{ $labels.gate }} rejection rate is {{ $value | humanizePercentage }}",
+                        },
                     },
                     {
                         "alert": "URLGateHighHostDenials",
@@ -204,26 +181,22 @@ def get_alert_rules_config() -> Dict[str, Any]:
                         "labels": {"severity": "critical"},
                         "annotations": {
                             "summary": "Potential network attack detected",
-                            "description": "URL gate blocking {{ $value | humanize }}/sec"
-                        }
+                            "description": "URL gate blocking {{ $value | humanize }}/sec",
+                        },
                     },
                     {
                         "alert": "ExtractionGateZipBombDetection",
                         "expr": "rate(gate_errors_total{gate='extraction_gate', error_code=~'E_BOMB_RATIO|E_ENTRY_RATIO'}[5m]) > 0.05",
                         "for": "1m",
                         "labels": {"severity": "critical"},
-                        "annotations": {
-                            "summary": "Zip bomb attempts detected"
-                        }
+                        "annotations": {"summary": "Zip bomb attempts detected"},
                     },
                     {
                         "alert": "FilesystemGateTraversalDetection",
                         "expr": "rate(gate_errors_total{gate='filesystem_gate', error_code='E_TRAVERSAL'}[5m]) > 0.02",
                         "for": "1m",
                         "labels": {"severity": "critical"},
-                        "annotations": {
-                            "summary": "Path traversal attacks detected"
-                        }
+                        "annotations": {"summary": "Path traversal attacks detected"},
                     },
                     {
                         "alert": "GateLatencyHigh",
@@ -232,19 +205,17 @@ def get_alert_rules_config() -> Dict[str, Any]:
                         "labels": {"severity": "warning"},
                         "annotations": {
                             "summary": "{{ $labels.gate }} P99 latency elevated",
-                            "description": "Current: {{ $value }}ms"
-                        }
+                            "description": "Current: {{ $value }}ms",
+                        },
                     },
                     {
                         "alert": "DBBoundaryViolationAttempt",
                         "expr": "increase(gate_errors_total{gate='db_boundary_gate'}[1m]) > 0",
                         "for": "0m",
                         "labels": {"severity": "critical"},
-                        "annotations": {
-                            "summary": "Database boundary violation attempt"
-                        }
-                    }
-                ]
+                        "annotations": {"summary": "Database boundary violation attempt"},
+                    },
+                ],
             }
         ]
     }
@@ -300,7 +271,9 @@ def export_grafana_config(output_dir: str = "/etc/grafana/provisioning") -> None
         with open(rules_file, "w") as f:
             yaml.dump(alert_rules, f, default_flow_style=False)
     else:
-        print(f"⚠️ Skipping export of alert rules config to {rules_file} because 'yaml' module is not available.")
+        print(
+            f"⚠️ Skipping export of alert rules config to {rules_file} because 'yaml' module is not available."
+        )
 
     print(f"✅ Exported alert rules config to {rules_file}")
 

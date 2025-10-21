@@ -3,7 +3,7 @@
 Each stage records structured attempts and manifest entries to support resume
 logic and observability dashboards. This module defines the dataclasses used to
 represent those events plus ``TelemetrySink`` implementations that append them
-to JSONL files under advisory locks, guaranteeing atomic writes even when
+to JSONL files using a lock-aware writer, guaranteeing atomic writes even when
 multiple processes report progress concurrently.
 """
 
@@ -14,7 +14,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, Optional
 
-from DocsToKG.DocParsing.io import jsonl_append_iter
+from DocsToKG.DocParsing.io import jsonl_append_iter, DEFAULT_JSONL_WRITER
 
 __all__ = [
     "Attempt",
@@ -25,12 +25,8 @@ __all__ = [
 
 
 def _default_writer(path: Path, rows: Iterable[Dict[str, Any]]) -> int:
-    """Append ``rows`` to ``path`` under the shared FileLock."""
-
-    from DocsToKG.DocParsing.core import acquire_lock
-
-    with acquire_lock(path):
-        return jsonl_append_iter(path, rows, atomic=True)
+    """Append ``rows`` to ``path`` using the lock-aware JsonlWriter."""
+    return DEFAULT_JSONL_WRITER(path, rows)
 
 
 @dataclass(slots=True)
@@ -72,7 +68,14 @@ class TelemetrySink:
         *,
         writer: Optional[Callable[[Path, Iterable[Dict[str, Any]]], int | None]] = None,
     ) -> None:
-        """Initialise sink paths and ensure parent directories exist."""
+        """Initialise sink paths and ensure parent directories exist.
+
+        Args:
+            attempts_path: Path to the attempts JSONL file.
+            manifest_path: Path to the manifest JSONL file.
+            writer: Optional custom writer callable (path, rows) -> int | None.
+                    Defaults to DEFAULT_JSONL_WRITER (lock-aware appending).
+        """
 
         self._attempts_path = attempts_path
         self._manifest_path = manifest_path
@@ -156,7 +159,15 @@ class StageTelemetry:
         stage: str,
         writer: Optional[Callable[[Path, Iterable[Dict[str, Any]]], int | None]] = None,
     ) -> None:
-        """Bind the telemetry sink to a specific run identifier and stage."""
+        """Bind the telemetry sink to a specific run identifier and stage.
+
+        Args:
+            sink: The TelemetrySink instance managing attempt/manifest paths.
+            run_id: Unique identifier for this pipeline run.
+            stage: Name of the stage (e.g., 'doctags', 'chunk', 'embed').
+            writer: Optional custom writer callable. Defaults to sink's writer
+                    (which defaults to DEFAULT_JSONL_WRITER for lock-aware appending).
+        """
 
         self._sink = sink
         self._run_id = run_id

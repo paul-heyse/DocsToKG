@@ -154,9 +154,7 @@ class ResolverPipeline:
             meta={"attempted": len(outcomes), "outcomes": [o.classification for o in outcomes]},
         )
 
-    def _try_plan(
-        self, plan: DownloadPlan, artifact: Any, ctx: Any
-    ) -> DownloadOutcome:
+    def _try_plan(self, plan: DownloadPlan, artifact: Any, ctx: Any) -> DownloadOutcome:
         """
         Try a single plan: prepare → stream → finalize.
 
