@@ -111,27 +111,27 @@ class DownloadPipeline:
 
 
 def build_pipeline(
-    config_path: Optional[str] = None,
     config: Optional[ContentDownloadConfig] = None,
+    config_path: Optional[str] = None,
     cli_overrides: Optional[dict[str, Any]] = None,
 ) -> DownloadPipeline:
     """
     Build a download pipeline from configuration.
 
     Args:
+        config: Optional pre-loaded ContentDownloadConfig (preferred)
         config_path: Optional path to config file (YAML/JSON)
-        config: Optional pre-loaded ContentDownloadConfig
         cli_overrides: Optional CLI overrides dict
 
     Returns:
         Initialized DownloadPipeline instance
 
     Raises:
-        ValueError: If neither config_path nor config provided
+        ValueError: If neither config nor config_path provided
     """
     if config is None:
         if config_path is None:
-            raise ValueError("Must provide either config_path or config")
+            raise ValueError("Must provide either config or config_path")
         from DocsToKG.ContentDownload.config import load_config
 
         config = load_config(path=config_path, cli_overrides=cli_overrides)
