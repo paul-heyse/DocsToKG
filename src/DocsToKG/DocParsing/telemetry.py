@@ -1,10 +1,45 @@
 """Telemetry data structures and JSONL sinks for DocParsing stages.
 
 Each stage records structured attempts and manifest entries to support resume
-logic and observability dashboards. This module defines the dataclasses used to
-represent those events plus ``TelemetrySink`` implementations that append them
-to JSONL files using a lock-aware writer, guaranteeing atomic writes even when
-multiple processes report progress concurrently.
+logic and observability dashboards. This module defines dataclasses for representing
+those events plus TelemetrySink implementations that append them to JSONL files
+using a lock-aware writer (via dependency injection), guaranteeing atomic writes
+even when multiple processes report progress concurrently.
+
+Key Components:
+- Attempt: Dataclass representing a single processing attempt (status, duration, metadata)
+- ManifestEntry: Dataclass representing successful pipeline output (tokens, schema version)
+- TelemetrySink: Manages persistent storage of attempts and manifest entries to JSONL
+- StageTelemetry: Binds a sink to a specific run ID and stage name for convenient logging
+- DEFAULT_JSONL_WRITER: Provides lock-aware appending for concurrent-safe writes
+
+The TelemetrySink and StageTelemetry accept an optional writer dependency (defaulting
+to DEFAULT_JSONL_WRITER), enabling both production use and test injection of custom
+writers without modifying telemetry logic.
+
+Example:
+    from DocsToKG.DocParsing.telemetry import TelemetrySink, StageTelemetry
+    from pathlib import Path
+    
+    # Create a telemetry sink for a pipeline run
+    sink = TelemetrySink(
+        attempts_path=Path("attempts.jsonl"),
+        manifest_path=Path("manifest.jsonl")
+    )
+    
+    # Bind to a specific stage and run
+    stage_telemetry = StageTelemetry(
+        sink=sink,
+        run_id="run-2025-10-21",
+        stage="embedding"
+    )
+    
+    # Log attempt completion (uses lock-aware writer internally)
+    stage_telemetry.log_attempt_success(
+        file_id="doc1",
+        duration_s=1.23,
+        output_path="vectors.npy"
+    )
 """
 
 from __future__ import annotations

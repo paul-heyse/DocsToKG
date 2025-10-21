@@ -166,24 +166,24 @@ def run_from_config(
 
 def _build_telemetry(paths: Optional[Mapping[str, Path]], run_id: str) -> RunTelemetry:
     """Build telemetry sinks from configuration.
-    
+
     Creates sinks based on provided telemetry_paths dictionary:
     - CSV sink (key: 'csv')
     - SQLite sink (key: 'sqlite')
     - Manifest index sink (key: 'manifest_index')
     - Last attempt CSV sink (key: 'last_attempt')
     - Summary sink (key: 'summary')
-    
+
     At least one path must be provided. Calling without paths will raise an error
     to ensure telemetry configuration is explicit.
-    
+
     Args:
         paths: Mapping of sink names to file paths (required)
         run_id: Unique run identifier for this execution
-        
+
     Returns:
         RunTelemetry instance with configured sinks
-        
+
     Raises:
         ValueError: If no telemetry paths are provided
     """
@@ -193,9 +193,9 @@ def _build_telemetry(paths: Optional[Mapping[str, Path]], run_id: str) -> RunTel
             "Provide at least one of: 'csv', 'sqlite', 'manifest_index', "
             "'last_attempt', 'summary'"
         )
-    
+
     sinks: list[AttemptSink] = []
-    
+
     # Create sinks for each provided path
     if "csv" in paths:
         sinks.append(CsvSink(paths["csv"]))
@@ -207,16 +207,16 @@ def _build_telemetry(paths: Optional[Mapping[str, Path]], run_id: str) -> RunTel
         sinks.append(LastAttemptCsvSink(paths["last_attempt"]))
     if "summary" in paths:
         sinks.append(SummarySink(paths["summary"]))
-    
+
     if not sinks:
         raise ValueError(
             "No recognized telemetry paths provided. "
             "Expected one of: 'csv', 'sqlite', 'manifest_index', 'last_attempt', 'summary'"
         )
-    
+
     # Composite sink handles all outputs
     multi_sink = MultiSink(sinks) if len(sinks) > 1 else sinks[0]
-    
+
     return RunTelemetry(sink=multi_sink)
 
 

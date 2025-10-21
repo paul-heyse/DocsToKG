@@ -282,7 +282,6 @@ def queue_retry_failed(
         dry_run: Show what would be retried without making changes
     """
     try:
-
         queue = WorkQueue(queue_path, wal_mode=True)
         conn = queue._get_connection()
 

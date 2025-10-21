@@ -1,10 +1,29 @@
 """
 Low-level I/O helpers shared across DocParsing stages.
 
-This module houses JSONL streaming utilities, atomic write helpers, and manifest
-bookkeeping routines. It deliberately avoids importing the CLI-facing modules so
-that other packages can depend on these primitives without pulling in heavy
-dependencies.
+This module provides JSONL streaming utilities, atomic write helpers, and manifest
+bookkeeping routines that power the resume and observability infrastructure. It
+deliberately avoids importing CLI-facing modules so other packages can depend on
+these primitives without pulling in heavy dependencies.
+
+Key Components:
+- JsonlWriter: Lock-aware JSONL append writer for concurrent-safe telemetry writes
+- atomic_write: Atomic file writing with fsync durability and parent directory creation
+- jsonl_append_iter: Streaming JSONL appends with optional atomicity
+- Manifest indexing and hash computation for content verification
+- Unicode normalization helpers for cross-platform path handling
+
+The JsonlWriter is the recommended interface for appending to shared manifest or
+attempt log files, as it serializes concurrent writers using FileLock and ensures
+atomic writes even under concurrent access.
+
+Example:
+    from DocsToKG.DocParsing.io import DEFAULT_JSONL_WRITER
+    from pathlib import Path
+    
+    # Atomically append manifest entries using lock-aware writer
+    rows = [{"id": "doc1", "status": "completed"}]
+    DEFAULT_JSONL_WRITER(Path("manifest.jsonl"), rows)
 """
 
 from __future__ import annotations
