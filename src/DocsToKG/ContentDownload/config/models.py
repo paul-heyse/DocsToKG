@@ -415,6 +415,97 @@ class ResolversConfig(BaseModel):
 
 
 # ============================================================================
+# Work Queue Orchestration (PR #8: Work Orchestrator & Bounded Concurrency)
+# ============================================================================
+
+
+class QueueConfig(BaseModel):
+    """Configuration for SQLite-backed work queue."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
+
+    backend: Literal["sqlite"] = Field(
+        default="sqlite",
+        description="Queue backend (currently only sqlite supported)",
+    )
+    path: str = Field(
+        default="state/workqueue.sqlite",
+        description="Path to SQLite database file",
+    )
+    wal_mode: bool = Field(
+        default=True,
+        description="Enable WAL mode for concurrent access",
+    )
+    timeout_sec: int = Field(
+        default=10,
+        ge=1,
+        description="Database operation timeout in seconds",
+    )
+
+
+class OrchestratorConfig(BaseModel):
+    """Configuration for work orchestration and bounded concurrency."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
+
+    max_workers: int = Field(
+        default=8,
+        ge=1,
+        le=256,
+        description="Maximum concurrent worker threads",
+    )
+    max_per_resolver: Dict[str, int] = Field(
+        default_factory=dict,
+        description="Per-resolver concurrency limits (e.g., {'unpaywall': 2, 'crossref': 4})",
+    )
+    max_per_host: int = Field(
+        default=4,
+        ge=1,
+        description="Default per-host concurrency limit",
+    )
+    lease_ttl_seconds: int = Field(
+        default=600,
+        ge=30,
+        description="Job lease time-to-live (crash recovery window)",
+    )
+    heartbeat_seconds: int = Field(
+        default=30,
+        ge=5,
+        description="Heartbeat interval to extend leases",
+    )
+    max_job_attempts: int = Field(
+        default=3,
+        ge=1,
+        description="Maximum attempts before job marked as error",
+    )
+    retry_backoff_seconds: int = Field(
+        default=60,
+        ge=1,
+        description="Initial backoff delay for retries (exponential)",
+    )
+    jitter_seconds: int = Field(
+        default=15,
+        ge=0,
+        description="Random jitter for retry backoff",
+    )
+
+    @field_validator("max_per_resolver")
+    @classmethod
+    def validate_per_resolver(cls, v: Dict[str, int]) -> Dict[str, int]:
+        """Validate per-resolver limits are positive."""
+        for resolver, limit in v.items():
+            if limit <= 0:
+                raise ValueError(f"Per-resolver limit for '{resolver}' must be > 0")
+        return v
+
+    @field_validator("heartbeat_seconds", "lease_ttl_seconds")
+    @classmethod
+    def validate_heartbeat_vs_ttl(cls, v: int) -> int:
+        """Validate heartbeat and TTL values."""
+        return v
+
+
+# ============================================================================
 # Storage & Catalog Configuration (PR #9: Artifact Catalog & Storage Index)
 # ============================================================================
 
@@ -522,6 +613,12 @@ class ContentDownloadConfig(BaseModel):
     )
     telemetry: TelemetryConfig = Field(
         default_factory=TelemetryConfig, description="Telemetry configuration"
+    )
+    queue: QueueConfig = Field(
+        default_factory=QueueConfig, description="Work queue configuration"
+    )
+    orchestrator: OrchestratorConfig = Field(
+        default_factory=OrchestratorConfig, description="Work orchestrator configuration"
     )
     storage: StorageConfig = Field(
         default_factory=StorageConfig,
