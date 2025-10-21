@@ -15,5 +15,12 @@ This module implements PR #9: Artifact Catalog & Storage Index, enabling:
 
 from __future__ import annotations
 
+from DocsToKG.ContentDownload.catalog.models import DocumentRecord
+from DocsToKG.ContentDownload.catalog.store import CatalogStore, SQLiteCatalog
+
 __version__ = "1.0.0"
-__all__ = []
+__all__ = [
+    "DocumentRecord",
+    "CatalogStore",
+    "SQLiteCatalog",
+]
