@@ -33,7 +33,8 @@ def test_queue_enqueue_new_artifact() -> None:
                 "queue-enqueue",
                 "doi:10.1234/test",
                 '{"doi":"10.1234/test"}',
-                "--queue", queue_path,
+                "--queue",
+                queue_path,
             ],
         )
 
@@ -54,7 +55,8 @@ def test_queue_enqueue_duplicate_artifact() -> None:
                 "queue-enqueue",
                 artifact_id,
                 '{"doi":"10.1234/test"}',
-                "--queue", queue_path,
+                "--queue",
+                queue_path,
             ],
         )
         assert result1.exit_code == 0
@@ -66,7 +68,8 @@ def test_queue_enqueue_duplicate_artifact() -> None:
                 "queue-enqueue",
                 artifact_id,
                 '{"doi":"10.1234/test"}',
-                "--queue", queue_path,
+                "--queue",
+                queue_path,
             ],
         )
         assert result2.exit_code == 0
@@ -84,7 +87,8 @@ def test_queue_enqueue_invalid_json() -> None:
                 "queue-enqueue",
                 "doi:10.1234/test",
                 "not-valid-json",
-                "--queue", queue_path,
+                "--queue",
+                queue_path,
             ],
         )
 
@@ -131,8 +135,10 @@ def test_queue_import_with_limit() -> None:
             [
                 "queue-import",
                 str(jsonl_file),
-                "--queue", queue_path,
-                "--limit", "2",
+                "--queue",
+                queue_path,
+                "--limit",
+                "2",
             ],
         )
 
@@ -232,9 +238,12 @@ def test_queue_run_creates_orchestrator() -> None:
             app,
             [
                 "queue-run",
-                "--queue", queue_path,
-                "--workers", "4",
-                "--max-per-host", "2",
+                "--queue",
+                queue_path,
+                "--workers",
+                "4",
+                "--max-per-host",
+                "2",
             ],
             catch_exceptions=False,
             input="\n",  # Send enter to exit
@@ -316,7 +325,11 @@ def test_queue_retry_failed_actually_retries() -> None:
 
         assert result.exit_code == 0
         # Should either retry or show no jobs (if already tried)
-        assert "Retried" in result.stdout or "No failed jobs" in result.stdout or "Skipping" in result.stdout
+        assert (
+            "Retried" in result.stdout
+            or "No failed jobs" in result.stdout
+            or "Skipping" in result.stdout
+        )
 
 
 def test_queue_enqueue_with_default_json() -> None:
@@ -329,7 +342,8 @@ def test_queue_enqueue_with_default_json() -> None:
             [
                 "queue-enqueue",
                 "doi:10.1234/test",
-                "--queue", queue_path,
+                "--queue",
+                queue_path,
             ],
         )
 
