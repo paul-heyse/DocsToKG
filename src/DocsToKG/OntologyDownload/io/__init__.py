@@ -23,6 +23,10 @@ from .extraction_constraints import (
     validate_path_constraints,
     validate_streaming_file_size,
 )
+from .extraction_integrity import (
+    check_windows_portability,
+    validate_archive_format,
+)
 from .extraction_policy import (
     ExtractionPolicy,
     lenient_defaults,
@@ -55,10 +59,6 @@ from .network import (
     validate_url_security,
 )
 from .rate_limit import RateLimiterHandle, apply_retry_after, get_bucket, reset
-from .extraction_integrity import (
-    check_windows_portability,
-    validate_archive_format,
-)
 
 __all__ = [
     "extract_archive_safe",

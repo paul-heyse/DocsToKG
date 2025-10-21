@@ -24,12 +24,11 @@ from __future__ import annotations
 
 import unicodedata
 from pathlib import Path, PurePosixPath
-from typing import Dict, List, Optional, Set
+from typing import Optional, Set
 
 from ..errors import ConfigError
 from .extraction_policy import ExtractionPolicy
 from .extraction_telemetry import ExtractionErrorCode, error_message
-
 
 # ============================================================================
 # PATH NORMALIZATION & VALIDATION
