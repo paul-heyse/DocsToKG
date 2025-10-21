@@ -3,29 +3,36 @@
 #   "module": "DocsToKG.OntologyDownload.io.extraction_policy",
 #   "purpose": "Configuration and validation for the 10 archive extraction hardening policies",
 #   "sections": [
-#     {"id": "policy", "name": "Extraction Policy", "anchor": "POL", "kind": "dataclass"},
+#     {"id": "policy", "name": "Extraction Policy", "anchor": "POL", "kind": "pydantic"},
 #     {"id": "defaults", "name": "Defaults & Factory", "anchor": "DEF", "kind": "factory"},
-#     {"id": "validation", "name": "Policy Validation", "anchor": "VAL", "kind": "methods"}
+#     {"id": "validation", "name": "Policy Validation", "anchor": "VAL", "kind": "validators"}
 #   ]
 # }
 # === /NAVMAP ===
 
 """Configuration and validation for the 10 archive extraction hardening policies.
 
-This module provides the ExtractionPolicy dataclass that defines all 10 policies
+This module provides the ExtractionSettings Pydantic v2 model that defines all 10+ policies
 with sensible, secure defaults. Each policy is independently configurable to support
 different use cases while maintaining defense-in-depth security.
+
+Benefits of Pydantic v2:
+- Automatic field validation and coercion
+- JSON schema generation for documentation
+- Serialization to dict/JSON with schema conformance
+- Type safety with runtime checking
+- Provenance tracking via config_hash computation
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Literal
+from typing import Any, Literal
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
-@dataclass
-class ExtractionPolicy:
-    """Configuration for all 10 archive extraction hardening policies.
+class ExtractionSettings(BaseModel):
+    """Pydantic v2 model for all 10+ archive extraction hardening policies.
 
     Default-deny security posture: all policies enabled by default, opt-in for risky features.
 
@@ -44,269 +51,394 @@ class ExtractionPolicy:
     - max_path_len: Max bytes for full path
     - normalize_unicode: Unicode normalization (NFC | NFD)
     - casefold_collision_policy: Detect case-fold duplicates (reject | allow)
+    - windows_portability_strict: Enforce Windows portability
 
     **Phase 3: Resource Budgets**
     - max_entries: Entry count budget
     - max_file_size_bytes: Per-file size limit
     - max_entry_ratio: Per-entry compression ratio
+    - max_total_ratio: Total compression ratio
 
     **Phase 4: Permissions & Space**
+    - check_disk_space: Verify space before extraction
     - preserve_permissions: Preserve file modes (or strip setuid/setgid)
     - dir_mode: Default directory mode
     - file_mode: Default file mode
-    - check_disk_space: Verify space before extraction
     """
+
+    model_config = ConfigDict(
+        validate_assignment=True,
+        str_strip_whitespace=True,
+        extra="forbid",  # Reject unknown fields
+    )
 
     # ========================================================================
     # PHASE 1: Foundation (Encapsulation + DirFD)
     # ========================================================================
 
-    encapsulate: bool = True
-    """Enable single-root encapsulation (default: True).
+    encapsulate: bool = Field(
+        default=True,
+        description="Enable single-root encapsulation to prevent tar-bomb attacks",
+    )
 
-    When True, all extracted files go into a deterministic subdirectory
-    of `destination`, preventing tar-bomb-style extraction into sibling dirs.
-    """
+    encapsulation_name: Literal["sha256", "basename"] = Field(
+        default="sha256",
+        description="Encapsulation root naming: sha256 (unique) or basename (human-readable)",
+    )
 
-    encapsulation_name: Literal["sha256", "basename"] = "sha256"
-    """Encapsulation root naming policy.
-
-    - "sha256": Use first 12 chars of archive SHA256 digest (reproducible, unique)
-    - "basename": Use archive filename (human-readable, not unique)
-    """
-
-    use_dirfd: bool = True
-    """Enable DirFD + openat semantics (default: True).
-
-    When True, uses O_PATH + openat() for all filesystem operations on the
-    encapsulation root, eliminating TOCTOU races and symlink-in-parent attacks.
-    """
+    use_dirfd: bool = Field(
+        default=True,
+        description="Enable DirFD + openat semantics for TOCTOU race prevention",
+    )
 
     # ========================================================================
     # PHASE 2: Pre-Scan Security (Links, Specials, Paths)
     # ========================================================================
 
-    allow_symlinks: bool = False
-    """Allow symlink entries (default: False).
+    allow_symlinks: bool = Field(
+        default=False,
+        description="Allow symlink entries (must resolve within root)",
+    )
 
-    When False, symlinks are rejected during pre-scan.
-    When True, symlinks are allowed but must resolve within root.
-    """
+    allow_hardlinks: bool = Field(
+        default=False,
+        description="Allow hardlink entries (must reference already-extracted file)",
+    )
 
-    allow_hardlinks: bool = False
-    """Allow hardlink entries (default: False).
+    max_depth: int = Field(
+        default=32,
+        ge=1,
+        le=1000,
+        description="Maximum path depth (prevents deeply nested path attacks)",
+    )
 
-    When False, hardlinks are rejected during pre-scan.
-    When True, hardlinks are allowed if target is already extracted.
-    """
+    max_components_len: int = Field(
+        default=240,
+        ge=1,
+        le=1000,
+        description="Maximum bytes per path component (UTF-8 encoded)",
+    )
 
-    max_depth: int = 32
-    """Maximum path depth (default: 32).
+    max_path_len: int = Field(
+        default=4096,
+        ge=1,
+        le=65536,
+        description="Maximum bytes for full path (UTF-8 encoded)",
+    )
 
-    Number of directory levels deep. Prevents deeply nested path attacks.
-    """
+    normalize_unicode: Literal["NFC", "NFD", "none"] = Field(
+        default="NFC",
+        description="Unicode normalization: NFC (composed), NFD (decomposed), or none",
+    )
 
-    max_components_len: int = 240
-    """Maximum bytes per path component (default: 240).
+    casefold_collision_policy: Literal["reject", "allow"] = Field(
+        default="reject",
+        description="Detect case-fold collisions: reject (fail) or allow (first wins)",
+    )
 
-    After UTF-8 encoding. Most filesystems support 255; we reserve margin.
-    """
-
-    max_path_len: int = 4096
-    """Maximum bytes for full path (default: 4096).
-
-    After UTF-8 encoding. Most systems support 4096; we cap here.
-    """
-
-    normalize_unicode: Literal["NFC", "NFD", "none"] = "NFC"
-    """Unicode normalization for paths (default: "NFC").
-
-    - "NFC": Normalize to composed form (standard)
-    - "NFD": Normalize to decomposed form
-    - "none": No normalization
-    """
-
-    casefold_collision_policy: Literal["reject", "allow"] = "reject"
-    """Policy for case-fold collisions (default: "reject").
-
-    Detects paths that differ only in case (e.g., "file.txt" and "FILE.txt").
-    - "reject": Fail extraction if collision detected
-    - "allow": Allow both (first wins on case-insensitive filesystems)
-    """
-
-    windows_portability_strict: bool = True
-    """Enforce Windows portability checks (default: True).
-
-    When True, blocks Windows reserved names (CON, NUL, LPT1-9, COM1-9)
-    and files with trailing spaces/dots.
-    """
+    windows_portability_strict: bool = Field(
+        default=True,
+        description="Enforce Windows portability checks (reserved names, trailing space/dot)",
+    )
 
     # ========================================================================
     # PHASE 3: Resource Budgets
     # ========================================================================
 
-    max_entries: int = 50_000
-    """Maximum entry count (default: 50,000).
+    max_entries: int = Field(
+        default=50_000,
+        ge=1,
+        le=10_000_000,
+        description="Maximum entry count (prevents extraction bombs)",
+    )
 
-    Prevents extraction bombs with millions of tiny files consuming inodes.
-    """
+    max_file_size_bytes: int = Field(
+        default=2 * 1024 * 1024 * 1024,  # 2 GiB
+        ge=1,
+        le=1024 * 1024 * 1024 * 1024,  # 1 TB
+        description="Maximum per-file size in bytes",
+    )
 
-    max_file_size_bytes: int = 2 * 1024 * 1024 * 1024  # 2 GiB
-    """Maximum per-file size (default: 2 GiB).
+    max_entry_ratio: float = Field(
+        default=100.0,
+        gt=0.0,
+        le=10000.0,
+        description="Maximum per-entry compression ratio (prevents zip-bomb at file level)",
+    )
 
-    Enforced both on declared size (pre-scan) and streamed size (extract).
-    """
-
-    max_entry_ratio: float = 100.0
-    """Maximum per-entry compression ratio (default: 100:1).
-
-    If provided by libarchive, detects entries with extreme compression.
-    Prevents zip-bomb attacks at per-file granularity.
-    """
+    max_total_ratio: float = Field(
+        default=10.0,
+        gt=0.0,
+        le=10000.0,
+        description="Maximum total compression ratio (prevents zip-bomb at archive level)",
+    )
 
     # ========================================================================
     # PHASE 4: Permissions & Space
     # ========================================================================
 
-    # Phase 3-4: Throughput & I/O Efficiency (Optimization Phase)
-    # Space & I/O budgeting
-    check_disk_space: bool = True
-    space_safety_margin: float = 1.10  # 10% headroom
+    check_disk_space: bool = Field(
+        default=True,
+        description="Verify available disk space before extraction",
+    )
+
+    space_safety_margin: float = Field(
+        default=1.10,
+        ge=1.0,
+        le=2.0,
+        description="Safety margin for disk space checks (1.10 = 10% headroom)",
+    )
 
     # File preallocation
-    preallocate: bool = True
-    preallocate_strategy: str = "full"  # "full" | "none"
+    preallocate: bool = Field(
+        default=True,
+        description="Preallocate disk space for files (reduces fragmentation)",
+    )
+
+    preallocate_strategy: Literal["full", "none"] = Field(
+        default="full",
+        description="Preallocation strategy: full (posix_fallocate) or none",
+    )
 
     # Adaptive buffer sizing
-    copy_buffer_min: int = 64 * 1024  # 64 KiB
-    copy_buffer_max: int = 1024 * 1024  # 1 MiB
+    copy_buffer_min: int = Field(
+        default=64 * 1024,  # 64 KiB
+        ge=1024,
+        le=1024 * 1024,
+        description="Minimum copy buffer size in bytes",
+    )
+
+    copy_buffer_max: int = Field(
+        default=1024 * 1024,  # 1 MiB
+        ge=1024,
+        le=100 * 1024 * 1024,
+        description="Maximum copy buffer size in bytes",
+    )
 
     # Atomic writes & fsync discipline
-    atomic: bool = True
-    group_fsync: int = 32  # fsync parent directory every N files
+    atomic: bool = Field(
+        default=True,
+        description="Enable atomic write discipline (temp → fsync → rename → dirfsync)",
+    )
+
+    group_fsync: int = Field(
+        default=32,
+        ge=1,
+        le=10000,
+        description="Directory fsync frequency (every N files)",
+    )
 
     # Inline hashing
-    hash_enable: bool = True
-    hash_algorithms: list[str] = None  # Default: ["sha256"]
-    hash_mode: str = "inline"  # "inline" | "parallel"
-    hash_parallel_threads: int = 2
+    hash_enable: bool = Field(
+        default=True,
+        description="Enable inline hashing during extraction",
+    )
+
+    hash_algorithms: list[str] = Field(
+        default=["sha256"],
+        description="Hash algorithms to compute (e.g., sha256, sha512)",
+    )
+
+    hash_mode: Literal["inline", "parallel"] = Field(
+        default="inline",
+        description="Hashing mode: inline (during write) or parallel",
+    )
+
+    hash_parallel_threads: int = Field(
+        default=2,
+        ge=1,
+        le=32,
+        description="Number of threads for parallel hashing",
+    )
 
     # Selective extraction (include/exclude patterns)
-    include_globs: list[str] = None  # None = include all
-    exclude_globs: list[str] = None  # None = exclude none
-    report_skipped: bool = True
+    include_globs: list[str] = Field(
+        default_factory=list,
+        description="Include patterns (glob syntax); empty = include all",
+    )
+
+    exclude_globs: list[str] = Field(
+        default_factory=list,
+        description="Exclude patterns (glob syntax); empty = exclude none",
+    )
+
+    report_skipped: bool = Field(
+        default=True,
+        description="Report skipped entries in telemetry",
+    )
 
     # CPU guard (wall-time limit)
-    max_wall_time_seconds: int = 120
-    cpu_guard_action: str = "abort"  # "abort" | "warn"
+    max_wall_time_seconds: int = Field(
+        default=120,
+        ge=1,
+        le=3600,
+        description="Maximum wall-time limit in seconds",
+    )
+
+    cpu_guard_action: Literal["abort", "warn"] = Field(
+        default="abort",
+        description="Action on timeout: abort (fail) or warn (log and continue)",
+    )
 
     # Permissions enforcement (Phase 4)
-    preserve_permissions: bool = False
-    file_mode: int = 0o644
-    dir_mode: int = 0o755
+    preserve_permissions: bool = Field(
+        default=False,
+        description="Preserve file permissions from archive (or use defaults)",
+    )
+
+    file_mode: int = Field(
+        default=0o644,
+        description="Default file mode (octal, e.g., 0o644)",
+    )
+
+    dir_mode: int = Field(
+        default=0o755,
+        description="Default directory mode (octal, e.g., 0o755)",
+    )
 
     # ========================================================================
-    # Phase 3-4: Correctness & Integrity (Optimization Phase - Part 3)
+    # Correctness & Integrity
     # ========================================================================
 
-    # CRC/Integrity verification
-    integrity_verify: bool = True
-    integrity_fail_on_mismatch: bool = True
+    integrity_verify: bool = Field(
+        default=True,
+        description="Enable CRC/checksum verification",
+    )
+
+    integrity_fail_on_mismatch: bool = Field(
+        default=True,
+        description="Fail extraction if integrity check fails",
+    )
 
     # Timestamp policy
-    timestamp_mode: str = "preserve"  # "preserve" | "normalize" | "source_date_epoch"
-    timestamp_normalize_to: str = "archive_mtime"  # "archive_mtime" | "now"
-    timestamp_preserve_dir_mtime: bool = False
+    timestamp_mode: Literal["preserve", "normalize", "source_date_epoch"] = Field(
+        default="preserve",
+        description="Timestamp handling: preserve (from archive), normalize, or source_date_epoch",
+    )
 
-    # Unicode normalization
-    unicode_normalize: str = "NFC"  # "NFC" | "NFD"
-    unicode_on_decode_error: str = "reject"  # "reject" | "replace"
+    timestamp_normalize_to: Literal["archive_mtime", "now"] = Field(
+        default="archive_mtime",
+        description="When normalizing timestamps: use archive mtime or current time",
+    )
+
+    timestamp_preserve_dir_mtime: bool = Field(
+        default=False,
+        description="Preserve directory mtimes (or leave as extraction time)",
+    )
 
     # Format allow-list
-    allowed_formats: list[str] = None  # None = default allow-list
-    allowed_filters: list[str] = None  # None = default allow-list
+    allowed_formats: list[str] = Field(
+        default=["zip", "tar", "ustar", "pax", "gnutar"],
+        description="Allowed archive formats (empty = no restrictions)",
+    )
+
+    allowed_filters: list[str] = Field(
+        default=["none", "gzip", "bzip2", "xz", "zstd"],
+        description="Allowed compression filters (empty = no restrictions)",
+    )
 
     # Entry ordering
-    order_mode: str = "header"  # "header" | "path_asc"
+    deterministic_order: Literal["header", "path_asc"] = Field(
+        default="header",
+        description="Output ordering: header (archive order) or path_asc (lexicographic)",
+    )
 
     # Duplicate entry policy
-    duplicate_policy: str = "reject"  # "reject" | "first_wins" | "last_wins"
+    duplicate_policy: Literal["reject", "first_wins", "last_wins"] = Field(
+        default="reject",
+        description="Duplicate handling: reject (fail), first_wins, or last_wins",
+    )
 
     # Provenance manifest
-    manifest_emit: bool = True
-    manifest_filename: str = ".extract.audit.json"
-    manifest_include_digest: bool = True
+    manifest_emit: bool = Field(
+        default=True,
+        description="Write .extract.audit.json manifest",
+    )
+
+    manifest_filename: str = Field(
+        default=".extract.audit.json",
+        description="Audit manifest filename",
+    )
+
+    manifest_include_digest: bool = Field(
+        default=True,
+        description="Include file digests in audit manifest",
+    )
 
     # ========================================================================
-    # VALIDATION METHODS
+    # VALIDATORS
     # ========================================================================
 
-    def validate(self) -> list[str]:
-        """Validate policy configuration.
+    @field_validator("max_path_len")
+    @classmethod
+    def validate_max_path_len(cls, v: int, info) -> int:
+        """Ensure max_path_len >= max_components_len."""
+        if "max_components_len" in info.data:
+            if v < info.data["max_components_len"]:
+                raise ValueError(
+                    f"max_path_len ({v}) must be >= max_components_len ({info.data['max_components_len']})"
+                )
+        return v
+
+    @field_validator("copy_buffer_max")
+    @classmethod
+    def validate_copy_buffer_max(cls, v: int, info) -> int:
+        """Ensure copy_buffer_max >= copy_buffer_min."""
+        if "copy_buffer_min" in info.data:
+            if v < info.data["copy_buffer_min"]:
+                raise ValueError(
+                    f"copy_buffer_max ({v}) must be >= copy_buffer_min ({info.data['copy_buffer_min']})"
+                )
+        return v
+
+    @field_validator("use_dirfd")
+    @classmethod
+    def validate_use_dirfd(cls, v: bool, info) -> bool:
+        """use_dirfd requires encapsulate=True."""
+        if v and "encapsulate" in info.data and not info.data["encapsulate"]:
+            raise ValueError("use_dirfd requires encapsulate=True")
+        return v
+
+    @field_validator("file_mode", "dir_mode", mode="before")
+    @classmethod
+    def validate_mode(cls, v: int | str) -> int:
+        """Accept octal strings or int file modes."""
+        if isinstance(v, str):
+            return int(v, 8)
+        if not isinstance(v, int):
+            raise ValueError(f"Mode must be int or octal string, got {type(v)}")
+        if v <= 0 or v > 0o777:
+            raise ValueError(f"Mode must be in range [0o001, 0o777], got {oct(v)}")
+        return v
+
+    # ========================================================================
+    # METHODS
+    # ========================================================================
+
+    def model_dump_minimal(self) -> dict[str, Any]:
+        """Dump only non-default fields for config_hash computation.
 
         Returns:
-            List of error messages (empty if valid).
+            Dictionary with only customized fields (for provenance tracking).
         """
-        errors: list[str] = []
-
-        # Phase 1
-        if self.encapsulation_name not in ("sha256", "basename"):
-            errors.append(
-                f"encapsulation_name must be 'sha256' or 'basename', got '{self.encapsulation_name}'"
-            )
-        if self.use_dirfd and not self.encapsulate:
-            errors.append("use_dirfd requires encapsulate=True")
-
-        # Phase 2
-        if self.max_depth <= 0:
-            errors.append(f"max_depth must be > 0, got {self.max_depth}")
-        if self.max_components_len <= 0:
-            errors.append(f"max_components_len must be > 0, got {self.max_components_len}")
-        if self.max_path_len <= 0:
-            errors.append(f"max_path_len must be > 0, got {self.max_path_len}")
-        if self.max_path_len < self.max_components_len:
-            errors.append(
-                f"max_path_len ({self.max_path_len}) must be >= max_components_len ({self.max_components_len})"
-            )
-        if self.normalize_unicode not in ("NFC", "NFD", "none"):
-            errors.append(
-                f"normalize_unicode must be 'NFC', 'NFD', or 'none', got '{self.normalize_unicode}'"
-            )
-        if self.casefold_collision_policy not in ("reject", "allow"):
-            errors.append(
-                f"casefold_collision_policy must be 'reject' or 'allow', got '{self.casefold_collision_policy}'"
-            )
-
-        # Phase 3
-        if self.max_entries <= 0:
-            errors.append(f"max_entries must be > 0, got {self.max_entries}")
-        if self.max_file_size_bytes <= 0:
-            errors.append(f"max_file_size_bytes must be > 0, got {self.max_file_size_bytes}")
-        if self.max_entry_ratio <= 0:
-            errors.append(f"max_entry_ratio must be > 0, got {self.max_entry_ratio}")
-
-        # Phase 4
-        if self.dir_mode <= 0 or self.dir_mode > 0o777:
-            errors.append(f"dir_mode must be in range [0o001, 0o777], got {oct(self.dir_mode)}")
-        if self.file_mode <= 0 or self.file_mode > 0o777:
-            errors.append(f"file_mode must be in range [0o001, 0o777], got {oct(self.file_mode)}")
-
-        return errors
-
-    def is_valid(self) -> bool:
-        """Check if policy is valid."""
-        return len(self.validate()) == 0
+        defaults = ExtractionSettings()
+        result = {}
+        for field_name, field_value in self:
+            default_value = getattr(defaults, field_name)
+            if field_value != default_value:
+                result[field_name] = field_value
+        return result
 
     def summary(self) -> dict[str, str]:
-        """Get a human-readable summary of all enabled policies.
+        """Get a human-readable summary of all policies.
 
         Returns:
-            Dictionary mapping policy name to status (enabled/disabled).
+            Dictionary mapping policy name to status/value.
         """
         return {
-            "Phase 1: Encapsulation": f"enabled (policy={self.encapsulation_name})"
-            if self.encapsulate
-            else "disabled",
+            "Phase 1: Encapsulation": (
+                f"enabled (policy={self.encapsulation_name})" if self.encapsulate else "disabled"
+            ),
             "Phase 1: DirFD": "enabled" if self.use_dirfd else "disabled",
             "Phase 2: Symlinks": "rejected" if not self.allow_symlinks else "allowed",
             "Phase 2: Hardlinks": "rejected" if not self.allow_hardlinks else "allowed",
@@ -315,44 +447,55 @@ class ExtractionPolicy:
             "Phase 2: Full Path Length": f"max={self.max_path_len} bytes",
             "Phase 2: Unicode Normalization": self.normalize_unicode,
             "Phase 2: Case-Fold Collisions": self.casefold_collision_policy,
+            "Phase 2: Windows Portability": (
+                "strict" if self.windows_portability_strict else "lenient"
+            ),
             "Phase 3: Max Entries": f"{self.max_entries:,}",
             "Phase 3: Max File Size": f"{self.max_file_size_bytes / (1024**3):.1f} GiB",
             "Phase 3: Max Entry Ratio": f"{self.max_entry_ratio}:1",
+            "Phase 3: Max Total Ratio": f"{self.max_total_ratio}:1",
             "Phase 4: Preserve Permissions": "yes" if self.preserve_permissions else "no",
             "Phase 4: Dir Mode": oct(self.dir_mode),
             "Phase 4: File Mode": oct(self.file_mode),
             "Phase 4: Check Disk Space": "yes" if self.check_disk_space else "no",
+            "Deterministic Ordering": self.deterministic_order,
+            "Manifest Emission": "yes" if self.manifest_emit else "no",
         }
 
 
-def safe_defaults() -> ExtractionPolicy:
-    """Factory for safe extraction policy defaults.
+# For backward compatibility with old code referencing ExtractionPolicy
+ExtractionPolicy = ExtractionSettings
+
+
+def safe_defaults() -> ExtractionSettings:
+    """Factory for safe extraction settings defaults.
 
     Returns a policy with all protections enabled and conservative limits.
     """
-    return ExtractionPolicy()
+    return ExtractionSettings()
 
 
-def lenient_defaults() -> ExtractionPolicy:
-    """Factory for lenient extraction policy (less restrictive).
+def lenient_defaults() -> ExtractionSettings:
+    """Factory for lenient extraction settings (less restrictive).
 
     Disables some defenses; use only for trusted archives.
     """
-    return ExtractionPolicy(
+    return ExtractionSettings(
         allow_symlinks=True,
         allow_hardlinks=True,
         max_entries=1_000_000,
         max_file_size_bytes=100 * 1024 * 1024 * 1024,  # 100 GiB
         max_entry_ratio=1000.0,
+        max_total_ratio=100.0,
     )
 
 
-def strict_defaults() -> ExtractionPolicy:
-    """Factory for strict extraction policy (maximum protection).
+def strict_defaults() -> ExtractionSettings:
+    """Factory for strict extraction settings (maximum protection).
 
     Minimal limits; use for untrusted archives from adversarial sources.
     """
-    return ExtractionPolicy(
+    return ExtractionSettings(
         allow_symlinks=False,
         allow_hardlinks=False,
         max_depth=16,
@@ -361,6 +504,7 @@ def strict_defaults() -> ExtractionPolicy:
         max_entries=10_000,
         max_file_size_bytes=100 * 1024 * 1024,  # 100 MiB
         max_entry_ratio=50.0,
+        max_total_ratio=5.0,
         normalize_unicode="NFC",
         casefold_collision_policy="reject",
         preserve_permissions=False,

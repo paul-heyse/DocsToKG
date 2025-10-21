@@ -80,6 +80,7 @@ ReasonCode = Literal[
 ```
 
 **Design Features**:
+
 - ✅ Frozen + slots (immutable, memory-efficient)
 - ✅ Validation in `__post_init__` (invariants enforced)
 - ✅ All fields documented
@@ -160,6 +161,7 @@ class Resolver(Protocol):
 ```
 
 **Key Points**:
+
 - Structural protocol (not ABC)
 - Returns canonical `ResolverResult`
 - Zero or more `DownloadPlan` per resolver
@@ -213,12 +215,14 @@ def prepare_candidate_download(
 ```
 
 **Validation**:
+
 - ✅ Robots.txt compliance
 - ✅ Content-type policy
 - ✅ Size policy
 - ✅ Cache hints
 
 **Exception Semantics**:
+
 - `SkipDownload("robots")` → `DownloadOutcome(classification="skip")`
 - `DownloadError("conn-error")` → `DownloadOutcome(classification="error")`
 
@@ -246,6 +250,7 @@ def stream_candidate_payload(
 ```
 
 **Operations**:
+
 - ✅ HEAD request (validation)
 - ✅ GET request (payload)
 - ✅ Content-type validation
@@ -274,6 +279,7 @@ def finalize_candidate_download(
 ```
 
 **Operations**:
+
 - ✅ Integrity validation (placeholder)
 - ✅ Atomic move temp → final
 - ✅ Manifest recording
@@ -386,12 +392,14 @@ def finalize_candidate_download(
 ## What's Next
 
 ### Phase 4: Pipeline Orchestration (`pipeline.py`)
+
 - Consume `ResolverResult` from resolvers
 - Orchestrate prepare → stream → finalize
 - Catch exceptions, convert to outcomes
 - Record in manifest
 
 ### Phase 5: Test Suite
+
 - Unit tests for canonical types
 - Contract tests (resolver/execution)
 - Happy/skip/error path tests
@@ -402,7 +410,7 @@ def finalize_candidate_download(
 ## Production Readiness Checklist
 
 - ✅ All types frozen (immutable)
-- ✅ All types validated (__post_init__)
+- ✅ All types validated (**post_init**)
 - ✅ All types documented
 - ✅ Type safety: 100% mypy
 - ✅ Linting: 0 violations

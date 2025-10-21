@@ -14,13 +14,13 @@ Usage example:
 
     class MyResolver:
         name = "my_resolver"
-        
+
         def resolve(self, artifact, session, ctx, telemetry, run_id):
             # Attempt to find a PDF URL
             url = get_pdf_url(artifact, session)
             if not url:
                 return ResolverResult(plans=[])  # Nothing to offer
-            
+
             # Return one or more plans
             plan = DownloadPlan(url=url, resolver_name=self.name)
             return ResolverResult(plans=[plan])

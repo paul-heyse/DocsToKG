@@ -179,7 +179,7 @@ class DownloadOutcome:
         # Enforce invariant: ok=False ⇒ path=None
         if not self.ok and self.path is not None:
             raise ValueError(
-                "DownloadOutcome.ok=False implies path must be None, " f"got path={self.path!r}"
+                f"DownloadOutcome.ok=False implies path must be None, got path={self.path!r}"
             )
 
 
