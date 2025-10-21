@@ -42,7 +42,8 @@ import json
 import logging
 import random
 import threading
-from typing import TYPE_CHECKING, Any, Mapping
+import time
+from typing import TYPE_CHECKING, Any, Mapping, Optional
 
 if TYPE_CHECKING:
     from DocsToKG.ContentDownload.orchestrator.limits import KeyedLimiter
@@ -110,19 +111,9 @@ class Worker:
         logger.debug(f"Worker initialized: {worker_id}")
 
     def stop(self) -> None:
-        """Signal worker to stop processing new jobs.
-
-        Also closes the thread-local database connection to ensure
-        proper cleanup of database resources.
-        """
+        """Signal worker to stop processing new jobs."""
         self._stop.set()
         logger.info(f"Worker {self.worker_id} stopping...")
-
-        # Close thread-local database connection
-        try:
-            self.queue.close_connection()
-        except Exception as e:
-            logger.warning(f"Error closing connection for worker {self.worker_id}: {e}")
 
     def run_one(self, job: Mapping[str, Any]) -> None:
         """Execute a single leased job.

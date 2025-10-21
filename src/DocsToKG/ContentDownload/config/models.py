@@ -244,6 +244,115 @@ class TelemetryConfig(BaseModel):
         return v
 
 
+class HishelConfig(BaseModel):
+    """Configuration for Hishel HTTP caching (RFC 9111 compliant).
+    
+    Hishel is an HTTP caching library that follows RFC 9111 standards for
+    cache control, validation, and expiration. This config controls cache
+    backend, TTL, and RFC 9111 compliance options.
+    """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
+
+    enabled: bool = Field(
+        default=True,
+        description="Enable HTTP caching",
+    )
+    backend: Literal["file", "sqlite", "redis", "s3"] = Field(
+        default="file",
+        description="Cache backend: file (filesystem), sqlite (embedded DB), redis (distributed), s3 (cloud)",
+    )
+    base_path: str = Field(
+        default="state/hishel-cache",
+        description="Base directory path for file-based cache storage",
+    )
+    sqlite_path: str = Field(
+        default="state/hishel-cache.sqlite",
+        description="SQLite database file path (used when backend='sqlite')",
+    )
+    redis_url: Optional[str] = Field(
+        default=None,
+        description="Redis connection URL (required if backend='redis'). Format: redis://[:password]@host:port[/db]",
+    )
+    s3_bucket: Optional[str] = Field(
+        default=None,
+        description="S3 bucket name (required if backend='s3')",
+    )
+    s3_prefix: str = Field(
+        default="hishel-cache/",
+        description="S3 object key prefix for cache entries",
+    )
+    ttl_seconds: int = Field(
+        default=30 * 24 * 3600,
+        ge=1,
+        description="Cache entry time-to-live in seconds. Default: 30 days (2592000 sec)",
+    )
+    check_ttl_every_seconds: int = Field(
+        default=600,
+        ge=1,
+        description="How often to check and clean up expired entries (seconds)",
+    )
+    force_cache: bool = Field(
+        default=False,
+        description="Force caching regardless of Cache-Control headers (strict mode)",
+    )
+    allow_heuristics: bool = Field(
+        default=False,
+        description="Allow heuristic freshness when no cache directives present (RFC 7234 §4.2.3)",
+    )
+    allow_stale: bool = Field(
+        default=False,
+        description="Serve stale responses when origin is unreachable (RFC 5861 §4.2.4)",
+    )
+    always_revalidate: bool = Field(
+        default=False,
+        description="Always revalidate cached responses before use (Cache-Control: must-revalidate)",
+    )
+    cache_private: bool = Field(
+        default=True,
+        description="Cache private responses (Cache-Control: private) for single-user scenarios",
+    )
+    cacheable_methods: List[str] = Field(
+        default_factory=lambda: ["GET"],
+        description="HTTP methods that are eligible for caching",
+    )
+    cacheable_statuses: List[int] = Field(
+        default_factory=lambda: [200, 301, 308],
+        description="HTTP status codes that are eligible for caching (200 OK, 301 Moved Permanently, 308 Permanent Redirect)",
+    )
+
+    @field_validator("ttl_seconds", "check_ttl_every_seconds")
+    @classmethod
+    def validate_intervals(cls, v: int) -> int:
+        """Ensure intervals are positive."""
+        if v <= 0:
+            raise ValueError("Time intervals must be > 0")
+        return v
+
+    @field_validator("cacheable_methods")
+    @classmethod
+    def validate_methods(cls, v: List[str]) -> List[str]:
+        """Validate HTTP methods against RFC 7231."""
+        if not v:
+            raise ValueError("cacheable_methods must not be empty")
+        valid_methods = {"GET", "HEAD", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "TRACE"}
+        invalid = set(m.upper() for m in v) - valid_methods
+        if invalid:
+            raise ValueError(f"Invalid HTTP methods: {invalid}")
+        return [m.upper() for m in v]
+
+    @field_validator("cacheable_statuses")
+    @classmethod
+    def validate_statuses(cls, v: List[int]) -> List[int]:
+        """Validate HTTP status codes per RFC 7231."""
+        if not v:
+            raise ValueError("cacheable_statuses must not be empty")
+        for status in v:
+            if not (100 <= status < 600):
+                raise ValueError(f"Invalid HTTP status code: {status} (must be 100-599)")
+        return v
+
+
 # ============================================================================
 # Resolver-Specific Config Models
 # ============================================================================
@@ -613,6 +722,9 @@ class ContentDownloadConfig(BaseModel):
     )
     telemetry: TelemetryConfig = Field(
         default_factory=TelemetryConfig, description="Telemetry configuration"
+    )
+    hishel: HishelConfig = Field(
+        default_factory=HishelConfig, description="Hishel HTTP caching configuration (RFC 9111)"
     )
     queue: QueueConfig = Field(
         default_factory=QueueConfig, description="Work queue configuration"
