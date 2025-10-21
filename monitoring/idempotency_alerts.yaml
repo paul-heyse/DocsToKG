@@ -10,7 +10,7 @@ groups:
       - alert: IdempotencyJobCompletionRateLow
         expr: |
           (
-            SELECT CAST(SUM(CASE WHEN state IN ('FINALIZED', 'INDEXED', 'DEDUPED') THEN 1 ELSE 0 END) AS FLOAT) 
+            SELECT CAST(SUM(CASE WHEN state IN ('FINALIZED', 'INDEXED', 'DEDUPED') THEN 1 ELSE 0 END) AS FLOAT)
             / CAST(COUNT(*) AS FLOAT)
             FROM artifact_jobs
             WHERE created_at > datetime('now', '-1 hour')
@@ -25,7 +25,7 @@ groups:
             The idempotency system's job completion rate has dropped below the SLO target of 99.5%.
             Current: {{ $value | humanizePercentage }}
             Target: 99.5%
-            
+
             Actions:
             1. Check manifest.sqlite3 for job state distribution
             2. Run: SELECT state, COUNT(*) FROM artifact_jobs GROUP BY state
@@ -49,7 +49,7 @@ groups:
           description: |
             One or more jobs have stale leases (lease_until < now).
             This indicates worker crashes or network partitions.
-            
+
             Actions:
             1. Run reconciler: python -c "
                import sqlite3
@@ -66,7 +66,7 @@ groups:
       - alert: IdempotencyHighReplayRate
         expr: |
           (
-            SELECT CAST(COUNT(CASE WHEN result_json IS NOT NULL THEN 1 END) AS FLOAT) 
+            SELECT CAST(COUNT(CASE WHEN result_json IS NOT NULL THEN 1 END) AS FLOAT)
             / CAST(COUNT(*) AS FLOAT)
             FROM artifact_ops
             WHERE started_at > datetime('now', '-1 hour')
@@ -80,15 +80,15 @@ groups:
           description: |
             The operation replay rate has exceeded 10% (healthy target: <5%).
             High replays indicate frequent retries or crashes.
-            
+
             Current: {{ $value | humanizePercentage }}
             Target: < 5%
             Error Budget: ± 10%
-            
+
             Actions:
             1. Check retry logs for patterns
             2. Analyze operation types being replayed:
-               SELECT op_type, COUNT(*) FROM artifact_ops 
+               SELECT op_type, COUNT(*) FROM artifact_ops
                WHERE result_json IS NOT NULL GROUP BY op_type
             3. Review network stability (packet loss, timeouts)
             4. Check rate limiter settings for aggressive throttling
@@ -99,11 +99,11 @@ groups:
         expr: |
           (
             (
-              SELECT CAST(SUM(CASE WHEN state IN ('FINALIZED', 'INDEXED', 'DEDUPED') THEN 1 ELSE 0 END) AS FLOAT) 
+              SELECT CAST(SUM(CASE WHEN state IN ('FINALIZED', 'INDEXED', 'DEDUPED') THEN 1 ELSE 0 END) AS FLOAT)
               / CAST(COUNT(*) AS FLOAT)
               FROM artifact_jobs
               WHERE created_at > datetime('now', '-1 day')
-            ) 
+            )
             - 0.995  -- JOB_COMPLETION_RATE_TARGET
           ) > 0.005  -- Error budget reached
         for: 10m
@@ -116,10 +116,10 @@ groups:
           description: |
             Job completion SLO error budget is exhausted (< 25% remaining).
             This indicates the system is at or exceeding error tolerance.
-            
+
             Target: 99.5% ± 0.5%
             Current: {{ $value | humanizePercentage }}
-            
+
             Actions:
             1. Scale workers if throughput is increasing
             2. Review recent deployments for issues
@@ -145,10 +145,10 @@ groups:
           description: |
             Crash recovery success rate has dropped below target.
             This indicates recovery logic may be failing.
-            
+
             Target: 99.9%
             Current: {{ $value | humanizePercentage }}
-            
+
             Actions:
             1. Review crash logs for failed reconciliation
             2. Verify reconciler is running on startup
@@ -177,10 +177,10 @@ groups:
           description: |
             Average lease acquisition latency exceeds 100ms.
             This may indicate database contention or locking issues.
-            
+
             Target p99: 100ms
             Current avg: {{ $value | humanizeDuration }}
-            
+
             Actions:
             1. Check SQLite database lock contention
             2. Verify rate limiter is not overly aggressive
@@ -209,7 +209,7 @@ groups:
           description: |
             No new artifact_jobs have been created in the past 5 minutes.
             This may indicate the system is idle or stuck.
-            
+
             Actions:
             1. Verify system is still processing work
             2. Check for deployment/restart in progress
@@ -224,7 +224,7 @@ groups:
       - record: idempotency:job_completion_rate:5m
         expr: |
           (
-            SELECT CAST(SUM(CASE WHEN state IN ('FINALIZED', 'INDEXED', 'DEDUPED') THEN 1 ELSE 0 END) AS FLOAT) 
+            SELECT CAST(SUM(CASE WHEN state IN ('FINALIZED', 'INDEXED', 'DEDUPED') THEN 1 ELSE 0 END) AS FLOAT)
             / CAST(COUNT(*) AS FLOAT)
             FROM artifact_jobs
             WHERE created_at > datetime('now', '-5 minutes')
@@ -254,7 +254,7 @@ groups:
       - record: idempotency:operation_replay_rate:5m
         expr: |
           (
-            SELECT CAST(COUNT(CASE WHEN result_json IS NOT NULL THEN 1 END) AS FLOAT) 
+            SELECT CAST(COUNT(CASE WHEN result_json IS NOT NULL THEN 1 END) AS FLOAT)
             / CAST(COUNT(*) AS FLOAT)
             FROM artifact_ops
             WHERE started_at > datetime('now', '-5 minutes')
