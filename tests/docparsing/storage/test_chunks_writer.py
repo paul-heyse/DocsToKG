@@ -277,7 +277,8 @@ class TestParquetChunksWriter:
 
         # Minimum is 1
         count = ParquetChunksWriter._estimate_row_group_count(
-            file_size=1024 * 1024, avg_row_group_mb=32  # 1MB < 32MB
+            file_size=1024 * 1024,
+            avg_row_group_mb=32,  # 1MB < 32MB
         )
         assert count == 1
 
