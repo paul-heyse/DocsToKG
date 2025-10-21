@@ -1,0 +1,217 @@
+================================================================================
+  OPTIMIZATION 9: PHASE 1 - CORE TYPES IMPLEMENTATION ✅ COMPLETE
+================================================================================
+
+Date: October 21, 2025
+Status: ✅ PHASE 1 COMPLETE & VERIFIED
+Files Created: 2
+Lines of Code: 421 LOC
+Linting: All checks passed ✅
+Type Hints: Complete ✅
+Docstrings: Comprehensive ✅
+
+================================================================================
+DELIVERABLES
+================================================================================
+
+FILE 1: src/DocsToKG/ContentDownload/fallback/__init__.py
+  • Module docstring with comprehensive overview
+  • Package-level imports and __all__ exports
+  • Example usage demonstration
+  • Status: ✅ 49 LOC, linting clean
+
+FILE 2: src/DocsToKG/ContentDownload/fallback/types.py
+  • ResolutionOutcome: Literal with 7 outcomes
+  • AttemptPolicy: 4 fields + __post_init__ validation
+  • AttemptResult: 7 fields + 3 properties + __post_init__ validation
+  • TierPlan: 3 fields + __post_init__ validation
+  • FallbackPlan: 4 fields + 5 methods + __post_init__ validation
+  • Status: ✅ 372 LOC, linting clean
+
+TOTAL: 421 LOC, fully specified and verified
+
+================================================================================
+WHAT WAS BUILT
+================================================================================
+
+1. ResolutionOutcome (Literal Type)
+   Possible values:
+     "success"       - Found valid PDF
+     "no_pdf"        - Target exists but no PDF
+     "nonretryable"  - Terminal error (404, etc.)
+     "retryable"     - Transient error (429, 503, etc.)
+     "timeout"       - Attempt exceeded timeout
+     "skipped"       - Skipped by health gate or cancellation
+     "error"         - Unexpected exception
+
+2. AttemptPolicy (Dataclass)
+   Fields:
+     • name: Source identifier (e.g., "unpaywall_pdf")
+     • timeout_ms: Individual timeout in milliseconds
+     • retries_max: Max Tenacity retries for this source
+     • robots_respect: Whether to honor robots.txt
+   Validation:
+     • timeout_ms must be positive
+     • retries_max must be non-negative
+
+3. AttemptResult (Dataclass)
+   Fields:
+     • outcome: ResolutionOutcome
+     • reason: Short reason code (e.g., "oa_pdf", "breaker_open")
+     • elapsed_ms: Wall-clock time for attempt
+     • url: Candidate PDF URL (optional, for "success")
+     • status: HTTP status code (optional)
+     • host: Hostname (optional)
+     • meta: Metadata dict (optional)
+   Properties:
+     • is_success: True iff outcome == "success"
+     • is_retryable: True for "retryable" or "timeout"
+     • is_terminal: True for terminal outcomes
+   Validation:
+     • success outcome requires url to be set
+     • elapsed_ms must be non-negative
+
+4. TierPlan (Dataclass)
+   Fields:
+     • name: Tier identifier (e.g., "direct_oa")
+     • parallel: Max concurrent attempts in this tier
+     • sources: Tuple of source names
+   Validation:
+     • parallel must be positive
+     • sources cannot be empty
+     • parallel cannot exceed len(sources)
+
+5. FallbackPlan (Dataclass)
+   Fields:
+     • budgets: Dict with required keys:
+         - total_timeout_ms: Hard cap
+         - total_attempts: Across all sources
+         - max_concurrent: Max inflight threads
+         - per_source_timeout_ms: Default timeout
+     • tiers: Tuple of TierPlan objects
+     • policies: Dict[source_name → AttemptPolicy]
+     • gates: Health gate config dict
+   Methods:
+     • get_policy(source_name) → AttemptPolicy
+   Properties:
+     • total_sources: Count of unique sources
+     • offline_behavior: Configured offline behavior
+     • skip_if_breaker_open: Whether to skip on open
+   Validation:
+     • All required budget keys present
+     • All budget values > 0
+     • Tiers not empty
+     • All sources in tiers have policies
+
+================================================================================
+VERIFICATION RESULTS
+================================================================================
+
+✅ AttemptPolicy Creation
+   Created: AttemptPolicy(name='unpaywall_pdf', timeout_ms=6000, retries_max=3)
+   Result: ✅ Correct
+
+✅ AttemptResult (Success)
+   Created: outcome='success', url='https://example.org/paper.pdf', elapsed_ms=1234
+   Result: ✅ is_success=True, is_terminal=True
+
+✅ AttemptResult (Skipped)
+   Created: outcome='skipped', reason='breaker_open', elapsed_ms=5
+   Result: ✅ is_success=False, is_terminal=True
+
+✅ TierPlan Creation
+   Created: name='direct_oa', parallel=2, sources=3
+   Result: ✅ Correct
+
+✅ FallbackPlan Creation
+   Created: 2 tiers, 3 sources, 120000ms budget, 20 attempts
+   Result: ✅ total_sources=3, offline_behavior='metadata_only'
+
+✅ Validation: Invalid timeout_ms
+   Test: AttemptPolicy(..., timeout_ms=-1)
+   Result: ✅ ValueError raised as expected
+
+✅ Validation: Success without URL
+   Test: AttemptResult(outcome='success', url=None)
+   Result: ✅ ValueError raised as expected
+
+✅ Validation: Invalid parallel
+   Test: TierPlan(..., parallel=0)
+   Result: ✅ ValueError raised as expected
+
+================================================================================
+CODE QUALITY METRICS
+================================================================================
+
+Linting (ruff check):        ✅ All checks passed
+Type Hints:                   ✅ Complete (no Any except Dict/List)
+Docstrings:                   ✅ Comprehensive (every class & method)
+Frozen Dataclasses:          ✅ Yes (immutable & hashable)
+Validation:                   ✅ In __post_init__ for all classes
+Field Ordering:              ✅ Non-default fields first
+Module Structure:            ✅ Clear sections with comments
+
+Imports:                      ✅ Minimal (dataclass, field, typing)
+External Dependencies:        ❌ None (zero!)
+Complexity:                   ✅ Low (pure data structures)
+
+================================================================================
+WHAT'S NEXT: PHASE 2
+================================================================================
+
+Phase 2 is now unblocked and ready to start:
+
+TASK: Create fallback/orchestrator.py with FallbackOrchestrator class
+
+What Phase 2 Will Implement:
+  • FallbackOrchestrator.__init__() - Initialize with plan, breaker, rate limiter, etc.
+  • resolve_pdf() - Main orchestration method
+  • _health_gate() - Check breaker, offline, rate limits
+  • _emit_attempt_telemetry() - Log attempt results
+  • Threading model - Tier parallelization with queue.Queue
+  • Budget enforcement - Time, attempts, concurrency limits
+  • Cancellation logic - Stop on first success, cancel rest
+
+Estimated Effort: 4 hours
+Complexity: HIGH (threading, state management, cancellation)
+
+================================================================================
+PRODUCTION READINESS CHECKLIST
+================================================================================
+
+Phase 1 Completion (Core Types):
+  ✅ All 5 dataclasses implemented
+  ✅ All validation logic in place
+  ✅ All properties and methods working
+  ✅ Comprehensive docstrings
+  ✅ Type hints complete
+  ✅ No external dependencies
+  ✅ Linting clean
+  ✅ Zero issues found
+
+Ready for Phase 2:
+  ✅ YES - All prerequisites complete
+
+Ready for Deployment:
+  ⏳ NOT YET - Phases 2-10 needed before deployment
+
+================================================================================
+SUMMARY
+================================================================================
+
+✅ PHASE 1 COMPLETE
+
+The core types for the Fallback & Resiliency Strategy are fully implemented,
+tested, and production-ready. All 5 dataclasses are immutable, frozen, and
+have comprehensive validation in __post_init__.
+
+The types define the complete specification for:
+  • Resolution outcomes (7 possible values)
+  • Source policies (timeout, retries, robots respect)
+  • Attempt results (success/failure with metadata)
+  • Tier plans (parallel sources, ordering)
+  • Complete resolution plans (budgets, tiers, gates)
+
+Next Step: Begin Phase 2 (Orchestrator) - Ready to start immediately
+
+================================================================================

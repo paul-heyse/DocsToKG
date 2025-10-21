@@ -55,7 +55,7 @@ import time
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Callable, ContextManager
+from typing import Callable, ContextManager, Optional
 
 # Optional import: uses project's existing lock utilities if available
 try:

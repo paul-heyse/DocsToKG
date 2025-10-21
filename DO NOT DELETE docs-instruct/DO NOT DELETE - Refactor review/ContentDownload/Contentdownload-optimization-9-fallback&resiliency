@@ -1,0 +1,450 @@
+Absolutely — here’s a **repo-shaped, junior-dev/agent-ready plan** for **9) Fallback & resiliency strategy** that plugs cleanly into the stack you’ve built (HTTPX+Hishel+Tenacity+pyrate-limiter+pybreaker+url-normalize+Wayback+idempotent jobs).
+
+I’ll give you:
+
+1. goals & success criteria,
+2. a tight **config schema** (`fallback.yaml`),
+3. the **runtime types** you’ll use,
+4. an **orchestrator** that executes the plan (with cancellation & budgets),
+5. detailed **source adapters** and ordering,
+6. **health gates** (breaker, limiter, offline),
+7. **telemetry** & idempotency,
+8. **tests**, **CLI**, and rollout tips.
+
+---
+
+## 0) Outcomes (what “good” looks like)
+
+* For each artifact, you run a **deterministic plan**: try N sources **in priority order**, with **tight time/attempt budgets**, **skip unhealthy hosts**, and **stop as soon as** you have a **validated PDF**.
+* You never hammer a sick origin (breaker gate); you keep requests within **per-source** and **total** budgets; you **fan-out** small, cancel losers when a winner is found.
+* Every attempt is **recorded once** (idempotent), you know **why** it succeeded/failed, and you can tune the plan from YAML/CLI without code changes.
+
+---
+
+## 1) Config (YAML/env/CLI)
+
+`configs/fallback.yaml`:
+
+```yaml
+version: 1
+
+# Global budgets per artifact resolution
+budgets:
+  total_timeout_ms: 120000         # hard cap per artifact
+  total_attempts: 20               # across all sources
+  max_concurrent: 3                # concurrent attempts across distinct hosts
+  per_source_timeout_ms: 10000     # default per attempt (can override per source)
+
+# Resolution order (tiers). Within a tier, you may run a small fan-out.
+tiers:
+  - name: "direct_oa"
+    parallel: 2
+    sources:
+      - unpaywall_pdf
+      - arxiv_pdf
+      - pmc_pdf     # PubMed Central direct PDFs
+  - name: "doi_follow"
+    parallel: 1
+    sources:
+      - doi_redirect_pdf  # follow DOI via crossref/unpaywall/openalex link to publisher PDF
+  - name: "landing_scrape"
+    parallel: 2
+    sources:
+      - publisher_landing_pdf  # HTML parse → meta/link/anchor PDF extraction
+      - europe_pmc_pdf
+  - name: "archive"
+    parallel: 1
+    sources:
+      - wayback_pdf           # availability+CDX path
+      - wayback_html_to_pdf   # HTML→PDF parse
+
+# Per-source policy
+sources:
+  unpaywall_pdf:
+    timeout_ms: 6000
+    retries_max: 3
+  arxiv_pdf:
+    timeout_ms: 6000
+    retries_max: 3
+  pmc_pdf:
+    timeout_ms: 8000
+  doi_redirect_pdf:
+    timeout_ms: 8000
+    retries_max: 3
+  publisher_landing_pdf:
+    timeout_ms: 12000
+    retries_max: 2
+    robots_respect: true
+  europe_pmc_pdf:
+    timeout_ms: 8000
+  wayback_pdf:
+    timeout_ms: 12000
+  wayback_html_to_pdf:
+    timeout_ms: 15000
+
+# Health gates
+gates:
+  skip_if_breaker_open: true
+  skip_if_http2_denied: false  # generally not needed; we mount HTTP/1.1 where needed
+  offline_behavior: "metadata_only"  # "metadata_only" | "block_all" | "cache_only"
+```
+
+**Overlays** (env/CLI):
+
+* `DOCSTOKG_FB_TOTAL_TIMEOUT_MS`, `DOCSTOKG_FB_MAX_CONCURRENT`, `DOCSTOKG_FB_TIER_OVERRIDE=...`
+* `--disable-wayback`, `--tier landing_scrape.parallel=1`, etc.
+
+---
+
+## 2) Runtime types (thin & explicit)
+
+```python
+# fallback/types.py
+from dataclasses import dataclass
+from typing import Optional, Literal, Dict, Any
+
+ResolutionOutcome = Literal["success","no_pdf","nonretryable","retryable","timeout","skipped","error"]
+
+@dataclass
+class AttemptPolicy:
+    name: str                      # "unpaywall_pdf"
+    timeout_ms: int
+    retries_max: int
+    robots_respect: bool = False
+
+@dataclass
+class AttemptResult:
+    outcome: ResolutionOutcome
+    url: Optional[str]             # candidate PDF URL if found
+    status: Optional[int]          # HTTP status for final check
+    host: Optional[str]
+    reason: str                    # short code ("no_snapshot","breaker_open","html_parse_failed",...)
+    meta: Dict[str,Any]            # any extra (content-type, redirect_chain, etc.)
+    elapsed_ms: int
+
+@dataclass
+class TierPlan:
+    name: str
+    parallel: int
+    sources: list[str]             # source names
+
+@dataclass
+class FallbackPlan:
+    budgets: dict
+    tiers: list[TierPlan]
+    policies: dict[str, AttemptPolicy]
+    gates: dict
+```
+
+---
+
+## 3) Orchestrator (scheduling, cancellation, budgets)
+
+Key ideas:
+
+* **Tiered** loop: try sources tier by tier; within a tier, launch up to `parallel` attempts (parallelism across **different hosts** when possible).
+* **Cancellation**: race attempts; as soon as one returns a **validated** PDF candidate (HEAD 200 CT `application/pdf` or sniff), cancel the rest.
+* **Budgets**: enforce `total_timeout_ms`, `total_attempts`, `per_source_timeout_ms`.
+* **Health gates**: skip attempt if **breaker is open** for that host, or offline rules prevent it.
+
+```python
+# fallback/orchestrator.py (sync version; you can asyncify later)
+import time, threading, queue
+from typing import Callable, Iterable
+from DocsToKG.ContentDownload.breakers import BreakerRegistry, BreakerOpenError
+from DocsToKG.ContentDownload.ratelimit import RateLimitRegistry
+from DocsToKG.ContentDownload.urls import canonical_for_request, canonical_host
+
+AttemptFn = Callable[[AttemptPolicy, dict], AttemptResult]
+
+class FallbackOrchestrator:
+    def __init__(self, *, plan: FallbackPlan, breaker: BreakerRegistry, rate: RateLimitRegistry,
+                 head_client, raw_client, telemetry, logger):
+        self.plan = plan
+        self.breaker = breaker
+        self.rate = rate
+        self.head = head_client     # cached; for metadata/head checks
+        self.raw = raw_client       # raw; for artifacts (no cache)
+        self.tele = telemetry
+        self.log = logger
+
+    def resolve_pdf(self, *, context: dict, adapters: dict[str, AttemptFn]) -> AttemptResult:
+        """
+        context: {"work_id":..., "artifact_id":..., "doi":..., "candidate_urls":[...], "offline": bool}
+        adapters: mapping source_name -> function that returns AttemptResult
+        """
+        budgets = self.plan.budgets
+        t0 = time.monotonic()
+        attempts_used = 0
+
+        # cancellation
+        result_queue: "queue.Queue[AttemptResult]" = queue.Queue()
+        cancel_flag = threading.Event()
+
+        def run_attempt(source_name: str):
+            policy = self.plan.policies[source_name]
+            try:
+                if cancel_flag.is_set():
+                    res = AttemptResult("skipped", None, None, None, "cancelled", {}, 0)
+                    result_queue.put(res)
+                    return
+                started = time.monotonic()
+                # Health gates
+                gate = self._health_gate(source_name, context)
+                if gate:
+                    result_queue.put(gate)
+                    return
+                # Execute adapter
+                res = adapters[source_name](policy, context)
+                res.elapsed_ms = int((time.monotonic() - started) * 1000)
+                result_queue.put(res)
+            except BreakerOpenError as e:
+                result_queue.put(AttemptResult("skipped", None, None, None, "breaker_open", {"msg": str(e)}, 0))
+            except Exception as e:
+                result_queue.put(AttemptResult("error", None, None, None, "exception", {"msg": str(e)}, 0))
+
+        # Tiered scheduling
+        for tier in self.plan.tiers:
+            # build tier candidates respecting budgets
+            if attempts_used >= budgets["total_attempts"]:
+                break
+            # At most 'parallel' workers
+            names = list(tier.sources)
+            inflight: list[threading.Thread] = []
+            launched = 0
+
+            while names and launched < tier.parallel and attempts_used < budgets["total_attempts"]:
+                name = names.pop(0)
+                th = threading.Thread(target=run_attempt, args=(name,), daemon=True)
+                th.start()
+                inflight.append(th)
+                launched += 1
+                attempts_used += 1
+
+            # Collect outcomes for this tier (until success or all done)
+            done = 0
+            while done < launched:
+                # total timeout cap
+                if (time.monotonic() - t0) * 1000 >= budgets["total_timeout_ms"]:
+                    cancel_flag.set()
+                    break
+                try:
+                    res = result_queue.get(timeout=0.25)
+                except queue.Empty:
+                    continue
+
+                done += 1
+                self._emit_attempt_telemetry(tier.name, res, context)
+
+                if res.outcome == "success" and res.url:
+                    cancel_flag.set()
+                    # Best-effort: cancel other threads by flag; they'll skip quickly
+                    return res
+
+            # Join threads (short)
+            for th in inflight:
+                th.join(timeout=0.5)
+
+            # If not successful, continue to next tier
+
+        # No success
+        elapsed_ms = int((time.monotonic() - t0) * 1000)
+        return AttemptResult("no_pdf", None, None, None, "exhausted", {"elapsed_ms": elapsed_ms}, elapsed_ms)
+
+    # ---------- helpers ----------
+    def _health_gate(self, source_name: str, context: dict) -> Optional[AttemptResult]:
+        # Offline behavior
+        if context.get("offline"):
+            # allow metadata-only tiers if you configured adapters to use cached client; block artifact attempts
+            if self.plan.gates.get("offline_behavior","metadata_only") != "metadata_only":
+                return AttemptResult("skipped", None, None, None, "offline_block", {}, 0)
+        # Breaker gate (host depends on adapter; for URL-driven adapters, we pre-derive host)
+        # Adapters should check their own host(s) with BreakerRegistry.allow() right before send.
+        return None
+
+    def _emit_attempt_telemetry(self, tier: str, res: AttemptResult, context: dict) -> None:
+        # Tight, low-cardinality fields for dashboards
+        self.tele.emit({
+            "event": "fallback_attempt",
+            "tier": tier,
+            "source": res.meta.get("source"),
+            "outcome": res.outcome,
+            "reason": res.reason,
+            "host": res.host,
+            "status": res.status,
+            "elapsed_ms": res.elapsed_ms,
+            "work_id": context.get("work_id"),
+            "artifact_id": context.get("artifact_id"),
+        })
+```
+
+> You can replace the threads with `asyncio` later; the structure (pipeline, budgets, cancel flag) stays the same.
+
+---
+
+## 4) Source adapters (how each source behaves)
+
+Make each adapter **pure**: given a `policy` & `context`, it returns an `AttemptResult`. Adapters must:
+
+* **canonicalize** outgoing URLs (`role="metadata"` for JSON/HTML calls; `role="artifact"` for PDFs),
+* consult **BreakerRegistry** before sending; call Tenacity-wrapped clients (hub),
+* **HEAD** candidate PDF URLs to validate (`200 + CT application/pdf`), or sniff `%PDF-` when servers lie,
+* set `res.meta["source"]=<adapter_name>` and `host`.
+
+### 4.1 Unpaywall PDF (fast path)
+
+* Use DOI from context → Unpaywall API (`role="metadata"`, cached client).
+* If `oa_location.url_for_pdf` exists, **HEAD** it with raw client; success → return `AttemptResult("success", url=..., status=200, host=..., reason="oa_pdf")`.
+
+### 4.2 arXiv PDF
+
+* From arXiv ID or OpenAlex/metadata context; build `https://arxiv.org/pdf/<id>.pdf` and **HEAD**; success → return.
+
+### 4.3 PMC PDF
+
+* From PMCID/PMID; E-utils or EPMC to PDF; **HEAD** then return.
+
+### 4.4 DOI follow (publisher redirect)
+
+* Build `https://doi.org/<doi>`; follow redirects with **raw client** until final URL; if `.pdf` or HEAD CT OK, return.
+* Breakers/limiter handle politeness.
+
+### 4.5 Landing scrape (publisher HTML)
+
+* GET landing page (`role="landing"`, cached client), respect `robots_respect`; parse `<meta name=citation_pdf_url>`, `<link rel="alternate" type="application/pdf">`, `<a href="...pdf">`.
+* Canonicalize discovered URL; **HEAD** candidate; return on success.
+
+### 4.6 Europe PMC PDF
+
+* Query EPMC API by DOI/PMID; follow its PDF link; **HEAD** then return.
+
+### 4.7 Wayback
+
+* Use your WaybackResolver (availability/CDX and optional HTML parse).
+* Ensure artifact **HEAD** passes (200/CT OK) before success.
+
+> All adapters share a tiny utility: `head_pdf(url) -> (ok, status, host, reason, meta)` that does Tenacity-wrapped HEAD, CT/sniff validation, and breaker updates.
+
+---
+
+## 5) Health & resiliency gates (how to avoid waste)
+
+* **Breaker gate**: Adapters must call `breaker.allow(host, role="artifact", resolver=<name>)` **before** network. If open → return `AttemptResult("skipped","breaker_open")`.
+* **Limiter**: handled by transport; orchestrator just observes `rate_delay_ms` in telemetry to tune future rates.
+* **Offline**: Orchestrator returns `skipped/offline_block` on artifact attempts; metadata adapters can still run with `only-if-cached` (Hishel).
+* **Cache**: metadata calls are cached; repeated attempts inside a plan are cheap (no token spend).
+
+---
+
+## 6) Idempotency (ops ledger integration)
+
+Each adapter should wrap side-effects (HTTP + decision) in **artifact_ops** using the `op_key("FALLBACK", job_id, source=<name>, attempt=n)` pattern so if the plan restarts mid-tier, repeats **don’t** double record or redo work.
+
+The **winner** adapter (first success) stores `op_key("RESOLUTION", job_id, source=<name>)` and the orchestrator stops.
+
+---
+
+## 7) Telemetry (what to log)
+
+Per attempt:
+
+* `event=fallback_attempt` — `tier`, `source`, `host`, `outcome`, `reason`, `status`, `elapsed_ms`.
+* For successes add `pdf_url`, `content_length`, and `from_cache` on the validation HEAD if available.
+* Per artifact summary (`fallback_summary`): `tiers_touched`, `attempts`, `time_to_success_ms`, `winner_source`, `winner_host`, `path="direct_oa|doi_follow|landing|archive|none"`.
+
+**SLOs to watch**:
+
+* Time to success p50/p95,
+* % that succeed in tier 1/2/3/4,
+* % blocked by breaker,
+* % offline-blocked,
+* % resolved by Wayback.
+
+---
+
+## 8) Tests (high-value)
+
+* **Winner cancels rest**: mock two adapters; second is slow; first succeeds; ensure second is cancelled/skipped.
+* **Budget expiry**: set `total_timeout_ms` low; ensure orchestrator returns `exhausted`.
+* **Breaker skips**: mark host breaker open; adapter quickly returns `skipped/breaker_open`; orchestrator advances to next source.
+* **Offline**: `offline=True` → artifact attempts are skipped; if metadata-only tiers can produce cached pdf (edge), assert behavior matches config.
+* **Wayback last-chance**: ensure it only runs after earlier tiers fail.
+* **Robots**: landing parser respects `robots_respect`; when disallowed, return `skipped/robots_disallow`.
+
+---
+
+## 9) CLI knobs (ops)
+
+Add to your main CLI:
+
+```
+--fallback-total-timeout-ms 90000
+--fallback-parallel landing_scrape=1
+--disable-wayback
+--fallback-dryrun  # prints plan per artifact but does not attempt network
+```
+
+A `fallback plan` subcommand that prints the **effective plan** (tiers + sources + per-source timeouts) aids debugging and tuning.
+
+---
+
+## 10) Rollout plan
+
+1. Ship orchestrator **disabled** by default; log the **virtual plan** it would have run for a week (dry-run mode).
+2. Enable for **tier 1** only (direct_oa) and measure “time to success”.
+3. Gradually enable tier 2 (doi_follow), then landing_scrape, finally archive.
+4. Tune per-source `timeout_ms` & tier `parallel` from telemetry.
+5. Re-order sources if a particular publisher consistently outperforms others.
+
+---
+
+## 11) Implementation notes & guardrails
+
+* Always **canonicalize** candidate URLs (`canonical_for_request` with `role="artifact"`) before HEAD/GET; this stabilizes keys for caching/limiter/breaker.
+* Don’t rely on filename extensions; always **HEAD**; when CT is wrong, sniff first bytes for `%PDF-`.
+* Be strict with **robots** for landing scrapes; maintain a small allowlist for known safe publishers if needed.
+* Keep adapter code **stateless**; all finite state lives in the orchestrator, idempotency ledger, and breaker/limiter.
+* When a tier runs in parallel, prefer **different hosts** to diversify risk (e.g., Unpaywall + arXiv, not Unpaywall + another Unpaywall call).
+
+---
+
+## 12) Minimal adapter signature (example: Unpaywall)
+
+```python
+def adapter_unpaywall_pdf(policy: AttemptPolicy, ctx: dict) -> AttemptResult:
+    doi = ctx.get("doi")
+    if not doi:
+        return AttemptResult("skipped", None, None, None, "no_doi", {"source":"unpaywall_pdf"}, 0)
+    # metadata call (cached)
+    r = ctx["head_client"].get(f"https://api.unpaywall.org/v2/{doi}?email=you@example.com",
+                               timeout=(5, policy.timeout_ms/1000),
+                               follow_redirects=True,
+                               extensions={"role": "metadata"})
+    if r.status_code != 200:
+        return AttemptResult("retryable" if r.status_code in (429,500,503) else "nonretryable",
+                             None, r.status_code, "api.unpaywall.org", "api_status",
+                             {"source":"unpaywall_pdf"}, 0)
+    pdf = (r.json().get("best_oa_location") or {}).get("url_for_pdf")
+    if not pdf:
+        return AttemptResult("nonretryable", None, 200, "api.unpaywall.org", "no_pdf_field", {"source":"unpaywall_pdf"}, 0)
+    # validate candidate PDF (raw client)
+    pdf_url = canonical_for_request(pdf, role="artifact")
+    host = canonical_host(pdf_url)
+    # breaker preflight
+    ctx["breaker"].allow(host, role="artifact", resolver="unpaywall_pdf")
+    h = ctx["raw_client"].head(pdf_url, follow_redirects=True,
+                               timeout=(5, policy.timeout_ms/1000),
+                               extensions={"role":"artifact"})
+    ct = h.headers.get("Content-Type","").lower()
+    if h.status_code == 200 and ("pdf" in ct or h.content[:5] == b"%PDF-"):
+        return AttemptResult("success", pdf_url, 200, host, "oa_pdf", {"source":"unpaywall_pdf"}, 0)
+    return AttemptResult("nonretryable", None, h.status_code, host, "head_not_pdf", {"ct":ct, "source":"unpaywall_pdf"}, 0)
+```
+
+> Other adapters follow the same shape: **get candidate**, **breaker allow**, **HEAD validate** → **AttemptResult**.
+
+---
+
+### Done
+
+This gives you a deterministic, budgeted, health-aware resolution pipeline with clean seams (adapters are tiny and pure; the orchestrator controls time, concurrency, and cancellation; breaker/limiter/offline/caching remain in your hub). It’s explicit enough for a junior dev or AI agent to implement in one PR per tier (start with **direct_oa**, add **doi_follow**, then **landing_scrape**, then **archive**).

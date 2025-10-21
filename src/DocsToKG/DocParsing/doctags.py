@@ -559,7 +559,9 @@ def _build_pdf_plan(
             )
         )
 
-    plan = StagePlan(stage_name=MANIFEST_STAGE, items=tuple(plan_items), total_items=len(plan_items))
+    plan = StagePlan(
+        stage_name=MANIFEST_STAGE, items=tuple(plan_items), total_items=len(plan_items)
+    )
     return plan, resume_skipped
 
 
@@ -904,7 +906,6 @@ class DoctagsCfg(StageConfigBase):
                 f"received {utilization}"
             )
         self.gpu_memory_utilization = utilization
-
 
 
 PROFILE_PRESETS: Dict[str, Dict[str, Any]] = {
@@ -1993,11 +1994,13 @@ def pdf_convert_one(task: PdfTask) -> PdfConversionResult:
         )
 
 
-def pdf_main(args: argparse.Namespace | None = None) -> int:
+def pdf_main(args: argparse.Namespace | None = None, config_adapter=None) -> int:
     """Coordinate vLLM startup and parallel DocTags conversion.
 
     Args:
         args: Optional argument namespace injected during programmatic use.
+        config_adapter: Optional DoctagsCfg instance from ConfigurationAdapter (new pattern).
+              If provided, bypasses sys.argv parsing and uses this config directly.
 
     Returns:
         Process exit code, where ``0`` indicates success.
@@ -2015,24 +2018,39 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
     except Exception:
         pass
 
-    if args is None:
-        namespace = pdf_parse_args()
-    elif isinstance(args, argparse.Namespace):
-        namespace = args
-        if getattr(namespace, "_cli_explicit_overrides", None) is None:
-            keys = [name for name in vars(namespace) if not name.startswith("_")]
-            annotate_cli_overrides(namespace, explicit=keys, defaults={})
+    # NEW PATH: If adapter provided (from unified CLI), use it directly
+    if config_adapter is not None:
+        cfg = config_adapter
+        config_snapshot = cfg.to_manifest()
+        namespace = argparse.Namespace()
+        for field_def in fields(DoctagsCfg):
+            setattr(namespace, field_def.name, getattr(cfg, field_def.name))
+    # LEGACY PATH: Parse from args or sys.argv
     else:
-        namespace = pdf_parse_args(args)
+        if args is None:
+            namespace = pdf_parse_args()
+        elif isinstance(args, argparse.Namespace):
+            namespace = args
+            if getattr(namespace, "_cli_explicit_overrides", None) is None:
+                keys = [name for name in vars(namespace) if not name.startswith("_")]
+                annotate_cli_overrides(namespace, explicit=keys, defaults={})
+        else:
+            namespace = pdf_parse_args(args)
 
-    profile = getattr(namespace, "profile", None)
-    defaults = PROFILE_PRESETS.get(profile or "", {})
-    cfg = DoctagsCfg.from_args(namespace, mode="pdf", defaults=defaults)
-    config_snapshot = cfg.to_manifest()
-    for field_def in fields(DoctagsCfg):
-        setattr(namespace, field_def.name, getattr(cfg, field_def.name))
-    if profile:
-        config_snapshot.setdefault("profile", profile)
+        profile = getattr(namespace, "profile", None)
+        defaults = PROFILE_PRESETS.get(profile or "", {})
+
+        # Build config from namespace (legacy: no from_args() available)
+        cfg = DoctagsCfg()
+        cfg.apply_args(namespace, defaults=defaults)
+        cfg.mode = "pdf"  # Explicit mode for pdf_main
+        cfg.finalize()
+
+        config_snapshot = cfg.to_manifest()
+        for field_def in fields(DoctagsCfg):
+            setattr(namespace, field_def.name, getattr(cfg, field_def.name))
+        if profile:
+            config_snapshot.setdefault("profile", profile)
 
     log_level = cfg.log_level
     run_id = uuid.uuid4().hex
@@ -2723,11 +2741,13 @@ def html_convert_one(task: HtmlTask) -> HtmlConversionResult:
         )
 
 
-def html_main(args: argparse.Namespace | None = None) -> int:
-    """Entrypoint for parallel HTML-to-DocTags conversion across a dataset.
+def html_main(args: argparse.Namespace | None = None, config_adapter=None) -> int:
+    """Convert HTML documents to DocTags using multiprocessing.
 
     Args:
         args: Optional pre-parsed CLI namespace to override command-line inputs.
+        config_adapter: Optional DoctagsCfg instance from ConfigurationAdapter (new pattern).
+              If provided, bypasses sys.argv parsing and uses this config directly.
 
     Returns:
         Process exit code, where ``0`` denotes success.
@@ -2740,20 +2760,39 @@ def html_main(args: argparse.Namespace | None = None) -> int:
     except Exception:
         pass
 
-    if args is None:
-        namespace = html_parse_args()
-    elif isinstance(args, argparse.Namespace):
-        namespace = args
-        if getattr(namespace, "_cli_explicit_overrides", None) is None:
-            keys = [name for name in vars(namespace) if not name.startswith("_")]
-            annotate_cli_overrides(namespace, explicit=keys, defaults={})
+    # NEW PATH: If adapter provided (from unified CLI), use it directly
+    if config_adapter is not None:
+        cfg = config_adapter
+        config_snapshot = cfg.to_manifest()
+        namespace = argparse.Namespace()
+        for field_def in fields(DoctagsCfg):
+            setattr(namespace, field_def.name, getattr(cfg, field_def.name))
+    # LEGACY PATH: Parse from args or sys.argv
     else:
-        namespace = html_parse_args(args)
+        if args is None:
+            namespace = html_parse_args()
+        elif isinstance(args, argparse.Namespace):
+            namespace = args
+            if getattr(namespace, "_cli_explicit_overrides", None) is None:
+                keys = [name for name in vars(namespace) if not name.startswith("_")]
+                annotate_cli_overrides(namespace, explicit=keys, defaults={})
+        else:
+            namespace = html_parse_args(args)
 
-    cfg = DoctagsCfg.from_args(namespace, mode="html")
-    config_snapshot = cfg.to_manifest()
-    for field_def in fields(DoctagsCfg):
-        setattr(namespace, field_def.name, getattr(cfg, field_def.name))
+        profile = getattr(namespace, "profile", None)
+        defaults = PROFILE_PRESETS.get(profile or "", {})
+
+        # Build config from namespace (legacy: no from_args() available)
+        cfg = DoctagsCfg()
+        cfg.apply_args(namespace, defaults=defaults)
+        cfg.mode = "html"  # Explicit mode for html_main
+        cfg.finalize()
+
+        config_snapshot = cfg.to_manifest()
+        for field_def in fields(DoctagsCfg):
+            setattr(namespace, field_def.name, getattr(cfg, field_def.name))
+        if profile:
+            config_snapshot.setdefault("profile", profile)
 
     log_level = cfg.log_level
     run_id = uuid.uuid4().hex

@@ -17,10 +17,10 @@ Example:
     >>> from DocsToKG.OntologyDownload.network import get_http_client
     >>> from DocsToKG.OntologyDownload.network.retry import create_http_retry_policy
     >>> from DocsToKG.OntologyDownload.network.redirect import safe_get_with_redirect
-    >>> 
+    >>>
     >>> client = get_http_client()
     >>> policy = create_http_retry_policy(max_delay_seconds=30)
-    >>> 
+    >>>
     >>> for attempt in policy:
     ...     with attempt:
     ...         response, hops = safe_get_with_redirect(client, url)
@@ -51,6 +51,11 @@ from DocsToKG.OntologyDownload.network.policy import (
     MAX_CONNECTIONS,
     MAX_KEEPALIVE_CONNECTIONS,
 )
+from DocsToKG.OntologyDownload.network.polite_client import (
+    close_polite_http_client,
+    get_polite_http_client,
+    reset_polite_http_client,
+)
 from DocsToKG.OntologyDownload.network.redirect import (
     MaxRedirectsExceeded,
     MissingLocationHeader,
@@ -74,6 +79,10 @@ __all__ = [
     "get_http_client",
     "close_http_client",
     "reset_http_client",
+    # Polite client (integration)
+    "get_polite_http_client",
+    "close_polite_http_client",
+    "reset_polite_http_client",
     # Timeouts and pooling
     "HTTP_CONNECT_TIMEOUT",
     "HTTP_READ_TIMEOUT",

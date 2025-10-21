@@ -1,0 +1,195 @@
+# Circuit Breaker Configuration for DocsToKG ContentDownload
+#
+# This configuration defines policies for circuit breakers protecting access to resolver
+# endpoints and upstream services. The circuit breaker pattern helps recover gracefully
+# from transient failures and cascading issues.
+#
+# Configuration Precedence (low to high):
+#   1. YAML defaults (this file)
+#   2. Environment variable overlays (DOCSTOKG_BREAKERS_* prefix)
+#   3. CLI argument overrides (--breaker-* flags)
+#
+# Schema Version: Aligned with breakers.BreakerConfig
+
+defaults:
+  # === Failure Threshold ===
+  # Number of consecutive failures before opening the breaker
+  fail_max: 5
+
+  # === Recovery Timeout ===
+  # Seconds to wait before transitioning to half-open (probe) state
+  # Allows the system time to recover before attempting requests again
+  reset_timeout_s: 60
+
+  # === Retry-After Cap ===
+  # Maximum duration (seconds) to honor Retry-After headers from 429/503 responses
+  # Prevents servers from putting breakers into extremely long cooldowns
+  # Default: 900 seconds (15 minutes)
+  retry_after_cap_s: 900
+
+  # === HTTP Status Classification ===
+  classify:
+    # Statuses that count as failures (trigger breaker)
+    # Defaults: [500, 502, 503, 504] (server errors)
+    failure_statuses: [500, 502, 503, 504]
+
+    # Statuses that are neutral (don't affect breaker state)
+    # Examples: 404 (not found), 403 (forbidden), 410 (gone)
+    # These are treated as successful responses from the breaker's perspective
+    # because they indicate the service is working, just the resource isn't available
+    neutral_statuses:
+      [
+        400,
+        401,
+        403,
+        404,
+        405,
+        406,
+        408,
+        410,
+        411,
+        413,
+        414,
+        415,
+        416,
+        418,
+        451,
+      ]
+
+  # === Half-Open State Configuration ===
+  # When breaker is half-open (probing), small jitter desynchronizes probe calls
+  # from multiple workers to avoid thundering herd on the recovering service
+  half_open:
+    jitter_ms: 150 # Stagger probe calls by 0-150ms
+
+  # === Role-Specific Overrides ===
+  # Define per-role thresholds (metadata, landing, artifact downloads)
+  # Roles can have different sensitivity; e.g., metadata APIs are critical and fail faster
+  roles:
+    metadata:
+      # Lower threshold for metadata endpoints - they're critical path
+      fail_max: 3
+      reset_timeout_s: 45
+      # Half-open: require 2 successes before closing (safer for metadata)
+      success_threshold: 2
+
+    landing:
+      # Landing pages are less critical
+      fail_max: 5
+      reset_timeout_s: 60
+
+    artifact:
+      # Artifact downloads can tolerate more failures
+      fail_max: 8
+      reset_timeout_s: 120
+
+# === Advanced Policies ===
+advanced:
+  # === Rolling Window Policy ===
+  # Detects burst failures and temporarily opens breaker
+  # This is separate from the consecutive-failure breaker (fail_max)
+  rolling:
+    enabled: true
+    # Trigger: if this many failures occur within...
+    threshold_failures: 3
+    # ...this many seconds, manually open the breaker
+    window_s: 10
+    # Open the breaker for this duration after detecting burst
+    cooldown_s: 30
+
+# === Host-Specific Policies ===
+# Override defaults for specific hosts. Useful for flaky or strict endpoints.
+# Host keys are normalized to lowercase punycode, e.g., "api.crossref.org", "export.arxiv.org"
+hosts:
+  api.crossref.org:
+    # Crossref is usually stable but rate-limited; be conservative
+    fail_max: 6
+    reset_timeout_s: 90
+    retry_after_cap_s: 600 # Cap at 10 minutes for Crossref
+
+  export.arxiv.org:
+    # ArXiv is sometimes slow but stable; higher threshold
+    fail_max: 10
+    reset_timeout_s: 120
+    # ArXiv doesn't usually send long Retry-After, but be safe
+    retry_after_cap_s: 600
+
+  api.openalex.org:
+    # OpenAlex is usually reliable, but fast recovery
+    fail_max: 4
+    reset_timeout_s: 45
+    retry_after_cap_s: 300 # Short cap; fast retries
+
+  api.semanticscholar.org:
+    # Semantic Scholar can be flaky; be patient with recovery
+    fail_max: 7
+    reset_timeout_s: 150
+    retry_after_cap_s: 900
+
+  unpaywall.org:
+    # Unpaywall is external; be lenient
+    fail_max: 8
+    reset_timeout_s: 120
+    retry_after_cap_s: 900
+
+# === Resolver-Specific Policies ===
+# Optional: override breaker behavior for specific resolvers globally
+# (less common than host-specific policies)
+resolvers:
+  # Example: if the 'wayback' resolver has known issues
+  # wayback:
+  #   fail_max: 4
+  #   reset_timeout_s: 120
+# ============================================================================
+# USAGE EXAMPLES
+# ============================================================================
+
+# 1. Load this config:
+#    python -m DocsToKG.ContentDownload.cli \
+#      --resolver-config path/to/resolver-config.yaml \
+#      --out runs/content --topic "machine learning" --year-start 2023 --year-end 2024
+
+# 2. Override via CLI flags:
+#    --breaker-defaults fail_max=8 reset_timeout_s=90
+#    --breaker-host api.crossref.org fail_max=10 reset_timeout_s=120
+#    --breaker-rolling threshold=5 window=15 cooldown=60
+
+# 3. Override via environment variables:
+#    export DOCSTOKG_BREAKERS_YAML=/path/to/this/file
+#    export DOCSTOKG_BREAKERS_HOST_crossref_fail_max=10
+#    export DOCSTOKG_BREAKERS_ROLLING_THRESHOLD=5
+
+# 4. Inspect breaker state:
+#    python -m DocsToKG.ContentDownload.cli breaker show
+#    python -m DocsToKG.ContentDownload.cli breaker show --host api.crossref.org
+
+# 5. Force-open breaker for maintenance:
+#    python -m DocsToKG.ContentDownload.cli breaker open api.crossref.org \
+#      --seconds 600 --reason "maintenance window"
+
+# 6. Analyze and suggest tuning:
+#    python -m DocsToKG.ContentDownload.cli breaker-advise --window-s 600
+
+# ============================================================================
+# BEST PRACTICES
+# ============================================================================
+
+# 1. Start conservative (higher fail_max, longer recovery time)
+#    Monitor telemetry and reduce thresholds as needed
+
+# 2. Align reset_timeout_s with expected recovery time
+#    Too short: constant probing; too long: extended downtime
+
+# 3. Use role-specific overrides for critical paths (metadata)
+#    Keep metadata APIs aggressive; allow landing/artifact more slack
+
+# 4. Rolling window catches burst failures
+#    Set threshold low (3-5) to detect patterns early
+
+# 5. Retry-After caps prevent malicious or misconfigured servers
+#    from locking up your breaker for hours
+
+# 6. Monitor telemetry via:
+#    - manifest.sqlite3 breaker_events table
+#    - manifest.metrics.json breaker statistics
+#    - CLI: breaker-advise command for recommendations

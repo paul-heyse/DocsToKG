@@ -58,6 +58,8 @@ from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Set, 
 from pyalex import Topics, Works
 from pyrate_limiter import Duration, Rate
 
+from DocsToKG.ContentDownload.cache_loader import load_cache_config
+from DocsToKG.ContentDownload.cache_policy import CacheRouter
 from DocsToKG.ContentDownload.core import (
     DEFAULT_MIN_PDF_BYTES,
     DEFAULT_SNIFF_BYTES,
@@ -78,11 +80,10 @@ from DocsToKG.ContentDownload.ratelimit import (
     get_rate_limiter_manager,
     validate_policies,
 )
+from DocsToKG.ContentDownload.ratelimits_loader import load_rate_config
 from DocsToKG.ContentDownload.resolvers import DEFAULT_RESOLVER_ORDER, default_resolvers
 from DocsToKG.ContentDownload.telemetry import ManifestUrlIndex
 from DocsToKG.ContentDownload.urls import configure_url_policy, parse_param_allowlist_spec
-from DocsToKG.ContentDownload.cache_loader import CacheConfig, load_cache_config
-from DocsToKG.ContentDownload.cache_policy import CacheRouter
 
 __all__ = [
     "ResolvedConfig",
@@ -133,6 +134,7 @@ class ResolvedConfig:
     retry_after_cap: float
     rate_policies: Mapping[str, RolePolicy]
     rate_backend: BackendConfig
+    rate_config: Optional[Any] = None  # RateConfig from ratelimits_loader
     cache_config: Optional[Any] = None  # CacheConfig from cache_loader
     cache_disabled: bool = False  # If True, bypass all caching
 
@@ -256,6 +258,35 @@ def build_parser() -> argparse.ArgumentParser:
         default=[],
         metavar="HOST.ROLE=MS",
         help="Override maximum wait milliseconds for a specific host role (e.g., host.artifact=5000).",
+    )
+    rate_group.add_argument(
+        "--rate-backend",
+        dest="rate_backend",
+        default=None,
+        choices=["memory", "sqlite", "redis", "postgres"],
+        help="Pyrate-limiter backend for rate limiting storage (default: memory).",
+    )
+    rate_group.add_argument(
+        "--rate-max-inflight",
+        dest="rate_max_inflight",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Global in-flight request ceiling (default: 500).",
+    )
+    rate_group.add_argument(
+        "--rate-aimd-enabled",
+        dest="rate_aimd_enabled",
+        action="store_true",
+        help="Enable AIMD dynamic rate tuning based on 429 responses (default: disabled).",
+    )
+    rate_group.add_argument(
+        "--rate-config",
+        dest="rate_config_path",
+        type=Path,
+        default=None,
+        metavar="PATH",
+        help="Path to ratelimits.yaml configuration file.",
     )
 
     url_group = parser.add_argument_group("URL normalization")
@@ -1310,6 +1341,64 @@ def resolve_config(
     else:
         cache_config = None
 
+    # Phase 7: Load Pyrate-Limiter rate limiting configuration
+    rate_config_path = _expand_path(getattr(args, "rate_config_path", None))
+    rate_config = None
+
+    if rate_config_path:
+        try:
+            rate_config = load_rate_config(
+                rate_config_path,
+                env=os.environ,
+                cli_backend=getattr(args, "rate_backend", None),
+                cli_global_max_inflight=getattr(args, "rate_max_inflight", None),
+                cli_aimd_enabled=getattr(args, "rate_aimd_enabled", False),
+            )
+            LOGGER.info(
+                "Loaded Pyrate-Limiter rate config from %s with %d hosts",
+                rate_config_path,
+                len(rate_config.hosts),
+            )
+            if LOGGER.isEnabledFor(logging.DEBUG):
+                LOGGER.debug(
+                    "Rate config backend: %s, global_max_inflight: %s, AIMD: %s",
+                    rate_config.backend.kind,
+                    rate_config.global_max_inflight,
+                    rate_config.aimd.enabled,
+                )
+        except Exception as exc:
+            LOGGER.warning(
+                "Failed to load Pyrate-Limiter rate config from %s: %s; continuing with defaults",
+                rate_config_path,
+                exc,
+            )
+            rate_config = None
+    else:
+        # Try loading with defaults if CLI overrides are provided
+        if (
+            getattr(args, "rate_backend", None)
+            or getattr(args, "rate_max_inflight", None) is not None
+            or getattr(args, "rate_aimd_enabled", False)
+        ):
+            try:
+                rate_config = load_rate_config(
+                    None,
+                    env=os.environ,
+                    cli_backend=getattr(args, "rate_backend", None),
+                    cli_global_max_inflight=getattr(args, "rate_max_inflight", None),
+                    cli_aimd_enabled=getattr(args, "rate_aimd_enabled", False),
+                )
+                LOGGER.info(
+                    "Loaded Pyrate-Limiter defaults with CLI overrides (backend: %s)",
+                    rate_config.backend.kind,
+                )
+            except Exception as exc:
+                LOGGER.warning(
+                    "Failed to load Pyrate-Limiter config with CLI overrides: %s; continuing with defaults",
+                    exc,
+                )
+                rate_config = None
+
     return ResolvedConfig(
         args=args,
         run_id=run_id,
@@ -1334,6 +1423,7 @@ def resolve_config(
         retry_after_cap=args.retry_after_cap,
         rate_policies=rate_policies,
         rate_backend=backend_config,
+        rate_config=rate_config,  # This field is now populated.
         cache_config=cache_config,
         cache_disabled=cache_disabled,
     )

@@ -97,7 +97,7 @@ from DocsToKG.ContentDownload.core import (
 from DocsToKG.ContentDownload.urls import canonical_for_index
 
 MANIFEST_SCHEMA_VERSION = 5
-SQLITE_SCHEMA_VERSION = 7
+SQLITE_SCHEMA_VERSION = 8
 CSV_HEADER_TOKENS = {"run_id", "work_id"}
 
 
@@ -572,6 +572,32 @@ class AttemptSink(Protocol):
     def __exit__(self, exc_type, exc, tb) -> None:  # pragma: no cover - structural typing helper
         """Exit the runtime context for the sink."""
 
+    def log_fallback_attempt(self, event: Mapping[str, Any]) -> None:
+        """Log a single fallback resolution attempt.
+
+        Args:
+            event: Fallback attempt metadata (tier, source, outcome, elapsed_ms, etc.).
+
+        Returns:
+            None
+
+        Raises:
+            Exception: Implementations may propagate write failures.
+        """
+
+    def log_fallback_summary(self, event: Mapping[str, Any]) -> None:
+        """Log the overall summary of a fallback resolution attempt.
+
+        Args:
+            event: Fallback summary (attempts_used, tiers_tried, total_elapsed_ms, etc.).
+
+        Returns:
+            None
+
+        Raises:
+            Exception: Implementations may propagate write failures.
+        """
+
 
 def _utc_timestamp() -> str:
     """Return the current time as an ISO 8601 UTC timestamp."""
@@ -680,10 +706,18 @@ class RunTelemetry(AttemptSink):
 
     def log_breaker_event(self, event: Mapping[str, Any]) -> None:
         """Forward breaker telemetry events to the underlying sink."""
+        if hasattr(self._sink, "log_breaker_event"):
+            self._sink.log_breaker_event(event)
 
-        payload = dict(event)
-        payload.setdefault("timestamp", _utc_timestamp())
-        self._sink.log_breaker_event(payload)
+    def log_fallback_attempt(self, event: Mapping[str, Any]) -> None:
+        """Forward fallback attempt events to the underlying sink."""
+        if hasattr(self._sink, "log_fallback_attempt"):
+            self._sink.log_fallback_attempt(event)
+
+    def log_fallback_summary(self, event: Mapping[str, Any]) -> None:
+        """Forward fallback summary events to the underlying sink."""
+        if hasattr(self._sink, "log_fallback_summary"):
+            self._sink.log_fallback_summary(event)
 
     def emit(self, event: Mapping[str, Any]) -> None:
         """Compatibility helper for :class:`NetworkBreakerListener`."""
@@ -870,7 +904,9 @@ class JsonlSink:
                 "reason": (
                     record.reason.value
                     if isinstance(record.reason, ReasonCode)
-                    else record.reason if record.reason is not None else None
+                    else record.reason
+                    if record.reason is not None
+                    else None
                 ),
                 "reason_detail": getattr(record, "reason_detail", None),
                 "metadata": record.metadata,
@@ -937,6 +973,20 @@ class JsonlSink:
         """Append a breaker telemetry event to the JSONL log."""
 
         payload = {"record_type": "breaker_event", **dict(event)}
+        payload.setdefault("timestamp", _utc_timestamp())
+        self._write(payload)
+
+    def log_fallback_attempt(self, event: Mapping[str, Any]) -> None:
+        """Append a fallback attempt event to the JSONL log."""
+
+        payload = {"record_type": "fallback_attempt", **dict(event)}
+        payload.setdefault("timestamp", _utc_timestamp())
+        self._write(payload)
+
+    def log_fallback_summary(self, event: Mapping[str, Any]) -> None:
+        """Append a fallback summary event to the JSONL log."""
+
+        payload = {"record_type": "fallback_summary", **dict(event)}
         payload.setdefault("timestamp", _utc_timestamp())
         self._write(payload)
 
@@ -1085,7 +1135,9 @@ class CsvSink:
             "reason": (
                 record.reason.value
                 if isinstance(record.reason, ReasonCode)
-                else record.reason if record.reason is not None else None
+                else record.reason
+                if record.reason is not None
+                else None
             ),
             "reason_detail": getattr(record, "reason_detail", None) or "",
             "sha256": record.sha256,
@@ -1116,6 +1168,16 @@ class CsvSink:
 
     def log_breaker_event(self, event: Mapping[str, Any]) -> None:  # pragma: no cover
         """Ignore breaker events for CSV sinks."""
+
+        return None
+
+    def log_fallback_attempt(self, event: Mapping[str, Any]) -> None:  # pragma: no cover
+        """Ignore fallback attempts for CSV sinks."""
+
+        return None
+
+    def log_fallback_summary(self, event: Mapping[str, Any]) -> None:  # pragma: no cover
+        """Ignore fallback summaries for CSV sinks."""
 
         return None
 
@@ -1164,6 +1226,20 @@ class MultiSink:
 
         for sink in self._sinks:
             sink.log_breaker_event(event)
+
+    def log_fallback_attempt(self, event: Mapping[str, Any]) -> None:
+        """Fan out fallback attempt events to each sink."""
+
+        for sink in self._sinks:
+            if hasattr(sink, "log_fallback_attempt"):
+                sink.log_fallback_attempt(event)
+
+    def log_fallback_summary(self, event: Mapping[str, Any]) -> None:
+        """Fan out fallback summary events to each sink."""
+
+        for sink in self._sinks:
+            if hasattr(sink, "log_fallback_summary"):
+                sink.log_fallback_summary(event)
 
     def close(self) -> None:
         """Close sinks while capturing the first raised exception."""
@@ -1251,6 +1327,16 @@ class ManifestIndexSink:
     def __exit__(self, exc_type, exc, tb) -> None:
         self.close()
 
+    def log_fallback_attempt(self, event: Mapping[str, Any]) -> None:  # pragma: no cover - no-op
+        """Fallback events are ignored by the manifest index sink."""
+
+        return None
+
+    def log_fallback_summary(self, event: Mapping[str, Any]) -> None:  # pragma: no cover - no-op
+        """Fallback summary events are ignored by the manifest index sink."""
+
+        return None
+
 
 class LastAttemptCsvSink:
     """Write a CSV snapshot containing the most recent manifest entry per work."""
@@ -1292,6 +1378,16 @@ class LastAttemptCsvSink:
 
     def log_breaker_event(self, event: Mapping[str, Any]) -> None:  # pragma: no cover - no-op
         """Breaker events are ignored by the last-attempt CSV sink."""
+
+        return None
+
+    def log_fallback_attempt(self, event: Mapping[str, Any]) -> None:  # pragma: no cover - no-op
+        """Fallback attempts are ignored by the last-attempt CSV sink."""
+
+        return None
+
+    def log_fallback_summary(self, event: Mapping[str, Any]) -> None:  # pragma: no cover - no-op
+        """Fallback summaries are ignored by the last-attempt CSV sink."""
 
         return None
 
@@ -1394,6 +1490,16 @@ class SummarySink:
 
         return None
 
+    def log_fallback_attempt(self, event: Mapping[str, Any]) -> None:  # pragma: no cover - no-op
+        """Fallback attempts are not persisted in the summary sink."""
+
+        return None
+
+    def log_fallback_summary(self, event: Mapping[str, Any]) -> None:  # pragma: no cover - no-op
+        """Fallback summaries are not persisted in the summary sink."""
+
+        return None
+
     def close(self) -> None:
         """Write the captured summary to disk exactly once."""
 
@@ -1493,7 +1599,9 @@ class SqliteSink:
                     (
                         record.reason.value
                         if isinstance(record.reason, ReasonCode)
-                        else record.reason if record.reason is not None else None
+                        else record.reason
+                        if record.reason is not None
+                        else None
                     ),
                     getattr(record, "reason_detail", None),
                     metadata_json,
@@ -1632,6 +1740,77 @@ class SqliteSink:
                         host,
                         scope,
                         resolver,
+                        payload,
+                    ),
+                )
+                self._conn.commit()
+
+    def log_fallback_attempt(self, event: Mapping[str, Any]) -> None:
+        """Persist a fallback resolution attempt event."""
+
+        timestamp = event.get("timestamp") or _utc_timestamp()
+        run_id = event.get("run_id")
+        work_id = event.get("work_id")
+        artifact_id = event.get("artifact_id")
+        tier = event.get("tier")
+        source = event.get("source")
+        outcome = event.get("outcome")
+        reason = event.get("reason")
+        elapsed_ms = event.get("elapsed_ms", 0)
+        status = event.get("status")
+        host = event.get("host")
+        payload = json.dumps(dict(event), sort_keys=True)
+
+        with locks.sqlite_lock(self._path):
+            with self._lock:
+                self._conn.execute(
+                    """
+                    INSERT INTO fallback_events
+                    (timestamp, run_id, work_id, artifact_id, tier, source, outcome, reason, elapsed_ms, status, host, payload)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        timestamp,
+                        run_id,
+                        work_id,
+                        artifact_id,
+                        tier,
+                        source,
+                        outcome,
+                        reason,
+                        elapsed_ms,
+                        status,
+                        host,
+                        payload,
+                    ),
+                )
+                self._conn.commit()
+
+    def log_fallback_summary(self, event: Mapping[str, Any]) -> None:
+        """Persist a fallback summary event (optional: can be logged as attempt with special marker)."""
+
+        # For now, we log summaries the same way as attempts but with outcome="summary"
+        # This allows tracking at both attempt and summary levels
+        timestamp = event.get("timestamp") or _utc_timestamp()
+        run_id = event.get("run_id")
+        work_id = event.get("work_id")
+        artifact_id = event.get("artifact_id")
+        payload = json.dumps(dict(event), sort_keys=True)
+
+        with locks.sqlite_lock(self._path):
+            with self._lock:
+                self._conn.execute(
+                    """
+                    INSERT INTO fallback_events
+                    (timestamp, run_id, work_id, artifact_id, outcome, payload)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        timestamp,
+                        run_id,
+                        work_id,
+                        artifact_id,
+                        "summary",
                         payload,
                     ),
                 )
@@ -1777,6 +1956,25 @@ class SqliteSink:
             )
             """
         )
+        self._conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS fallback_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT,
+                run_id TEXT,
+                work_id TEXT,
+                artifact_id TEXT,
+                tier TEXT,
+                source TEXT,
+                outcome TEXT,
+                reason TEXT,
+                elapsed_ms INTEGER,
+                status INTEGER,
+                host TEXT,
+                payload TEXT
+            )
+            """
+        )
         if current_version < SQLITE_SCHEMA_VERSION:
             self._run_migrations(current_version)
         self._conn.execute(f"PRAGMA user_version={SQLITE_SCHEMA_VERSION}")
@@ -1828,6 +2026,27 @@ class SqliteSink:
                     host TEXT,
                     scope TEXT,
                     resolver TEXT,
+                    payload TEXT
+                )
+                """
+            )
+
+        if current_version < 8:
+            self._conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS fallback_events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp TEXT,
+                    run_id TEXT,
+                    work_id TEXT,
+                    artifact_id TEXT,
+                    tier TEXT,
+                    source TEXT,
+                    outcome TEXT,
+                    reason TEXT,
+                    elapsed_ms INTEGER,
+                    status INTEGER,
+                    host TEXT,
                     payload TEXT
                 )
                 """
@@ -2240,7 +2459,9 @@ def iter_previous_manifest_entries(
                         qualifier = (
                             "newer"
                             if schema_version > MANIFEST_SCHEMA_VERSION
-                            else "older" if schema_version < MANIFEST_SCHEMA_VERSION else "unknown"
+                            else "older"
+                            if schema_version < MANIFEST_SCHEMA_VERSION
+                            else "unknown"
                         )
                         raise ValueError(
                             "Unsupported manifest schema_version {observed} ({qualifier}); expected version {expected}. "

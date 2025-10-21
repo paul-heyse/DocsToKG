@@ -1,0 +1,202 @@
+################################################################################
+# Fallback & Resiliency Strategy Configuration
+################################################################################
+#
+# This configuration defines the multi-tiered PDF resolution strategy for the
+# ContentDownload module. It specifies:
+#   - Tier ordering and parallelism (which sources to try, when, and how many)
+#   - Budget constraints (time, attempts, concurrency)
+#   - Per-source policies (timeouts, retries, robots respect)
+#   - Health gates (breaker behavior, offline mode, rate limiting)
+#
+# The configuration is loaded from:
+#   1. This YAML file (default)
+#   2. Environment variables (DOCSTOKG_FALLBACK_*)
+#   3. CLI arguments (--fallback-* flags)
+#
+# Precedence: CLI > Environment > YAML
+#
+################################################################################
+
+# Budgets: Global constraints for the entire resolution process
+#
+# These limits apply across ALL tiers and sources combined.
+budgets:
+  # Maximum time to spend on PDF resolution (milliseconds)
+  total_timeout_ms: 120_000 # 2 minutes
+
+  # Maximum total attempts across all sources
+  total_attempts: 20
+
+  # Maximum concurrent threads across all tiers
+  max_concurrent: 3
+
+  # Default timeout per source (milliseconds)
+  per_source_timeout_ms: 10_000 # 10 seconds
+
+# Tiers: Sequential resolution stages
+#
+# Within each tier, sources run in parallel (up to tier.parallel limit).
+# Execution proceeds tier-by-tier; stops immediately upon first success.
+tiers:
+  # Tier 1: Direct Open Access
+  #   Tries: Unpaywall (cached API), arXiv (direct), PMC (direct)
+  #   Parallelism: 2 (Unpaywall + arXiv in parallel, then PMC)
+  #   Why: Fast, reliable, direct links
+  - name: direct_oa
+    parallel: 2
+    sources:
+      - unpaywall_pdf
+      - arxiv_pdf
+      - pmc_pdf
+
+  # Tier 2: DOI Redirect
+  #   Tries: Follow DOI to landing page, extract PDF
+  #   Parallelism: 1 (serial)
+  #   Why: Covers publisher-specific PDFs
+  - name: doi_follow
+    parallel: 1
+    sources:
+      - doi_redirect_pdf
+
+  # Tier 3: Landing Page Scrape & Europe PMC
+  #   Tries: Scrape landing page for PDFs, query Europe PMC API
+  #   Parallelism: 2
+  #   Why: Catches citations, biomedical focus
+  - name: landing_scrape
+    parallel: 2
+    sources:
+      - landing_scrape_pdf
+      - europe_pmc_pdf
+
+  # Tier 4: Archive (Wayback Machine)
+  #   Tries: Query Wayback CDX for archived PDFs
+  #   Parallelism: 1 (serial)
+  #   Why: Last resort for old articles
+  - name: archive
+    parallel: 1
+    sources:
+      - wayback_pdf
+
+# Policies: Per-source configuration
+#
+# Each source has a policy defining timeout, retry behavior, and politeness.
+policies:
+  # Unpaywall: REST API for Open Access
+  unpaywall_pdf:
+    timeout_ms: 6_000
+    retries_max: 2
+    robots_respect: false
+
+  # arXiv: Direct PDF URL construction
+  arxiv_pdf:
+    timeout_ms: 8_000
+    retries_max: 3
+    robots_respect: false
+
+  # PubMed Central: Direct URL construction
+  pmc_pdf:
+    timeout_ms: 8_000
+    retries_max: 3
+    robots_respect: false
+
+  # DOI Redirect: Follow chains, scrape HTML
+  doi_redirect_pdf:
+    timeout_ms: 10_000
+    retries_max: 2
+    robots_respect: true # Respect landing pages
+
+  # Landing Page Scrape: Fetch and parse HTML
+  landing_scrape_pdf:
+    timeout_ms: 12_000
+    retries_max: 2
+    robots_respect: true
+
+  # Europe PMC: REST API for biomedical articles
+  europe_pmc_pdf:
+    timeout_ms: 6_000
+    retries_max: 2
+    robots_respect: false
+
+  # Wayback Machine: CDX API + archive access
+  wayback_pdf:
+    timeout_ms: 10_000
+    retries_max: 1
+    robots_respect: false
+
+# Gates: Health checks and adaptive behavior
+#
+# Gates determine when to skip attempts based on system state.
+gates:
+  # Skip attempts if circuit breaker is open (host is unhealthy)
+  skip_if_breaker_open: true
+
+  # Skip artifact attempts in offline mode
+  # "metadata_only": only metadata APIs (Unpaywall, Europe PMC)
+  # "block_all": block all attempts
+  # "cache_only": use only cached responses
+  offline_behavior: metadata_only
+
+  # Skip attempts if rate limiter would wait too long
+  skip_if_rate_wait_exceeds_ms: 5_000
+
+# Thresholds: Tuning for retry behavior
+#
+# These control when adapters classify outcomes as retryable vs terminal.
+thresholds:
+  # HTTP statuses to treat as retryable (transient)
+  retryable_statuses:
+    - 429 # Too Many Requests
+    - 502 # Bad Gateway
+    - 503 # Service Unavailable
+    - 504 # Gateway Timeout
+
+  # HTTP statuses to treat as terminal (non-retryable)
+  terminal_statuses:
+    - 400 # Bad Request
+    - 401 # Unauthorized
+    - 403 # Forbidden
+    - 404 # Not Found
+    - 405 # Method Not Allowed
+    - 410 # Gone
+
+# Metadata: Configuration version and schema
+#
+# Used to detect incompatible configurations.
+metadata:
+  version: "1.0"
+  schema_version: 1
+  created: "2025-10-21"
+  updated: "2025-10-21"
+################################################################################
+# TUNING GUIDE
+################################################################################
+#
+# To optimize for different scenarios:
+#
+# FAST RESOLUTION (prioritize speed):
+#   1. Reduce total_timeout_ms to 60_000
+#   2. Reduce max_concurrent to 2
+#   3. Remove wayback tier
+#   4. Reduce per-source timeouts by 50%
+#
+# HIGH RELIABILITY (maximize success rate):
+#   1. Increase total_timeout_ms to 180_000
+#   2. Increase total_attempts to 30
+#   3. Add more tiers or sources
+#   4. Increase per-source timeouts
+#   5. Set parallel=1 for all tiers (serial)
+#
+# RESOURCE CONSTRAINED:
+#   1. Reduce total_timeout_ms to 30_000
+#   2. Reduce max_concurrent to 1
+#   3. Remove landing_scrape tier
+#   4. Set parallel=1 everywhere
+#
+# BANDWIDTH CONSTRAINED:
+#   1. Reduce per-source timeouts
+#   2. Skip wayback tier (high latency)
+#   3. Increase robots_respect to true
+#   4. Reduce total_attempts
+#
+################################################################################

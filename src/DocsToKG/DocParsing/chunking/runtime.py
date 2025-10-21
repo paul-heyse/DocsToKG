@@ -1050,7 +1050,9 @@ def _chunk_stage_worker(item: WorkItem) -> ItemOutcome:
             "sanitizer_profile": sanitizer_profile,
             "anchors_injected": bool(config.inject_anchors),
         }
-        return ItemOutcome(status="failure", duration_s=duration, manifest=manifest, result={}, error=err)
+        return ItemOutcome(
+            status="failure", duration_s=duration, manifest=manifest, result={}, error=err
+        )
 
     if result.status != "success":
         error_message = result.error or "unknown error"
@@ -1073,7 +1075,9 @@ def _chunk_stage_worker(item: WorkItem) -> ItemOutcome:
             "chunk_count": result.chunk_count,
             "anchors_injected": result.anchors_injected,
         }
-        return ItemOutcome(status="failure", duration_s=result.duration_s, manifest=manifest, result={}, error=err)
+        return ItemOutcome(
+            status="failure", duration_s=result.duration_s, manifest=manifest, result={}, error=err
+        )
 
     _write_fingerprint(fingerprint_path, input_sha256=input_hash, cfg_hash=cfg_hash)
 
@@ -1094,7 +1098,13 @@ def _chunk_stage_worker(item: WorkItem) -> ItemOutcome:
         "total_tokens": result.total_tokens,
         "anchors_injected": result.anchors_injected,
     }
-    return ItemOutcome(status="success", duration_s=result.duration_s, manifest=manifest, result=result_payload, error=None)
+    return ItemOutcome(
+        status="success",
+        duration_s=result.duration_s,
+        manifest=manifest,
+        result=result_payload,
+        error=None,
+    )
 
 
 def _make_chunk_stage_hooks(
@@ -1153,7 +1163,13 @@ def _make_chunk_stage_hooks(
                     **rel_fields,
                 )
                 payload = dict(outcome_or_error.manifest)
-                for key in ("input_path", "input_hash", "output_path", "schema_version", "hash_alg"):
+                for key in (
+                    "input_path",
+                    "input_hash",
+                    "output_path",
+                    "schema_version",
+                    "hash_alg",
+                ):
                     payload.pop(key, None)
                 manifest_log_success(
                     stage=MANIFEST_STAGE,
@@ -1205,7 +1221,14 @@ def _make_chunk_stage_hooks(
                 **rel_fields,
             )
             payload = dict(outcome_or_error.manifest)
-            for key in ("input_path", "input_hash", "output_path", "schema_version", "hash_alg", "error"):
+            for key in (
+                "input_path",
+                "input_hash",
+                "output_path",
+                "schema_version",
+                "hash_alg",
+                "error",
+            ):
                 payload.pop(key, None)
             manifest_log_failure(
                 stage=MANIFEST_STAGE,
@@ -1266,15 +1289,17 @@ def _make_chunk_stage_hooks(
     )
 
 
-
 def _main_inner(
     args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = None,
+    config_adapter=None,
 ) -> int:
     """CLI driver that chunks DocTags files and enforces minimum token thresholds.
 
     Args:
         args (argparse.Namespace | None): Optional CLI namespace supplied during
             testing or orchestration.
+        config_adapter: Optional ChunkerCfg instance from ConfigurationAdapter (new pattern).
+              If provided, bypasses sys.argv parsing and uses this config directly.
 
     Returns:
         int: Exit code where ``0`` indicates success.
@@ -1287,31 +1312,46 @@ def _main_inner(
         data_chunks(bootstrap_root)
     except Exception as exc:
         logging.getLogger(__name__).debug("Failed to bootstrap chunking directories", exc_info=exc)
-    if args is None:
-        namespace = parse_args_with_overrides(parser)
-    elif isinstance(args, argparse.Namespace):
-        namespace = args
-        if getattr(namespace, "_cli_explicit_overrides", None) is None:
-            keys = [name for name in vars(namespace) if not name.startswith("_")]
-            annotate_cli_overrides(namespace, explicit=keys, defaults={})
-    elif isinstance(args, SimpleNamespace) or hasattr(args, "__dict__"):
-        base = parse_args_with_overrides(parser, [])
-        payload = {key: value for key, value in vars(args).items() if not key.startswith("_")}
-        for key, value in payload.items():
-            setattr(base, key, value)
-        annotate_cli_overrides(base, explicit=payload.keys(), defaults={})
-        namespace = base
-    else:
-        namespace = parse_args_with_overrides(parser, args)
 
-    profile = getattr(namespace, "profile", None)
-    defaults = CHUNK_PROFILE_PRESETS.get(profile or "", {})
-    cfg = ChunkerCfg.from_args(namespace, defaults=defaults)
-    base_config = cfg.to_manifest()
-    if profile:
-        base_config.setdefault("profile", profile)
-    for field_def in fields(ChunkerCfg):
-        setattr(namespace, field_def.name, getattr(cfg, field_def.name))
+    # NEW PATH: If adapter provided (from unified CLI), use it directly
+    if config_adapter is not None:
+        cfg = config_adapter
+        base_config = cfg.to_manifest()
+        namespace = argparse.Namespace()
+        for field_def in fields(ChunkerCfg):
+            setattr(namespace, field_def.name, getattr(cfg, field_def.name))
+    # LEGACY PATH: Parse from args or sys.argv
+    else:
+        if args is None:
+            namespace = parse_args_with_overrides(parser)
+        elif isinstance(args, argparse.Namespace):
+            namespace = args
+            if getattr(namespace, "_cli_explicit_overrides", None) is None:
+                keys = [name for name in vars(namespace) if not name.startswith("_")]
+                annotate_cli_overrides(namespace, explicit=keys, defaults={})
+        elif isinstance(args, SimpleNamespace) or hasattr(args, "__dict__"):
+            base = parse_args_with_overrides(parser, [])
+            payload = {key: value for key, value in vars(args).items() if not key.startswith("_")}
+            for key, value in payload.items():
+                setattr(base, key, value)
+            annotate_cli_overrides(base, explicit=payload.keys(), defaults={})
+            namespace = base
+        else:
+            namespace = parse_args_with_overrides(parser, args)
+
+        profile = getattr(namespace, "profile", None)
+        defaults = CHUNK_PROFILE_PRESETS.get(profile or "", {})
+
+        # Build config from namespace (legacy: no from_args() available)
+        cfg = ChunkerCfg()
+        cfg.apply_args(namespace, defaults=defaults)
+        cfg.finalize()
+
+        base_config = cfg.to_manifest()
+        if profile:
+            base_config.setdefault("profile", profile)
+        for field_def in fields(ChunkerCfg):
+            setattr(namespace, field_def.name, getattr(cfg, field_def.name))
 
     log_level = getattr(namespace, "log_level", "INFO")
     run_id = uuid.uuid4().hex
@@ -1594,7 +1634,7 @@ def _main_inner(
                 in_dir=in_dir,
                 out_dir=out_dir,
                 telemetry=stage_telemetry,
-        )
+            )
             return 0
 
         chunk_config = ChunkWorkerConfig(

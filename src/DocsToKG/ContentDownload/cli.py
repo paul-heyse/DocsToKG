@@ -34,6 +34,9 @@ from DocsToKG.ContentDownload.args import (
     resolve_config,
     resolve_topic_id_if_needed,
 )
+from DocsToKG.ContentDownload.breakers import BreakerRegistry
+
+# Phase 4/5: Breaker CLI integration
 from DocsToKG.ContentDownload.core import (
     DEFAULT_MIN_PDF_BYTES,
     DEFAULT_SNIFF_BYTES,
@@ -79,11 +82,6 @@ from DocsToKG.ContentDownload.telemetry import (
     SummarySink,
     load_previous_manifest,
 )
-
-# Phase 4/5: Breaker CLI integration
-from DocsToKG.ContentDownload.cli_breakers import install_breaker_cli
-from DocsToKG.ContentDownload.cli_breaker_advisor import install_breaker_advisor_cli
-from DocsToKG.ContentDownload.breakers import BreakerRegistry
 
 __all__ = (
     "AttemptSink",
@@ -153,10 +151,11 @@ def _make_breaker_registry():
     and runtime configuration happens in Phase 10 (runner integration).
     """
     try:
+        import tempfile
+        from pathlib import Path
+
         from DocsToKG.ContentDownload.breakers import BreakerConfig
         from DocsToKG.ContentDownload.sqlite_cooldown_store import SQLiteCooldownStore
-        from pathlib import Path
-        import tempfile
 
         # Create minimal config for CLI-only operations
         cfg = BreakerConfig()
@@ -186,6 +185,12 @@ def main(argv: Optional[Sequence[str]] = None) -> RunResult:
     LOGGER.setLevel(log_level)
     resolved = resolve_config(args, parser, resolver_factory=default_resolvers)
     bootstrap_run_environment(resolved)
+
+    # Phase 7: Initialize rate limiter with resolved configuration
+    from DocsToKG.ContentDownload.httpx_transport import initialize_rate_limiter_from_config
+
+    initialize_rate_limiter_from_config(resolved.rate_config)
+
     download_run = DownloadRun(resolved)
     download_run.iterate_openalex_func = iterate_openalex
     download_run.download_candidate_func = download_candidate

@@ -1,0 +1,208 @@
+================================================================================
+  OPTIMIZATION 9: FALLBACK & RESILIENCY STRATEGY - IMPLEMENTATION PLAN READY
+================================================================================
+
+STATUS: ✅ DETAILED PLAN COMPLETE & READY TO BEGIN IMPLEMENTATION
+DATE: October 21, 2025
+
+================================================================================
+EXECUTIVE SUMMARY
+================================================================================
+
+Optimization 9 introduces a deterministic, tiered fallback strategy for PDF 
+resolution. It attempts multiple sources in priority order with budgeted 
+execution, health gates, and automatic cancellation when a valid PDF is found.
+
+Key Features:
+  • 7 source adapters (Unpaywall → arXiv → PMC → DOI → Landing → EPMC → Wayback)
+  • Tiered execution with parallelism (2-3 concurrent per tier)
+  • Budget enforcement (time, attempts, concurrency)
+  • Health gates (breaker, offline, rate limiter aware)
+  • Full observability (per-attempt telemetry, SLOs)
+  • Zero-config defaults with YAML/env/CLI tuning
+
+================================================================================
+IMPLEMENTATION PHASES (10 phases, ~35 hours total)
+================================================================================
+
+PHASE 1: Core Types [2 hours] - READY TO START
+  • Create fallback/types.py
+  • Define: ResolutionOutcome, AttemptPolicy, AttemptResult, TierPlan, FallbackPlan
+  • Complexity: LOW (dataclasses only)
+  Status: PENDING → Ready to start immediately
+
+PHASE 2: Orchestrator [4 hours] - BLOCKED ON PHASE 1
+  • Create fallback/orchestrator.py
+  • Implements: FallbackOrchestrator class with resolve_pdf()
+  • Threading: tier parallelization with queue.Queue
+  • Complexity: HIGH (threading, budgets, cancellation)
+
+PHASE 3: Adapters [6 hours] - BLOCKED ON PHASE 1-2
+  • Create fallback/adapters/ with 7 source adapters
+  • Each adapter: pure function (policy, context) → AttemptResult
+  • Complexity: MEDIUM-HIGH (HTTP logic, parsing)
+
+PHASE 4: Config [1 hour] - INDEPENDENT
+  • Create config/fallback.yaml
+  • Define tiers, sources, budgets, gates
+  • Complexity: LOW (YAML structure)
+
+PHASE 5: Loader [3 hours] - BLOCKED ON PHASE 4
+  • Create fallback/loader.py
+  • Load YAML, merge env vars, apply CLI overrides
+  • Complexity: MEDIUM (precedence handling)
+
+PHASE 6: CLI [3 hours] - BLOCKED ON PHASE 1-5
+  • Create cli_fallback.py
+  • Commands: plan, dryrun, tune
+  • Complexity: MEDIUM
+
+PHASE 7: Telemetry [2 hours] - INDEPENDENT
+  • Update telemetry.py
+  • Add fallback_events table
+  • Complexity: LOW
+
+PHASE 8: Integration [2 hours] - BLOCKED ON ALL ABOVE
+  • Wire into download.process_one_work()
+  • Add feature gate (DOCSTOKG_ENABLE_FALLBACK)
+  • Complexity: LOW
+
+PHASE 9: Tests [6 hours] - BLOCKED ON PHASE 1-8
+  • Create test_fallback.py
+  • 50+ tests: types, orchestrator, adapters, config, integration
+  • Complexity: HIGH
+
+PHASE 10: Documentation [2 hours] - BLOCKED ON ALL ABOVE
+  • Update AGENTS.md
+  • Config guide, CLI examples, playbooks, best practices
+  • Complexity: LOW
+
+================================================================================
+CRITICAL IMPLEMENTATION DECISIONS
+================================================================================
+
+1. TIER ORDERING (Why This Order?)
+   Tier 1 - direct_oa:     Unpaywall + arXiv + PMC (fastest, highest success)
+   Tier 2 - doi_follow:    DOI redirects (moderate speed)
+   Tier 3 - landing_scrape: Publisher HTML (slower, covers many)
+   Tier 4 - archive:       Wayback (slowest, last resort)
+
+2. PARALLELISM STRATEGY
+   • Tier 1: 2 parallel (Unpaywall + arXiv diversify risk)
+   • Tier 2: 1 parallel (DOI follow already includes redirects)
+   • Tier 3: 2 parallel (different publishers)
+   • Tier 4: 1 parallel (only Wayback)
+
+3. BUDGET ENFORCEMENT
+   • total_timeout_ms: Hard cap from start (120s default)
+   • total_attempts: Count across all sources (20 default)
+   • max_concurrent: Limit inflight threads (3 default)
+   • per_source_timeout_ms: Individual timeout (10s default)
+
+4. CANCELLATION STRATEGY
+   • Use threading.Event() flag
+   • Race adapters in tier; first success cancels rest
+   • Losers check flag; skip quickly if cancelled
+   • Short thread.join(timeout=0.5) to avoid hanging
+
+5. HEALTH GATES
+   • Check breaker.allow(host) before each attempt
+   • Skip entire tier if offline mode + artifact tier
+   • Rate limiter: handled by transport (orchestrator observes)
+
+6. TELEMETRY DESIGN
+   • Low-cardinality fields only (tier, source, outcome, reason)
+   • Per-attempt events (fallback_attempt)
+   • Summary events (fallback_summary) after resolution
+   • SLOs: p50/p95 time, success % by tier, breaker blocks
+
+================================================================================
+PRODUCTION READINESS
+================================================================================
+
+Pre-Deployment Checklist (all required):
+  ✓ All 50+ tests passing
+  ✓ Code coverage ≥ 90%
+  ✓ Linting clean (ruff, black)
+  ✓ Type hints complete
+  ✓ Docstrings on all public APIs
+  ✓ Feature gate defaults to OFF
+  ✓ YAML validates on load
+  ✓ Thread safety verified
+  ✓ Budget enforcement tested
+  ✓ Telemetry recording verified
+  ✓ CLI commands working
+  ✓ AGENTS.md comprehensive
+  ✓ 1-week telemetry baseline
+  ✓ SLO dashboard ready
+
+Risk Mitigation:
+  Threading contention   [LOW] → Load test with 10+ concurrent
+  Adapter failure        [MED] → Fallback to next tier
+  Timeout too aggressive [MED] → Start conservative, tune up
+  Telemetry overhead     [LOW] → Keep fields low-cardinality
+  Config complexity      [LOW] → Validate on load
+
+================================================================================
+KEY FILES TO CREATE/MODIFY
+================================================================================
+
+CREATE (New):
+  src/DocsToKG/ContentDownload/fallback/__init__.py
+  src/DocsToKG/ContentDownload/fallback/types.py                    (~150 LOC)
+  src/DocsToKG/ContentDownload/fallback/orchestrator.py             (~350 LOC)
+  src/DocsToKG/ContentDownload/fallback/loader.py                   (~250 LOC)
+  src/DocsToKG/ContentDownload/fallback/cli_fallback.py             (~180 LOC)
+  src/DocsToKG/ContentDownload/fallback/adapters/__init__.py        (~100 LOC)
+  src/DocsToKG/ContentDownload/fallback/adapters/unpaywall.py       (~80 LOC)
+  src/DocsToKG/ContentDownload/fallback/adapters/arxiv.py           (~70 LOC)
+  src/DocsToKG/ContentDownload/fallback/adapters/pmc.py             (~80 LOC)
+  src/DocsToKG/ContentDownload/fallback/adapters/doi_redirect.py    (~90 LOC)
+  src/DocsToKG/ContentDownload/fallback/adapters/landing_scrape.py  (~150 LOC)
+  src/DocsToKG/ContentDownload/fallback/adapters/europe_pmc.py      (~80 LOC)
+  src/DocsToKG/ContentDownload/fallback/adapters/wayback.py         (~70 LOC)
+  src/DocsToKG/ContentDownload/config/fallback.yaml                 (~100 LOC)
+  tests/content_download/test_fallback.py                           (~700 LOC)
+  FALLBACK_RESILIENCY_IMPLEMENTATION_PLAN.md                        (~550 LOC)
+
+MODIFY:
+  src/DocsToKG/ContentDownload/telemetry.py                         (+50 LOC)
+  src/DocsToKG/ContentDownload/download.py                          (+30-40 LOC)
+  src/DocsToKG/ContentDownload/AGENTS.md                            (+300-400 LOC)
+
+Total New Code: ~3,200 LOC (mostly boilerplate, ~800 LOC truly complex)
+Total New Tests: ~700 LOC (50+ test cases)
+Total Documentation: ~850 LOC (guide + playbooks)
+
+================================================================================
+TIMELINE ESTIMATE
+================================================================================
+
+Week 1: Types + Orchestrator + Config + Loader (10 hours)
+  Phase 1 (2h) → Phase 4 (1h) → Phase 5 (3h) → Phase 2 (4h)
+
+Week 2: Adapters + Telemetry + Tests (14 hours)
+  Phase 3 (6h) → Phase 7 (2h) → Phase 9 (6h)
+
+Week 3: CLI + Integration + Documentation (8 hours)
+  Phase 6 (3h) → Phase 8 (2h) → Phase 10 (2h) + testing (1h)
+
+TOTAL: ~32 hours (~1 month part-time or 4 days full-time)
+
+================================================================================
+READY TO BEGIN PHASE 1?
+================================================================================
+
+YES! Phase 1 (Types) is fully specified and ready to implement immediately.
+
+Next steps:
+1. Create fallback/__init__.py
+2. Create fallback/types.py with all 5 dataclasses
+3. Add comprehensive docstrings
+4. Add type hints
+5. Run linting/formatting
+6. Verify no external dependencies
+
+All specification & design complete. Ready to proceed with implementation.
+
+================================================================================

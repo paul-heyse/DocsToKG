@@ -394,6 +394,294 @@ domain_content_rules:
 - **Concurrency validation**: run small `--dry-run --log-format jsonl` workloads, inspect `manifest.metrics.json` latency blocks before raising `--workers`.
 - **Rate limiter tuning**: default backend is in-memory (single host). Switch to SQLite for shared runners (`--rate-backend sqlite:path=/var/run/docstokg/rl.sqlite`), `multiprocess` for forked workers, or Redis/Postgres for distributed quotas. Use `--rate` / `--rate-mode` / `--rate-max-delay` (or `DOCSTOKG_RATE*` env vars) to adjust host windows, then confirm changes via startup `rate-policy` log and `manifest.metrics.json`. `--rate-disable` (or `DOCSTOKG_RATE_DISABLED=true`) keeps the fallback path handy during pilots.
 
+## Circuit Breaker Operations
+
+### Overview
+
+The circuit breaker subsystem protects the download pipeline from cascading failures by automatically detecting unhealthy hosts and temporarily blocking requests. It integrates with the rate limiter, respects `Retry-After` headers, detects rolling-window failures, and provides CLI-based operational controls and telemetry-driven auto-tuning.
+
+**Key modules:**
+
+- `breakers.py`: Core `BreakerRegistry` implementing the circuit breaker pattern via `pybreaker`.
+- `breakers_loader.py`: Configuration loading from YAML, environment variables, and CLI arguments.
+- `sqlite_cooldown_store.py`: Cross-process cooldown storage (for multi-worker setups) using SQLite with wall-clock to monotonic time conversion.
+- `networking_breaker_listener.py`: Telemetry listener emitting state transitions, successes, and failures.
+- `cli_breakers.py`: Operational commands (`breaker show`, `breaker open`, `breaker close`).
+- `breaker_advisor.py`: Telemetry-driven metrics aggregation and heuristic-based tuning recommendations.
+- `breaker_autotune.py`: Safe, bounded application of auto-tuning recommendations.
+- `cli_breaker_advisor.py`: CLI command for analyzing telemetry and suggesting/applying tuning.
+
+### Configuration
+
+Circuit breaker policies are defined in `src/DocsToKG/ContentDownload/config/breakers.yaml`:
+
+```yaml
+defaults:
+  fail_max: 5                           # Trip breaker after N consecutive failures
+  reset_timeout_s: 60                   # Wait this long before half-open probe
+  retry_after_cap_s: 900                # Cap Retry-After at this value
+  classify:
+    failure_statuses: [500, 502, 503, 504]  # HTTP statuses that count as failures
+    neutral_statuses: [400, 401, 403, 404, 405, 406, 408, 410, 411, 413, 414, 415, 416, 418, 451]
+  half_open:
+    jitter_ms: 150                      # Random delay to desynchronize probes
+  roles:
+    metadata:
+      fail_max: 3
+      reset_timeout_s: 45
+      success_threshold: 2               # Require 2 successes to close (half-open)
+    landing:
+      fail_max: 5
+      reset_timeout_s: 60
+    artifact:
+      fail_max: 8
+      reset_timeout_s: 120
+advanced:
+  rolling:
+    enabled: true
+    threshold_failures: 3                # Trip if ≥3 failures occur in window_s
+    window_s: 10
+    cooldown_s: 30                       # Manual open for this duration
+hosts:
+  api.crossref.org:
+    fail_max: 6
+    reset_timeout_s: 90
+    retry_after_cap_s: 600
+  # ... per-host overrides
+```
+
+**Tuning knobs:**
+
+- `fail_max`: Decrease to trip earlier (e.g., 3 for noisy hosts); increase for stable hosts (e.g., 8).
+- `reset_timeout_s`: Increase if Retry-After headers suggest longer cooldowns; decrease for fast recovery.
+- `success_threshold`: Set to 2–3 if half-open failures are common; default 1 for reliable hosts.
+- `trial_calls`: Number of probe requests allowed in half-open state (per role).
+- `retry_after_cap_s`: Maximum duration to respect for `Retry-After` headers.
+- `rolling.threshold_failures`: Detect burst failures; decrease for hypersensitivity.
+
+### CLI Operations
+
+#### **1. Inspect Breaker State**
+
+```bash
+# Show all breakers
+python -m DocsToKG.ContentDownload.cli breaker show
+
+# Filter by host
+python -m DocsToKG.ContentDownload.cli breaker show --host api.crossref.org
+```
+
+Output:
+
+```
+HOST                        STATE                COOLDOWN_REMAIN_MS
+api.crossref.org            host:closed                          0
+api.openalex.org            host:open,resolver:   (remaining cooldown in ms)
+export.arxiv.org            host:half_open       1234
+```
+
+#### **2. Force-Open a Breaker (Manual Cooldown)**
+
+```bash
+# Open for 300 seconds with optional reason
+python -m DocsToKG.ContentDownload.cli breaker open api.example.org --seconds 300 --reason "maintenance-window"
+
+# Close immediately (clear cooldown and reset counters)
+python -m DocsToKG.ContentDownload.cli breaker close api.example.org
+```
+
+#### **3. Analyze Telemetry & Auto-Tune**
+
+```bash
+# Suggest changes based on recent telemetry
+python -m DocsToKG.ContentDownload.cli breaker-advise --window-s 600
+
+# Apply safe adjustments in-memory (no YAML update)
+python -m DocsToKG.ContentDownload.cli breaker-advise --window-s 600 --enforce
+```
+
+Output:
+
+```
+[api.example.org]
+  - fail_max → 3
+  - reset_timeout_s → 45
+  - reason: High 429 ratio 12.5%: reduce metadata RPS 20%
+  - reason: Reset timeout → ~45s (based on Retry-After/open durations)
+```
+
+### Telemetry & Observability
+
+**Breaker events are persisted in `manifest.sqlite3`:**
+
+```sql
+SELECT * FROM breaker_events
+WHERE host = 'api.crossref.org'
+  AND ts >= datetime('now', '-1 hour')
+ORDER BY ts DESC;
+```
+
+Columns:
+
+- `host`: Hostname (punycode normalized).
+- `ts`: Epoch timestamp.
+- `event_type`: `'state_change'`, `'success'`, `'failure'`, `'before_call'`.
+- `details`: JSON (state changes include `old_state`, `new_state`, `reset_timeout_s`).
+
+**Metrics visible in `manifest.metrics.json`:**
+
+- `breaker_transitions`: Count of state transitions per host.
+- `breaker_opens_per_hour`: Estimated opens/hour (extrapolated from window).
+- `half_open_successes`: Probes that succeeded (recovery indicator).
+
+### Operational Playbooks
+
+#### **Scenario 1: Host Repeatedly Opens**
+
+**Problem:** A resolver endpoint is experiencing intermittent errors; the breaker keeps opening.
+
+**Diagnosis:**
+
+```bash
+# 1. Check current state
+python -m DocsToKG.ContentDownload.cli breaker show --host api.example.org
+
+# 2. Query telemetry for open reasons
+sqlite3 runs/content/manifest.sqlite3 << 'SQL'
+SELECT ts, event_type, details FROM breaker_events
+WHERE host = 'api.example.org' AND event_type = 'failure'
+ORDER BY ts DESC LIMIT 10;
+SQL
+
+# 3. Analyze 429 vs 5xx mix
+jq 'select(.record_type=="attempt" and .host=="api.example.org") | {ts, status, retry_after_s}' runs/content/manifest.jsonl | sort | uniq -c
+```
+
+**Remediation:**
+
+Option A (Rate Limiter Issue): If many 429s, reduce request rate:
+
+```bash
+# Check current rate limit settings
+python -m DocsToKG.ContentDownload.cli --rate-help
+
+# Re-run with reduced rate
+python -m DocsToKG.ContentDownload.cli --resume-from runs/content/manifest.jsonl \
+  --rate api.example.org=3/s,200/h \
+  --out runs/content
+```
+
+Option B (Transient Issue): Manually cool down for a period:
+
+```bash
+python -m DocsToKG.ContentDownload.cli breaker open api.example.org --seconds 600 --reason "known-maintenance"
+
+# Wait 10 minutes, then close and resume
+sleep 600
+python -m DocsToKG.ContentDownload.cli breaker close api.example.org
+python -m DocsToKG.ContentDownload.cli --resume-from runs/content/manifest.jsonl --out runs/content
+```
+
+Option C (Configuration Tuning): Adjust breaker parameters:
+
+```yaml
+# Edit breakers.yaml
+hosts:
+  api.example.org:
+    fail_max: 4               # Trip sooner (3 → 4)
+    reset_timeout_s: 120      # Wait longer before probe (60 → 120)
+    success_threshold: 2      # Require 2 successes to close
+```
+
+Then re-run:
+
+```bash
+python -m DocsToKG.ContentDownload.cli --resume-from runs/content/manifest.jsonl \
+  --out runs/content
+```
+
+#### **Scenario 2: Auto-Tune Based on Telemetry**
+
+After a run completes, analyze and apply recommendations:
+
+```bash
+# 1. Suggest tuning based on telemetry
+python -m DocsToKG.ContentDownload.cli breaker-advise --window-s 3600
+
+# 2. Review suggestions (printed to console)
+
+# 3. Apply safe tuning
+python -m DocsToKG.ContentDownload.cli breaker-advise --window-s 3600 --enforce
+
+# 4. Resume with auto-tuned settings
+python -m DocsToKG.ContentDownload.cli --resume-from runs/content/manifest.jsonl \
+  --out runs/content
+```
+
+#### **Scenario 3: Cross-Process Workers Respecting Shared Opens**
+
+For multi-worker runs on the same host (using `--workers > 1`):
+
+1. **Single machine, multiprocess:** Uses SQLite cooldown store automatically
+
+   ```bash
+   python -m DocsToKG.ContentDownload.cli --workers 4 --out runs/content
+   # All workers share cooldown state via SQLite file locking
+   ```
+
+2. **Multiple machines, distributed:** (Future) Use Redis cooldown store:
+
+   ```bash
+   # Set environment or config to use Redis
+   export DOCSTOKG_BREAKER_COOLDOWN_STORE="redis://redis.example.com:6379/1"
+
+   python -m DocsToKG.ContentDownload.cli --workers 4 --out runs/content
+   # All workers (across hosts) share cooldown state via Redis
+   ```
+
+#### **Scenario 4: Debug Half-Open Behavior**
+
+If you suspect half-open probes are not recovering correctly:
+
+```bash
+# 1. Enable verbose logging (if available)
+export DOCSTOKG_BREAKER_DEBUG=1
+
+# 2. Run with dry-run to observe state transitions
+python -m DocsToKG.ContentDownload.cli \
+  --max 10 \
+  --dry-run \
+  --out runs/content
+
+# 3. Inspect breaker_events table for half-open attempts
+sqlite3 runs/content/manifest.sqlite3 << 'SQL'
+SELECT ts, host, event_type, details
+FROM breaker_events
+WHERE host = 'api.example.org'
+  AND event_type IN ('state_change', 'success', 'failure')
+ORDER BY ts DESC
+LIMIT 20;
+SQL
+
+# 4. Check if state cycles OPEN → HALF_OPEN → CLOSED or flaps
+```
+
+**Common patterns:**
+
+- **Healthy recovery:** OPEN → HALF_OPEN → CLOSED (successful probes)
+- **Flapping:** OPEN → HALF_OPEN → OPEN → HALF_OPEN (failed probes, short reset_timeout)
+- **Stuck:** OPEN → HALF_OPEN (never recovers; requires manual `breaker close`)
+
+### Best Practices
+
+1. **Start conservative:** Default `fail_max=5` is reasonable; adjust only after observing patterns.
+2. **Respect Retry-After:** The breaker honors `Retry-After` headers automatically; adjust `retry_after_cap_s` if servers suggest very long cooldowns.
+3. **Monitor half-open failures:** High half-open failure rates suggest instability; increase `success_threshold`.
+4. **Use rolling window for burst detection:** Enable `advanced.rolling` to catch transient spikes.
+5. **Log state transitions:** Review `breaker_events` table periodically for unexpected patterns.
+6. **Test with `--dry-run`:** Before resuming a large run, validate breaker state with `--dry-run`.
+7. **Combine with rate limiter:** Circuit breakers are a last resort; use rate limits to prevent 429s first.
+
 ## Migration Checklist
 
 - Remove bespoke sleeps/token buckets from automation and rely on the centralized limiter (`--rate*` flags) for host-specific politeness.

@@ -85,55 +85,70 @@
 # }
 # === /NAVMAP ===
 
-"""Per-host (and optional per-resolver) circuit breakers using pybreaker.
+"""Circuit breaker pattern implementation using pybreaker library.
 
-This module provides a centralized circuit breaker implementation that replaces
-the legacy CircuitBreaker in networking.py with a pybreaker-based solution.
+This module provides per-host and per-resolver circuit breaker functionality to protect
+the download pipeline from cascading failures. It implements the classic circuit breaker
+state machine (Closed → Open → Half-Open → Closed) with the following features:
 
-Key Features:
-- Per-host breakers with configurable failure thresholds and reset timeouts
-- Optional per-resolver breakers for resolver-specific failure patterns
-- Retry-After aware cooldowns that honor server directives
-- Rolling window manual-open for intermittent failure patterns
-- Half-open trial calls with configurable limits per role
-- Pluggable cooldown storage (in-memory, SQLite, Redis)
-- Comprehensive telemetry integration
+- **Pre-flight checking**: `allow()` method blocks requests to unhealthy hosts
+- **Post-response updates**: `on_success()`/`on_failure()` track state transitions
+- **Retry-After awareness**: Respects 429/503 `Retry-After` headers with configurable caps
+- **Rolling window detection**: Detects burst failures within a time window
+- **Half-open probing**: Limits trial calls per request role with jitter
+- **Cross-process state sharing**: Uses cooldown store (SQLite/Redis) for multi-worker coordination
+- **Telemetry integration**: Emits structured events via pluggable listener factory
 
-Typical Usage:
-    from DocsToKG.ContentDownload.breakers import BreakerRegistry, BreakerConfig
+Key Classes:
+  - RequestRole: Enum for request types (metadata, landing, artifact)
+  - BreakerOpenError: Exception raised when breaker is open
+  - BreakerPolicy: Configuration for default breaker behavior
+  - BreakerRolePolicy: Per-role policy overrides
+  - BreakerRegistry: Central registry managing per-host and per-resolver breakers
+  - CooldownStore: Interface for cross-process cooldown persistence
 
-    config = BreakerConfig()  # Load from YAML/env/CLI
-    registry = BreakerRegistry(config, listener_factory=my_listener_factory)
+Example:
+  ```python
+  from DocsToKG.ContentDownload.breakers import BreakerRegistry, BreakerConfig
+  from DocsToKG.ContentDownload.sqlite_cooldown_store import SQLiteCooldownStore
 
-    # Pre-flight check
-    registry.allow(host="api.crossref.org", role=RequestRole.METADATA)
+  config = BreakerConfig()  # Load from YAML/env/CLI
+  store = SQLiteCooldownStore(Path("breakers.db"))
+  registry = BreakerRegistry(config, cooldown_store=store)
 
-    # After request
-    registry.on_success(host="api.crossref.org", role=RequestRole.METADATA)
-    # or
-    registry.on_failure(host="api.crossref.org", role=RequestRole.METADATA,
-                        status=503, retry_after_s=60.0)
+  try:
+      registry.allow(host="api.example.org", role=RequestRole.METADATA)
+      response = make_request(host)
+      registry.on_success(host)
+  except BreakerOpenError:
+      # Host is open, skip request
+      pass
+  except Exception as e:
+      registry.on_failure(host, exception=e)
+  ```
+
+See Also:
+  - breakers_loader.py: Configuration loading
+  - networking_breaker_listener.py: Telemetry events
+  - sqlite_cooldown_store.py: Cross-process state sharing
 """
 
 from __future__ import annotations
 
+import threading
+import time
+from collections import deque
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import (
     Callable,
     Dict,
-    Iterable,
     List,
     Mapping,
-    MutableMapping,
     Optional,
     Protocol,
-    Sequence,
     Tuple,
 )
-import time
-import threading
-from collections import deque
 
 # Optional import: keep module import-safe if pybreaker is absent in some test envs.
 try:
@@ -503,9 +518,9 @@ class BreakerRegistry:
         # Apply role overrides in allow() / half-open enforcement (breaker stays host-wide)
         listeners = []
         if self.listener_factory:
-            l = self.listener_factory(host, "host", None)
-            if l is not None:
-                listeners.append(l)
+            listener = self.listener_factory(host, "host", None)
+            if listener is not None:
+                listeners.append(listener)
         # Build kwargs for CircuitBreaker, conditionally including success_threshold
         cb_kwargs = {
             "fail_max": base.fail_max,
@@ -530,9 +545,9 @@ class BreakerRegistry:
         base = self.config.resolvers.get(resolver, self.config.defaults)
         listeners = []
         if self.listener_factory:
-            l = self.listener_factory(resolver, "resolver", resolver)
-            if l is not None:
-                listeners.append(l)
+            listener = self.listener_factory(resolver, "resolver", resolver)
+            if listener is not None:
+                listeners.append(listener)
         # Build kwargs for CircuitBreaker
         cb_kwargs = {
             "fail_max": base.fail_max,

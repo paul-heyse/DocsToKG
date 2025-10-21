@@ -2228,12 +2228,14 @@ def _ensure_pyarrow_vectors() -> None:
         ) from exc
 
 
-def _main_inner(args: argparse.Namespace | None = None) -> int:
+def _main_inner(args: argparse.Namespace | None = None, config_adapter=None) -> int:
     """CLI entrypoint for chunk UUID cleanup and embedding generation.
 
     Args:
         args (argparse.Namespace | None): Optional parsed arguments, primarily
             for testing or orchestration.
+        config_adapter: Optional EmbedCfg instance from ConfigurationAdapter (new pattern).
+              If provided, bypasses sys.argv parsing and uses this config directly.
 
     Returns:
         int: Exit code where ``0`` indicates success.
@@ -2249,45 +2251,61 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
         data_vectors(bootstrap_root)
     except Exception as exc:
         logging.getLogger(__name__).debug("Failed to bootstrap data directories", exc_info=exc)
-    explicit_overrides: set[str]
-    if args is None:
-        namespace = parse_args_with_overrides(parser)
-        explicit_overrides = set(getattr(namespace, "_cli_explicit_overrides", ()) or ())
-    elif isinstance(args, argparse.Namespace):
-        namespace = args
-        if getattr(namespace, "_cli_explicit_overrides", None) is None:
-            keys = [name for name in vars(namespace) if not name.startswith("_")]
-            annotate_cli_overrides(namespace, explicit=keys, defaults={})
-            explicit_overrides = set(keys)
-        else:
-            explicit_overrides = set(namespace._cli_explicit_overrides or ())
-    elif isinstance(args, SimpleNamespace) or hasattr(args, "__dict__"):
-        base = parse_args_with_overrides(parser, [])
-        payload = {key: value for key, value in vars(args).items() if not key.startswith("_")}
-        for key, value in payload.items():
-            setattr(base, key, value)
-        defaults = getattr(base, "_cli_defaults", {})
-        annotate_cli_overrides(base, explicit=payload.keys(), defaults=defaults)
-        explicit_overrides = set(payload.keys())
-        namespace = base
+
+    # NEW PATH: If adapter provided (from unified CLI), use it directly
+    if config_adapter is not None:
+        cfg = config_adapter
+        base_config = cfg.to_manifest()
+        namespace = argparse.Namespace()
+        for field_def in fields(EmbedCfg):
+            setattr(namespace, field_def.name, getattr(cfg, field_def.name))
+        explicit_overrides = set()
+    # LEGACY PATH: Parse from args or sys.argv
     else:
-        namespace = parse_args_with_overrides(parser, args)
-        explicit_overrides = set(getattr(namespace, "_cli_explicit_overrides", ()) or ())
+        explicit_overrides: set[str]
+        if args is None:
+            namespace = parse_args_with_overrides(parser)
+            explicit_overrides = set(getattr(namespace, "_cli_explicit_overrides", ()) or ())
+        elif isinstance(args, argparse.Namespace):
+            namespace = args
+            if getattr(namespace, "_cli_explicit_overrides", None) is None:
+                keys = [name for name in vars(namespace) if not name.startswith("_")]
+                annotate_cli_overrides(namespace, explicit=keys, defaults={})
+                explicit_overrides = set(keys)
+            else:
+                explicit_overrides = set(namespace._cli_explicit_overrides or ())
+        elif isinstance(args, SimpleNamespace) or hasattr(args, "__dict__"):
+            base = parse_args_with_overrides(parser, [])
+            payload = {key: value for key, value in vars(args).items() if not key.startswith("_")}
+            for key, value in payload.items():
+                setattr(base, key, value)
+            defaults = getattr(base, "_cli_defaults", {})
+            annotate_cli_overrides(base, explicit=payload.keys(), defaults=defaults)
+            explicit_overrides = set(payload.keys())
+            namespace = base
+        else:
+            namespace = parse_args_with_overrides(parser, args)
+            explicit_overrides = set(getattr(namespace, "_cli_explicit_overrides", ()) or ())
+
+        profile = getattr(namespace, "profile", None)
+        defaults = EMBED_PROFILE_PRESETS.get(profile or "", {})
+
+        # Build config from namespace (legacy: no from_args() available)
+        cfg = EmbedCfg()
+        cfg.apply_args(namespace, defaults=defaults)
+        cfg.finalize()
+
+        base_config = cfg.to_manifest()
+        if profile:
+            base_config.setdefault("profile", profile)
+        for field_def in fields(EmbedCfg):
+            setattr(namespace, field_def.name, getattr(cfg, field_def.name))
 
     if getattr(namespace, "plan_only", False) and getattr(namespace, "validate_only", False):
         raise EmbeddingCLIValidationError(
             option="--plan-only/--validate-only",
             message="flags cannot be combined",
         )
-
-    profile = getattr(namespace, "profile", None)
-    defaults = EMBED_PROFILE_PRESETS.get(profile or "", {})
-    cfg = EmbedCfg.from_args(namespace, defaults=defaults)
-    base_config = cfg.to_manifest()
-    if profile:
-        base_config.setdefault("profile", profile)
-    for field_def in fields(EmbedCfg):
-        setattr(namespace, field_def.name, getattr(cfg, field_def.name))
 
     validate_only = bool(cfg.validate_only)
     plan_only = bool(getattr(namespace, "plan_only", False))
@@ -2299,6 +2317,8 @@ def _main_inner(args: argparse.Namespace | None = None) -> int:
         level=str(log_level),
         base_fields={"run_id": run_id, "stage": EMBED_STAGE},
     )
+    profile = getattr(namespace, "profile", None)
+    defaults = EMBED_PROFILE_PRESETS.get(profile or "", {})
     if profile and defaults:
         log_event(
             logger,

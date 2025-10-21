@@ -248,6 +248,33 @@ def _load_or_create_cache_router() -> CacheRouter:
     return _CACHE_ROUTER
 
 
+def initialize_rate_limiter_from_config(rate_config: Optional[object] = None) -> None:
+    """Initialize the global rate limiter with Phase 7 configuration.
+
+    Args:
+        rate_config: Optional RateConfig from args.resolve_config (Phase 7).
+                    If None, uses defaults from get_rate_limiter_manager().
+    """
+    if rate_config is None:
+        # Just ensure the manager is initialized with defaults
+        _manager = get_rate_limiter_manager()
+        LOGGER.info("Rate limiter initialized with defaults")
+    else:
+        # Initialize with provided config
+        try:
+            # rate_config is a RateConfig from ratelimits_loader
+            _manager = get_rate_limiter_manager(cfg=rate_config)
+            LOGGER.info(
+                "Rate limiter initialized with Phase 7 config (backend: %s, inflight: %s, AIMD: %s)",
+                rate_config.backend.kind,
+                rate_config.global_max_inflight,
+                rate_config.aimd.enabled,
+            )
+        except Exception as e:
+            LOGGER.warning("Failed to initialize rate limiter from config: %s; using defaults", e)
+            get_rate_limiter_manager()
+
+
 def _create_client_unlocked() -> None:
     global _HTTP_CLIENT
 
@@ -267,7 +294,7 @@ def _create_client_unlocked() -> None:
         base_transport = base_transport or httpx.HTTPTransport(retries=0)
         if not isinstance(base_transport, RateLimitedTransport):
             # Wrap with rate limiter
-            base_transport = RateLimitedTransport(base_transport, manager=limiter_manager)
+            base_transport = RateLimitedTransport(base_transport, registry=limiter_manager)
 
         # Wrap with role-aware cache transport
         cache_transport = build_role_aware_cache_transport(

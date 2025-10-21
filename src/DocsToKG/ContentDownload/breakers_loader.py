@@ -84,22 +84,20 @@ Usage:
 
 from __future__ import annotations
 
-import os
 import re
-import ssl
 from dataclasses import replace
 from pathlib import Path
-from typing import Any, Dict, Iterable, Mapping, Optional, Sequence, Tuple
-
-try:
-    import yaml  # PyYAML  # type: ignore[import-untyped]
-except Exception as e:  # pragma: no cover
-    raise RuntimeError("PyYAML is required to load breaker YAML configs") from e
+from typing import Any, Dict, Mapping, Optional, Sequence
 
 try:
     import idna  # IDNA 2008 with UTS #46 support
 except Exception as e:  # pragma: no cover
     raise RuntimeError("idna is required for proper hostname normalization") from e
+
+try:
+    import yaml  # PyYAML  # type: ignore[import-untyped]
+except Exception as e:  # pragma: no cover
+    raise RuntimeError("PyYAML is required to load breaker YAML configs") from e
 
 import logging
 

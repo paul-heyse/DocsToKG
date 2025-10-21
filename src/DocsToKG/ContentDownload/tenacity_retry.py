@@ -13,7 +13,7 @@ import email.utils
 import logging
 import time
 from datetime import datetime
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 
 import httpx
 import tenacity
@@ -164,7 +164,7 @@ def _make_retry_predicate(
     method: str,
     offline: bool = False,
     breaker_open: bool = False,
-) -> Callable:
+) -> Callable[[Any], bool]:
     """Create a retry predicate for Tenacity.
 
     Args:
@@ -183,12 +183,12 @@ def _make_retry_predicate(
             pass
         else:
             # Method not retryable, never retry
-            def never_retry(outcome):
+            def never_retry(outcome: Any) -> bool:
                 return False
 
             return never_retry
 
-    def predicate(outcome):
+    def predicate(outcome: Any) -> bool:
         """Check if outcome should be retried."""
         exception = outcome.exception()
         if exception is not None:
@@ -241,9 +241,12 @@ def build_tenacity_retrying(
     )
 
     # Build stop policy (attempt limit OR wall-clock limit)
-    stop_policy = tenacity.stop_after_attempt(cfg.max_attempts)
+    stop_attempt: tenacity.stop_after_attempt = tenacity.stop_after_attempt(cfg.max_attempts)
     if cfg.max_total_s > 0:
-        stop_policy = stop_policy | tenacity.stop_after_delay(cfg.max_total_s)
+        stop_delay: tenacity.stop_after_delay = tenacity.stop_after_delay(cfg.max_total_s)
+        stop_policy: Any = stop_attempt | stop_delay
+    else:
+        stop_policy = stop_attempt
 
     # Build wait strategy with Retry-After support
     fallback_wait = tenacity.wait_random_exponential(

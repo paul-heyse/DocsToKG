@@ -1,0 +1,182 @@
+# Pyrate-Limiter Rate Limiting Configuration
+# RFC-compliant multi-window rate limiting for per-host and per-role policies
+#
+# This configuration controls how the ContentDownload module limits request rates
+# to respect API constraints and prevent server overload.
+
+version: 1
+
+# Default rate policies applied to hosts without explicit configuration
+defaults:
+  metadata:
+    # API metadata queries: 10/s smoothing + 5000/hour politeness
+    rates:
+      - "10/SECOND"
+      - "5000/HOUR"
+    max_delay_ms: 200 # Max wait for metadata requests before failing
+    count_head: false # Don't count HEAD requests against quota
+
+  landing:
+    # Landing page fetches: 5/s smoothing + 2000/hour politeness
+    rates:
+      - "5/SECOND"
+      - "2000/HOUR"
+    max_delay_ms: 250 # Max wait for landing pages
+    count_head: false
+
+  artifact:
+    # Artifact (PDF/etc) downloads: 2/s smoothing + 500/hour politeness
+    rates:
+      - "2/SECOND"
+      - "500/HOUR"
+    max_delay_ms: 2000 # Allow more wait for artifacts
+    count_head: false
+
+# Host-specific policy overrides (normalization: lowercase punycode)
+hosts:
+  # Crossref API - high-rate API, supports burst requests
+  api.crossref.org:
+    metadata:
+      rates: ["50/SECOND", "10000/HOUR"]
+      max_delay_ms: 250
+    landing:
+      rates: ["20/SECOND", "5000/HOUR"]
+      max_delay_ms: 300
+    artifact:
+      rates: ["5/SECOND", "300/MINUTE"]
+      max_delay_ms: 5000
+
+  # OpenAlex API - comprehensive metadata source
+  api.openalex.org:
+    metadata:
+      rates: ["20/SECOND", "8000/HOUR"]
+      max_delay_ms: 200
+    landing:
+      rates: ["10/SECOND", "4000/HOUR"]
+      max_delay_ms: 250
+    artifact:
+      rates: ["2/SECOND", "500/HOUR"]
+      max_delay_ms: 4000
+
+  # arXiv - conservative rate limits (1 request every 3 seconds)
+  export.arxiv.org:
+    metadata:
+      rates: ["1/3SECOND", "1000/DAY"]
+      max_delay_ms: 200
+    landing:
+      rates: ["1/3SECOND", "500/DAY"]
+      max_delay_ms: 3000
+    artifact:
+      rates: ["1/3SECOND", "200/DAY"]
+      max_delay_ms: 6000
+
+  # Unpaywall - moderate rate limits
+  api.unpaywall.org:
+    metadata:
+      rates: ["10/SECOND", "2000/HOUR"]
+      max_delay_ms: 200
+    landing:
+      rates: ["5/SECOND", "1000/HOUR"]
+      max_delay_ms: 250
+
+  # Internet Archive - flexible rate limits
+  archive.org:
+    metadata:
+      rates: ["10/SECOND", "3000/HOUR"]
+      max_delay_ms: 150
+    landing:
+      rates: ["5/SECOND", "1500/HOUR"]
+      max_delay_ms: 200
+    artifact:
+      rates: ["3/SECOND", "300/MINUTE"]
+      max_delay_ms: 3000
+
+# Pyrate-Limiter backend configuration
+backend:
+  # Backend type: memory, multiprocess, sqlite, redis, postgres
+  # memory: In-process only, ephemeral (suitable for single-machine dev/test)
+  # multiprocess: Shared across Python processes via Manager (single machine)
+  # sqlite: Persistent file-based, file-lock for multiprocess (single machine)
+  # redis: Distributed, high-performance (multi-machine/multi-process)
+  # postgres: Distributed persistence with explicit SQL (multi-machine)
+  kind: "memory"
+
+  # Hostname/port for network backends (redis, postgres)
+  # Examples:
+  #   redis://localhost:6379/0
+  #   postgresql://user:pass@localhost:5432/ratelimit
+  dsn: ""
+
+# AIMD (Additive Increase, Multiplicative Decrease) dynamic rate tuning
+# Automatically adapts rate limits based on server 429 responses
+aimd:
+  # Enable automatic rate tuning (default: false for safety)
+  enabled: false
+
+  # Window size for checking 429 ratio (seconds)
+  window_s: 60
+
+  # Trigger decrease when 429 ratio exceeds this (5% = high_429_ratio: 0.05)
+  high_429_ratio: 0.05
+
+  # Percentage increase per stable window (no high 429s)
+  increase_step_pct: 5
+
+  # Percentage decrease when high 429s detected
+  decrease_step_pct: 20
+
+  # Minimum multiplier floor (don't go below 30% of base rate)
+  min_multiplier: 0.3
+
+  # Maximum multiplier ceiling (don't exceed base rate)
+  max_multiplier: 1.0
+
+# Global settings
+global_max_inflight: 500 # Max in-flight requests across all hosts/roles
+
+# Environment Variable Overrides
+# ================================
+# Set these to override configuration file settings (precedence: CLI > ENV > YAML):
+#
+#   DOCSTOKG_RLIMIT_BACKEND=redis
+#   DOCSTOKG_RLIMIT_GLOBAL_INFLIGHT=1000
+#   DOCSTOKG_RLIMIT_AIMD_ENABLED=true
+#   DOCSTOKG_RLIMIT__api.example.org__metadata=rates:50/SECOND+10000/HOUR,max_delay_ms:250
+#
+# CLI Argument Overrides
+# ======================
+# Command-line arguments take highest precedence:
+#
+#   --rate-backend redis
+#   --rate-max-inflight 1000
+#   --rate-aimd-enabled true
+#   --rate-host-override api.example.org:metadata=rates:50/SECOND+10000/HOUR,max_delay_ms:250
+#
+# Production Recommendations
+# ==========================
+#
+# 1. STORAGE BACKEND:
+#    - Development: memory (no external dependencies)
+#    - Staging: sqlite (persistence, single machine)
+#    - Production: redis (distributed, scalable)
+#
+# 2. RATE LIMITS:
+#    - Start conservative (defaults recommended)
+#    - Monitor 429/503 rates for 24-48 hours
+#    - Gradually increase if stable and hitting limits
+#    - Use AIMD only after validation period
+#
+# 3. GLOBAL CEILING:
+#    - Set based on machine capacity
+#    - Formula: (CPU cores * 8) + (memory_GB * 4)
+#    - Example: 8 cores, 16GB RAM → ~96 max_inflight
+#
+# 4. MONITORING:
+#    - Track rate_delay_ms p50, p95, p99
+#    - Monitor 429/503 response rates
+#    - Alert on rate_delay_ms > 1000ms (potential bottleneck)
+#
+# 5. TUNING:
+#    - Per-role tuning: artifacts usually need higher delay tolerance
+#    - Per-host tuning: conservative APIs need stricter limits
+#    - AIMD: Enable cautiously after 24h of stable operation
