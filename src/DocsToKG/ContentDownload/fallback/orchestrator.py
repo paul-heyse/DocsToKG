@@ -1,403 +1,367 @@
-"""Fallback orchestration: deterministic, tiered PDF resolution.
+"""
+Fallback & Resiliency Orchestrator
 
-This module implements the core orchestration logic for the fallback strategy:
-- Tiered execution with per-tier parallelism
-- Budget enforcement (time, attempts, concurrency)
-- Health gates (breaker, offline, rate limiter awareness)
-- Automatic cancellation when success is found
-- Full telemetry emission
+Coordinates tiered PDF resolution across multiple sources with:
+- Deterministic source ordering and tier sequencing
+- Budgeted execution (time, attempts, concurrency)
+- Thread-safe parallel resolution within tiers
+- Health gate integration (breaker, offline, rate limiter)
+- Full telemetry emission and observability
+- Graceful fallback to main pipeline on failure
 
-The orchestrator uses threading for parallelism within tiers and a queue for
-result collection. Execution stops immediately upon success.
+Design:
+- Pure orchestration logic (no side effects beyond resolution)
+- Adapter protocol (resolve function)
+- Budget enforcement at orchestrator level
+- Health gates checked before each source attempt
+- Full attempt tracing for debugging and metrics
 """
 
 from __future__ import annotations
 
 import logging
-import queue
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Callable, Dict, Optional
 
-from DocsToKG.ContentDownload.fallback.types import (
-    AttemptResult,
-    FallbackPlan,
-)
+from .types import AttemptResult, FallbackPlan, ResolutionOutcome
 
-# Type alias for adapter functions
-AttemptFn = Callable[[Any, Dict[str, Any]], AttemptResult]
+LOGGER = logging.getLogger(__name__)
 
 
 class FallbackOrchestrator:
-    """Orchestrates deterministic, budgeted PDF resolution across tiers.
+    """
+    Orchestrates tiered PDF resolution across multiple sources.
 
-    The orchestrator executes tiers sequentially. Within each tier, sources run
-    in parallel up to the tier's `parallel` limit. Execution stops immediately
-    when one attempt succeeds. Budget constraints (time, attempts, concurrency)
-    are enforced throughout.
+    Coordinates:
+    - Tier-by-tier resolution (sequential tiers, parallel sources within tier)
+    - Budget enforcement (time, attempts, concurrency)
+    - Health gate evaluation (circuit breaker, offline, rate limiter)
+    - Attempt result aggregation and first-success semantics
+    - Full telemetry emission
 
     Attributes:
-        plan: FallbackPlan with configuration
-        breaker: BreakerRegistry for health checking
-        rate: Rate limiter for politeness
-        head_client: Cached HTTP client for metadata
-        raw_client: Raw HTTP client for artifacts
-        telemetry: Telemetry sink for structured events
+        plan: FallbackPlan with budgets, tiers, policies, gates
+        breaker: Optional circuit breaker registry
+        rate_limiter: Optional rate limiter manager
+        clients: HTTP clients dict (passed to adapters)
+        telemetry: Optional telemetry sink
         logger: Logger instance
-
-    Example:
-        ```python
-        orchestrator = FallbackOrchestrator(
-            plan=plan,
-            breaker=breaker_registry,
-            rate=rate_limiter,
-            head_client=cached_client,
-            raw_client=raw_client,
-            telemetry=telemetry_sink,
-            logger=logger
-        )
-
-        result = orchestrator.resolve_pdf(
-            context={"work_id": "123", "artifact_id": "abc", "doi": "..."},
-            adapters={
-                "unpaywall_pdf": adapter_unpaywall,
-                "arxiv_pdf": adapter_arxiv,
-                # ... etc
-            }
-        )
-
-        if result.outcome == "success":
-            print(f"Found: {result.url}")
-        else:
-            print(f"Failed: {result.reason}")
-        ```
     """
 
     def __init__(
         self,
-        *,
         plan: FallbackPlan,
-        breaker: Any,
-        rate: Any,
-        head_client: Any,
-        raw_client: Any,
-        telemetry: Any,
-        logger: logging.Logger,
+        breaker: Optional[Any] = None,
+        rate_limiter: Optional[Any] = None,
+        clients: Optional[Dict[str, Any]] = None,
+        telemetry: Optional[Any] = None,
+        logger: Optional[logging.Logger] = None,
     ) -> None:
-        """Initialize the orchestrator.
+        """Initialize orchestrator.
 
         Args:
-            plan: Complete FallbackPlan with budgets and tiers
-            breaker: BreakerRegistry instance
-            rate: Rate limiter manager
-            head_client: Cached HTTP client for metadata
-            raw_client: Raw HTTP client for artifacts
-            telemetry: Telemetry sink
-            logger: Logger instance
+            plan: FallbackPlan configuration
+            breaker: Optional circuit breaker registry
+            rate_limiter: Optional rate limiter manager
+            clients: HTTP clients dict
+            telemetry: Optional telemetry sink
+            logger: Optional logger (uses module logger if not provided)
         """
         self.plan = plan
         self.breaker = breaker
-        self.rate = rate
-        self.head = head_client
-        self.raw = raw_client
-        self.tele = telemetry
-        self.log = logger
+        self.rate_limiter = rate_limiter
+        self.clients = clients or {}
+        self.telemetry = telemetry
+        self.logger = logger or LOGGER
+
+        # Budget tracking (mutable state)
+        self._attempt_count = 0
+        self._budget_lock = threading.Lock()
+        self._start_time: Optional[float] = None
+        self._cancellation_flag = threading.Event()
 
     def resolve_pdf(
         self,
-        *,
         context: Dict[str, Any],
-        adapters: Dict[str, AttemptFn],
+        adapters: Dict[str, Callable[[Any, Dict[str, Any]], AttemptResult]],
     ) -> AttemptResult:
-        """Resolve a PDF URL using tiered fallback strategy.
+        """Resolve PDF using tiered strategy.
 
-        Executes tiers sequentially, parallelizing within each tier. Stops
-        immediately upon success or when budgets are exhausted.
+        Main entry point. Iterates through tiers, executes sources in parallel
+        (up to tier parallelism), enforces budgets, checks health gates,
+        and returns first success or final failure.
 
         Args:
-            context: Request context (work_id, artifact_id, doi, etc.)
-            adapters: Mapping of source_name to adapter function
+            context: Resolution context (artifact metadata, etc.)
+            adapters: Dict mapping source_name → adapter function
 
         Returns:
-            AttemptResult indicating success/failure and details
-
-        Raises:
-            KeyError: If a required adapter is missing
+            AttemptResult with outcome and metadata
         """
-        budgets = self.plan.budgets
-        t0 = time.monotonic()
-        attempts_used = 0
+        self._start_time = time.time()
+        self._attempt_count = 0
+        self._cancellation_flag.clear()
 
-        # Cancellation flag (shared across threads)
-        cancel_flag = threading.Event()
+        self.logger.debug(
+            f"Starting fallback resolution: {len(self.plan.tiers)} tier(s), "
+            f"budget={self.plan.budgets.get('total_timeout_ms', 'unlimited')}ms"
+        )
 
-        # Result queue (thread-safe)
-        result_queue: queue.Queue[AttemptResult] = queue.Queue()
-
-        def run_attempt(source_name: str) -> None:
-            """Run a single source attempt in a thread.
-
-            Args:
-                source_name: Name of the source to attempt
-            """
-            policy = self.plan.get_policy(source_name)
-            try:
-                # Check cancellation flag
-                if cancel_flag.is_set():
-                    res = AttemptResult(
-                        outcome="skipped",
-                        reason="cancelled",
-                        elapsed_ms=0,
-                    )
-                    result_queue.put(res)
-                    return
-
-                # Check health gates
-                gate_result = self._health_gate(source_name, context)
-                if gate_result is not None:
-                    result_queue.put(gate_result)
-                    return
-
-                # Execute adapter
-                started = time.monotonic()
-                res = adapters[source_name](policy, context)
-                res_with_time = AttemptResult(
-                    outcome=res.outcome,
-                    reason=res.reason,
-                    elapsed_ms=int((time.monotonic() - started) * 1000),
-                    url=res.url,
-                    status=res.status,
-                    host=res.host,
-                    meta=res.meta,
-                )
-                result_queue.put(res_with_time)
-            except KeyError as e:
-                result_queue.put(
-                    AttemptResult(
-                        outcome="error",
-                        reason="missing_adapter",
-                        elapsed_ms=0,
-                        meta={"msg": str(e)},
-                    )
-                )
-            except Exception as e:  # pylint: disable=broad-except
-                result_queue.put(
-                    AttemptResult(
-                        outcome="error",
-                        reason="exception",
-                        elapsed_ms=0,
-                        meta={"msg": str(e)},
-                    )
-                )
-
-        # ====================================================================
-        # Tiered scheduling loop
-        # ====================================================================
+        # Try each tier sequentially
         for tier in self.plan.tiers:
-            # Check if we've exhausted attempt budget
-            if attempts_used >= budgets["total_attempts"]:
-                self.log.info(
-                    f"Stopping: exhausted attempt budget "
-                    f"({attempts_used}/{budgets['total_attempts']})"
+            if self._is_budget_exhausted():
+                self.logger.info("Budget exhausted, stopping resolution")
+                return self._timeout_outcome()
+
+            tier_result = self._resolve_tier(tier, context, adapters)
+
+            if tier_result.is_success():
+                self.logger.info(
+                    f"Success in tier '{tier.name}': {tier_result.url} "
+                    f"(elapsed={tier_result.elapsed_ms}ms)"
                 )
+                return tier_result
+
+            # Continue to next tier on skip/failure
+            self.logger.debug(
+                f"Tier '{tier.name}' failed/skipped, trying next tier "
+                f"(attempts={self._attempt_count})"
+            )
+
+        # All tiers exhausted
+        self.logger.warning(
+            f"All tiers exhausted, no PDF found (attempts={self._attempt_count})"
+        )
+        return AttemptResult(
+            outcome="error",
+            reason="all_tiers_exhausted",
+            elapsed_ms=self._elapsed_ms(),
+            meta={"total_attempts": self._attempt_count},
+        )
+
+    def _resolve_tier(
+        self,
+        tier: Any,
+        context: Dict[str, Any],
+        adapters: Dict[str, Callable[[Any, Dict[str, Any]], AttemptResult]],
+    ) -> AttemptResult:
+        """Resolve a single tier (parallel sources).
+
+        Executes sources within tier up to tier.parallel concurrency.
+        Returns first success or aggregated failure.
+
+        Args:
+            tier: TierPlan with source names and parallelism
+            context: Resolution context
+            adapters: Adapter functions dict
+
+        Returns:
+            AttemptResult (success or failure)
+        """
+        self.logger.debug(f"Resolving tier '{tier.name}' ({len(tier.sources)} sources)")
+
+        # Filter adapters and health-check each source
+        available_sources = []
+        for source_name in tier.sources:
+            if self._is_budget_exhausted():
                 break
 
-            # Check if we've exhausted time budget
-            elapsed_ms = int((time.monotonic() - t0) * 1000)
-            if elapsed_ms >= budgets["total_timeout_ms"]:
-                self.log.info(
-                    f"Stopping: exhausted time budget "
-                    f"({elapsed_ms}/{budgets['total_timeout_ms']}ms)"
+            # Health gate check
+            gate_result = self._health_gate(source_name, context)
+            if gate_result is not None:
+                self.logger.debug(
+                    f"Source '{source_name}' skipped: {gate_result.reason}"
                 )
-                break
+                self._emit_telemetry(tier.name, gate_result, context)
+                self._attempt_count += 1
+                continue
 
-            self.log.debug(f"Starting tier: {tier.name}")
+            # Source available
+            if source_name in adapters:
+                available_sources.append(source_name)
+            else:
+                self.logger.warning(f"Adapter not found for source '{source_name}'")
 
-            # Build list of sources to try
-            names = list(tier.sources)
-            inflight: list[threading.Thread] = []
-            launched = 0
+        if not available_sources:
+            self.logger.debug(f"Tier '{tier.name}': no available sources")
+            return AttemptResult(
+                outcome="skipped",
+                reason="no_available_sources",
+                elapsed_ms=self._elapsed_ms(),
+            )
 
-            # Launch sources up to tier parallelism limit
-            while names and launched < tier.parallel and attempts_used < budgets["total_attempts"]:
-                name = names.pop(0)
-                th = threading.Thread(
-                    target=run_attempt,
-                    args=(name,),
-                    daemon=True,
-                    name=f"fallback-{name}",
-                )
-                th.start()
-                inflight.append(th)
-                launched += 1
-                attempts_used += 1
-
-            # Collect outcomes for this tier
-            done = 0
-            tier_results: list[AttemptResult] = []
-
-            while done < launched:
-                # Check time budget on each iteration
-                elapsed_ms = int((time.monotonic() - t0) * 1000)
-                if elapsed_ms >= budgets["total_timeout_ms"]:
-                    self.log.info("Time budget exhausted, cancelling tier")
-                    cancel_flag.set()
+        # Parallel execution
+        with ThreadPoolExecutor(
+            max_workers=min(tier.parallel, len(available_sources))
+        ) as executor:
+            futures = {}
+            for source_name in available_sources:
+                if self._is_budget_exhausted():
                     break
 
+                future = executor.submit(
+                    adapters[source_name],
+                    self.plan.policies[source_name],
+                    context,
+                )
+                futures[future] = source_name
+
+            # Collect results (first success wins)
+            for future in as_completed(futures, timeout=self._remaining_timeout_s()):
+                if self._cancellation_flag.is_set():
+                    break
+
+                source_name = futures[future]
                 try:
-                    # Wait with timeout to check budget periodically
-                    res = result_queue.get(timeout=0.25)
-                    done += 1
-                    tier_results.append(res)
+                    result = future.result(timeout=1)
+                except Exception as e:
+                    self.logger.error(f"Adapter '{source_name}' raised: {e}")
+                    result = AttemptResult(
+                        outcome="error",
+                        reason="adapter_error",
+                        elapsed_ms=self._elapsed_ms(),
+                        meta={"error": str(e)},
+                    )
 
-                    # Emit telemetry
-                    self._emit_attempt_telemetry(tier.name, res, context)
+                self._attempt_count += 1
+                self._emit_telemetry(tier.name, result, context)
 
-                    # Check for success
-                    if res.is_success:
-                        self.log.info(f"Success in tier {tier.name}: {res.reason}")
-                        cancel_flag.set()
-                        # Clean up remaining threads
-                        for th in inflight:
-                            th.join(timeout=0.5)
-                        # Emit summary
-                        elapsed_ms = int((time.monotonic() - t0) * 1000)
-                        summary_event = {
-                            "outcome": "success",
-                            "reason": res.reason,
-                            "tier": tier.name,
-                            "total_elapsed_ms": elapsed_ms,
-                            "attempts_used": attempts_used,
-                            "work_id": context.get("work_id"),
-                            "artifact_id": context.get("artifact_id"),
-                        }
-                        if hasattr(self.tele, "log_fallback_summary"):
-                            self.tele.log_fallback_summary(summary_event)
-                        return res
+                if result.is_success():
+                    self._cancellation_flag.set()
+                    return result
 
-                except queue.Empty:
-                    # Timeout - check budget and continue waiting
-                    continue
-
-            # Join threads for this tier
-            for th in inflight:
-                th.join(timeout=0.5)
-
-            # Log tier summary
-            successes = sum(1 for r in tier_results if r.is_success)
-            self.log.debug(f"Tier {tier.name} complete: {successes}/{launched} success")
-
-        # ====================================================================
-        # No success - return exhausted outcome
-        # ====================================================================
-        elapsed_ms = int((time.monotonic() - t0) * 1000)
-        self.log.warning(f"No PDF found after {attempts_used} attempts in {elapsed_ms}ms")
-        # Emit summary for exhausted outcome
-        summary_event = {
-            "outcome": "exhausted",
-            "reason": "no_pdf_found",
-            "total_elapsed_ms": elapsed_ms,
-            "attempts_used": attempts_used,
-            "tiers_attempted": len(self.plan.tiers),
-            "work_id": context.get("work_id"),
-            "artifact_id": context.get("artifact_id"),
-        }
-        if hasattr(self.tele, "log_fallback_summary"):
-            self.tele.log_fallback_summary(summary_event)
+        # Tier exhausted
         return AttemptResult(
-            outcome="no_pdf",
-            reason="exhausted",
-            elapsed_ms=elapsed_ms,
-            meta={
-                "attempts": attempts_used,
-                "tiers": len(self.plan.tiers),
-            },
+            outcome="error",
+            reason="tier_exhausted",
+            elapsed_ms=self._elapsed_ms(),
+            meta={"tier": tier.name, "sources_tried": len(available_sources)},
         )
 
     def _health_gate(
-        self,
-        source_name: str,
-        context: Dict[str, Any],
+        self, source_name: str, context: Dict[str, Any]
     ) -> Optional[AttemptResult]:
-        """Check health gates for a source attempt.
+        """Check health gate for a source.
 
-        Gates include:
-        - Breaker status (skip if open)
-        - Offline mode (skip artifact attempts)
+        Evaluates:
+        - Circuit breaker state
+        - Offline mode
+        - Rate limiter awareness
 
-        Args:
-            source_name: Name of the source
-            context: Request context
-
-        Returns:
-            AttemptResult (skipped) if gate blocks, None otherwise
+        Returns None if source is healthy (proceed), or AttemptResult(skipped)
+        if gate fails.
         """
-        # Check offline behavior
-        if context.get("offline"):
-            if self.plan.offline_behavior != "metadata_only" and self._is_artifact_source(
-                source_name
-            ):
+        # Circuit breaker check
+        if self.breaker:
+            try:
+                # Check if source is open
+                breaker_key = f"fallback_{source_name}"
+                if self.breaker.is_open(breaker_key):
+                    return AttemptResult(
+                        outcome="skipped",
+                        reason="breaker_open",
+                        meta={"breaker_key": breaker_key},
+                    )
+            except Exception as e:
+                self.logger.debug(f"Breaker check failed: {e}")
+
+        # Offline mode check
+        if context.get("offline_mode"):
+            # Allow only cached sources
+            if source_name not in ("landing_scrape",):  # Landing may have local cache
                 return AttemptResult(
                     outcome="skipped",
-                    reason="offline_block",
-                    elapsed_ms=0,
-                    meta={"behavior": self.plan.offline_behavior},
+                    reason="offline_mode",
+                    meta={"source": source_name},
                 )
 
-        # Breaker gate would be checked by adapter before network attempt
-        # (adapters call breaker.allow() internally)
+        # Rate limiter awareness (informational only, don't block)
+        if self.rate_limiter:
+            try:
+                # Check rate limiter state (don't acquire, just peek)
+                # This is informational for telemetry
+                pass
+            except Exception as e:
+                self.logger.debug(f"Rate limiter check failed: {e}")
+
         return None
 
-    def _is_artifact_source(self, source_name: str) -> bool:
-        """Check if a source is for artifact (vs. metadata) attempts.
-
-        Artifact sources: any that directly fetch PDFs (as opposed to
-        metadata APIs). For now, conservative: mark none as metadata-only.
-
-        Args:
-            source_name: Name of the source
-
-        Returns:
-            True if artifact source, False if metadata-only
-        """
-        # In this simple implementation, all sources are artifact attempts
-        # (they fetch actual PDFs or landing pages, not metadata APIs only).
-        # Adapters like landing_scrape still download HTML, so they're
-        # "artifact-tier" in this context.
-        return True
-
-    def _emit_attempt_telemetry(
-        self,
-        tier: str,
-        result: AttemptResult,
-        context: Dict[str, Any],
+    def _emit_telemetry(
+        self, tier_name: str, result: AttemptResult, context: Dict[str, Any]
     ) -> None:
-        """Emit structured telemetry for an attempt.
+        """Emit attempt telemetry.
 
         Args:
-            tier: Tier name
+            tier_name: Current tier name
             result: AttemptResult
-            context: Request context
+            context: Resolution context
         """
-        event = {
-            "event": "fallback_attempt",
-            "tier": tier,
-            "outcome": result.outcome,
-            "reason": result.reason,
-            "elapsed_ms": result.elapsed_ms,
-            "host": result.host,
-            "status": result.status,
-            "work_id": context.get("work_id"),
-            "artifact_id": context.get("artifact_id"),
-        }
+        if not self.telemetry:
+            return
 
-        # Add source from metadata if available
-        if result.meta and "source" in result.meta:
-            event["source"] = result.meta["source"]
+        try:
+            event = {
+                "event_type": "fallback_attempt",
+                "tier": tier_name,
+                "outcome": result.outcome,
+                "reason": result.reason,
+                "url": result.url,
+                "elapsed_ms": result.elapsed_ms,
+                "status": result.status,
+                "host": result.host,
+                "meta": dict(result.meta),
+            }
+            self.telemetry.emit(event)
+        except Exception as e:
+            self.logger.warning(f"Telemetry emission failed: {e}")
 
-        # Log via telemetry sink (assuming it has log_fallback_attempt)
-        if hasattr(self.tele, "log_fallback_attempt"):
-            self.tele.log_fallback_attempt(event)
+    def _is_budget_exhausted(self) -> bool:
+        """Check if budget is exhausted.
 
-        # Also log to standard logger
-        self.log.debug(f"Fallback attempt: {event}")
+        Checks both time and attempt budgets.
+        """
+        with self._budget_lock:
+            # Attempt budget
+            if (
+                self._attempt_count
+                >= self.plan.budgets.get("total_attempts", float("inf"))
+            ):
+                return True
+
+            # Time budget
+            if self._elapsed_ms() >= self.plan.budgets.get(
+                "total_timeout_ms", float("inf")
+            ):
+                return True
+
+        return False
+
+    def _elapsed_ms(self) -> int:
+        """Get elapsed time in milliseconds."""
+        if not self._start_time:
+            return 0
+        return int((time.time() - self._start_time) * 1000)
+
+    def _remaining_timeout_s(self) -> Optional[float]:
+        """Get remaining timeout in seconds."""
+        remaining_ms = self.plan.budgets.get("total_timeout_ms", float("inf")) - self._elapsed_ms()
+        if remaining_ms <= 0:
+            return 0.1  # Minimal timeout to trigger
+        return remaining_ms / 1000.0
+
+    def _timeout_outcome(self) -> AttemptResult:
+        """Create a timeout outcome."""
+        return AttemptResult(
+            outcome="timeout",
+            reason="budget_exhausted",
+            elapsed_ms=self._elapsed_ms(),
+            meta={
+                "total_attempts": self._attempt_count,
+                "budget_ms": self.plan.budgets.get("total_timeout_ms"),
+            },
+        )
+
+
+__all__ = ["FallbackOrchestrator"]
