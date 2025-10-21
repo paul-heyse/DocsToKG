@@ -297,7 +297,7 @@ def stream_to_part(
         RuntimeError: On HTTP errors, Content-Range mismatch, or Content-Length mismatch.
     """
     from DocsToKG.ContentDownload.io_utils import SizeMismatchError
-    
+
     part_path.parent.mkdir(parents=True, exist_ok=True)
     resumed_from = 0
     t0 = time.monotonic()

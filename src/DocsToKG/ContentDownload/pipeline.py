@@ -19,7 +19,8 @@ Design:
 from __future__ import annotations
 
 import logging
-from typing import Any, Optional, Sequence
+from dataclasses import dataclass, field
+from typing import Any, Dict, Optional, Sequence
 
 from DocsToKG.ContentDownload.api import (
     DownloadOutcome,
@@ -27,11 +28,19 @@ from DocsToKG.ContentDownload.api import (
     ResolverResult,
 )
 from DocsToKG.ContentDownload.api.exceptions import DownloadError, SkipDownload
+from DocsToKG.ContentDownload.api.types import (
+    AttemptRecord,
+    AttemptStatus,
+    DownloadStreamResult,
+    OutcomeClass,
+    ReasonCode,
+)
 from DocsToKG.ContentDownload.download_execution import (
     finalize_candidate_download,
     prepare_candidate_download,
     stream_candidate_payload,
 )
+from DocsToKG.ContentDownload.telemetry_records import PipelineResult
 
 LOGGER = logging.getLogger(__name__)
 
@@ -260,3 +269,50 @@ class ResolverPipeline:
                 reason="download-error",  # type: ignore
                 meta={"error": str(e)},
             )
+
+
+# ============================================================================
+# BACKWARD COMPATIBILITY RE-EXPORTS
+# ============================================================================
+# Phase 7B: Export types from api/types and telemetry_records for backward compat
+
+# Legacy placeholder stubs for minimal compatibility
+
+@dataclass
+class ResolverMetrics:
+    """⚠️  DEPRECATED: Legacy metrics placeholder.
+    
+    Use telemetry infrastructure instead.
+    Kept only for download.py type hints during transition.
+    """
+    attempts: Dict[str, int] = field(default_factory=dict)
+    successes: Dict[str, int] = field(default_factory=dict)
+    errors: Dict[str, int] = field(default_factory=dict)
+
+@dataclass
+class ResolverConfig:
+    """⚠️  DEPRECATED: Legacy resolver config placeholder.
+    
+    Kept only for legacy test imports.
+    Do not use in new code.
+    """
+    pass
+
+__all__ = [
+    # Core orchestrator
+    "ResolverPipeline",
+    # Re-exported types from api/types
+    "AttemptRecord",
+    "DownloadOutcome",
+    "DownloadPlan",
+    "DownloadStreamResult",
+    "ResolverResult",
+    "AttemptStatus",
+    "OutcomeClass",
+    "ReasonCode",
+    # Re-exported from telemetry_records
+    "PipelineResult",
+    # Legacy compatibility stubs
+    "ResolverMetrics",
+    "ResolverConfig",
+]

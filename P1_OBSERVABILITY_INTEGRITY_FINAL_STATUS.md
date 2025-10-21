@@ -1,6 +1,6 @@
 # P1 (Observability & Integrity) — Final Implementation Status
 
-**Date:** October 21, 2025  
+**Date:** October 21, 2025
 **Status:** 🟢 **100% COMPLETE & PRODUCTION READY**
 
 ---
@@ -25,12 +25,14 @@ The **P1 (Observability & Integrity)** scope is fully implemented and production
 **Location:** `src/DocsToKG/ContentDownload/telemetry.py`
 
 **Delivered:**
+
 - `SimplifiedAttemptRecord` dataclass (140 LOC)
 - 40+ stable status/reason token constants (ATTEMPT_STATUS_*, ATTEMPT_REASON_*)
 - `AttemptSink` protocol extended with `log_io_attempt()` method
 - `RunTelemetry` class implementing `log_io_attempt()` delegation
 
 **Tests:** 16/16 passing (100%)
+
 - SimplifiedAttemptRecord validation
 - ListAttemptSink collection behavior
 - HTTP HEAD/GET/retry/304/error emission
@@ -46,6 +48,7 @@ The **P1 (Observability & Integrity)** scope is fully implemented and production
 **Location:** `src/DocsToKG/ContentDownload/io_utils.py`
 
 **Delivered:**
+
 - `SizeMismatchError` exception class (38 LOC)
 - `atomic_write_stream()` function (84 LOC)
   - Temporary file + fsync + atomic rename pattern
@@ -54,6 +57,7 @@ The **P1 (Observability & Integrity)** scope is fully implemented and production
   - 1 MiB default chunk size
 
 **Tests:** 24/24 passing (100%)
+
 - Basic write functionality (small, large, chunked, empty)
 - Content-Length verification (match, too few, too many)
 - Temporary file cleanup on error
@@ -67,12 +71,14 @@ The **P1 (Observability & Integrity)** scope is fully implemented and production
 
 ### Phase 2: HTTP Emission & Pipeline Wiring ✅
 
-**Location:** 
+**Location:**
+
 - `src/DocsToKG/ContentDownload/networking.py` (HTTP emission)
 - `src/DocsToKG/ContentDownload/download_execution.py` (Parameter threading)
 - `src/DocsToKG/ContentDownload/pipeline.py` (Pipeline wiring)
 
 **Delivered:**
+
 - `emit_http_event()` integrated into `request_with_retries()`
 - Telemetry and run_id params added to download helpers:
   - `prepare_candidate_download()`
@@ -83,6 +89,7 @@ The **P1 (Observability & Integrity)** scope is fully implemented and production
 - Best-effort emission (never breaks requests)
 
 **Tests:** 9/9 passing (100%)
+
 - End-to-end telemetry flow
 - Backward compatibility
 - Download chain wiring
@@ -97,6 +104,7 @@ The **P1 (Observability & Integrity)** scope is fully implemented and production
 **Location:** `src/DocsToKG/ContentDownload/robots.py`
 
 **Delivered:**
+
 - `RobotsCache` class (120 LOC)
   - Thread-safe per-hostname caching
   - Configurable TTL (default 3600s)
@@ -107,6 +115,7 @@ The **P1 (Observability & Integrity)** scope is fully implemented and production
 - Telemetry emission on robots check
 
 **Tests:** 19/20 passing (95%)
+
 - Initialization and TTL behavior
 - Allowed/disallowed URL detection
 - Fail-open semantics
@@ -124,6 +133,7 @@ The **P1 (Observability & Integrity)** scope is fully implemented and production
 **Location:** `src/DocsToKG/ContentDownload/telemetry.py`
 
 **Delivered:**
+
 - `RunTelemetry.record_pipeline_result()` method
 - Centralized final outcome emission
 - Consistent run_id threading
@@ -140,6 +150,7 @@ The **P1 (Observability & Integrity)** scope is fully implemented and production
 **Location:** `src/DocsToKG/ContentDownload/streaming.py`
 
 **Delivered:**
+
 - Added `verify_content_length` parameter to `stream_to_part()`
 - SizeMismatchError raised on mismatch
 - Works correctly with resume (partial downloads)
@@ -147,6 +158,7 @@ The **P1 (Observability & Integrity)** scope is fully implemented and production
 - Config field `DownloadPolicy.verify_content_length` already exists
 
 **Tests:** 6/6 new tests passing (100%)
+
 - `test_content_length_match_succeeds`
 - `test_content_length_mismatch_raises_error`
 - `test_content_length_too_many_bytes_raises_error`
@@ -262,24 +274,29 @@ SimplifiedAttemptRecord
 ## Integration Points
 
 ### 1. HTTP Layer (`networking.py`)
+
 - `request_with_retries()` emits HTTP attempt events
 - Captures: verb, status, http_status, elapsed_ms, bytes
 
 ### 2. Download Pipeline (`download.py`, `download_execution.py`)
+
 - Telemetry and run_id threaded through call chain
 - `stream_to_part()` called with verify_content_length flag
 - Final outcomes routed through `RunTelemetry.record_pipeline_result()`
 
 ### 3. Streaming Integration (`streaming.py`)
+
 - `stream_to_part()` verifies Content-Length matches actual bytes
 - Raises SizeMismatchError on mismatch
 - Works with resume (partial downloads)
 
 ### 4. Resolver Pipeline (`resolvers/landing_page.py`)
+
 - `RobotsCache` checked before landing-page fetches
 - New event reason: `ResolverEventReason.ROBOTS_DISALLOWED`
 
 ### 5. Configuration (`config/models.py`)
+
 - `DownloadPolicy` fields:
   - `atomic_write`: bool
   - `verify_content_length`: bool
@@ -355,6 +372,7 @@ These are covered by existing Pillar 7 (Observability) work.
 **P1 (Observability & Integrity) is 100% complete and production-ready.**
 
 All objectives met:
+
 1. ✅ Telemetry + run_id passed through download call chain
 2. ✅ Every HTTP interaction emits structured attempt event
 3. ✅ Atomic file writes + Content-Length verification guarantee on-disk integrity

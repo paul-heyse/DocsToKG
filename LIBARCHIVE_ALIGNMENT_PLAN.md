@@ -19,6 +19,7 @@ All gaps have been closed. Implementation is production-ready and matches specif
 ## Gap Closure Summary (100% Complete)
 
 ### ✅ Gap 1: Per-Entry Compression Ratio (ZIP-Only)
+
 - **Status:** CLOSED (commit 158978fb)
 - **Implementation:** Extract compressed_size from libarchive entry object
 - **Validation:** Passed to PreScanValidator.validate_entry() for ZIP bomb detection
@@ -26,6 +27,7 @@ All gaps have been closed. Implementation is production-ready and matches specif
 - **Specification:** ✅ "Per-entry compression ratio check (max_entry_ratio)"
 
 ### ✅ Gap 2: Deterministic Ordering Setting
+
 - **Status:** CLOSED (commit 158978fb)
 - **Field Added:** `ExtractionSettings.deterministic_order: Literal["header", "path_asc"]`
 - **Implementation:** Sorting logic after pre-scan if deterministic_order == "path_asc"
@@ -33,6 +35,7 @@ All gaps have been closed. Implementation is production-ready and matches specif
 - **Specification:** ✅ "Choose header order OR path ascending (once, expose as setting)"
 
 ### ✅ Gap 3: Full Policy Snapshot in Audit JSON
+
 - **Status:** CLOSED (commit 158978fb)
 - **Change:** Audit manifest now includes full policy.model_dump()
 - **Coverage:** All 30+ settings captured in .extract.audit.json
@@ -40,6 +43,7 @@ All gaps have been closed. Implementation is production-ready and matches specif
 - **Specification:** ✅ "Include full materialized policy (not just hash)"
 
 ### ✅ Gap 4: Windows Portability Test Coverage
+
 - **Status:** CLOSED (commit 41b59f98)
 - **Tests Added:** 31 parametrized Windows portability tests
 - **Coverage:**
