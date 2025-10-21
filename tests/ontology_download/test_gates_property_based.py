@@ -152,11 +152,11 @@ class TestFilesystemGateProperties:
             alphabet=string.ascii_lowercase + string.digits + "-_", min_size=1, max_size=50
         )
     )
-    @settings(max_examples=100)
+    @settings(max_examples=100, suppress_health_check=[HealthCheck.function_scoped_fixture])
     def test_filesystem_gate_accepts_normal_paths(self, path_part: str, tmp_path: Path):
         """Filesystem gate should accept well-formed paths."""
         root = tmp_path / "extract"
-        root.mkdir()
+        root.mkdir(exist_ok=True)
 
         result = filesystem_gate(
             root_path=str(root),
@@ -168,11 +168,11 @@ class TestFilesystemGateProperties:
     @given(
         depth=st.integers(min_value=1, max_value=10),
     )
-    @settings(max_examples=50)
+    @settings(max_examples=50, suppress_health_check=[HealthCheck.function_scoped_fixture])
     def test_filesystem_gate_accepts_reasonable_depths(self, depth: int, tmp_path: Path):
         """Filesystem gate should accept reasonable path depths."""
         root = tmp_path / "extract"
-        root.mkdir()
+        root.mkdir(exist_ok=True)
 
         # Build a nested path
         parts = [f"dir{i}" for i in range(depth)]
@@ -196,13 +196,13 @@ class TestFilesystemGateProperties:
             ]
         )
     )
-    @settings(max_examples=50)
+    @settings(max_examples=50, suppress_health_check=[HealthCheck.function_scoped_fixture])
     def test_filesystem_gate_rejects_traversal_attempts(
         self, traversal_attempt: str, tmp_path: Path
     ):
         """Filesystem gate should reject all path traversal attempts."""
         root = tmp_path / "extract"
-        root.mkdir()
+        root.mkdir(exist_ok=True)
 
         with pytest.raises(FilesystemPolicyException):
             filesystem_gate(
@@ -221,13 +221,13 @@ class TestFilesystemGateProperties:
             ]
         )
     )
-    @settings(max_examples=50)
+    @settings(max_examples=50, suppress_health_check=[HealthCheck.function_scoped_fixture])
     def test_filesystem_gate_rejects_absolute_paths(
         self, absolute_path: str, tmp_path: Path
     ):
         """Filesystem gate should reject absolute paths."""
         root = tmp_path / "extract"
-        root.mkdir()
+        root.mkdir(exist_ok=True)
 
         with pytest.raises(FilesystemPolicyException):
             filesystem_gate(
@@ -257,8 +257,10 @@ class TestGateInvariants:
 
     @given(st.just(0))
     @settings(max_examples=10)
-    def test_all_gate_timings_reasonable(self, _: int, tmp_path: Path):
+    def test_all_gate_timings_reasonable(self, _: int):
         """All gates should complete within reasonable time bounds."""
+        import tempfile
+
         # URL gate
         url_result = url_gate(
             "https://example.com/path",
@@ -276,15 +278,16 @@ class TestGateInvariants:
         )
         assert extraction_result.elapsed_ms < 50.0
 
-        # Filesystem gate
-        root = tmp_path / "extract"
-        root.mkdir()
-        fs_result = filesystem_gate(
-            root_path=str(root),
-            entry_paths=["test.txt"],
-            allow_symlinks=False,
-        )
-        assert fs_result.elapsed_ms < 50.0
+        # Filesystem gate - use context manager to avoid fixture issue
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir) / "extract"
+            root.mkdir()
+            fs_result = filesystem_gate(
+                root_path=str(root),
+                entry_paths=["test.txt"],
+                allow_symlinks=False,
+            )
+            assert fs_result.elapsed_ms < 50.0
 
 
 if __name__ == "__main__":
