@@ -20,6 +20,11 @@ from .client import (
     request_with_redirect_audit,
     reset_http_client,
 )
+from .download_helper import (
+    DownloadError,
+    head_request,
+    stream_download_to_file,
+)
 from .instrumentation import (
     CacheStatus,
     NetRequestEmitter,
@@ -36,6 +41,10 @@ __all__ = [
     "close_http_client",
     "reset_http_client",
     "request_with_redirect_audit",
+    # Download helpers
+    "stream_download_to_file",
+    "head_request",
+    "DownloadError",
     # Telemetry
     "CacheStatus",
     "RequestStatus",
