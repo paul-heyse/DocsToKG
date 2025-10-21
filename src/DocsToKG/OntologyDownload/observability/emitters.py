@@ -348,12 +348,8 @@ class ParquetEmitter(EventEmitter):
         try:
             event_dict = event.to_dict()
             # Flatten context and ids for Parquet
-            event_dict.update({
-                f"context_{k}": v for k, v in event_dict.pop("context", {}).items()
-            })
-            event_dict.update({
-                f"ids_{k}": v for k, v in event_dict.pop("ids", {}).items()
-            })
+            event_dict.update({f"context_{k}": v for k, v in event_dict.pop("context", {}).items()})
+            event_dict.update({f"ids_{k}": v for k, v in event_dict.pop("ids", {}).items()})
 
             with self._lock:
                 self._batch_buffer.append(event_dict)
