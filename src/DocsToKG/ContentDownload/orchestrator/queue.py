@@ -32,19 +32,19 @@ The queue implements a job state machine:
 **Usage:**
 
     queue = WorkQueue("state/workqueue.sqlite", wal_mode=True)
-    
+
     # Enqueue artifacts (idempotent)
     queue.enqueue("doi:10.1234/example", {"doi": "10.1234/example"})
-    
+
     # Lease jobs for processing
     jobs = queue.lease("worker-1", limit=5, lease_ttl_sec=600)
-    
+
     # Process jobs, then ack with outcome
     queue.ack(job["id"], "done", last_error=None)
-    
+
     # On failure, retry
     queue.fail_and_retry(job["id"], backoff_sec=60, max_attempts=3, last_error=str(e))
-    
+
     # Monitor
     stats = queue.stats()  # {"queued": 10, "in_progress": 2, ...}
 
@@ -111,25 +111,25 @@ CREATE INDEX IF NOT EXISTS idx_jobs_created ON jobs(created_at);
 
 class WorkQueue:
     """SQLite-backed work queue with idempotent enqueue and crash-safe leasing.
-    
+
     Provides durable job coordination with exactly-once semantics through
     atomic state transitions and worker leasing with TTL-based recovery.
     """
-    
+
     def __init__(self, path: str, wal_mode: bool = True) -> None:
         """Initialize work queue.
-        
+
         Args:
             path: Path to SQLite database file
             wal_mode: Enable WAL mode for concurrent access (default True)
         """
         self.path = path
         self._connection_lock = threading.Lock()
-        
+
         # Create parent directories if needed
         db_path = Path(path)
         db_path.parent.mkdir(parents=True, exist_ok=True)
-        
+
         # Initialize database with WAL mode if requested
         conn = sqlite3.connect(path, timeout=10.0)
         if wal_mode:
@@ -139,16 +139,16 @@ class WorkQueue:
         conn.executescript(_SCHEMA_SQL)
         conn.commit()
         conn.close()
-        
+
         logger.info(f"WorkQueue initialized at {path} (wal_mode={wal_mode})")
-    
+
     def _get_connection(self) -> sqlite3.Connection:
         """Get thread-local database connection."""
         conn = sqlite3.connect(self.path, timeout=10.0)
         conn.execute("PRAGMA foreign_keys=ON")
         conn.row_factory = sqlite3.Row
         return conn
-    
+
     def enqueue(
         self,
         artifact_id: str,
@@ -156,15 +156,15 @@ class WorkQueue:
         resolver_hint: Optional[str] = None,
     ) -> bool:
         """Idempotently enqueue an artifact for processing.
-        
+
         Args:
             artifact_id: Unique artifact identifier (e.g., "doi:10.1234/example")
             artifact: Artifact payload (serialized to JSON)
             resolver_hint: Optional hint about which resolver might work
-            
+
         Returns:
             True if enqueued (new), False if already exists (idempotent)
-            
+
         Raises:
             sqlite3.Error: If database operation fails
         """
@@ -172,27 +172,34 @@ class WorkQueue:
         try:
             now_iso = datetime.now(timezone.utc).isoformat()
             artifact_json = json.dumps(dict(artifact))
-            
+
             cursor = conn.execute(
                 """
-                INSERT OR IGNORE INTO jobs 
+                INSERT OR IGNORE INTO jobs
                 (artifact_id, artifact_json, state, resolver_hint, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?)
                 """,
-                (artifact_id, artifact_json, JobState.QUEUED.value, resolver_hint, now_iso, now_iso),
+                (
+                    artifact_id,
+                    artifact_json,
+                    JobState.QUEUED.value,
+                    resolver_hint,
+                    now_iso,
+                    now_iso,
+                ),
             )
             conn.commit()
-            
+
             was_inserted = cursor.rowcount > 0
             if was_inserted:
                 logger.debug(f"Enqueued artifact {artifact_id}")
             else:
                 logger.debug(f"Artifact {artifact_id} already enqueued (idempotent)")
-            
+
             return was_inserted
         finally:
             conn.close()
-    
+
     def lease(
         self,
         worker_id: str,
@@ -200,19 +207,19 @@ class WorkQueue:
         lease_ttl_sec: int,
     ) -> list[dict[str, Any]]:
         """Atomically lease up to `limit` jobs for a worker.
-        
+
         Moves jobs from QUEUED (or stale IN_PROGRESS) to IN_PROGRESS state,
         assigning them to the worker. Implements crash recovery by re-leasing
         jobs whose lease has expired.
-        
+
         Args:
             worker_id: Unique worker identifier
             limit: Maximum jobs to lease
             lease_ttl_sec: Lease time-to-live in seconds
-            
+
         Returns:
             List of job dicts ready for processing
-            
+
         Raises:
             sqlite3.Error: If database operation fails
         """
@@ -221,7 +228,7 @@ class WorkQueue:
             now_iso = datetime.now(timezone.utc).isoformat()
             lease_expires = datetime.now(timezone.utc) + timedelta(seconds=lease_ttl_sec)
             lease_expires_iso = lease_expires.isoformat()
-            
+
             # Atomically lease queued jobs and stale in-progress jobs
             cursor = conn.execute(
                 """
@@ -246,7 +253,7 @@ class WorkQueue:
                 ),
             )
             conn.commit()
-            
+
             # Fetch the leased jobs
             leased_jobs = conn.execute(
                 """
@@ -258,7 +265,7 @@ class WorkQueue:
                 """,
                 (worker_id, JobState.IN_PROGRESS.value, now_iso, limit),
             ).fetchall()
-            
+
             result = [
                 {
                     "id": row["id"],
@@ -270,23 +277,23 @@ class WorkQueue:
                 }
                 for row in leased_jobs
             ]
-            
+
             if result:
                 logger.debug(f"Worker {worker_id} leased {len(result)} jobs")
-            
+
             return result
         finally:
             conn.close()
-    
+
     def heartbeat(self, worker_id: str) -> None:
         """Extend lease for active worker.
-        
+
         Updates lease_expires_at to current time + lease_ttl, keeping the worker's
         jobs from being reclaimed by other workers.
-        
+
         Args:
             worker_id: Worker identifier
-            
+
         Raises:
             sqlite3.Error: If database operation fails
         """
@@ -294,7 +301,7 @@ class WorkQueue:
         try:
             now_iso = datetime.now(timezone.utc).isoformat()
             # Note: In production, would extend by lease_ttl_sec, but keeping simple here
-            
+
             cursor = conn.execute(
                 """
                 UPDATE jobs
@@ -304,12 +311,12 @@ class WorkQueue:
                 (now_iso, now_iso, worker_id, JobState.IN_PROGRESS.value),
             )
             conn.commit()
-            
+
             if cursor.rowcount > 0:
                 logger.debug(f"Heartbeat for worker {worker_id} extended {cursor.rowcount} leases")
         finally:
             conn.close()
-    
+
     def ack(
         self,
         job_id: int,
@@ -317,14 +324,14 @@ class WorkQueue:
         last_error: Optional[str] = None,
     ) -> None:
         """Acknowledge job completion with outcome.
-        
+
         Transitions job to terminal state (DONE, SKIPPED, or ERROR).
-        
+
         Args:
             job_id: Job ID
             outcome: Terminal outcome (e.g., "done", "skipped", "error")
             last_error: Optional error message if outcome is error
-            
+
         Raises:
             ValueError: If outcome is not a valid JobState
             sqlite3.Error: If database operation fails
@@ -339,11 +346,11 @@ class WorkQueue:
             state = JobState.ERROR
         else:
             raise ValueError(f"Invalid outcome: {outcome}")
-        
+
         conn = self._get_connection()
         try:
             now_iso = datetime.now(timezone.utc).isoformat()
-            
+
             cursor = conn.execute(
                 """
                 UPDATE jobs
@@ -353,14 +360,14 @@ class WorkQueue:
                 (state.value, last_error, now_iso, job_id),
             )
             conn.commit()
-            
+
             if cursor.rowcount > 0:
                 logger.debug(f"Job {job_id} acked with outcome={outcome}")
             else:
                 logger.warning(f"Job {job_id} not found for ack")
         finally:
             conn.close()
-    
+
     def fail_and_retry(
         self,
         job_id: int,
@@ -369,23 +376,23 @@ class WorkQueue:
         last_error: str,
     ) -> None:
         """Increment attempts and retry or fail job.
-        
+
         On failure, either re-queues the job (with a delay) or marks it ERROR
         if max_attempts has been exceeded.
-        
+
         Args:
             job_id: Job ID
             backoff_sec: Seconds to delay before retrying
             max_attempts: Maximum attempts allowed
             last_error: Error message describing the failure
-            
+
         Raises:
             sqlite3.Error: If database operation fails
         """
         conn = self._get_connection()
         try:
             now_iso = datetime.now(timezone.utc).isoformat()
-            
+
             # Increment attempts
             cursor = conn.execute(
                 """
@@ -397,21 +404,21 @@ class WorkQueue:
                 """,
                 (last_error, now_iso, job_id),
             )
-            
+
             # Check if we should retry or fail
             job = conn.execute("SELECT attempts FROM jobs WHERE id = ?", (job_id,)).fetchone()
             if job is None:
                 logger.warning(f"Job {job_id} not found for fail_and_retry")
                 return
-            
+
             attempts = job["attempts"]
-            
+
             if attempts < max_attempts:
                 # Re-queue with exponential backoff (simple: just use backoff_sec)
                 delay_expires = (
                     datetime.now(timezone.utc) + timedelta(seconds=backoff_sec)
                 ).isoformat()
-                
+
                 conn.execute(
                     """
                     UPDATE jobs
@@ -435,20 +442,19 @@ class WorkQueue:
                     (JobState.ERROR.value, now_iso, job_id),
                 )
                 logger.warning(
-                    f"Job {job_id} marked ERROR after {attempts} attempts. "
-                    f"Error: {last_error}"
+                    f"Job {job_id} marked ERROR after {attempts} attempts. Error: {last_error}"
                 )
-            
+
             conn.commit()
         finally:
             conn.close()
-    
+
     def stats(self) -> dict[str, int]:
         """Get queue statistics.
-        
+
         Returns:
             Dict with counts for each state and total
-            
+
         Raises:
             sqlite3.Error: If database operation fails
         """
@@ -459,7 +465,7 @@ class WorkQueue:
                 SELECT state, COUNT(*) as count FROM jobs GROUP BY state
                 """
             ).fetchall()
-            
+
             stats_dict: dict[str, int] = {
                 "queued": 0,
                 "in_progress": 0,
@@ -468,13 +474,13 @@ class WorkQueue:
                 "error": 0,
                 "total": 0,
             }
-            
+
             for row in counts:
                 state = row["state"]
                 count = row["count"]
                 stats_dict[state] = count
                 stats_dict["total"] += count
-            
+
             return stats_dict
         finally:
             conn.close()

@@ -30,10 +30,10 @@ from DocsToKG.ContentDownload.api.types import AttemptStatus, ReasonCode
 class TelemetryAttemptRecord:
     """
     Structured telemetry record for HTTP/IO attempts.
-    
+
     Used throughout the download pipeline to track detailed low-level
     HTTP and I/O operations with full traceability.
-    
+
     Attributes:
         ts: Timestamp when attempt occurred (UTC)
         run_id: Run identifier (None if telemetry disabled)
@@ -49,7 +49,7 @@ class TelemetryAttemptRecord:
         content_length_hdr: Content-Length header value (for verification)
         extra: Arbitrary metadata (retry count, redirect chain, etc)
     """
-    
+
     ts: datetime
     run_id: Optional[str]
     resolver: Optional[str]

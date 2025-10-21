@@ -49,16 +49,16 @@ class ConfigurationError(ValueError):
 
 def load_from_yaml(yaml_path: Path) -> Dict[str, Any]:
     """Load fallback plan from YAML file.
-    
+
     Fallback strategy is enabled by default with no backward compatibility
     checks. All configuration is read from the YAML file.
-    
+
     Args:
         yaml_path: Path to fallback.yaml or custom configuration file
-        
+
     Returns:
         Dictionary representation of the FallbackPlan
-        
+
     Raises:
         FileNotFoundError: If yaml_path doesn't exist
         ConfigurationError: If YAML is invalid or missing required keys

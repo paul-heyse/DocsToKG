@@ -53,6 +53,7 @@ class ResolverPipeline:
         session: Any,
         telemetry: Optional[Any] = None,
         run_id: Optional[str] = None,
+        client_map: Optional[dict[str, Any]] = None,
     ):
         """
         Initialize pipeline.
@@ -62,11 +63,13 @@ class ResolverPipeline:
             session: HTTP session/client
             telemetry: Optional telemetry sink
             run_id: Optional run ID for correlation
+            client_map: Optional dict mapping resolver_name → per-resolver HTTP client
         """
         self._resolvers = list(resolvers)
         self._session = session
         self._telemetry = telemetry
         self._run_id = run_id
+        self._client_map = client_map or {}
 
     def run(self, artifact: Any, ctx: Any) -> DownloadOutcome:
         """
@@ -168,6 +171,9 @@ class ResolverPipeline:
         Returns:
             DownloadOutcome (success, skip, or error)
         """
+        # Select per-resolver client (fallback to shared session if not available)
+        client = self._client_map.get(plan.resolver_name, self._session)
+
         try:
             # Stage 1: Prepare (preflight validation)
             try:
@@ -199,7 +205,7 @@ class ResolverPipeline:
             try:
                 stream = stream_candidate_payload(
                     adj_plan,
-                    session=self._session,
+                    session=client,
                     timeout_s=getattr(ctx, "timeout_s", None),
                     max_bytes=getattr(ctx, "max_bytes", None),
                     telemetry=self._telemetry,

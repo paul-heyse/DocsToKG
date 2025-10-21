@@ -25,6 +25,7 @@ from DocsToKG.ContentDownload.resolver_http_client import (
     RetryConfig,
     TokenBucket,
 )
+from DocsToKG.ContentDownload.resolver_pipeline import ResolverPipeline
 
 
 class TestHttpSession(unittest.TestCase):
