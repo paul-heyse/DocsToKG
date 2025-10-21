@@ -1134,6 +1134,7 @@ def _chunk_stage_worker(item: WorkItem) -> ItemOutcome:
         "parse_engine": result.parse_engine,
         "anchors_injected": result.anchors_injected,
         "sanitizer_profile": result.sanitizer_profile,
+        "chunks_format": config.format,
     }
     result_payload = {
         "chunk_count": result.chunk_count,

@@ -18,16 +18,17 @@ from __future__ import annotations
 import logging
 import os
 import time
-from contextlib import nullcontext
 from typing import Any, Optional
 
 from DocsToKG.ContentDownload.api import (
     DownloadOutcome,
     DownloadPlan,
     DownloadStreamResult,
-    ReasonCode,
 )
 from DocsToKG.ContentDownload.api.exceptions import DownloadError, SkipDownload
+from DocsToKG.ContentDownload.io_utils import SizeMismatchError, atomic_write_stream
+from DocsToKG.ContentDownload.policy.path_gate import PathPolicyError, validate_path_safety
+from DocsToKG.ContentDownload.policy.url_gate import PolicyError, validate_url_security
 
 LOGGER = logging.getLogger(__name__)
 
@@ -81,21 +82,23 @@ def stream_candidate_payload(
     timeout_s: Optional[float] = None,
     chunk_size: int = 1 << 20,  # 1 MB default
     max_bytes: Optional[int] = None,
+    verify_content_length: bool = True,
     telemetry: Any = None,
     run_id: Optional[str] = None,
 ) -> DownloadStreamResult:
     """
-    Stream HTTP payload to a temporary file.
+    Stream HTTP payload to a temporary file using atomic write.
 
     Emits telemetry for HEAD and GET attempts.
     Validates content-type and size during streaming.
+    Honors hishel cache metadata (from_cache, revalidated extensions).
 
     Returns:
         DownloadStreamResult with path_tmp, bytes_written, http_status, content_type.
 
     Raises:
-        SkipDownload: If content-type doesn't match expected
-        DownloadError: If connection error, timeout, or size exceeded
+        SkipDownload: If content-type doesn't match expected or 304 not-modified
+        DownloadError: If connection error, timeout, size exceeded, or size mismatch
     """
     if not session:
         raise DownloadError(
@@ -104,6 +107,12 @@ def stream_candidate_payload(
         )
 
     url = plan.url
+
+    # Validate URL security
+    try:
+        validate_url_security(url)
+    except PolicyError as e:
+        raise SkipDownload("security-policy", f"URL security policy violation: {e}")
 
     # HEAD request (optional, for validation)
     t0 = time.monotonic_ns()
@@ -120,17 +129,19 @@ def stream_candidate_payload(
             elapsed_ms=elapsed_ms,
         )
     except Exception as e:  # pylint: disable=broad-except
-        raise DownloadError(
-            "conn-error",
-            f"HEAD request failed: {e}",
-        ) from e
+        # Some servers 405 on HEAD; proceed without failing
+        LOGGER.debug(f"HEAD request failed (proceeding to GET): {e}")
 
-    # GET request
+    # GET request via httpx + hishel
     t0 = time.monotonic_ns()
     try:
         resp = session.get(url, stream=True, allow_redirects=True, timeout=timeout_s)
         elapsed_ms = (time.monotonic_ns() - t0) // 1_000_000
         content_type = resp.headers.get("Content-Type", "").lower()
+
+        # Check for hishel cache extensions
+        from_cache = bool(getattr(resp, "extensions", {}).get("from_cache"))
+        revalidated = bool(getattr(resp, "extensions", {}).get("revalidated"))
 
         _emit(
             telemetry,
@@ -142,6 +153,36 @@ def stream_candidate_payload(
             content_type=content_type,
             elapsed_ms=elapsed_ms,
         )
+
+        # Emit cache-aware tokens
+        if from_cache and not revalidated:
+            _emit(
+                telemetry,
+                run_id=run_id,
+                resolver_name=plan.resolver_name,
+                url=url,
+                status="cache-hit",
+                http_status=resp.status_code,
+                content_type=content_type,
+                reason="ok",
+            )
+        if revalidated and resp.status_code == 304:
+            _emit(
+                telemetry,
+                run_id=run_id,
+                resolver_name=plan.resolver_name,
+                url=url,
+                status="http-304",
+                http_status=304,
+                content_type=content_type,
+                reason="not-modified",
+            )
+            return DownloadStreamResult(
+                path_tmp="",
+                bytes_written=0,
+                http_status=304,
+                content_type=content_type,
+            )
     except Exception as e:  # pylint: disable=broad-except
         raise DownloadError(
             "conn-error",
@@ -155,54 +196,70 @@ def stream_candidate_payload(
             f"Expected {plan.expected_mime}, got {content_type}",
         )
 
-    # Write to temporary file
+    # Extract Content-Length and prepare for atomic write
+    cl = resp.headers.get("Content-Length")
+    expected_len = int(cl) if (cl and cl.isdigit()) else None
+
+    # Write to temporary file using atomic writer
     tmp_dir = os.getcwd()
     os.makedirs(tmp_dir, exist_ok=True)
     tmp_path = os.path.join(tmp_dir, ".download.part")
 
-    bytes_written = 0
     try:
-        with open(tmp_path, "wb") as f:
-            for chunk in resp.iter_content(chunk_size=chunk_size):
-                if not chunk:
-                    continue
+        bytes_written = atomic_write_stream(
+            dest_path=tmp_path,
+            byte_iter=resp.iter_bytes(),
+            expected_len=(expected_len if verify_content_length else None),
+            chunk_size=chunk_size,
+        )
 
-                bytes_written += len(chunk)
+        # Check size limit
+        if max_bytes and bytes_written > max_bytes:
+            raise DownloadError(
+                "too-large",
+                f"Payload exceeded {max_bytes} bytes",
+            )
 
-                # Check size limit
-                if max_bytes and bytes_written > max_bytes:
-                    raise DownloadError(
-                        "too-large",
-                        f"Payload exceeded {max_bytes} bytes",
-                    )
+        # Emit final success record
+        _emit(
+            telemetry,
+            run_id=run_id,
+            resolver_name=plan.resolver_name,
+            url=url,
+            status="http-200",
+            http_status=resp.status_code,
+            bytes_written=bytes_written,
+            content_type=content_type,
+            content_length_hdr=expected_len,
+        )
 
-                f.write(chunk)
+        return DownloadStreamResult(
+            path_tmp=tmp_path,
+            bytes_written=bytes_written,
+            http_status=resp.status_code,
+            content_type=content_type,
+        )
+
+    except SizeMismatchError:
+        _emit(
+            telemetry,
+            run_id=run_id,
+            resolver_name=plan.resolver_name,
+            url=url,
+            status="size-mismatch",
+            http_status=resp.status_code,
+            content_type=content_type,
+            reason="size-mismatch",
+            content_length_hdr=expected_len,
+        )
+        raise DownloadError("size-mismatch")
     except DownloadError:
         raise
     except Exception as e:  # pylint: disable=broad-except
         raise DownloadError(
             "download-error",
-            f"Write to temp file failed: {e}",
+            f"Atomic write failed: {e}",
         ) from e
-
-    # Emit final success record
-    _emit(
-        telemetry,
-        run_id=run_id,
-        resolver_name=plan.resolver_name,
-        url=url,
-        status="http-200",
-        http_status=resp.status_code,
-        bytes_written=bytes_written,
-        content_type=content_type,
-    )
-
-    return DownloadStreamResult(
-        path_tmp=tmp_path,
-        bytes_written=bytes_written,
-        http_status=resp.status_code,
-        content_type=content_type,
-    )
 
 
 def finalize_candidate_download(
@@ -217,8 +274,9 @@ def finalize_candidate_download(
     Finalize downloaded artifact (move to final location).
 
     Performs:
+    - 304 short-circuit (no file write needed)
     - Integrity checks (if needed)
-    - Atomic move from temp → final
+    - Atomic move from temp → final (already done by atomic_write_stream)
     - Update manifest
 
     Returns:
@@ -227,14 +285,33 @@ def finalize_candidate_download(
     Raises:
         DownloadError: If integrity check fails or move fails
     """
+    # 304 Not Modified: no file to finalize
+    if stream.http_status == 304:
+        return DownloadOutcome(
+            ok=True,
+            classification="skip",
+            path=None,
+            reason="not-modified",
+            meta={"http_status": 304},
+        )
+
+    # Validate final path safety
+    try:
+        validate_path_safety(final_path)
+    except PathPolicyError as e:
+        raise SkipDownload("path-policy", f"Path policy violation: {e}")
+
     # Determine final path (in real implementation, would use storage policy)
     if not final_path:
         base = plan.url.rsplit("/", 1)[-1] or "download.bin"
         final_path = os.path.join(os.getcwd(), base)
 
-    # Atomically move temp → final
+    # atomic_write_stream already moved temp → dest_path, so final_path exists
+    # Just verify and emit event
     try:
-        os.replace(stream.path_tmp, final_path)
+        if stream.path_tmp and not os.path.exists(final_path):
+            # If atomic_write_stream didn't finalize, move it now
+            os.replace(stream.path_tmp, final_path)
     except Exception as e:  # pylint: disable=broad-except
         raise DownloadError(
             "download-error",

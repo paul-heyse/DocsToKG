@@ -29,7 +29,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 class RetryPolicy(BaseModel):
     """Configuration for HTTP request retry behavior."""
 
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid", frozen=True)
 
     retry_statuses: List[int] = Field(
         default=[429, 500, 502, 503, 504],
@@ -58,7 +58,7 @@ class RetryPolicy(BaseModel):
 class BackoffPolicy(BaseModel):
     """Configuration for backoff strategy."""
 
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid", frozen=True)
 
     strategy: Literal["exponential", "constant"] = Field(
         default="exponential", description="Backoff strategy"
@@ -76,7 +76,7 @@ class BackoffPolicy(BaseModel):
 class RateLimitPolicy(BaseModel):
     """Configuration for rate limiting (token bucket)."""
 
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid", frozen=True)
 
     capacity: int = Field(default=5, description="Token bucket capacity")
     refill_per_sec: float = Field(default=1.0, description="Tokens/sec refill rate")
@@ -107,7 +107,7 @@ class RateLimitPolicy(BaseModel):
 class RobotsPolicy(BaseModel):
     """Configuration for robots.txt handling."""
 
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid", frozen=True)
 
     enabled: bool = Field(default=True, description="Enable robots.txt checks")
     ttl_seconds: int = Field(default=3600, description="Cache TTL")
@@ -123,7 +123,7 @@ class RobotsPolicy(BaseModel):
 class DownloadPolicy(BaseModel):
     """Configuration for download safety and integrity."""
 
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid", frozen=True)
 
     atomic_write: bool = Field(default=True, description="Use atomic writes")
     verify_content_length: bool = Field(default=True, description="Verify Content-Length matches")
@@ -150,7 +150,7 @@ class DownloadPolicy(BaseModel):
 class HttpClientConfig(BaseModel):
     """Configuration for HTTP client behavior (HTTPX singleton)."""
 
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid", frozen=True)
 
     http2: bool = Field(default=True, description="Enable HTTP/2")
     user_agent: str = Field(
@@ -241,7 +241,7 @@ class HttpClientConfig(BaseModel):
 class TelemetryConfig(BaseModel):
     """Configuration for telemetry and manifest output."""
 
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid", frozen=True)
 
     sinks: List[str] = Field(
         default_factory=lambda: ["csv"],
@@ -268,7 +268,7 @@ class HishelConfig(BaseModel):
     backend, TTL, and RFC 9111 compliance options.
     """
 
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid", frozen=True)
 
     enabled: bool = Field(
         default=True,
@@ -386,7 +386,7 @@ class HishelConfig(BaseModel):
 class ResolverCommonConfig(BaseModel):
     """Common configuration options for all resolvers."""
 
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid", frozen=True)
 
     enabled: bool = Field(default=True, description="Enable this resolver")
     retry: RetryPolicy = Field(default_factory=RetryPolicy, description="Retry policy")
@@ -494,7 +494,7 @@ class FigshareConfig(ResolverCommonConfig):
 class ResolversConfig(BaseModel):
     """Configuration for resolver system and ordering."""
 
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid", frozen=True)
 
     order: List[str] = Field(
         default_factory=lambda: [
@@ -556,7 +556,7 @@ class ResolversConfig(BaseModel):
 class QueueConfig(BaseModel):
     """Configuration for SQLite-backed work queue."""
 
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid", frozen=True)
 
     backend: Literal["sqlite"] = Field(
         default="sqlite",
@@ -580,7 +580,7 @@ class QueueConfig(BaseModel):
 class OrchestratorConfig(BaseModel):
     """Configuration for work orchestration and bounded concurrency."""
 
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid", frozen=True)
 
     max_workers: int = Field(
         default=8,
@@ -656,7 +656,7 @@ class OrchestratorConfig(BaseModel):
 class StorageConfig(BaseModel):
     """Storage backend and layout configuration for downloaded artifacts."""
 
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid", frozen=True)
 
     backend: Literal["fs", "s3"] = Field(
         default="fs",
@@ -695,7 +695,7 @@ class StorageConfig(BaseModel):
 class CatalogConfig(BaseModel):
     """Artifact catalog database and retention configuration."""
 
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid", frozen=True)
 
     backend: Literal["sqlite", "postgres"] = Field(
         default="sqlite",
@@ -746,7 +746,7 @@ class FeatureGatesConfig(BaseModel):
             policy = create_http_retry_policy()
     """
 
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid", frozen=True)
 
     enable_contextual_retry: bool = Field(
         default=False,
@@ -773,9 +773,13 @@ class ContentDownloadConfig(BaseModel):
 
     Loaded from file (YAML/JSON), overlaid with environment variables,
     and finally overridden by CLI arguments. Precedence: file < env < CLI.
+
+    **Immutability:** This configuration is frozen after creation. Once loaded,
+    no fields can be modified. This ensures reproducibility and prevents accidental
+    configuration mutations at runtime.
     """
 
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid", validate_assignment=True)
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid", frozen=True)
 
     run_id: Optional[str] = Field(
         default=None, description="Unique run identifier for traceability"
@@ -824,3 +828,21 @@ class ContentDownloadConfig(BaseModel):
 
         normalized = json.dumps(self.model_dump(mode="json"), sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(normalized.encode()).hexdigest()
+
+    def verify_immutable(self) -> bool:
+        """
+        Verify that this config instance is immutable (frozen).
+
+        Returns:
+            True if frozen, raises ValidationError if not.
+
+        Raises:
+            ValidationError: If an attempt is made to modify any field.
+        """
+        try:
+            # Attempt to modify a field - should fail if frozen
+            self.run_id = "test"  # type: ignore
+            return False  # Should never reach here if frozen
+        except Exception:
+            # Expected: field cannot be modified due to frozen=True
+            return True

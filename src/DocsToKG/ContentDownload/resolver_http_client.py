@@ -149,6 +149,13 @@ class TokenBucket:
         # This should not be reached, but satisfy type checker
         return 0.0
 
+    def refund(self, tokens: float) -> None:
+        """Refund tokens to the bucket."""
+        with self._lock:
+            self._refill()  # Ensure tokens are up-to-date before refunding
+            self.tokens = min(self.capacity, self.tokens + tokens)
+            LOGGER.debug(f"Refunded {tokens} tokens to bucket. Current tokens: {self.tokens}")
+
 
 class PerResolverHttpClient:
     """
@@ -298,6 +305,15 @@ class PerResolverHttpClient:
 
             try:
                 resp = self.session.request(method, url, timeout=req_timeout, **kwargs)
+
+                # Check if response is from hishel cache (pure cache hit, not revalidated)
+                # If so, refund the rate-limit token since no network was used
+                from_cache = bool(getattr(resp, "extensions", {}).get("from_cache"))
+                revalidated = bool(getattr(resp, "extensions", {}).get("revalidated"))
+                if from_cache and not revalidated:
+                    # Pure cache hit: refund token and return immediately
+                    self.rate_limiter.refund(tokens=1.0)
+                    return resp
 
                 # Check if we should retry this response
                 if resp.status_code in self.config.retry_statuses:

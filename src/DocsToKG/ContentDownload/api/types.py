@@ -39,6 +39,7 @@ AttemptStatus = Literal[
     "http-get",
     "http-200",
     "http-304",
+    "cache-hit",
     "robots-fetch",
     "robots-disallowed",
     "retry",
