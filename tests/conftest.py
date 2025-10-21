@@ -73,6 +73,22 @@ from tests.fixtures.determinism import (  # noqa: F401
     tmp_isolated_dir,
 )
 
+# Import Phase 2 fixtures (Optimization 9 Phase 2)
+from tests.fixtures.http_mocking import (  # noqa: F401
+    http_mock,
+    mocked_http_client,
+)
+from tests.fixtures.duckdb_fixtures import (  # noqa: F401
+    duckdb_migrations,
+    duckdb_with_test_data,
+    ephemeral_duckdb,
+)
+from tests.fixtures.telemetry_fixtures import (  # noqa: F401
+    event_sink,
+    mock_event_emitter,
+    ratelimit_registry_reset,
+)
+
 # --- Globals ---
 
 ROOT = Path(__file__).resolve().parent.parent

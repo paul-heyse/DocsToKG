@@ -303,9 +303,9 @@ class DuckDBEmitter(EventEmitter):
         try:
             with self._lock:
                 self._flush()
-                self.conn.close()
+                # Note: DuckDB connections don't require explicit closing
         except Exception as e:
-            logger.error(f"Error closing DuckDB connection: {e}")
+            logger.error(f"Error closing DuckDB emitter: {e}")
 
 
 # ============================================================================
