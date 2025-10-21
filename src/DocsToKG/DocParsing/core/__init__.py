@@ -1,11 +1,28 @@
 """Core namespace aggregating shared DocParsing orchestration helpers.
 
-This package surface brings together the reusable CLI builders, batching and
-planning utilities, manifest writers, filesystem helpers, and environment
-bootstrap logic that power every DocParsing stage. Downstream code can import
-from ``DocsToKG.DocParsing.core`` to access opinionated defaults, advisory
-locks, resume-safe JSONL writers, and tokenizer/embedding initialisation
-routines without needing to know which submodule provides each feature.
+This package surface brings together reusable CLI builders, batching and planning
+utilities, manifest writers, filesystem helpers, and environment bootstrap logic
+that power every DocParsing stage.
+
+Downstream code can import from ``DocsToKG.DocParsing.core`` to access:
+- Process-safe file writes via safe_write()
+- Opinionated defaults and resume-safe JSONL writers
+- Portable multiprocessing coordination (set_spawn_or_warn, find_free_port)
+- Tokenizer and embedding initialization routines
+- Manifest and filesystem helpers
+
+All features are available from this top-level namespace without needing to know
+which submodule provides each feature.
+
+Example:
+    from DocsToKG.DocParsing.core import safe_write, set_spawn_or_warn
+    from pathlib import Path
+
+    # Atomically write output with process safety
+    safe_write(Path("results.json"), lambda: save_results())
+
+    # Configure subprocess spawning strategy
+    set_spawn_or_warn()
 """
 
 from __future__ import annotations
@@ -64,7 +81,7 @@ from DocsToKG.DocParsing.logging import (
 
 from .batching import Batcher
 from .cli_utils import CLIOption, build_subcommand, detect_mode
-from .concurrency import ReservedPort, find_free_port, set_spawn_or_warn, safe_write
+from .concurrency import ReservedPort, find_free_port, safe_write, set_spawn_or_warn
 from .discovery import (
     DEFAULT_CAPTION_MARKERS,
     DEFAULT_HEADING_MARKERS,

@@ -1,9 +1,9 @@
 # 📋 TASK 1.3 PHASE 2: OBSERVABILITY INTEGRATION - DETAILED PLAN
 
-**Date**: October 21, 2025  
-**Task**: Integrate observability instrumentation into catalog modules  
-**Scope**: Wire event emission into boundaries, doctor, gc, and CLI  
-**Estimated Time**: 2-3 hours  
+**Date**: October 21, 2025
+**Task**: Integrate observability instrumentation into catalog modules
+**Scope**: Wire event emission into boundaries, doctor, gc, and CLI
+**Estimated Time**: 2-3 hours
 **Target LOC**: 300-500 (integration code) + 100+ (tests)
 
 ---
@@ -127,7 +127,7 @@ def download_boundary(...):
         # Existing logic
         yield result
         duration_ms = (time.time() - start_time) * 1000
-        emit_boundary_success("download", artifact_id, version_id, duration_ms, 
+        emit_boundary_success("download", artifact_id, version_id, duration_ms,
                             extra_payload={"size": result.size})
     except Exception as e:
         duration_ms = (time.time() - start_time) * 1000
@@ -150,7 +150,7 @@ def migrate(...):
     try:
         result = apply_migrations()
         duration_ms = (time.time() - start_time) * 1000
-        emit_cli_command_success("migrate", duration_ms, 
+        emit_cli_command_success("migrate", duration_ms,
                                 result_summary={"applied": len(result)})
     except Exception as e:
         duration_ms = (time.time() - start_time) * 1000
@@ -318,7 +318,6 @@ def test_doctor_fixes_flow():
 
 ---
 
-*Integration Plan: October 21, 2025*  
-*Scope: 2-3 hours*  
+*Integration Plan: October 21, 2025*
+*Scope: 2-3 hours*
 *Target Quality: 100/100*
-

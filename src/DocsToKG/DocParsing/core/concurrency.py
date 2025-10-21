@@ -2,9 +2,28 @@
 
 Chunking and embedding stages parallelise work across processes and threads,
 so they need lightweight primitives that keep manifests and network resources
-safe. This module provides advisory lock management, portable multiprocessing
-spawn controls, and free-port discovery routines that help the CLI coordinate
-Docling/vLLM workers without relying on heavyweight dependencies.
+safe. This module provides:
+
+- safe_write(): Public API for atomic file writes with process-safe FileLock
+- Portable multiprocessing spawn controls via set_spawn_or_warn()
+- Free-port discovery routines via find_free_port()
+- Reserved port enumeration via ReservedPort
+
+These helpers coordinate Docling/vLLM workers without relying on heavyweight
+dependencies. The safe_write() function is the recommended way to atomically
+write files when multiple processes may access them concurrently.
+
+Example:
+    from DocsToKG.DocParsing.core import safe_write
+    from pathlib import Path
+
+    # Atomically write a file with process-safe locking
+    wrote = safe_write(
+        Path("output.json"),
+        lambda: save_json_to_output(),
+        timeout=60.0,
+        skip_if_exists=True
+    )
 """
 
 from __future__ import annotations
@@ -13,9 +32,8 @@ import contextlib
 import logging
 import socket
 import time
-import warnings
 from pathlib import Path
-from typing import Iterator, Optional, Callable
+from typing import Callable, Optional
 
 from filelock import FileLock, Timeout
 
