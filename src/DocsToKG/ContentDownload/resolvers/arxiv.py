@@ -20,23 +20,35 @@ from typing import TYPE_CHECKING, Iterable
 
 from DocsToKG.ContentDownload.core import strip_prefix
 
-from .base import RegisteredResolver, ResolverEvent, ResolverEventReason, ResolverResult
 from .registry_v2 import register_v2
+
+class ResolverResult:
+    """Result from resolver attempt."""
+    def __init__(self, url=None, referer=None, metadata=None, 
+                 event=None, event_reason=None, **kwargs):
+        self.url = url
+        self.referer = referer
+        self.metadata = metadata or {}
+        self.event = event
+        self.event_reason = event_reason
+        for k, v in kwargs.items():
+            setattr(self, k, v)
+
+
 
 if TYPE_CHECKING:  # pragma: no cover
     import httpx
 
     from DocsToKG.ContentDownload.core import WorkArtifact
-    from DocsToKG.ContentDownload.pipeline import ResolverConfig
-
+    
 
 @register_v2("arxiv")
-class ArxivResolver(RegisteredResolver):
+class ArxivResolver:
     """Resolve arXiv preprints using arXiv identifier lookups."""
 
     name = "arxiv"
 
-    def is_enabled(self, config: "ResolverConfig", artifact: "WorkArtifact") -> bool:
+    def is_enabled(self, config: Any, artifact: "WorkArtifact") -> bool:
         """Return ``True`` when the work exposes an arXiv identifier.
 
         Args:
@@ -51,7 +63,7 @@ class ArxivResolver(RegisteredResolver):
     def iter_urls(
         self,
         client: "httpx.Client",  # noqa: ARG002 - unused, kept for signature parity
-        config: "ResolverConfig",
+        config: Any,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
         """Yield the canonical arXiv PDF URL for ``artifact`` when available.

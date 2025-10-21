@@ -25,7 +25,6 @@ import httpx
 from DocsToKG.ContentDownload.networking import BreakerOpenError
 from DocsToKG.ContentDownload.robots import RobotsCache
 
-from .base import (
     BeautifulSoup,
     RegisteredResolver,
     ResolverEvent,
@@ -39,16 +38,29 @@ from .base import (
 )
 from .registry_v2 import register_v2
 
+class ResolverResult:
+    """Result from resolver attempt."""
+    def __init__(self, url=None, referer=None, metadata=None, 
+                 event=None, event_reason=None, **kwargs):
+        self.url = url
+        self.referer = referer
+        self.metadata = metadata or {}
+        self.event = event
+        self.event_reason = event_reason
+        for k, v in kwargs.items():
+            setattr(self, k, v)
+
+
+
 if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.core import WorkArtifact
-    from DocsToKG.ContentDownload.pipeline import ResolverConfig
-
+    
 
 LOGGER = logging.getLogger(__name__)
 
 
 @register_v2("landing_page")
-class LandingPageResolver(RegisteredResolver):
+class LandingPageResolver:
     """Attempt to scrape landing pages for PDF links when metadata fails."""
 
     name = "landing_page"
@@ -58,7 +70,7 @@ class LandingPageResolver(RegisteredResolver):
         super().__init__()
         self._robots_cache = RobotsCache(ttl_sec=3600)
 
-    def is_enabled(self, config: "ResolverConfig", artifact: "WorkArtifact") -> bool:
+    def is_enabled(self, config: Any, artifact: "WorkArtifact") -> bool:
         """Return ``True`` when landing page URLs are available to scrape.
 
         Args:
@@ -73,7 +85,7 @@ class LandingPageResolver(RegisteredResolver):
     def iter_urls(
         self,
         client: httpx.Client,
-        config: "ResolverConfig",
+        config: Any,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
         """Scrape landing pages for PDF links and yield matching results.

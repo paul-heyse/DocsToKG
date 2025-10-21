@@ -62,7 +62,6 @@ import httpx
 from DocsToKG.ContentDownload.networking import BreakerOpenError, request_with_retries
 from DocsToKG.ContentDownload.urls import canonical_for_index, canonical_for_request
 
-from .base import (
     RegisteredResolver,
     ResolverEvent,
     ResolverEventReason,
@@ -82,10 +81,23 @@ except ImportError:  # pragma: no cover - handled gracefully at runtime
     ArchiveNotInAvailabilityAPIResponse = None  # type: ignore[assignment]
     WaybackError = Exception  # type: ignore[assignment]
 
+class ResolverResult:
+    """Result from resolver attempt."""
+    def __init__(self, url=None, referer=None, metadata=None, 
+                 event=None, event_reason=None, **kwargs):
+        self.url = url
+        self.referer = referer
+        self.metadata = metadata or {}
+        self.event = event
+        self.event_reason = event_reason
+        for k, v in kwargs.items():
+            setattr(self, k, v)
+
+
+
 if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.core import WorkArtifact
-    from DocsToKG.ContentDownload.pipeline import ResolverConfig
-
+    
 
 LOGGER = logging.getLogger(__name__)
 
@@ -111,12 +123,12 @@ class _HTTPXResponseAdapter:
 
 
 @register_v2("wayback")
-class WaybackResolver(RegisteredResolver):
+class WaybackResolver:
     """Fallback resolver that queries the Internet Archive Wayback Machine."""
 
     name = "wayback"
 
-    def is_enabled(self, config: "ResolverConfig", artifact: "WorkArtifact") -> bool:
+    def is_enabled(self, config: Any, artifact: "WorkArtifact") -> bool:
         """Return ``True`` when prior resolver attempts have failed."""
 
         return bool(artifact.failed_pdf_urls)
@@ -124,7 +136,7 @@ class WaybackResolver(RegisteredResolver):
     def iter_urls(
         self,
         client: httpx.Client,
-        config: "ResolverConfig",
+        config: Any,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
         """Yield archived URLs discovered via availability/CDX lookups."""
@@ -206,7 +218,7 @@ class WaybackResolver(RegisteredResolver):
     def _discover_snapshots(
         self,
         client: httpx.Client,
-        config: "ResolverConfig",
+        config: Any,
         original_url: str,
         canonical_url: str,
         publication_year: Optional[int],
@@ -297,7 +309,7 @@ class WaybackResolver(RegisteredResolver):
     def _check_availability(
         self,
         client: httpx.Client,
-        config: "ResolverConfig",
+        config: Any,
         url: str,
         min_pdf_bytes: int,
     ) -> Tuple[Optional[str], Dict[str, Any]]:
@@ -343,7 +355,7 @@ class WaybackResolver(RegisteredResolver):
     def _query_cdx(
         self,
         client: httpx.Client,
-        config: "ResolverConfig",
+        config: Any,
         url: str,
         publication_year: Optional[int],
         year_window: int,
@@ -396,7 +408,7 @@ class WaybackResolver(RegisteredResolver):
     def _parse_html_for_pdf(
         self,
         client: httpx.Client,
-        config: "ResolverConfig",
+        config: Any,
         html_url: str,
     ) -> Tuple[Optional[str], Dict[str, Any]]:
         """Fetch an archived HTML page and attempt to recover a PDF link from it."""
@@ -474,7 +486,7 @@ class WaybackResolver(RegisteredResolver):
     def _verify_pdf_snapshot(
         self,
         client: httpx.Client,
-        config: "ResolverConfig",
+        config: Any,
         url: str,
         min_bytes: int,
     ) -> Tuple[bool, Dict[str, Any]]:
@@ -548,7 +560,7 @@ class WaybackResolver(RegisteredResolver):
             if "resp" in locals():
                 resp.close()
 
-    def _user_agent(self, config: "ResolverConfig") -> str:
+    def _user_agent(self, config: Any) -> str:
         header = config.polite_headers.get("User-Agent")
         if header:
             return header
@@ -558,7 +570,7 @@ class WaybackResolver(RegisteredResolver):
     def _override_wayback_http(
         self,
         client: httpx.Client,
-        config: "ResolverConfig",
+        config: Any,
     ) -> Iterator[None]:
         """Monkeypatch waybackpy HTTP helpers so they use our shared HTTPX client."""
 

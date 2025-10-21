@@ -22,22 +22,34 @@ import httpx
 
 from DocsToKG.ContentDownload.core import normalize_doi
 
-from .base import ApiResolverBase, ResolverEvent, ResolverEventReason, ResolverResult
 from .registry_v2 import register_v2
+
+class ResolverResult:
+    """Result from resolver attempt."""
+    def __init__(self, url=None, referer=None, metadata=None, 
+                 event=None, event_reason=None, **kwargs):
+        self.url = url
+        self.referer = referer
+        self.metadata = metadata or {}
+        self.event = event
+        self.event_reason = event_reason
+        for k, v in kwargs.items():
+            setattr(self, k, v)
+
+
 
 if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.core import WorkArtifact
-    from DocsToKG.ContentDownload.pipeline import ResolverConfig
-
+    
 
 @register_v2("core")
-class CoreResolver(ApiResolverBase):
+class CoreResolver:
     """Resolve PDFs using the CORE API."""
 
     name = "core"
     api_display_name = "CORE"
 
-    def is_enabled(self, config: "ResolverConfig", artifact: "WorkArtifact") -> bool:
+    def is_enabled(self, config: Any, artifact: "WorkArtifact") -> bool:
         """Return ``True`` when a DOI is present and the CORE API is configured.
 
         Args:
@@ -53,7 +65,7 @@ class CoreResolver(ApiResolverBase):
     def iter_urls(
         self,
         client: httpx.Client,
-        config: "ResolverConfig",
+        config: Any,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
         """Yield download URLs discovered via the CORE search API.
