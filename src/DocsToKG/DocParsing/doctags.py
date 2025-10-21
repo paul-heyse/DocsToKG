@@ -249,19 +249,16 @@
 
 """DocParsing Doctags Pipeline Utilities
 
-This module hosts the PDF → DocTags conversion workflow _and_ shared helpers
-used by other DocParsing doctags pipelines. It coordinates vLLM server lifecycle,
-manifest bookkeeping, and CLI argument scaffolding so chunking and embedding
-components can import consistent behaviours.
+This module implements the PDF and HTML conversion stages of DocParsing, transforming
+document files into structured tags and formatted text. Output is atomically written
+using process-safe file operations (safe_write).
 
 Key Features:
-- Shared CLI helpers (`add_data_root_option`, `add_resume_force_options`,
-  `prepare_data_root`, `resolve_pipeline_path`) to centralise directory and
-  resume/force handling.
-- PDF conversion pipeline that spins up a vLLM inference server, distributes
-  work across processes, and writes DocTags with manifest telemetry.
-- Utility routines for manifest updates, GPU resource configuration, and
-  polite rate control against vLLM endpoints.
+- PDF processing via Docling with optional vLLM LLM support
+- HTML processing via BeautifulSoup4 and structured extraction
+- Parallel processing through concurrent task dispatch
+- vLLM server lifecycle coordination
+- Manifest bookkeeping and telemetry
 
 Usage:
     from DocsToKG.DocParsing import doctags as doctags_module
