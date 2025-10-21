@@ -301,7 +301,6 @@ import time
 import types
 import uuid
 from collections import deque
-from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass, fields
 from itertools import chain
 from typing import (
@@ -337,6 +336,7 @@ from DocsToKG.DocParsing.core import (
     StageContext,
     StageError,
     StageHooks,
+    StageOptions,
     StageOutcome,
     StagePlan,
     WorkItem,
@@ -346,6 +346,7 @@ from DocsToKG.DocParsing.core import (
     find_free_port,
     get_http_session,
     normalize_http_timeout,
+    run_stage,
     set_spawn_or_warn,
 )
 from DocsToKG.DocParsing.env import (
@@ -2296,82 +2297,40 @@ def pdf_main(args: argparse.Namespace | None = None, config_adapter=None) -> int
                     },
                 )
                 return 0
+            # Build stage options from config
+            stage_options = StageOptions(
+                policy="cpu",  # ProcessPool with spawn (CPU intensive PDF conversion)
+                workers=workers,
+                per_item_timeout_s=0.0,  # No timeout by default
+                retries=0,  # PDF conversion is deterministic, no retries
+                retry_backoff_s=1.0,
+                error_budget=0,  # Stop on first failure
+                max_queue=0,  # No queue limit
+                resume=cfg.resume,
+                force=cfg.force,
+                diagnostics_interval_s=30.0,
+                dry_run=False,
+            )
 
-            with ProcessPoolExecutor(max_workers=workers) as ex:
-                future_map = {ex.submit(pdf_convert_one, task): task for task in tasks}
-                with tqdm(total=len(future_map), desc="Converting PDFs", unit="file") as pbar:
-                    for fut in as_completed(future_map):
-                        task = future_map[fut]
-                        raw_result = fut.result()
-                        result = normalize_conversion_result(raw_result, task)
-                        if result.status == "success":
-                            ok += 1
-                        elif result.status == "skip":
-                            skip += 1
-                        else:
-                            fail += 1
-                            log_event(
-                                logger,
-                                "error",
-                                "Conversion failed",
-                                stage=MANIFEST_STAGE,
-                                doc_id=result.doc_id,
-                                input_hash=result.input_hash,
-                                error_code="PDF_CONVERSION_FAILED",
-                                error=result.error or "unknown",
-                            )
+            # Get stage hooks for lifecycle management
+            stage_hooks = _make_pdf_stage_hooks(
+                logger=logger,
+                resolved_root=resolved_root,
+                resume_skipped=resume_skipped,
+            )
 
-                        duration = round(result.duration_s, 3)
-                        common_extra = {
-                            "parse_engine": "docling-vlm",
-                            "model_name": task.inference_model,
-                            "served_models": list(task.served_model_names),
-                            "vllm_version": vllm_version,
-                        }
-                        if result.status == "success":
-                            manifest_log_success(
-                                stage=MANIFEST_STAGE,
-                                doc_id=result.doc_id,
-                                duration_s=duration,
-                                schema_version="docparse/1.1.0",
-                                input_path=result.input_path,
-                                input_hash=result.input_hash,
-                                output_path=result.output_path,
-                                **common_extra,
-                            )
-                        elif result.status == "skip":
-                            manifest_log_skip(
-                                stage=MANIFEST_STAGE,
-                                doc_id=result.doc_id,
-                                input_path=result.input_path,
-                                input_hash=result.input_hash,
-                                output_path=result.output_path,
-                                schema_version="docparse/1.1.0",
-                                duration_s=duration,
-                                **common_extra,
-                            )
-                        else:
-                            manifest_log_failure(
-                                stage=MANIFEST_STAGE,
-                                doc_id=result.doc_id,
-                                duration_s=duration,
-                                schema_version="docparse/1.1.0",
-                                input_path=result.input_path,
-                                input_hash=result.input_hash,
-                                output_path=result.output_path,
-                                error=result.error or "unknown",
-                                **common_extra,
-                            )
-
-                        pbar.update(1)
-
+            # Run unified runner
+            outcome = run_stage(plan, _pdf_stage_worker, stage_options, stage_hooks)
             logger.info(
                 "Conversion summary",
                 extra={
                     "extra_fields": {
-                        "ok": ok,
-                        "skip": skip,
-                        "fail": fail,
+                        "ok": outcome.succeeded,
+                        "skip": outcome.skipped,
+                        "fail": outcome.failed,
+                        "total_wall_ms": outcome.wall_ms,
+                        "exec_p50_ms": outcome.exec_p50_ms,
+                        "exec_p95_ms": outcome.exec_p95_ms,
                     }
                 },
             )
@@ -2379,7 +2338,7 @@ def pdf_main(args: argparse.Namespace | None = None, config_adapter=None) -> int
             stop_vllm(proc, owns, grace=10)
             logger.info("All done")
 
-        return 0
+        return 0 if outcome.failed == 0 else 1
 
 
 # --- HTML Pipeline ---
@@ -2453,6 +2412,131 @@ if TYPE_CHECKING:
     from docling.document_converter import DocumentConverter
 
 os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")  # ensure CPU-only HTML conversions
+
+def _html_stage_worker(item: WorkItem) -> ItemOutcome:
+    """Worker entrypoint that proxies to :func:`html_convert_one`."""
+
+    metadata = item.metadata
+    task: HtmlTask = metadata["task"]
+    result = normalize_conversion_result(html_convert_one(task), task)
+
+    manifest_extra = {
+        "parse_engine": metadata.get("parse_engine", "docling"),
+        "model_name": None,
+    }
+
+    if result.status == "success":
+        return ItemOutcome(
+            status="success",
+            duration_s=result.duration_s,
+            manifest=manifest_extra,
+            result={"status": "success"},
+            error=None,
+        )
+
+    if result.status == "skip":
+        return ItemOutcome(
+            status="skip",
+            duration_s=result.duration_s,
+            manifest=manifest_extra,
+            result={"reason": "worker-skip"},
+            error=None,
+        )
+
+    error_message = result.error or "unknown error"
+    manifest_extra["error"] = error_message
+    err = StageError(
+        stage=HTML_MANIFEST_STAGE,
+        item_id=result.doc_id,
+        category="runtime",
+        message=error_message,
+        retryable=False,
+    )
+    return ItemOutcome(
+        status="failure",
+        duration_s=result.duration_s,
+        manifest=manifest_extra,
+        result={},
+        error=err,
+    )
+
+
+def _make_html_stage_hooks(
+    *,
+    logger,
+    resolved_root: Path,
+    resume_skipped: int,
+) -> StageHooks:
+    """Create lifecycle hooks for the HTML stage runner."""
+
+    def before_stage(context: StageContext) -> None:
+        context.metadata["logger"] = logger
+        context.metadata["resolved_root"] = resolved_root
+        context.metadata["schema_version"] = "docparse/1.1.0"
+        context.metadata["resume_skipped"] = resume_skipped
+
+    def after_item(
+        item: WorkItem,
+        outcome_or_error: ItemOutcome | StageError,
+        context: StageContext,
+    ) -> None:
+        stage_logger = context.metadata.get("logger", logger)
+        root = context.metadata.get("resolved_root", resolved_root)
+        schema_version = context.metadata.get("schema_version", "docparse/1.1.0")
+        metadata = item.metadata
+        doc_id = metadata["doc_id"]
+        input_path = Path(metadata["input_path"])
+        output_path = Path(metadata["output_path"])
+        input_hash = metadata["input_hash"]
+        hash_alg = metadata["hash_alg"]
+        rel_fields = {
+            "stage": HTML_MANIFEST_STAGE,
+            "doc_id": doc_id,
+            "input_relpath": metadata.get("input_relpath", relative_path(input_path, root)),
+            "output_relpath": metadata.get("output_relpath", relative_path(output_path, root)),
+        }
+
+        if isinstance(outcome_or_error, ItemOutcome):
+            payload = dict(outcome_or_error.manifest)
+            payload.setdefault("parse_engine", metadata.get("parse_engine", "docling"))
+            if outcome_or_error.status == "success":
+                manifest_log_success(
+                    stage=HTML_MANIFEST_STAGE,
+                    doc_id=doc_id,
+                    input_path=str(input_path),
+                    input_hash=input_hash,
+                    output_path=str(output_path),
+                    duration_s=round(outcome_or_error.duration_s, 3),
+                    schema_version=schema_version,
+                    **payload,
+                )
+            elif outcome_or_error.status == "skip":
+                manifest_log_skip(
+                    stage=HTML_MANIFEST_STAGE,
+                    doc_id=doc_id,
+                    input_path=str(input_path),
+                    input_hash=input_hash,
+                    output_path=str(output_path),
+                    duration_s=round(outcome_or_error.duration_s, 3),
+                    schema_version=schema_version,
+                    **payload,
+                )
+            else:
+                manifest_log_failure(
+                    stage=HTML_MANIFEST_STAGE,
+                    doc_id=doc_id,
+                    input_path=str(input_path),
+                    input_hash=input_hash,
+                    output_path=str(output_path),
+                    error=payload.get("error", "unknown"),
+                    duration_s=round(outcome_or_error.duration_s, 3),
+                    schema_version=schema_version,
+                    **payload,
+                )
+
+    return StageHooks(before_stage=before_stage, after_item=after_item)
+
+
 
 _CONVERTER: "DocumentConverter | None" = None
 
@@ -2982,76 +3066,46 @@ def html_main(args: argparse.Namespace | None = None, config_adapter=None) -> in
             )
             return 0
 
-        with ProcessPoolExecutor(max_workers=cfg.workers) as ex:
-            futures = [ex.submit(html_convert_one, task) for task in tasks]
-            for fut in tqdm(
-                as_completed(futures), total=len(futures), unit="file", desc="HTML → DocTags"
-            ):
-                result = fut.result()
-                duration = round(result.duration_s, 3)
-                if result.status == "success":
-                    ok += 1
-                    manifest_log_success(
-                        stage=HTML_MANIFEST_STAGE,
-                        doc_id=result.doc_id,
-                        duration_s=duration,
-                        schema_version="docparse/1.1.0",
-                        input_path=result.input_path,
-                        input_hash=result.input_hash,
-                        output_path=result.output_path,
-                        parse_engine="docling-html",
-                        html_sanitizer=result.sanitizer_profile,
-                    )
-                elif result.status == "skip":
-                    skip += 1
-                    manifest_log_skip(
-                        stage=HTML_MANIFEST_STAGE,
-                        doc_id=result.doc_id,
-                        input_path=result.input_path,
-                        input_hash=result.input_hash,
-                        output_path=result.output_path,
-                        schema_version="docparse/1.1.0",
-                        duration_s=duration,
-                        parse_engine="docling-html",
-                        html_sanitizer=result.sanitizer_profile,
-                    )
-                else:
-                    fail += 1
-                    log_event(
-                        logger,
-                        "error",
-                        "HTML conversion failure",
-                        stage=HTML_MANIFEST_STAGE,
-                        doc_id=result.doc_id,
-                        input_hash=result.input_hash,
-                        error_code="HTML_CONVERSION_FAILED",
-                        error=result.error or "conversion failed",
-                    )
-                    manifest_log_failure(
-                        stage=HTML_MANIFEST_STAGE,
-                        doc_id=result.doc_id,
-                        duration_s=duration,
-                        schema_version="docparse/1.1.0",
-                        input_path=result.input_path,
-                        input_hash=result.input_hash,
-                        output_path=result.output_path,
-                        error=result.error or "conversion failed",
-                        parse_engine="docling-html",
-                        html_sanitizer=result.sanitizer_profile,
-                    )
+            # Build stage options from config
+            stage_options = StageOptions(
+                policy="io",  # ThreadPool (I/O bound HTML parsing with Docling)
+                workers=cfg.workers,
+                per_item_timeout_s=0.0,  # No timeout by default
+                retries=0,  # HTML parsing is deterministic
+                retry_backoff_s=1.0,
+                error_budget=0,  # Stop on first failure
+                max_queue=0,  # No queue limit
+                resume=cfg.resume,
+                force=cfg.force,
+                diagnostics_interval_s=30.0,
+                dry_run=False,
+            )
+
+            # Get stage hooks for lifecycle management
+            stage_hooks = _make_html_stage_hooks(
+                logger=logger,
+                resolved_root=resolved_root,
+                resume_skipped=resume_skipped,
+            )
+
+            # Run unified runner
+            outcome = run_stage(plan, _html_stage_worker, stage_options, stage_hooks)
 
         logger.info(
             "HTML conversion summary",
             extra={
                 "extra_fields": {
-                    "ok": ok,
-                    "skip": skip,
-                    "fail": fail,
+                    "ok": outcome.succeeded,
+                    "skip": outcome.skipped,
+                    "fail": outcome.failed,
+                    "total_wall_ms": outcome.wall_ms,
+                    "exec_p50_ms": outcome.exec_p50_ms,
+                    "exec_p95_ms": outcome.exec_p95_ms,
                 }
             },
         )
 
-        return 0
+        return 0 if outcome.failed == 0 else 1
 
 
 # --- Docling Test Stubs ---
