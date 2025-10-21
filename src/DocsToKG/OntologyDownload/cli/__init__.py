@@ -4,8 +4,15 @@
 import importlib.util
 from pathlib import Path
 
-from DocsToKG.OntologyDownload.cli.obs_cmd import app as obs_app
+# Import db_cmd app directly (doesn't depend on obs_cmd)
 from DocsToKG.OntologyDownload.cli.db_cmd import app as db_app
+
+# Try to import obs_cmd, but don't fail if it has missing dependencies
+try:
+    from DocsToKG.OntologyDownload.cli.obs_cmd import app as obs_app
+except ImportError:
+    obs_app = None
+
 from DocsToKG.OntologyDownload.cli_main import _normalize_plan_args
 
 # Import the parent cli.py module directly
@@ -25,8 +32,8 @@ if spec and spec.loader:
     CONFIG_DIR = cli_impl.CONFIG_DIR
 
 __all__ = [
-    "obs_app",
     "db_app",
+    "obs_app",
     "_normalize_plan_args",
     "EXAMPLE_SOURCES_YAML",
     "net",
