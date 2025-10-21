@@ -15,7 +15,7 @@ import socket
 import time
 import warnings
 from pathlib import Path
-from typing import Iterator, Optional
+from typing import Iterator, Optional, Callable
 
 from filelock import FileLock, Timeout
 
@@ -25,18 +25,36 @@ __all__ = [
     "ReservedPort",
     "find_free_port",
     "set_spawn_or_warn",
+    "safe_write",
 ]
 
 
 LOGGER = get_logger(__name__, base_fields={"stage": "core"})
 
 
-@contextlib.contextmanager
-def _acquire_lock(path: Path, timeout: float = 60.0) -> Iterator[bool]:
-    """INTERNAL ONLY: Acquire an advisory lock using :mod:`filelock` primitives.
+def safe_write(
+    path: Path,
+    write_fn: Callable[[], None],
+    *,
+    timeout: float = 60.0,
+    skip_if_exists: bool = True,
+) -> bool:
+    """Atomically write a file with process-safe locking.
 
-    This is a private function used internally by doctags and embedding modules.
-    Not for public use. Subject to change without notice.
+    Acquires a FileLock, then executes write_fn. Returns True if write occurred,
+    False if file already exists and skip_if_exists=True.
+
+    Args:
+        path: File path to write
+        write_fn: Callable that performs the write (e.g., lambda: file.save())
+        timeout: FileLock timeout in seconds
+        skip_if_exists: If True, skip write if file already exists
+
+    Returns:
+        True if write occurred, False otherwise
+
+    Raises:
+        TimeoutError: If lock cannot be acquired within timeout
     """
     lock_path = path.with_suffix(path.suffix + ".lock")
     lock_path.parent.mkdir(parents=True, exist_ok=True)
@@ -44,11 +62,14 @@ def _acquire_lock(path: Path, timeout: float = 60.0) -> Iterator[bool]:
 
     try:
         file_lock.acquire(timeout=timeout)
-    except Timeout as exc:  # pragma: no cover - rare contention path
+    except Timeout as exc:
         raise TimeoutError(f"Could not acquire lock on {path} after {timeout}s") from exc
 
     try:
-        yield True
+        if skip_if_exists and path.exists():
+            return False
+        write_fn()
+        return True
     finally:
         with contextlib.suppress(RuntimeError):
             file_lock.release()

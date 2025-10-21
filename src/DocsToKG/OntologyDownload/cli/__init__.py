@@ -5,6 +5,7 @@ import importlib.util
 from pathlib import Path
 
 from DocsToKG.OntologyDownload.cli.obs_cmd import app as obs_app
+from DocsToKG.OntologyDownload.cli.db_cmd import app as db_app
 from DocsToKG.OntologyDownload.cli_main import _normalize_plan_args
 
 # Import the parent cli.py module directly
@@ -25,6 +26,7 @@ if spec and spec.loader:
 
 __all__ = [
     "obs_app",
+    "db_app",
     "_normalize_plan_args",
     "EXAMPLE_SOURCES_YAML",
     "net",

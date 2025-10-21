@@ -1662,8 +1662,6 @@ class SqliteSink:
     def __init__(self, path: Path) -> None:
         _ensure_parent_exists(path)
         self._path = path
-        alias_candidate = path.with_suffix(".sqlite")
-        self._legacy_alias_path = alias_candidate if alias_candidate != path else None
         self._conn = sqlite3.connect(path, check_same_thread=False)
         self._lock = threading.Lock()
         self._closed = False
@@ -1963,51 +1961,12 @@ class SqliteSink:
                 self._closed = True
                 self._conn.commit()
                 self._conn.close()
-            self._ensure_legacy_alias()
 
     def __enter__(self) -> "SqliteSink":
         return self
 
     def __exit__(self, exc_type, exc, tb) -> None:
         self.close()
-
-    def _ensure_legacy_alias(self) -> None:
-        """Create a compatibility alias at ``.sqlite`` when using ``.sqlite3`` files."""
-
-        alias = getattr(self, "_legacy_alias_path", None)
-        if not alias:
-            return
-        try:
-            target = self._path
-            if not target.exists():
-                return
-            if alias.exists() or alias.is_symlink():
-                try:
-                    if alias.resolve() == target.resolve():
-                        return
-                except OSError:
-                    pass
-                try:
-                    alias.unlink()
-                except OSError:
-                    logger.debug(
-                        "Failed to remove stale legacy SQLite alias at %s", alias, exc_info=True
-                    )
-                    return
-            try:
-                os.symlink(target, alias)
-            except (AttributeError, NotImplementedError, OSError):
-                try:
-                    shutil.copy2(target, alias)
-                except OSError:
-                    logger.debug(
-                        "Failed to copy legacy SQLite alias from %s to %s",
-                        target,
-                        alias,
-                        exc_info=True,
-                    )
-        except Exception:
-            logger.debug("Unable to create legacy SQLite alias for %s", alias, exc_info=True)
 
     def _initialise_schema(self, current_version: int) -> None:
         self._conn.execute(

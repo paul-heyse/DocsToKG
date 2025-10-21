@@ -64,7 +64,7 @@ from DocsToKG.DocParsing.logging import (
 
 from .batching import Batcher
 from .cli_utils import CLIOption, build_subcommand, detect_mode
-from .concurrency import ReservedPort, find_free_port, set_spawn_or_warn
+from .concurrency import ReservedPort, find_free_port, set_spawn_or_warn, safe_write
 from .discovery import (
     DEFAULT_CAPTION_MARKERS,
     DEFAULT_HEADING_MARKERS,
@@ -119,6 +119,7 @@ __all__ = [
     "ReservedPort",
     "find_free_port",
     "atomic_write",
+    "safe_write",
     "ChunkDiscovery",
     "iter_doctags",
     "iter_chunks",
