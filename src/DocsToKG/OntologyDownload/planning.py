@@ -70,6 +70,28 @@ from .errors import (
     RetryableValidationError,
     ValidationError,
 )
+
+# ============================================================================
+# CATALOG BOUNDARIES INTEGRATION (Task 1.1)
+# ============================================================================
+# Optional DuckDB and catalog boundary imports
+try:
+    import duckdb
+    from DocsToKG.OntologyDownload.catalog.boundaries import (
+        download_boundary,
+        extraction_boundary,
+        validation_boundary,
+        set_latest_boundary,
+    )
+    CATALOG_AVAILABLE = True
+except ImportError:  # pragma: no cover
+    CATALOG_AVAILABLE = False
+    duckdb = None  # type: ignore
+    download_boundary = None  # type: ignore
+    extraction_boundary = None  # type: ignore
+    validation_boundary = None  # type: ignore
+    set_latest_boundary = None  # type: ignore
+
 from .io import (
     RDF_MIME_ALIASES,
     RDF_MIME_FORMAT_LABELS,
@@ -1741,6 +1763,60 @@ def _resolve_plan_with_fallback(
         details = "; ".join(attempts) if attempts else "no resolvers attempted"
         raise ResolverError(f"All resolvers exhausted for ontology '{spec.id}': {details}")
     return primary, candidates
+
+
+# ============================================================================
+# CATALOG BOUNDARY HELPERS (Task 1.1)
+# ============================================================================
+
+
+def _get_duckdb_conn(active_config: 'ResolvedConfig') -> Optional['duckdb.DuckDBPyConnection']:
+    """Get or create DuckDB writer connection from config."""
+    if not CATALOG_AVAILABLE or duckdb is None:
+        return None
+    try:
+        from DocsToKG.OntologyDownload.catalog.connection import get_writer, DuckDBConfig
+        
+        db_cfg = DuckDBConfig(
+            path=active_config.defaults.db.path,
+            threads=active_config.defaults.db.threads,
+            readonly=False,
+            writer_lock=active_config.defaults.db.writer_lock
+        )
+        return get_writer(db_cfg)
+    except Exception:
+        return None
+
+
+def _safe_record_boundary(
+    adapter: logging.LoggerAdapter,
+    boundary_name: str,
+    boundary_fn,
+    *args,
+    **kwargs
+) -> Tuple[bool, Optional[Any]]:
+    """Safely call a boundary context manager with error handling.
+    
+    Returns: (success: bool, result: Any)
+    """
+    try:
+        with boundary_fn(*args, **kwargs) as result:
+            adapter.info(f"{boundary_name} recorded in catalog", extra={
+                "stage": "catalog",
+                "boundary": boundary_name,
+            })
+            return True, result
+    except Exception as e:
+        adapter.warning(
+            f"failed to record {boundary_name} in catalog",
+            extra={
+                "stage": "catalog",
+                "boundary": boundary_name,
+                "error": str(e),
+                "severity": "non-critical"
+            }
+        )
+        return False, None
 
 
 def fetch_one(
