@@ -1,7 +1,7 @@
 # P1: Observability & Integrity Implementation Plan
 
-**Status**: 🟡 **IN PROGRESS - 40% COMPLETE**  
-**Date Started**: October 21, 2025  
+**Status**: 🟡 **IN PROGRESS - 40% COMPLETE**
+**Date Started**: October 21, 2025
 **Estimated Completion**: Within 2 days
 
 ---
@@ -24,16 +24,19 @@ P1 (Observability & Integrity) delivers the foundational telemetry and file inte
 ### ✅ Phase 1A: Telemetry Primitives (COMPLETE - 40% of P1)
 
 **Deliverables**:
+
 - `SimplifiedAttemptRecord` dataclass for low-level HTTP/IO operations
 - Extended `AttemptSink` protocol with `log_io_attempt()` method
 - 40+ stable status/reason taxonomy tokens (constants)
 - Comprehensive test double `ListAttemptSink` for deterministic testing
 
 **Files Created/Modified**:
+
 - `src/DocsToKG/ContentDownload/telemetry.py` – 70 LOC (primitives + constants)
 - `tests/content_download/test_p1_http_telemetry.py` – 430+ LOC (16 tests, 100% passing)
 
 **Test Coverage** (16 tests, 100% pass rate):
+
 - SimplifiedAttemptRecord construction (3 tests)
 - ListAttemptSink collection (1 test)
 - HTTP HEAD emission with content-type (2 tests)
@@ -46,6 +49,7 @@ P1 (Observability & Integrity) delivers the foundational telemetry and file inte
 - Bytes written tracking (1 test)
 
 **Quality**:
+
 - ✅ 100% syntax validated
 - ✅ 0 linting errors (ruff clean)
 - ✅ Type-safe (forward references, frozen dataclass)
@@ -54,11 +58,13 @@ P1 (Observability & Integrity) delivers the foundational telemetry and file inte
 ### ✅ Phase 1B: Atomic Writes & Robots Guard (COMPLETE - 35% of P1)
 
 **Deliverables**:
+
 - `io_utils.py`: Atomic write with Content-Length verification
 - `robots.py`: Thread-safe cached robots.txt parser
 - Both production-ready with comprehensive error handling
 
 **Files Created**:
+
 - `src/DocsToKG/ContentDownload/io_utils.py` – 125 LOC
   - `SizeMismatchError` exception
   - `atomic_write_stream()` function with fsync guarantees
@@ -70,6 +76,7 @@ P1 (Observability & Integrity) delivers the foundational telemetry and file inte
   - Fail-open semantics for robustness
 
 **Quality**:
+
 - ✅ 100% syntax validated
 - ✅ 0 linting errors
 - ✅ Type-safe with full hints
@@ -108,6 +115,7 @@ P1 (Observability & Integrity) delivers the foundational telemetry and file inte
    - ~200 LOC
 
 **Acceptance Criteria**:
+
 - [ ] `telemetry` + `run_id` parameters flow through helpers
 - [ ] HEAD request emits with content-type
 - [ ] GET request emits with status/elapsed/bytes_written
@@ -145,6 +153,7 @@ P1 (Observability & Integrity) delivers the foundational telemetry and file inte
    - ~150 LOC
 
 **Acceptance Criteria**:
+
 - [ ] Robots.txt is checked before landing-page attempts
 - [ ] Disallowed URLs skip GET (return skip outcome)
 - [ ] `robots-disallowed` attempt recorded
@@ -176,6 +185,7 @@ P1 (Observability & Integrity) delivers the foundational telemetry and file inte
    - ~100 LOC
 
 **Acceptance Criteria**:
+
 - [ ] All manifest entries routed through `RunTelemetry`
 - [ ] `run_id` guaranteed on all manifest records
 - [ ] Schema consistent across attempts/manifests
@@ -228,6 +238,7 @@ EVENT FLOW:
 ## Test Strategy
 
 ### Phase 1A Tests (DONE - 16 tests passing)
+
 - SimplifiedAttemptRecord construction and validation
 - ListAttemptSink collection behavior
 - HTTP HEAD/GET/retry/304/error scenarios
@@ -235,6 +246,7 @@ EVENT FLOW:
 - Elapsed time and bytes tracking
 
 ### Phase 2 Tests (PENDING - ~200 LOC)
+
 - HTTP emission smoke tests with mock httpx
 - Retry/backoff visibility across attempts
 - 304 conditional request path
@@ -243,6 +255,7 @@ EVENT FLOW:
 - Backward compatibility (telemetry=None)
 
 ### Phase 3 Tests (PENDING - ~150 LOC)
+
 - RobotsCache integration with mock responses
 - Allowed/disallowed URL handling
 - robots-fetch / robots-disallowed telemetry
@@ -250,6 +263,7 @@ EVENT FLOW:
 - TTL cache expiration
 
 ### Phase 4 Tests (PENDING - ~100 LOC)
+
 - Manifest parity with HTTP attempt schema
 - run_id guaranteed on all records
 - Backward compatibility with old manifests
@@ -318,6 +332,7 @@ Week 2 (Final):
 ## PR Breakdown (4 Mergeable Increments)
 
 ### PR1: Telemetry Plumbing + HTTP Emission
+
 - SimplifiedAttemptRecord + status/reason taxonomy
 - Extended AttemptSink protocol (log_io_attempt)
 - HTTP emission in networking layer
@@ -325,12 +340,14 @@ Week 2 (Final):
 - ~600 LOC + ~200 test LOC
 
 ### PR2: Atomic Writes + Content-Length Verification
+
 - io_utils.py (atomic_write_stream)
 - Phase 1B tests (atomic write edge cases)
 - Integration into GET path
 - ~150 LOC + ~100 test LOC
 
 ### PR3: Robots Guard + Landing Integration
+
 - robots.py (RobotsCache)
 - Landing resolver integration
 - robots-disallowed telemetry
@@ -339,6 +356,7 @@ Week 2 (Final):
 - ~100 LOC + ~150 test LOC
 
 ### PR4: Manifest Unification
+
 - RunTelemetry.record_pipeline_result()
 - Pipeline integration
 - Phase 4 parity tests
@@ -364,6 +382,7 @@ Week 2 (Final):
 **Status Document**: `P1_OBSERVABILITY_INTEGRITY_PLAN.md` (this file)
 
 **Implementation Phase Docs** (TBD):
+
 - `P1_PHASE2_HTTP_EMISSION.md`
 - `P1_PHASE3_ROBOTS.md`
 - `P1_PHASE4_MANIFEST.md`

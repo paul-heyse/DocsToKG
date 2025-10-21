@@ -133,10 +133,10 @@ ATTEMPT_REASON_RETRY_AFTER = "retry-after"
 @dataclass(frozen=True)
 class SimplifiedAttemptRecord:
     """Low-level attempt record for HTTP/IO operations (P1 scope).
-    
+
     Complements existing AttemptRecord from pipeline.py. Used for granular
     HTTP telemetry (HEAD, GET, retries, robots) and atomic write integrity.
-    
+
     Attributes:
         ts: UTC timestamp when the attempt occurred.
         run_id: Run identifier; None means telemetry is disabled.
@@ -152,6 +152,7 @@ class SimplifiedAttemptRecord:
         content_length_hdr: Content-Length header value (for size verification).
         extra: Arbitrary metadata (retry attempt count, redirect chain, etc).
     """
+
     ts: datetime
     run_id: Optional[str]
     resolver: Optional[str]
