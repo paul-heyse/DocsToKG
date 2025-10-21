@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from DocsToKG.ContentDownload.catalog.connectors import (
+from DocsToKG.ContentDownload.catalog.connectors import (  # type: ignore[import-untyped]
     CatalogConnector,
     ProviderOperationError,
 )
