@@ -1,28 +1,12 @@
-"""Optional streaming integration layer for download.py.
+"""Streaming download integration for ContentDownload.
 
-This module provides conditional use of RFC-compliant streaming primitives from
-streaming.py while maintaining full backward compatibility with existing download.py
-logic. It allows incremental adoption of the new streaming architecture.
+This module provides the integration layer between the resolver pipeline and
+the new streaming architecture. It coordinates:
 
-Features:
-  - Graceful fallback to existing logic if streaming module not available
-  - Feature flag control for gradual rollout
-  - Performance comparison utilities
-  - Transparent use of new primitives (can_resume, stream_to_part, etc.)
-
-Usage:
-  # In download.py:
-  from DocsToKG.ContentDownload.streaming_integration import (
-      use_streaming_for_resume,
-      use_streaming_for_io,
-      streaming_enabled,
-  )
-
-  if use_streaming_for_resume(plan):
-      decision = streaming.can_resume(validators, part_state, ...)
-  else:
-      # Existing resume logic
-  ...
+- Streaming client setup
+- Resume state management
+- Schema-aware manifest handling
+- Integration with modern idempotency and work orchestration
 """
 
 from __future__ import annotations
@@ -69,59 +53,10 @@ if TYPE_CHECKING:
 # ============================================================================
 
 
-def streaming_enabled() -> bool:
-    """Check if streaming module is available and enabled.
-
-    Returns:
-        True if streaming can be used, False otherwise.
-
-    Env Vars:
-        DOCSTOKG_ENABLE_STREAMING: Set to "0" to disable streaming integration.
-        DOCSTOKG_STREAMING_RATIO: Ratio of jobs to use streaming (0.0-1.0).
-    """
-    if not _STREAMING_AVAILABLE:
-        return False
-
-    if os.getenv("DOCSTOKG_ENABLE_STREAMING") == "0":
-        return False
-
-    return True
-
-
-def idempotency_enabled() -> bool:
-    """Check if idempotency module is available and enabled.
-
-    Returns:
-        True if idempotency can be used, False otherwise.
-
-    Env Vars:
-        DOCSTOKG_ENABLE_IDEMPOTENCY: Set to "0" to disable idempotency.
-    """
-    if not _IDEMPOTENCY_AVAILABLE:
-        return False
-
-    if os.getenv("DOCSTOKG_ENABLE_IDEMPOTENCY") == "0":
-        return False
-
-    return True
-
-
-def schema_enabled() -> bool:
-    """Check if streaming_schema module is available and enabled.
-
-    Returns:
-        True if streaming schema can be used, False otherwise.
-
-    Env Vars:
-        DOCSTOKG_ENABLE_STREAMING_SCHEMA: Set to "0" to disable schema.
-    """
-    if not _SCHEMA_AVAILABLE:
-        return False
-
-    if os.getenv("DOCSTOKG_ENABLE_STREAMING_SCHEMA") == "0":
-        return False
-
-    return True
+# All streaming features enabled by default - no backward compatibility checks
+STREAMING_ENABLED = True
+IDEMPOTENCY_ENABLED = True
+SCHEMA_VALIDATION_ENABLED = True
 
 
 # ============================================================================
@@ -143,7 +78,7 @@ def use_streaming_for_resume(plan: Any) -> bool:
     Returns:
         True to use streaming.can_resume(), False to use existing logic.
     """
-    if not streaming_enabled():
+    if not STREAMING_ENABLED:
         return False
 
     # Skip if plan doesn't have necessary info for streaming
@@ -196,7 +131,7 @@ def try_streaming_resume_decision(
             if attempt_conditional:
                 ...
     """
-    if not streaming_enabled():
+    if not STREAMING_ENABLED:
         return None
 
     if not streaming:
@@ -240,7 +175,7 @@ def use_streaming_for_io(plan: Any) -> bool:
     Returns:
         True to use streaming.stream_to_part(), False to use existing logic.
     """
-    if not streaming_enabled():
+    if not STREAMING_ENABLED:
         return False
 
     # Verify plan has required attributes
@@ -287,7 +222,7 @@ def try_streaming_io(
             sha256 = hashlib.sha256()
             ...
     """
-    if not streaming_enabled():
+    if not STREAMING_ENABLED:
         return None
 
     if not streaming:
@@ -326,7 +261,7 @@ def use_streaming_for_finalization(outcome: Any) -> bool:
     Returns:
         True to use streaming finalization, False to use existing logic.
     """
-    if not streaming_enabled():
+    if not STREAMING_ENABLED:
         return False
 
     # Only finalize successful outcomes
@@ -360,9 +295,9 @@ def integration_status() -> Dict[str, bool]:
         LOGGER.info(f"Streaming integrations available: {status}")
     """
     return {
-        "streaming": streaming_enabled(),
-        "idempotency": idempotency_enabled(),
-        "schema": schema_enabled(),
+        "streaming": STREAMING_ENABLED,
+        "idempotency": IDEMPOTENCY_ENABLED,
+        "schema": SCHEMA_VALIDATION_ENABLED,
     }
 
 

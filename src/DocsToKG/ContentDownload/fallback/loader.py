@@ -48,18 +48,20 @@ class ConfigurationError(ValueError):
 
 
 def load_from_yaml(yaml_path: Path) -> Dict[str, Any]:
-    """Load configuration from YAML file.
-
+    """Load fallback plan from YAML file.
+    
+    Fallback strategy is enabled by default with no backward compatibility
+    checks. All configuration is read from the YAML file.
+    
     Args:
-        yaml_path: Path to YAML configuration file
-
+        yaml_path: Path to fallback.yaml or custom configuration file
+        
     Returns:
-        Dictionary with configuration
-
+        Dictionary representation of the FallbackPlan
+        
     Raises:
-        FileNotFoundError: If YAML file not found
-        yaml.YAMLError: If YAML is invalid
-        ConfigurationError: If configuration is incomplete
+        FileNotFoundError: If yaml_path doesn't exist
+        ConfigurationError: If YAML is invalid or missing required keys
     """
     if not yaml_path.exists():
         msg = f"Fallback config YAML not found: {yaml_path}"
@@ -95,11 +97,6 @@ def load_from_env() -> Dict[str, Any]:
         Dictionary with environment overrides
     """
     config: Dict[str, Any] = {}
-
-    # Check for overall enable flag
-    if os.getenv("DOCSTOKG_ENABLE_FALLBACK") == "0":
-        logger.debug("Fallback disabled via DOCSTOKG_ENABLE_FALLBACK=0")
-        return config
 
     # Budget overrides
     budgets = {}

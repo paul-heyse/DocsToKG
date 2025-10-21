@@ -105,20 +105,9 @@ from DocsToKG.ContentDownload.networking import (
 from DocsToKG.ContentDownload.telemetry import RunTelemetry, normalize_manifest_path
 from DocsToKG.ContentDownload.urls import canonical_for_index, canonical_for_request
 
-# Import idempotency feature gate from runner (graceful fallback to avoid circular imports)
-ENABLE_IDEMPOTENCY = False
-try:
-    from DocsToKG.ContentDownload.runner import ENABLE_IDEMPOTENCY  # type: ignore
-except (ImportError, RuntimeError):
-    # Feature gate not available; defaults to False for backward compatibility
-    pass
-
-# Feature gate for fallback strategy
-ENABLE_FALLBACK_STRATEGY = os.environ.get("DOCSTOKG_ENABLE_FALLBACK_STRATEGY", "0").lower() in (
-    "1",
-    "true",
-    "yes",
-)
+# New work orchestration enabled by default - no backward compatibility fallback
+ENABLE_IDEMPOTENCY = True
+ENABLE_FALLBACK_STRATEGY = True
 
 
 __all__ = [
