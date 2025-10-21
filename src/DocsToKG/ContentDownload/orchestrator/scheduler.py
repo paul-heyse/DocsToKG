@@ -29,16 +29,16 @@ This module provides the Orchestrator class that:
 
     from DocsToKG.ContentDownload.orchestrator import Orchestrator
     from DocsToKG.ContentDownload.orchestrator.config import OrchestratorConfig
-    
+
     config = OrchestratorConfig(max_workers=8, max_per_host=4)
     orch = Orchestrator(config, queue, pipeline, telemetry)
-    
+
     # Start dispatcher, heartbeat, and workers
     orch.start()
-    
+
     # Monitor queue depth
     stats = queue.stats()
-    
+
     # Graceful shutdown
     orch.stop()
 """
@@ -66,7 +66,7 @@ logger = logging.getLogger(__name__)
 
 class OrchestratorConfig:
     """Configuration for Orchestrator."""
-    
+
     def __init__(
         self,
         max_workers: int = 8,
@@ -79,7 +79,7 @@ class OrchestratorConfig:
         jitter_seconds: int = 15,
     ) -> None:
         """Initialize orchestrator configuration.
-        
+
         Args:
             max_workers: Global worker concurrency limit
             max_per_resolver: Per-resolver concurrency overrides
@@ -102,20 +102,20 @@ class OrchestratorConfig:
 
 class Orchestrator:
     """Worker pool orchestrator with dispatcher and heartbeat.
-    
+
     Manages:
     - Worker thread pool for job execution
     - Dispatcher loop for job leasing
     - Heartbeat for lease extension
     - Graceful shutdown
-    
+
     Attributes:
         config: OrchestratorConfig with tuning parameters
         queue: WorkQueue for job management
         pipeline: ResolverPipeline for job execution
         telemetry: Optional RunTelemetry for metrics
     """
-    
+
     def __init__(
         self,
         config: OrchestratorConfig,
@@ -124,7 +124,7 @@ class Orchestrator:
         telemetry: Optional["RunTelemetry"] = None,
     ) -> None:
         """Initialize orchestrator.
-        
+
         Args:
             config: OrchestratorConfig
             queue: WorkQueue instance
@@ -136,32 +136,30 @@ class Orchestrator:
         self.pipeline = pipeline
         self.telemetry = telemetry
         self.worker_id = f"orch-{uuid.uuid4()}"
-        
+
         self._stop = threading.Event()
         self._threads: list[threading.Thread] = []
-        self._jobs_queue: Queue[dict[str, Any]] = Queue(
-            maxsize=config.max_workers * 2
-        )
-        
+        self._jobs_queue: Queue[dict[str, Any]] = Queue(maxsize=config.max_workers * 2)
+
         # Import here to avoid circular deps
         from DocsToKG.ContentDownload.orchestrator.limits import KeyedLimiter
         from DocsToKG.ContentDownload.orchestrator.workers import Worker
-        
+
         self._KeyedLimiter = KeyedLimiter
         self._Worker = Worker
-        
+
         self._resolver_limiter = KeyedLimiter(
             default_limit=config.max_workers,
             per_key=config.max_per_resolver,
         )
         self._host_limiter = KeyedLimiter(default_limit=config.max_per_host)
-        
+
         logger.info(f"Orchestrator initialized: {self.worker_id}")
-    
+
     def start(self) -> None:
         """Start dispatcher, heartbeat, and worker threads."""
         logger.info(f"Starting orchestrator with {self.config.max_workers} workers")
-        
+
         # Start worker threads
         for i in range(self.config.max_workers):
             worker = self._Worker(
@@ -183,7 +181,7 @@ class Orchestrator:
             )
             t.start()
             self._threads.append(t)
-        
+
         # Start dispatcher
         dispatcher_thread = threading.Thread(
             target=self._dispatcher_loop,
@@ -192,7 +190,7 @@ class Orchestrator:
         )
         dispatcher_thread.start()
         self._threads.append(dispatcher_thread)
-        
+
         # Start heartbeat
         heartbeat_thread = threading.Thread(
             target=self._heartbeat_loop,
@@ -201,24 +199,24 @@ class Orchestrator:
         )
         heartbeat_thread.start()
         self._threads.append(heartbeat_thread)
-        
+
         logger.info(f"Orchestrator started: {len(self._threads)} threads")
-    
+
     def stop(self) -> None:
         """Signal stop and wait for threads."""
         logger.info(f"Orchestrator stopping: {self.worker_id}")
         self._stop.set()
-        
+
         # Join all threads with timeout
         for t in self._threads:
             t.join(timeout=5)
-        
+
         logger.info("Orchestrator stopped")
-    
+
     def _dispatcher_loop(self) -> None:
         """Lease jobs and feed worker queue."""
         logger.debug("Dispatcher loop started")
-        
+
         while not self._stop.is_set():
             try:
                 # Check available slots
@@ -230,60 +228,60 @@ class Orchestrator:
                         limit=free_slots,
                         lease_ttl_sec=self.config.lease_ttl_seconds,
                     )
-                    
+
                     for job in jobs:
                         self._jobs_queue.put(job, block=False)
-                    
+
                     if jobs:
                         logger.debug(f"Leased {len(jobs)} jobs")
-                
+
                 # Emit metrics
                 stats = self.queue.stats()
                 logger.debug(f"Queue stats: {stats}")
-                
+
                 # Sleep before next lease
                 time.sleep(1.0)
-                
+
             except Exception as e:
                 logger.error(f"Dispatcher error: {e}", exc_info=True)
                 time.sleep(1.0)
-        
+
         logger.debug("Dispatcher loop stopped")
-    
+
     def _heartbeat_loop(self) -> None:
         """Extend leases for active workers."""
         logger.debug("Heartbeat loop started")
-        
+
         while not self._stop.is_set():
             try:
                 self.queue.heartbeat(self.worker_id)
                 logger.debug(f"Heartbeat sent for {self.worker_id}")
                 time.sleep(self.config.heartbeat_seconds)
-                
+
             except Exception as e:
                 logger.error(f"Heartbeat error: {e}", exc_info=True)
                 time.sleep(1.0)
-        
+
         logger.debug("Heartbeat loop stopped")
-    
+
     def _worker_loop(self, worker: "Worker") -> None:
         """Worker thread execution loop."""
         logger.debug(f"Worker loop started: {worker.worker_id}")
-        
+
         while not self._stop.is_set():
             try:
                 # Get job with timeout
                 job = self._jobs_queue.get(timeout=1.0)
-                
+
                 if job is None:
                     break
-                
+
                 # Process job
                 worker.run_one(job)
-                
+
             except Empty:
                 continue
             except Exception as e:
                 logger.error(f"Worker error: {e}", exc_info=True)
-        
+
         logger.debug(f"Worker loop stopped: {worker.worker_id}")

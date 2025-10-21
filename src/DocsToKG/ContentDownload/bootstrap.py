@@ -45,7 +45,16 @@ from DocsToKG.ContentDownload.resolver_http_client import (
     PerResolverHttpClient,
     RetryConfig,
 )
-from DocsToKG.ContentDownload.telemetry import AttemptSink, RunTelemetry
+from DocsToKG.ContentDownload.telemetry import (
+    AttemptSink,
+    CsvSink,
+    LastAttemptCsvSink,
+    ManifestIndexSink,
+    MultiSink,
+    RunTelemetry,
+    SqliteSink,
+    SummarySink,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -156,54 +165,45 @@ def run_from_config(
 
 
 def _build_telemetry(paths: Optional[Mapping[str, Path]], run_id: str) -> RunTelemetry:
-    """Build telemetry sinks and RunTelemetry façade."""
-    # For now, create a simple no-op telemetry
-    # Phase 4 will add CSV, SQLite, etc. sinks
-
-    class _SimpleSink(AttemptSink):  # type: ignore[type-arg]
-        """Simple no-op sink for bootstrapping."""
-
-        def log_attempt(self, record: Any, *, timestamp: Optional[str] = None) -> None:
-            """No-op."""
-            pass
-
-        def log_io_attempt(self, record: Any) -> None:
-            """No-op."""
-            pass
-
-        def log_manifest(self, entry: Any) -> None:
-            """No-op."""
-            pass
-
-        def log_summary(self, summary: Any) -> None:
-            """No-op."""
-            pass
-
-        def log_breaker_event(self, event: Any) -> None:
-            """No-op."""
-            pass
-
-        def log_fallback_attempt(self, record: Any) -> None:
-            """No-op."""
-            pass
-
-        def log_fallback_summary(self, summary: Any) -> None:
-            """No-op."""
-            pass
-
-        def close(self) -> None:
-            """No-op."""
-            pass
-
-        def __enter__(self) -> "AttemptSink":  # type: ignore[type-arg]
-            """No-op."""
-            return self
-
-        def __exit__(self, *args: Any) -> None:
-            """No-op."""
-            pass
-
-    return RunTelemetry(sink=_SimpleSink())
+    """Build telemetry sinks from configuration.
+    
+    Creates appropriate sinks based on telemetry_paths:
+    - CSV sink if 'csv' path provided
+    - SQLite sink if 'sqlite' path provided  
+    - Manifest index sink if 'manifest_index' path provided
+    - Last attempt CSV sink if 'last_attempt' path provided
+    - Summary sink if 'summary' path provided
+    
+    Args:
+        paths: Mapping of sink names to file paths
+        run_id: Unique run identifier for this execution
+        
+    Returns:
+        RunTelemetry instance with appropriate sinks for configured outputs
+    """
+    sinks: list[AttemptSink] = []
+    
+    # Add sinks based on provided paths
+    if paths:
+        if "csv" in paths:
+            sinks.append(CsvSink(paths["csv"]))
+        if "sqlite" in paths:
+            sinks.append(SqliteSink(paths["sqlite"]))
+        if "manifest_index" in paths:
+            sinks.append(ManifestIndexSink(paths["manifest_index"]))
+        if "last_attempt" in paths:
+            sinks.append(LastAttemptCsvSink(paths["last_attempt"]))
+        if "summary" in paths:
+            sinks.append(SummarySink(paths["summary"]))
+    
+    # If no sinks configured, use only the most essential one
+    if not sinks:
+        sinks.append(SummarySink())
+    
+    # Composite sink handles all outputs
+    multi_sink = MultiSink(sinks) if len(sinks) > 1 else sinks[0]
+    
+    return RunTelemetry(sink=multi_sink)
 
 
 def _build_client_map(
