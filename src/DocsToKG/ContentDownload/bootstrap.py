@@ -159,16 +159,47 @@ def _build_telemetry(paths: Optional[Mapping[str, Path]], run_id: str) -> RunTel
     """Build telemetry sinks and RunTelemetry façade."""
     # For now, create a simple no-op telemetry
     # Phase 4 will add CSV, SQLite, etc. sinks
-    from DocsToKG.ContentDownload.api import AttemptSink
 
     class _SimpleSink(AttemptSink):  # type: ignore[type-arg]
         """Simple no-op sink for bootstrapping."""
 
-        def log_attempt(self, record: Any) -> None:
+        def log_attempt(self, record: Any, *, timestamp: Optional[str] = None) -> None:
+            """No-op."""
+            pass
+
+        def log_io_attempt(self, record: Any) -> None:
             """No-op."""
             pass
 
         def log_manifest(self, entry: Any) -> None:
+            """No-op."""
+            pass
+
+        def log_summary(self, summary: Any) -> None:
+            """No-op."""
+            pass
+
+        def log_breaker_event(self, event: Any) -> None:
+            """No-op."""
+            pass
+
+        def log_fallback_attempt(self, record: Any) -> None:
+            """No-op."""
+            pass
+
+        def log_fallback_summary(self, summary: Any) -> None:
+            """No-op."""
+            pass
+
+        def close(self) -> None:
+            """No-op."""
+            pass
+
+        def __enter__(self) -> "AttemptSink":  # type: ignore[type-arg]
+            """No-op."""
+            return self
+
+        def __exit__(self, *args: Any) -> None:
             """No-op."""
             pass
 
