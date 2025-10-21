@@ -18,7 +18,7 @@ import os
 
 import pytest
 
-from DocsToKG.ContentDownload.catalog.connectors import CatalogConnector, ProviderConfigError
+from DocsToKG.ContentDownload.catalog.connectors import CatalogConnector, ProviderConfigError, ProviderConnectionError
 
 
 class TestEnterpriseProvider:
@@ -26,7 +26,7 @@ class TestEnterpriseProvider:
 
     def test_enterprise_provider_requires_connection_url(self) -> None:
         """Enterprise provider requires connection_url in config."""
-        with pytest.raises(ProviderConfigError, match="connection_url is required"):
+        with pytest.raises(ProviderConnectionError, match="connection_url is required"):
             connector = CatalogConnector("enterprise", {})
             connector.open()
 
