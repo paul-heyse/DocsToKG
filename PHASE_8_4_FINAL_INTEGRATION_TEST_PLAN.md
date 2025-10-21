@@ -1,7 +1,7 @@
 # Phase 8.4: Final Integration & Testing - COMPLETE PLAN
 
-**Status**: 🚀 **READY FOR DEPLOYMENT**  
-**Date**: October 21, 2025  
+**Status**: 🚀 **READY FOR DEPLOYMENT**
+**Date**: October 21, 2025
 **Scope**: Complete 5 gate integrations + comprehensive test suite
 
 ---
@@ -19,7 +19,7 @@ from DocsToKG.OntologyDownload.policy.errors import PolicyReject
 
 try:
     secure_url = validate_url_security(planned.plan.url, http_config)
-    
+
     # GATE 2: URL Security
     url_result = url_gate(
         secure_url,
@@ -33,9 +33,9 @@ try:
             {"url": secure_url, "error_code": url_result.error_code, "event": "url_gate_rejected"},
         )
         raise PolicyError(f"URL policy violation: {url_result.error_code}")
-    
+
     planned.plan.url = secure_url
-    
+
 except (ConfigError, PolicyError) as exc:
     # existing error handling
     raise
@@ -56,9 +56,9 @@ from DocsToKG.OntologyDownload.policy.errors import PolicyReject
 
 def extract_archive(archive_path, destination, max_ratio=100.0, logger=None):
     """Extract archive with pre-scan zip bomb validation."""
-    
+
     log = logger or logging.getLogger(__name__)
-    
+
     # Pre-scan archive
     import zipfile
     try:
@@ -68,7 +68,7 @@ def extract_archive(archive_path, destination, max_ratio=100.0, logger=None):
     except Exception as e:
         log.error(f"Failed to scan archive: {e}")
         raise
-    
+
     # GATE 3: Extraction Policy (Zip Bomb Detection)
     extraction_result = extraction_gate(
         entries_total=entries_total,
@@ -78,9 +78,9 @@ def extract_archive(archive_path, destination, max_ratio=100.0, logger=None):
     if isinstance(extraction_result, PolicyReject):
         log.error(f"extraction gate rejected: {extraction_result.error_code}")
         raise ExtractionError(f"Archive policy violation: {extraction_result.error_code}")
-    
+
     log.debug(f"extraction gate passed ({extraction_result.elapsed_ms:.2f}ms)")
-    
+
     # Proceed with extraction
     with zipfile.ZipFile(archive_path) as zf:
         for info in zf.filelist:
@@ -103,12 +103,12 @@ from DocsToKG.OntologyDownload.policy.errors import PolicyReject
 
 def extract_entries(archive, destination, entries, logger=None):
     """Extract entries with path traversal protection."""
-    
+
     log = logger or logging.getLogger(__name__)
-    
+
     # GATE 4: Filesystem Security (Path Traversal Prevention)
     entry_paths = [e.filename if hasattr(e, 'filename') else str(e) for e in entries]
-    
+
     fs_result = filesystem_gate(
         root_path=str(destination),
         entry_paths=entry_paths,
@@ -117,9 +117,9 @@ def extract_entries(archive, destination, entries, logger=None):
     if isinstance(fs_result, PolicyReject):
         log.error(f"filesystem gate rejected: {fs_result.error_code}")
         raise IOError(f"Filesystem policy violation: {fs_result.error_code}")
-    
+
     log.debug(f"filesystem gate passed ({fs_result.elapsed_ms:.2f}ms)")
-    
+
     # Proceed with safe extraction
     for entry in entries:
         safe_path = _sanitize_path(entry.filename, destination)
@@ -142,9 +142,9 @@ from DocsToKG.OntologyDownload.policy.errors import PolicyReject
 
 def commit_extracted_manifest(manifest, connection, fs_success=True, logger=None):
     """Commit manifest with boundary validation."""
-    
+
     log = logger or logging.getLogger(__name__)
-    
+
     # GATE 6: DB Transaction Boundaries (No Torn Writes)
     db_result = db_boundary_gate(
         operation="pre_commit",
@@ -155,9 +155,9 @@ def commit_extracted_manifest(manifest, connection, fs_success=True, logger=None
         log.error(f"db_boundary gate rejected: {db_result.error_code}")
         connection.rollback()
         raise DBError(f"Transaction boundary violation: {db_result.error_code}")
-    
+
     log.debug(f"db_boundary gate passed ({db_result.elapsed_ms:.2f}ms)")
-    
+
     # Proceed with safe commit
     try:
         # Insert manifest records
@@ -184,9 +184,9 @@ from DocsToKG.OntologyDownload.policy.errors import PolicyReject
 
 def mirror_cas_artifact(src, dst, operation="move", logger=None):
     """Mirror artifact with storage policy validation."""
-    
+
     log = logger or logging.getLogger(__name__)
-    
+
     # GATE 5: Storage Operation Safety
     storage_result = storage_gate(
         operation=operation,
@@ -197,9 +197,9 @@ def mirror_cas_artifact(src, dst, operation="move", logger=None):
     if isinstance(storage_result, PolicyReject):
         log.error(f"storage gate rejected: {storage_result.error_code}")
         raise StorageError(f"Storage policy violation: {storage_result.error_code}")
-    
+
     log.debug(f"storage gate passed ({storage_result.elapsed_ms:.2f}ms)")
-    
+
     # Proceed with operation
     if operation == "move":
         shutil.move(src, dst)
@@ -227,37 +227,37 @@ from DocsToKG.OntologyDownload.settings import ResolvedConfig
 
 class TestConfigGateIntegration:
     """Test config_gate integration in fetch_one."""
-    
+
     def test_config_gate_validates_on_startup(self):
         """Config gate validates configuration at fetch_one start."""
         spec = FetchSpec(id="test", resolver="direct", target_formats=["owl"])
-        
+
         with patch("DocsToKG.OntologyDownload.planning.config_gate") as mock_gate:
             mock_gate.return_value = PolicyReject(
                 error_code=ErrorCode.E_CONFIG_INVALID,
                 details={"reason": "test"},
             )
-            
+
             with pytest.raises(ConfigError):
                 fetch_one(spec)
-            
+
             # Verify gate was called
             assert mock_gate.called
-    
+
     def test_config_gate_passes_valid_config(self):
         """Config gate accepts valid configuration."""
         spec = FetchSpec(id="test", resolver="direct", target_formats=["owl"])
-        
+
         with patch("DocsToKG.OntologyDownload.planning.config_gate") as mock_gate:
             mock_gate.return_value = PolicyOK(gate_name="config_gate", elapsed_ms=0.5)
-            
+
             with patch("DocsToKG.OntologyDownload.planning._resolve_plan_with_fallback"):
                 # Verify gate passed and continues
                 try:
                     fetch_one(spec, config=Mock())
                 except Exception:
                     pass  # Other phases may fail, we're testing config_gate
-            
+
             assert mock_gate.called
 ```
 
@@ -272,13 +272,13 @@ from DocsToKG.OntologyDownload.planning import fetch_one
 
 class TestGatesE2EIntegration:
     """Test all gates integrated in full pipeline."""
-    
+
     def test_gates_emit_events_on_pass(self, mock_emitter):
         """All gates emit policy.gate events on success."""
         # Full fetch scenario
         spec = FetchSpec(id="test", resolver="direct", target_formats=["owl"])
         config = create_test_config()
-        
+
         # Mock all gates to pass
         with patch.multiple(
             "DocsToKG.OntologyDownload.policy.gates",
@@ -289,40 +289,40 @@ class TestGatesE2EIntegration:
             db_boundary_gate=MagicMock(return_value=PolicyOK(...)),
         ):
             result = fetch_one(spec, config=config)
-            
+
             # Verify all policy.gate events emitted
             events = [e for e in mock_emitter.events if e["type"] == "policy.gate"]
             assert len(events) >= 4  # At least 4 gates in happy path
             assert all(e["payload"]["outcome"] == "ok" for e in events)
-    
+
     def test_gates_emit_events_on_rejection(self, mock_emitter):
         """Gates emit policy.gate ERROR events on rejection."""
         spec = FetchSpec(id="test", resolver="direct", target_formats=["owl"])
-        
+
         with patch("DocsToKG.OntologyDownload.planning.config_gate") as mock_gate:
             mock_gate.return_value = PolicyReject(
                 error_code=ErrorCode.E_CONFIG_INVALID,
                 details={},
             )
-            
+
             with pytest.raises(ConfigError):
                 fetch_one(spec)
-            
+
             # Verify rejection event emitted
             events = [e for e in mock_emitter.events if e["type"] == "policy.gate"]
             assert any(e["payload"]["outcome"] == "reject" for e in events)
-    
+
     def test_gates_record_metrics(self, mock_metrics_collector):
         """All gates record metrics."""
         spec = FetchSpec(id="test", resolver="direct", target_formats=["owl"])
-        
+
         with patch.multiple(
             "DocsToKG.OntologyDownload.policy.gates",
             config_gate=MagicMock(return_value=PolicyOK(...)),
             url_gate=MagicMock(return_value=PolicyOK(...)),
         ):
             fetch_one(spec)
-            
+
             # Verify metrics recorded
             metrics = mock_metrics_collector.metrics
             assert len(metrics) >= 2  # At least 2 gates
@@ -344,7 +344,7 @@ from DocsToKG.OntologyDownload.policy.gates import (
 
 class TestFilesystemGateProperties:
     """Property-based tests for filesystem_gate."""
-    
+
     @given(
         st.text(min_size=1, max_size=255).filter(
             lambda x: not any(c in x for c in "\x00\n\r")
@@ -356,10 +356,10 @@ class TestFilesystemGateProperties:
         with tempfile.TemporaryDirectory() as tmpdir:
             result1 = filesystem_gate(tmpdir, [path])
             result2 = filesystem_gate(tmpdir, [path])
-            
+
             assert (isinstance(result1, PolicyOK) and isinstance(result2, PolicyOK)) or \
                    (isinstance(result1, PolicyReject) and isinstance(result2, PolicyReject))
-    
+
     @given(st.lists(st.text(min_size=1, max_size=100)))
     def test_filesystem_gate_no_escape(self, paths):
         """Filesystem gate prevents escaping root."""
@@ -367,9 +367,9 @@ class TestFilesystemGateProperties:
         with tempfile.TemporaryDirectory() as tmpdir:
             # Add traversal attempts
             malicious_paths = paths + ["../../../etc/passwd", "/etc/passwd"]
-            
+
             result = filesystem_gate(tmpdir, malicious_paths)
-            
+
             # Either all rejected or specific rejection
             if isinstance(result, PolicyReject):
                 assert result.error_code in [
@@ -380,7 +380,7 @@ class TestFilesystemGateProperties:
 
 class TestExtractionGateProperties:
     """Property-based tests for extraction_gate."""
-    
+
     @given(
         st.integers(min_value=1, max_value=1_000_000),
         st.integers(min_value=1, max_value=1_000_000_000),
@@ -388,9 +388,9 @@ class TestExtractionGateProperties:
     def test_extraction_gate_ratio_calculation(self, entries, bytes_declared):
         """Extraction gate correctly calculates compression ratios."""
         result = extraction_gate(entries, bytes_declared)
-        
+
         ratio = bytes_declared / entries
-        
+
         if ratio > 10.0:
             assert isinstance(result, PolicyReject)
             assert result.error_code == ErrorCode.E_ENTRY_RATIO
@@ -403,6 +403,7 @@ class TestExtractionGateProperties:
 ## PART 3: DEPLOYMENT CHECKLIST
 
 ### Integration Checklist
+
 - [ ] URL gate wired into _populate_plan_metadata (planning.py line ~1159)
 - [ ] Extraction gate wired into extract_archive (io/extraction.py)
 - [ ] Filesystem gate wired into extract_entries (io/filesystem.py)
@@ -413,6 +414,7 @@ class TestExtractionGateProperties:
 - [ ] Logging added for gate rejections
 
 ### Testing Checklist
+
 - [ ] Unit tests created (test_gates_integration_*.py)
 - [ ] Property-based tests created (test_gates_property_based.py)
 - [ ] Integration tests created (test_gates_integration_e2e.py)
@@ -423,6 +425,7 @@ class TestExtractionGateProperties:
 - [ ] Metrics recording verified
 
 ### Validation Checklist
+
 - [ ] E2E scenario: fetch with valid config → success
 - [ ] E2E scenario: fetch with invalid config → rejection
 - [ ] E2E scenario: malicious URL → rejection
@@ -461,7 +464,7 @@ def test_url_gate_performance(benchmark):
 def test_e2e_full_pipeline():
     """Full pipeline with all gates."""
     spec = FetchSpec(id="hp", resolver="obo", target_formats=["owl"])
-    
+
     # This tests:
     # 1. Config validation
     # 2. URL validation
@@ -469,19 +472,19 @@ def test_e2e_full_pipeline():
     # 4. Extraction + zip bomb detection
     # 5. Path validation
     # 6. DB transaction validation
-    
+
     result = fetch_one(spec, config=test_config)
-    
+
     # Verify result
     assert result.manifest is not None
     assert len(result.manifest.files) > 0
-    
+
     # Verify events emitted
     events = get_emitted_events()
     policy_events = [e for e in events if e["type"] == "policy.gate"]
     assert len(policy_events) >= 4  # At least 4 gates
     assert all(e["payload"]["outcome"] == "ok" for e in policy_events)
-    
+
     # Verify metrics recorded
     metrics = get_recorded_metrics()
     assert len(metrics) >= 4
@@ -534,6 +537,7 @@ def test_e2e_full_pipeline():
 ## SUMMARY
 
 Phase 8.4 deliverables:
+
 - 5 gate integrations (code templates provided)
 - Comprehensive test suite (3 test files with patterns)
 - Performance validation approach

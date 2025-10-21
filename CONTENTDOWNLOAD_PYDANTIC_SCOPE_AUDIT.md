@@ -9,6 +9,7 @@
 ## Executive Summary
 
 The **Pydantic v2 Config refactoring** for ContentDownload was planned in detail but **has NOT been implemented**. The current codebase still uses:
+
 - **Dataclasses** (not Pydantic models) for configuration
 - **Ad-hoc resolver loading** (not a registry pattern)
 - **Scattered CLI parsing** (not unified Typer app with config introspection)
@@ -23,6 +24,7 @@ This is a **significant scope gap** requiring deliberate action to complete.
 ### 1. Pydantic v2 Config Models
 
 #### ✅ Planned
+
 - **Location:** `config/models.py`
 - **Contents:**
   - RetryPolicy (v2 model)
@@ -42,6 +44,7 @@ This is a **significant scope gap** requiring deliberate action to complete.
   - Environment variable support
 
 #### ❌ Actual
+
 **Status: NOT IMPLEMENTED**
 
 - `config/` directory exists but contains only YAML files:
@@ -60,6 +63,7 @@ This is a **significant scope gap** requiring deliberate action to complete.
 ### 2. Config Loader (file/env/CLI precedence)
 
 #### ✅ Planned
+
 - **Location:** `config/loader.py`
 - **Features:**
   - Load from YAML/JSON files
@@ -69,6 +73,7 @@ This is a **significant scope gap** requiring deliberate action to complete.
   - Example: `DTKG_HTTP__USER_AGENT="..."` → `http.user_agent` field
 
 #### ❌ Actual
+
 **Status: NOT IMPLEMENTED**
 
 - No `loader.py` file
@@ -83,6 +88,7 @@ This is a **significant scope gap** requiring deliberate action to complete.
 ### 3. Resolver Registry Pattern
 
 #### ✅ Planned
+
 - **Location:** `resolvers/__init__.py`
 - **Features:**
   - `@register(name)` decorator
@@ -99,6 +105,7 @@ This is a **significant scope gap** requiring deliberate action to complete.
   - Tight coupling to config model
 
 #### ❌ Actual
+
 **Status: NOT IMPLEMENTED**
 
 - No registry system
@@ -124,8 +131,10 @@ This is a **significant scope gap** requiring deliberate action to complete.
 ### 4. API Surface: Unified Types
 
 #### ✅ Planned
+
 - **Location:** `api/types.py`
 - **Types:**
+
   ```python
   @dataclass(frozen=True)
   class DownloadPlan:
@@ -156,6 +165,7 @@ This is a **significant scope gap** requiring deliberate action to complete.
   ```
 
 #### ❌ Actual
+
 **Status: PARTIALLY EXISTS, DIFFERENT LOCATION**
 
 - No `api/` directory
@@ -169,6 +179,7 @@ This is a **significant scope gap** requiring deliberate action to complete.
 ### 5. CLI Polish (Typer Commands)
 
 #### ✅ Planned
+
 - **Location:** `cli/app.py`
 - **Commands:**
   - `run` — main execution with overrides
@@ -183,6 +194,7 @@ This is a **significant scope gap** requiring deliberate action to complete.
   - `--chunk-size`
 
 #### ❌ Actual
+
 **Status: NOT IMPLEMENTED**
 
 - No `cli/app.py` file
@@ -213,6 +225,7 @@ Pipeline/Helpers (use dict access)
 ```
 
 **Problems:**
+
 - No strict validation
 - No environment variable support
 - No schema generation
@@ -241,6 +254,7 @@ Pipeline uses:
 ```
 
 **Benefits:**
+
 - Strict validation (`extra="forbid"`)
 - Environment variable support
 - CLI override composition
@@ -254,6 +268,7 @@ Pipeline uses:
 ## Missing Components Checklist
 
 ### Pydantic Models
+
 - [ ] `config/models.py` — All config classes
   - [ ] RetryPolicy
   - [ ] BackoffPolicy
@@ -267,11 +282,13 @@ Pipeline uses:
   - [ ] ContentDownloadConfig (top-level)
 
 ### Config Infrastructure
+
 - [ ] `config/loader.py` — File/env/CLI composition
 - [ ] `config/schema.py` — JSON schema export (optional)
 - [ ] Update `config/__init__.py` — Export public API
 
 ### Resolver Registry
+
 - [ ] Add `@register()` decorator to `resolvers/__init__.py`
 - [ ] Add `_REGISTRY` dict
 - [ ] Add `get_registry()` function
@@ -280,6 +297,7 @@ Pipeline uses:
 - [ ] Update `base.py` with Protocol definition
 
 ### API Surface
+
 - [ ] `api/__init__.py` — Package init
 - [ ] `api/types.py` — Unified types:
   - [ ] DownloadPlan
@@ -289,6 +307,7 @@ Pipeline uses:
   - [ ] AttemptRecord
 
 ### CLI Modernization
+
 - [ ] `cli/` package creation
 - [ ] `cli/__init__.py`
 - [ ] `cli/app.py` — Typer commands:
@@ -298,6 +317,7 @@ Pipeline uses:
   - [ ] explain
 
 ### Pipeline/Helper Refactoring
+
 - [ ] Update helpers to use `api/types.py`
 - [ ] Wire config into pipeline via dependency injection
 - [ ] Remove ad-hoc config passing
@@ -327,6 +347,7 @@ Pipeline uses:
 ## Implementation Path (Low-Risk)
 
 ### Phase 1: Foundation (No breaking changes yet)
+
 1. Create `config/models.py` with Pydantic v2 models (parallel to existing dataclasses)
 2. Create `config/loader.py` with file/env/CLI composition
 3. Create `api/types.py` with unified types
@@ -334,12 +355,14 @@ Pipeline uses:
 5. **No code changes to pipeline/helpers yet**
 
 ### Phase 2: Registry & Resolvers
+
 1. Add `@register()` decorator to all resolvers
 2. Create `build_resolvers()` function
 3. Update resolver imports (from manual to registry)
 4. **Test: resolver order & enable/disable work**
 
 ### Phase 3: Migration (Gradual cutover)
+
 1. Create adapter layer: `ContentDownloadConfig` ↔ `DownloadConfig`
 2. Update pipeline to accept both config types
 3. Update helpers to use `api/types.py` incrementally
@@ -347,12 +370,14 @@ Pipeline uses:
 5. **Gradual migration, no hard cutover**
 
 ### Phase 4: CLI Modernization
+
 1. Create `cli/app.py` with Typer
 2. Keep existing `cli.py` for backward compatibility
 3. Add new commands: print-config, validate-config, explain
 4. **Operators can use new CLI without disruption**
 
 ### Phase 5: Cleanup
+
 1. Remove old dataclass config classes
 2. Remove legacy CLI code
 3. Update docs/AGENTS.md
