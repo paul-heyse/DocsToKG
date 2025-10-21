@@ -605,9 +605,9 @@ def prepare_candidate_download(
         progress_update_interval=progress_update_interval,
         content_type_hint="",
         skip_outcome=skip_outcome,
-    telemetry=telemetry,
-            run_id=run_id,
-            )
+        telemetry=telemetry,
+        run_id=run_id,
+    )
 
 
 def stream_candidate_payload(plan: DownloadPreflightPlan) -> DownloadStreamResult:

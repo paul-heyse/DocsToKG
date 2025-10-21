@@ -96,9 +96,7 @@ class ResolverPipeline:
 
         # Try each resolver in order
         for resolver in self._resolvers:
-            LOGGER.debug(
-                f"Trying resolver '{resolver.name}' for artifact {artifact.work_id}"
-            )
+            LOGGER.debug(f"Trying resolver '{resolver.name}' for artifact {artifact.work_id}")
 
             try:
                 # Call resolver
@@ -156,9 +154,7 @@ class ResolverPipeline:
             meta={"attempted": len(outcomes), "outcomes": [o.classification for o in outcomes]},
         )
 
-    def _try_plan(
-        self, plan: DownloadPlan, artifact: Any, ctx: Any
-    ) -> DownloadOutcome:
+    def _try_plan(self, plan: DownloadPlan, artifact: Any, ctx: Any) -> DownloadOutcome:
         """
         Try a single plan: prepare → stream → finalize.
 
@@ -181,9 +177,7 @@ class ResolverPipeline:
                     run_id=self._run_id,
                 )
             except SkipDownload as e:
-                LOGGER.debug(
-                    f"Skipped plan (url={plan.url}, reason={e.reason}): {e}"
-                )
+                LOGGER.debug(f"Skipped plan (url={plan.url}, reason={e.reason}): {e}")
                 return DownloadOutcome(
                     ok=False,
                     classification="skip",
@@ -192,9 +186,7 @@ class ResolverPipeline:
                     meta={"error": str(e)},
                 )
             except DownloadError as e:
-                LOGGER.debug(
-                    f"Preflight error (url={plan.url}, reason={e.reason}): {e}"
-                )
+                LOGGER.debug(f"Preflight error (url={plan.url}, reason={e.reason}): {e}")
                 return DownloadOutcome(
                     ok=False,
                     classification="error",
@@ -214,9 +206,7 @@ class ResolverPipeline:
                     run_id=self._run_id,
                 )
             except SkipDownload as e:
-                LOGGER.debug(
-                    f"Skipped stream (url={plan.url}, reason={e.reason}): {e}"
-                )
+                LOGGER.debug(f"Skipped stream (url={plan.url}, reason={e.reason}): {e}")
                 return DownloadOutcome(
                     ok=False,
                     classification="skip",
@@ -225,9 +215,7 @@ class ResolverPipeline:
                     meta={"error": str(e)},
                 )
             except DownloadError as e:
-                LOGGER.debug(
-                    f"Stream error (url={plan.url}, reason={e.reason}): {e}"
-                )
+                LOGGER.debug(f"Stream error (url={plan.url}, reason={e.reason}): {e}")
                 return DownloadOutcome(
                     ok=False,
                     classification="error",
@@ -251,9 +239,7 @@ class ResolverPipeline:
                 )
                 return outcome
             except DownloadError as e:
-                LOGGER.debug(
-                    f"Finalization error (url={plan.url}, reason={e.reason}): {e}"
-                )
+                LOGGER.debug(f"Finalization error (url={plan.url}, reason={e.reason}): {e}")
                 return DownloadOutcome(
                     ok=False,
                     classification="error",

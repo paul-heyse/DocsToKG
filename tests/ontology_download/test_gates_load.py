@@ -28,6 +28,7 @@ class TestURLGateLoadTesting:
 
     def test_url_gate_concurrent_calls_1000(self):
         """URL gate should handle 1000 concurrent requests."""
+
         def invoke_gate() -> float:
             result = url_gate(
                 "https://example.com/path",
@@ -84,6 +85,7 @@ class TestExtractionGateLoadTesting:
 
     def test_extraction_gate_concurrent_calls_500(self):
         """Extraction gate should handle 500 concurrent requests."""
+
         def invoke_gate() -> float:
             result = extraction_gate(
                 entries_total=1000,
@@ -194,6 +196,7 @@ class TestDBBoundaryGateLoadTesting:
 
     def test_db_boundary_gate_concurrent_calls_1000(self):
         """DB boundary gate should handle 1000 concurrent calls."""
+
         def invoke_gate() -> float:
             result = db_boundary_gate(
                 operation="pre_commit",
@@ -224,6 +227,7 @@ class TestCombinedGateLoad:
 
     def test_all_gates_concurrent_mixed_load(self):
         """All gates should handle concurrent mixed-gate load."""
+
         def url_call() -> tuple[str, float]:
             result = url_gate(
                 "https://example.com/path",
@@ -276,6 +280,7 @@ class TestCombinedGateLoad:
 
     def test_gates_sustained_load_30_seconds(self):
         """Gates should maintain performance under 30-second sustained load."""
+
         def mixed_calls() -> List[float]:
             """Make mixed gate calls for one iteration."""
             times = []

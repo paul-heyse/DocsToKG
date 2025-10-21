@@ -264,6 +264,7 @@ def stream_to_part(
     expected_total: Optional[int],
     artifact_lock: Callable,
     logger: logging.Logger,
+    verify_content_length: bool = True,
 ) -> StreamMetrics:
     """Stream content into a `.part` file with resume support.
 
@@ -274,6 +275,7 @@ def stream_to_part(
       - fsync for durability
       - Chunked writing for memory efficiency
       - Atomic file state management
+      - Content-Length verification (optional)
 
     Args:
         client: HTTPX client (with Tenacity + rate limiting in stack)
@@ -286,13 +288,16 @@ def stream_to_part(
         expected_total: Expected Content-Length
         artifact_lock: Lock context manager for atomic operations
         logger: Logger instance
+        verify_content_length: If True, verify bytes_written matches expected_total
 
     Returns:
         StreamMetrics with bytes written, timing, and final hash
 
     Raises:
-        RuntimeError: On HTTP errors, Content-Range mismatch, etc.
+        RuntimeError: On HTTP errors, Content-Range mismatch, or Content-Length mismatch.
     """
+    from DocsToKG.ContentDownload.io_utils import SizeMismatchError
+    
     part_path.parent.mkdir(parents=True, exist_ok=True)
     resumed_from = 0
     t0 = time.monotonic()
@@ -368,6 +373,12 @@ def stream_to_part(
 
                 bytes_after = f.tell()
                 bytes_written = bytes_after - bytes_before
+
+                # P1 Scope: Verify Content-Length matches bytes written
+                if verify_content_length and expected_total is not None:
+                    total_bytes = (resumed_from or 0) + (bytes_written or 0)
+                    if total_bytes != expected_total:
+                        raise SizeMismatchError(expected_total, total_bytes)
 
     # Metrics
     elapsed_ms = int((time.monotonic() - t0) * 1000)
@@ -631,6 +642,7 @@ def download_pdf(
         expected_total=validators.content_length,
         artifact_lock=artifact_lock,
         logger=logger,
+        verify_content_length=cfg.io.verify_content_length,
     )
 
     # -------- Finalize & Index --------

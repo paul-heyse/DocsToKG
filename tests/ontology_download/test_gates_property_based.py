@@ -222,9 +222,7 @@ class TestFilesystemGateProperties:
         )
     )
     @settings(max_examples=50, suppress_health_check=[HealthCheck.function_scoped_fixture])
-    def test_filesystem_gate_rejects_absolute_paths(
-        self, absolute_path: str, tmp_path: Path
-    ):
+    def test_filesystem_gate_rejects_absolute_paths(self, absolute_path: str, tmp_path: Path):
         """Filesystem gate should reject absolute paths."""
         root = tmp_path / "extract"
         root.mkdir(exist_ok=True)

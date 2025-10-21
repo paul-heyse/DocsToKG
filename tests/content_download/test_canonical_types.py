@@ -50,14 +50,14 @@ class TestDownloadPlanImmutability:
     def test_plan_is_frozen(self):
         """DownloadPlan cannot be modified after creation."""
         plan = DownloadPlan(url="https://example.com/file.pdf", resolver_name="test")
-        
+
         with pytest.raises(FrozenInstanceError):
             plan.url = "https://example.com/other.pdf"  # type: ignore
 
     def test_plan_has_slots(self):
         """DownloadPlan uses slots (no __dict__)."""
         plan = DownloadPlan(url="https://example.com/file.pdf", resolver_name="test")
-        
+
         with pytest.raises(AttributeError):
             plan.__dict__  # type: ignore
 
@@ -137,9 +137,11 @@ class TestResolverResultSequence:
 
     def test_result_plans_sequence_type(self):
         """ResolverResult.plans uses Sequence (not List)."""
-        plans = tuple([
-            DownloadPlan(url="https://a.com/file.pdf", resolver_name="test"),
-        ])
+        plans = tuple(
+            [
+                DownloadPlan(url="https://a.com/file.pdf", resolver_name="test"),
+            ]
+        )
         result = ResolverResult(plans=plans)
         assert len(result.plans) == 1
 
@@ -274,12 +276,13 @@ class TestDownloadExecutionContracts:
             http_status=200,
             content_type="application/pdf",
         )
-        
+
         # Mock os.replace to avoid actual file operations
         import os
+
         original_replace = os.replace
         os.replace = MagicMock()
-        
+
         try:
             outcome = finalize_candidate_download(plan, stream)
             assert isinstance(outcome, DownloadOutcome)
@@ -310,7 +313,7 @@ class TestResolverPipeline:
         artifact = MagicMock()
         artifact.work_id = "work_123"
         ctx = MagicMock()
-        
+
         outcome = pipeline.run(artifact, ctx)
         assert outcome.ok is False
         assert outcome.classification == "error"
@@ -320,12 +323,12 @@ class TestResolverPipeline:
         resolver = MagicMock()
         resolver.name = "test"
         resolver.resolve.return_value = ResolverResult(plans=[])
-        
+
         pipeline = ResolverPipeline([resolver], MagicMock())
         artifact = MagicMock()
         artifact.work_id = "work_123"
         ctx = MagicMock()
-        
+
         outcome = pipeline.run(artifact, ctx)
         assert outcome.ok is False
         assert outcome.classification == "error"
@@ -346,7 +349,7 @@ class TestHappyPath:
         resolver.name = "test"
         plan = DownloadPlan(url="https://example.com/file.pdf", resolver_name="test")
         resolver.resolve.return_value = ResolverResult(plans=[plan])
-        
+
         # Create mock session
         session = MagicMock()
         response = MagicMock()
@@ -355,21 +358,22 @@ class TestHappyPath:
         response.iter_content = lambda chunk_size: [b"test data"]
         session.head.return_value = response
         session.get.return_value = response
-        
+
         # Create pipeline
         pipeline = ResolverPipeline([resolver], session)
-        
+
         # Mock artifacts and context
         artifact = MagicMock()
         artifact.work_id = "work_123"
         artifact.final_path = None
         ctx = MagicMock()
-        
+
         # Mock file operations
         import os
+
         original_replace = os.replace
         os.replace = MagicMock()
-        
+
         try:
             outcome = pipeline.run(artifact, ctx)
             # Note: outcome.ok may be False due to missing final_path handling

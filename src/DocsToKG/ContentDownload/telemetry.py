@@ -82,9 +82,8 @@ from typing import (
 from urllib.parse import urlsplit
 
 if TYPE_CHECKING:  # pragma: no cover
-    from DocsToKG.ContentDownload.api.types import AttemptRecord, DownloadOutcome
     from DocsToKG.ContentDownload.core import WorkArtifact
-    from DocsToKG.ContentDownload.pipeline import PipelineResult
+    from DocsToKG.ContentDownload.pipeline import AttemptRecord, DownloadOutcome, PipelineResult
 
 from DocsToKG.ContentDownload import locks
 from DocsToKG.ContentDownload.core import (
