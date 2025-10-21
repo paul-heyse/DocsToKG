@@ -89,6 +89,15 @@ from tests.fixtures.telemetry_fixtures import (  # noqa: F401
     ratelimit_registry_reset,
 )
 
+# Import Phase 4 fixtures (Optimization 9 Phase 4 - Snapshots)
+from tests.fixtures.snapshot_fixtures import (  # noqa: F401
+    snapshot_manager,
+)
+from tests.fixtures.snapshot_assertions import (  # noqa: F401
+    SnapshotAssertions,
+    canonicalize_json,
+)
+
 # --- Globals ---
 
 ROOT = Path(__file__).resolve().parent.parent

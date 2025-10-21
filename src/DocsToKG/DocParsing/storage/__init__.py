@@ -17,6 +17,8 @@ Modules:
 - schemas: Arrow schema declarations and Parquet footer contracts
 - paths: Dataset layout and path builders
 - writers: Atomic Parquet writers for all artifact types
+- chunks_writer: Specialized Parquet writer for Chunks datasets
+- dataset_view: Lazy dataset readers and introspection utilities
 - readers: Lazy dataset scans and analytics integration
 - embedding_integration: Parquet writer factory for embedding vectors
 """
@@ -27,5 +29,7 @@ __all__ = [
     "schemas",
     "paths",
     "writers",
+    "chunks_writer",
+    "dataset_view",
     "readers",
 ]

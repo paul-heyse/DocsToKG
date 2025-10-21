@@ -44,6 +44,7 @@ class ChunkerCfg(StageConfigBase):
     resume: bool = False
     force: bool = False
     inject_anchors: bool = False
+    format: str = "parquet"
 
     ENV_VARS: ClassVar[Dict[str, str]] = {
         "log_level": "DOCSTOKG_CHUNK_LOG_LEVEL",
@@ -63,6 +64,7 @@ class ChunkerCfg(StageConfigBase):
         "resume": "DOCSTOKG_CHUNK_RESUME",
         "force": "DOCSTOKG_CHUNK_FORCE",
         "inject_anchors": "DOCSTOKG_CHUNK_INJECT_ANCHORS",
+        "format": "DOCSTOKG_CHUNK_FORMAT",
         "config": "DOCSTOKG_CHUNK_CONFIG",
     }
 
@@ -85,6 +87,7 @@ class ChunkerCfg(StageConfigBase):
         "resume": StageConfigBase._coerce_bool,
         "force": StageConfigBase._coerce_bool,
         "inject_anchors": StageConfigBase._coerce_bool,
+        "format": StageConfigBase._coerce_str,
     }
 
     def finalize(self) -> None:
@@ -130,6 +133,7 @@ class ChunkerCfg(StageConfigBase):
         self.resume = bool(self.resume)
         self.force = bool(self.force)
         self.inject_anchors = bool(self.inject_anchors)
+        self.format = str(self.format or "parquet").strip()
 
         if self.min_tokens < 0 or self.max_tokens < 0:
             raise ChunkingCLIValidationError(
@@ -160,6 +164,12 @@ class ChunkerCfg(StageConfigBase):
             raise ChunkingCLIValidationError(
                 option="--soft-barrier-margin",
                 message="must be >= 0",
+            )
+
+        if self.format not in ("parquet", "jsonl"):
+            raise ChunkingCLIValidationError(
+                option="--format",
+                message="must be 'parquet' (default) or 'jsonl'",
             )
 
 

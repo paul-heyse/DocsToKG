@@ -127,6 +127,15 @@ CHUNK_CLI_OPTIONS: Tuple[CLIOption, ...] = (
     CLIOption(("--shard-index",), {"type": int, "default": 0}),
     CLIOption(("--validate-only",), {"action": "store_true"}),
     CLIOption(("--inject-anchors",), {"action": "store_true"}),
+    CLIOption(
+        ("--format",),
+        {
+            "type": str,
+            "default": "parquet",
+            "choices": ["parquet", "jsonl"],
+            "help": "Output format for chunked documents (default: %(default)s).",
+        },
+    ),
 )
 
 

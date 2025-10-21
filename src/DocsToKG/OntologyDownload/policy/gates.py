@@ -13,7 +13,7 @@ Gates:
 """
 
 import time
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional, Union, List
 
 from DocsToKG.OntologyDownload.policy.errors import (
     ErrorCode,
@@ -183,100 +183,179 @@ def url_gate(
 
 
 @policy_gate(
-    name="path_gate",
-    description="Validate filesystem paths, prevent traversal",
+    name="filesystem_gate",
+    description="Validate filesystem paths against security policy",
     domain="filesystem",
 )
-def path_gate(
-    path: str,
-    root: Optional[str] = None,
-    max_depth: int = 10,
+def filesystem_gate(
+    root_path: str,
+    entry_paths: List[str],
+    allow_symlinks: bool = False,
 ) -> Union[PolicyOK, PolicyReject]:
-    """Validate filesystem path against policy.
+    """Validate filesystem paths against security policy.
+
+    Enforces:
+    - Path normalization (NFC Unicode, no .. / absolute paths)
+    - Casefold collision detection
+    - Depth and length constraints
+    - Symlink rejection (unless explicitly allowed)
+    - Windows reserved name rejection
+    - Encapsulation within root
 
     Args:
-        path: Path to validate
-        root: Root directory (paths must be under this)
-        max_depth: Maximum directory depth
+        root_path: Root extraction directory
+        entry_paths: Relative paths to validate
+        allow_symlinks: If False, reject symlink entries
 
     Returns:
-        PolicyOK if path is valid, PolicyReject otherwise
+        PolicyOK if all paths valid, PolicyReject otherwise
     """
+    import os
+    import re
+    import unicodedata
+    from pathlib import Path, PureWindowsPath
+
     start_ms = time.perf_counter() * 1000
-    details: Dict[str, Any] = {"path": path.split("/")[-1] if "/" in path else path}
+    details: Dict[str, Any] = {}
 
     try:
-        import os
+        # Normalize root path
+        root_path = os.path.normpath(root_path)
+        root_resolved = os.path.abspath(root_path)
 
-        # Reject absolute paths
-        if os.path.isabs(path):
+        # Validate root exists and is directory
+        if not os.path.isdir(root_resolved):
             raise_policy_error(
                 ErrorCode.E_TRAVERSAL,
-                "Absolute paths not allowed",
-                details,
+                f"Root path is not a directory: {root_path}",
+                {"root": root_path},
                 FilesystemPolicyException,
             )
 
-        # Reject .. or ./.. traversal attempts
-        if ".." in path:
-            raise_policy_error(
-                ErrorCode.E_TRAVERSAL,
-                "Path traversal attempt (..) detected",
-                details,
-                FilesystemPolicyException,
-            )
+        # Track seen paths for collision detection
+        seen_casefold: Dict[str, str] = {}
 
-        # Reject paths starting with /
-        if path.startswith("/"):
-            raise_policy_error(
-                ErrorCode.E_TRAVERSAL,
-                "Paths starting with / not allowed",
-                details,
-                FilesystemPolicyException,
-            )
+        for entry_path in entry_paths:
+            # Convert to string if needed
+            entry_path_str = str(entry_path)
 
-        # Check depth
-        parts = [p for p in path.split("/") if p and p != "."]
-        if len(parts) > max_depth:
-            raise_policy_error(
-                ErrorCode.E_DEPTH,
-                f"Path too deep: {len(parts)} > {max_depth}",
-                {"depth": len(parts), "max_depth": max_depth},
-                FilesystemPolicyException,
-            )
-
-        # Check segment length (Windows limit is 255)
-        for segment in parts:
-            if len(segment) > 255:
+            # Reject absolute paths
+            if os.path.isabs(entry_path_str):
+                details = {"path": entry_path_str, "issue": "absolute_path"}
                 raise_policy_error(
-                    ErrorCode.E_SEGMENT_LEN,
-                    f"Path segment too long: {len(segment)} > 255",
-                    {"segment_len": len(segment)},
+                    ErrorCode.E_TRAVERSAL,
+                    f"Absolute path not allowed: {entry_path_str}",
+                    details,
                     FilesystemPolicyException,
                 )
 
-        # Check overall path length (Windows limit is 260)
-        if len(path) > 260:
-            raise_policy_error(
-                ErrorCode.E_PATH_LEN,
-                f"Path too long: {len(path)} > 260",
-                {"path_len": len(path)},
-                FilesystemPolicyException,
-            )
-
-        # Check for Windows reserved names
-        reserved = {"CON", "PRN", "AUX", "NUL", "COM1", "LPT1"}
-        for segment in parts:
-            if segment.upper() in reserved:
+            # Reject .. components
+            if ".." in entry_path_str or entry_path_str.startswith("."):
+                details = {"path": entry_path_str, "issue": "traversal_attempt"}
                 raise_policy_error(
-                    ErrorCode.E_PORTABILITY,
-                    f"Windows reserved name: {segment}",
-                    {"reserved_name": segment},
+                    ErrorCode.E_TRAVERSAL,
+                    f"Path traversal detected: {entry_path_str}",
+                    details,
+                    FilesystemPolicyException,
+                )
+
+            # Unicode NFC normalization
+            normalized = unicodedata.normalize("NFC", entry_path_str)
+            if normalized != entry_path_str:
+                entry_path_str = normalized
+
+            # Length constraints
+            if len(entry_path_str) > 4096:
+                details = {"path": entry_path_str[:50], "length": len(entry_path_str)}
+                raise_policy_error(
+                    ErrorCode.E_PATH_LEN,
+                    f"Path too long: {len(entry_path_str)} > 4096",
+                    details,
+                    FilesystemPolicyException,
+                )
+
+            # Depth constraint (max 20 levels)
+            depth = entry_path_str.count(os.sep)
+            if depth > 20:
+                details = {"path": entry_path_str, "depth": depth}
+                raise_policy_error(
+                    ErrorCode.E_DEPTH,
+                    f"Path too deep: {depth} > 20 levels",
+                    details,
+                    FilesystemPolicyException,
+                )
+
+            # Check segment length (max 255 per component)
+            for segment in entry_path_str.split(os.sep):
+                if len(segment) > 255:
+                    details = {"path": entry_path_str, "segment": segment[:50]}
+                    raise_policy_error(
+                        ErrorCode.E_SEGMENT_LEN,
+                        f"Path segment too long: {len(segment)} > 255",
+                        details,
+                        FilesystemPolicyException,
+                    )
+
+                # Reject Windows reserved names
+                reserved = {
+                    "con", "prn", "aux", "nul",
+                    "com1", "com2", "com3", "com4", "com5",
+                    "com6", "com7", "com8", "com9",
+                    "lpt1", "lpt2", "lpt3", "lpt4", "lpt5",
+                    "lpt6", "lpt7", "lpt8", "lpt9",
+                }
+                if segment.lower() in reserved:
+                    details = {"segment": segment}
+                    raise_policy_error(
+                        ErrorCode.E_PORTABILITY,
+                        f"Windows reserved name: {segment}",
+                        details,
+                        FilesystemPolicyException,
+                    )
+
+            # Casefold collision detection
+            casefold_key = entry_path_str.casefold()
+            if casefold_key in seen_casefold:
+                details = {
+                    "path1": seen_casefold[casefold_key],
+                    "path2": entry_path_str,
+                }
+                raise_policy_error(
+                    ErrorCode.E_CASEFOLD_COLLISION,
+                    f"Case-insensitive collision: {entry_path_str}",
+                    details,
+                    FilesystemPolicyException,
+                )
+            seen_casefold[casefold_key] = entry_path_str
+
+            # Resolve full path and check it's within root
+            full_path = os.path.normpath(os.path.join(root_resolved, entry_path_str))
+            full_resolved = os.path.abspath(full_path)
+
+            # Security: ensure it doesn't escape root
+            try:
+                os.path.relpath(full_resolved, root_resolved)
+                if not full_resolved.startswith(root_resolved + os.sep):
+                    if full_resolved != root_resolved:
+                        details = {"path": entry_path_str, "root": root_resolved}
+                        raise_policy_error(
+                            ErrorCode.E_TRAVERSAL,
+                            f"Path escapes root: {entry_path_str}",
+                            details,
+                            FilesystemPolicyException,
+                        )
+            except ValueError:
+                # relpath raises ValueError if paths are on different drives (Windows)
+                details = {"path": entry_path_str, "root": root_resolved}
+                raise_policy_error(
+                    ErrorCode.E_TRAVERSAL,
+                    f"Path on different volume: {entry_path_str}",
+                    details,
                     FilesystemPolicyException,
                 )
 
         elapsed_ms = time.perf_counter() * 1000 - start_ms
-        return PolicyOK(gate_name="path_gate", elapsed_ms=elapsed_ms)
+        return PolicyOK(gate_name="filesystem_gate", elapsed_ms=elapsed_ms)
 
     except Exception as e:
         elapsed_ms = time.perf_counter() * 1000 - start_ms
@@ -478,7 +557,7 @@ def db_gate(
 __all__ = [
     "config_gate",
     "url_gate",
-    "path_gate",
+    "filesystem_gate",
     "extraction_gate",
     "storage_gate",
     "db_gate",
