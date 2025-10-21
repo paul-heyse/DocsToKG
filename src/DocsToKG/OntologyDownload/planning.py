@@ -1966,6 +1966,32 @@ def fetch_one(
                     url_already_validated=True,
                 )
 
+                # === CATALOG: Record download in DuckDB (Task 1.1) ===
+                try:
+                    if CATALOG_AVAILABLE and download_boundary is not None:
+                        conn = _get_duckdb_conn(active_config)
+                        if conn is not None:
+                            # Compute relative path from storage root
+                            try:
+                                fs_relpath = str(destination.relative_to(STORAGE.base_path() or destination.parent))
+                            except (ValueError, AttributeError):
+                                fs_relpath = destination.name
+                            
+                            success, _ = _safe_record_boundary(
+                                adapter,
+                                "download",
+                                download_boundary,
+                                conn,
+                                artifact_id=result.sha256,
+                                version_id=version,
+                                fs_relpath=fs_relpath,
+                                size=result.content_length or 0,
+                                etag=result.etag
+                            )
+                except Exception as e:
+                    adapter.debug(f"Skipping download boundary: {e}")
+
+
                 if expected_checksum:
                     attempt_record["expected_checksum"] = expected_checksum.to_mapping()
 
@@ -2026,6 +2052,46 @@ def fetch_one(
                             max_uncompressed_bytes=active_config.defaults.http.max_uncompressed_bytes(),
                         )
                         artifacts.extend(str(path) for path in extracted_paths)
+
+                        # === CATALOG: Record extracted files in DuckDB (Task 1.1) ===
+                        try:
+                            if CATALOG_AVAILABLE and extraction_boundary is not None:
+                                conn = _get_duckdb_conn(active_config)
+                                if conn is not None and extraction_dir and extraction_dir.exists():
+                                    with extraction_boundary(conn, result.sha256) as ex_result:
+                                        # Insert extracted files into DB via appender
+                                        app = conn.appender("extracted_files")
+                                        for extracted_path in extracted_paths:
+                                            try:
+                                                rel_path = extracted_path.relative_to(extraction_dir)
+                                            except ValueError:
+                                                rel_path = extracted_path.name
+                                            
+                                            if extracted_path.exists():
+                                                st = extracted_path.stat()
+                                                file_id = f"{result.sha256}:{rel_path}"
+                                                app.append([
+                                                    file_id,
+                                                    result.sha256,
+                                                    version,
+                                                    str(rel_path),
+                                                    extracted_path.suffix.lower() or "unknown",
+                                                    st.st_size,
+                                                    datetime.fromtimestamp(st.st_mtime).isoformat(),
+                                                    None
+                                                ])
+                                                ex_result.files_inserted += 1
+                                                ex_result.total_size += st.st_size
+                                        
+                                        app.close()
+                                        ex_result.audit_path = extraction_dir / "extraction_audit.json"
+                                        adapter.info("extraction recorded in catalog", extra={
+                                            "stage": "catalog",
+                                            "files": ex_result.files_inserted
+                                        })
+                        except Exception as e:
+                            adapter.debug(f"Skipping extraction boundary: {e}")
+
                     except ConfigError as exc:
                         adapter.error(
                             "zip extraction failed",
@@ -2042,6 +2108,40 @@ def fetch_one(
                     for name, result in validation_results.items()
                     if not getattr(result, "ok", False)
                 ]
+
+                # === CATALOG: Record validation results in DuckDB (Task 1.1) ===
+                try:
+                    if CATALOG_AVAILABLE and validation_boundary is not None:
+                        conn = _get_duckdb_conn(active_config)
+                        if conn is not None:
+                            # Record validations for each extracted file and validator
+                            files_for_validation = extracted_paths if (extraction_dir and extraction_dir.exists()) else [destination]
+                            for extracted_path in files_for_validation:
+                                try:
+                                    file_id = f"{result.sha256}:{extracted_path.relative_to(extraction_dir) if extraction_dir else extracted_path.name}"
+                                except (ValueError, AttributeError):
+                                    file_id = f"{result.sha256}:{extracted_path.name}"
+                                
+                                for validator_name, validation_result in validation_results.items():
+                                    try:
+                                        status = "pass" if getattr(validation_result, "ok", False) else "fail"
+                                        details = getattr(validation_result, "details", None)
+                                        
+                                        success, _ = _safe_record_boundary(
+                                            adapter,
+                                            f"validation({validator_name})",
+                                            validation_boundary,
+                                            conn,
+                                            file_id=file_id,
+                                            validator=validator_name,
+                                            status=status,
+                                            details=details if isinstance(details, dict) else None
+                                        )
+                                    except Exception as e:
+                                        adapter.debug(f"Skipping validation boundary for {validator_name}: {e}")
+                except Exception as e:
+                    adapter.debug(f"Skipping validation boundary: {e}")
+
                 if failed_validators:
                     log_payload = {
                         "stage": "validate",
@@ -2167,6 +2267,38 @@ def fetch_one(
                     index_entry["expected_checksum"] = expected_checksum.to_mapping()
                 if cas_path:
                     index_entry["cas_path"] = str(cas_path)
+                # === CATALOG: Mark as latest in DuckDB (Task 1.1) ===
+                try:
+                    if CATALOG_AVAILABLE and set_latest_boundary is not None:
+                        conn = _get_duckdb_conn(active_config)
+                        if conn is not None:
+                            # Prepare LATEST.json in temp file
+                            latest_json_path = base_dir.parent / "LATEST.json"
+                            latest_temp_path = latest_json_path.with_suffix(".json.tmp")
+                            latest_temp_path.parent.mkdir(parents=True, exist_ok=True)
+                            
+                            latest_data = {
+                                "version": version,
+                                "downloaded_at": datetime.now(timezone.utc).isoformat(),
+                                "sha256": result.sha256,
+                                "resolver": effective_spec.resolver,
+                                "correlation_id": correlation,
+                            }
+                            
+                            with open(latest_temp_path, "w") as f:
+                                json.dump(latest_data, f, indent=2)
+                            
+                            success, _ = _safe_record_boundary(
+                                adapter,
+                                "set_latest",
+                                set_latest_boundary,
+                                conn,
+                                version_id=version,
+                                latest_json_path=latest_json_path
+                            )
+                except Exception as e:
+                    adapter.debug(f"Skipping set_latest boundary: {e}")
+
                 STORAGE.finalize_version(effective_spec.id, version, base_dir)
 
                 adapter.info(
