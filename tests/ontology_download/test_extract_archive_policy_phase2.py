@@ -374,3 +374,106 @@ class TestPhase2Integration:
             assert (
                 extracted[0].parents[1] == destination
             )  # Encapsulation root parent is destination
+
+
+class TestPhase2WindowsPortability:  # Gap 4: Windows portability test coverage
+    """Tests for Windows portability checks (reserved names, trailing space/dot)."""
+
+    @pytest.mark.parametrize(
+        "reserved_name",
+        [
+            "con",
+            "prn",
+            "aux",
+            "nul",
+            "com1",
+            "com2",
+            "com3",
+            "com4",
+            "com5",
+            "com6",
+            "com7",
+            "com8",
+            "com9",
+            "lpt1",
+            "lpt2",
+            "lpt3",
+            "lpt4",
+            "lpt5",
+            "lpt6",
+            "lpt7",
+            "lpt8",
+            "lpt9",
+        ],
+    )
+    def test_windows_reserved_names_rejected_strict(self, reserved_name):
+        """Windows reserved names are rejected in strict portability mode."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            destination = Path(tmpdir)
+            archive_path = destination / "test.zip"
+
+            # Create ZIP with reserved name
+            with zipfile.ZipFile(archive_path, "w") as zf:
+                zf.writestr(f"{reserved_name}.txt", "content")
+
+            policy = strict_defaults()
+            policy.windows_portability_strict = True
+            policy.encapsulate = False
+            policy.use_dirfd = False
+
+            # Should reject reserved names
+            with pytest.raises(ConfigError, match="reserved"):
+                extract_archive_safe(archive_path, destination, extraction_policy=policy)
+
+    @pytest.mark.parametrize(
+        "reserved_variant",
+        [
+            "CON",  # Uppercase
+            "Con",  # Mixed case
+            "con.txt",  # With extension
+            "PRN.dat",
+            "NUL.bin",
+        ],
+    )
+    def test_windows_reserved_names_case_insensitive(self, reserved_variant):
+        """Windows reserved name checks are case-insensitive."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            destination = Path(tmpdir)
+            archive_path = destination / "test.zip"
+
+            with zipfile.ZipFile(archive_path, "w") as zf:
+                zf.writestr(reserved_variant, "content")
+
+            policy = strict_defaults()
+            policy.windows_portability_strict = True
+            policy.encapsulate = False
+            policy.use_dirfd = False
+
+            with pytest.raises(ConfigError, match="reserved|portability"):
+                extract_archive_safe(archive_path, destination, extraction_policy=policy)
+
+    @pytest.mark.parametrize(
+        "trailing_name",
+        [
+            "file. ",  # Trailing space
+            "file.",  # Trailing dot
+            "file.txt ",  # Trailing space with extension
+            "file.txt.",  # Trailing dot with extension
+        ],
+    )
+    def test_windows_trailing_space_dot_rejected(self, trailing_name):
+        """Files with trailing space or dot are rejected."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            destination = Path(tmpdir)
+            archive_path = destination / "test.zip"
+
+            with zipfile.ZipFile(archive_path, "w") as zf:
+                zf.writestr(trailing_name, "content")
+
+            policy = strict_defaults()
+            policy.windows_portability_strict = True
+            policy.encapsulate = False
+            policy.use_dirfd = False
+
+            with pytest.raises(ConfigError, match="trailing|portability"):
+                extract_archive_safe(archive_path, destination, extraction_policy=policy)
