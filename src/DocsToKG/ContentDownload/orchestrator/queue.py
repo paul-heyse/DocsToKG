@@ -76,12 +76,11 @@ import json
 import logging
 import sqlite3
 import threading
-import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Iterable, Mapping, Optional
+from typing import Any, Mapping, Optional
 
-from ..orchestrator.models import JobState, JobResult
+from ..orchestrator.models import JobState
 
 __all__ = ["WorkQueue"]
 
@@ -125,6 +124,7 @@ class WorkQueue:
         """
         self.path = path
         self._connection_lock = threading.Lock()
+        self._local = threading.local()  # Per-thread connection storage
 
         # Create parent directories if needed
         db_path = Path(path)
@@ -143,11 +143,36 @@ class WorkQueue:
         logger.info(f"WorkQueue initialized at {path} (wal_mode={wal_mode})")
 
     def _get_connection(self) -> sqlite3.Connection:
-        """Get thread-local database connection."""
-        conn = sqlite3.connect(self.path, timeout=10.0)
-        conn.execute("PRAGMA foreign_keys=ON")
-        conn.row_factory = sqlite3.Row
-        return conn
+        """Get thread-local database connection.
+
+        Implements per-thread connection pooling to reduce overhead
+        of creating new connections on every operation.
+
+        Returns:
+            SQLite connection for current thread
+        """
+        # Check if thread-local connection exists and is still valid
+        if not hasattr(self._local, "conn") or self._local.conn is None:
+            # Lazy create connection for this thread
+            conn = sqlite3.connect(self.path, timeout=10.0)
+            conn.execute("PRAGMA foreign_keys=ON")
+            conn.row_factory = sqlite3.Row
+            self._local.conn = conn
+        return self._local.conn
+
+    def close_connection(self) -> None:
+        """Close thread-local database connection.
+
+        Should be called when a worker thread is shutting down to
+        ensure proper cleanup of database resources.
+        """
+        if hasattr(self._local, "conn") and self._local.conn is not None:
+            try:
+                self._local.conn.close()
+            except Exception as e:
+                logger.warning(f"Error closing connection: {e}")
+            finally:
+                self._local.conn = None
 
     def enqueue(
         self,
@@ -198,7 +223,7 @@ class WorkQueue:
 
             return was_inserted
         finally:
-            conn.close()
+            pass  # Don't close; keep thread-local connection alive
 
     def lease(
         self,
@@ -230,7 +255,7 @@ class WorkQueue:
             lease_expires_iso = lease_expires.isoformat()
 
             # Atomically lease queued jobs and stale in-progress jobs
-            cursor = conn.execute(
+            conn.execute(
                 """
                 UPDATE jobs
                 SET state = ?, worker_id = ?, lease_expires_at = ?, updated_at = ?
@@ -283,39 +308,47 @@ class WorkQueue:
 
             return result
         finally:
-            conn.close()
+            pass  # Don't close; keep thread-local connection alive
 
-    def heartbeat(self, worker_id: str) -> None:
+    def heartbeat(self, worker_id: str, lease_ttl_sec: int = 600) -> None:
         """Extend lease for active worker.
 
-        Updates lease_expires_at to current time + lease_ttl, keeping the worker's
-        jobs from being reclaimed by other workers.
+        Updates lease_expires_at to current time + lease_ttl_sec, keeping the worker's
+        jobs from being reclaimed by other workers. The lease extension duration
+        is configurable to match the orchestrator's lease TTL setting.
 
         Args:
             worker_id: Worker identifier
+            lease_ttl_sec: Seconds to extend lease (should match config.lease_ttl_seconds)
 
         Raises:
             sqlite3.Error: If database operation fails
         """
         conn = self._get_connection()
         try:
-            now_iso = datetime.now(timezone.utc).isoformat()
-            # Note: In production, would extend by lease_ttl_sec, but keeping simple here
+            now = datetime.now(timezone.utc)
+            now_iso = now.isoformat()
+
+            # Calculate lease expiration time
+            lease_expires = now + timedelta(seconds=lease_ttl_sec)
+            lease_expires_iso = lease_expires.isoformat()
 
             cursor = conn.execute(
                 """
                 UPDATE jobs
-                SET lease_expires_at = datetime(?, '+10 minutes'), updated_at = ?
+                SET lease_expires_at = ?, updated_at = ?
                 WHERE worker_id = ? AND state = ?
                 """,
-                (now_iso, now_iso, worker_id, JobState.IN_PROGRESS.value),
+                (lease_expires_iso, now_iso, worker_id, JobState.IN_PROGRESS.value),
             )
             conn.commit()
 
             if cursor.rowcount > 0:
-                logger.debug(f"Heartbeat for worker {worker_id} extended {cursor.rowcount} leases")
+                logger.debug(
+                    f"Heartbeat for worker {worker_id} extended {cursor.rowcount} leases (ttl={lease_ttl_sec}s)"
+                )
         finally:
-            conn.close()
+            pass  # Don't close; keep thread-local connection alive
 
     def ack(
         self,
@@ -366,7 +399,7 @@ class WorkQueue:
             else:
                 logger.warning(f"Job {job_id} not found for ack")
         finally:
-            conn.close()
+            pass  # Don't close; keep thread-local connection alive
 
     def fail_and_retry(
         self,
@@ -394,7 +427,7 @@ class WorkQueue:
             now_iso = datetime.now(timezone.utc).isoformat()
 
             # Increment attempts
-            cursor = conn.execute(
+            conn.execute(
                 """
                 UPDATE jobs
                 SET attempts = attempts + 1,
@@ -447,7 +480,7 @@ class WorkQueue:
 
             conn.commit()
         finally:
-            conn.close()
+            pass  # Don't close; keep thread-local connection alive
 
     def stats(self) -> dict[str, int]:
         """Get queue statistics.
@@ -483,4 +516,4 @@ class WorkQueue:
 
             return stats_dict
         finally:
-            conn.close()
+            pass  # Don't close; keep thread-local connection alive

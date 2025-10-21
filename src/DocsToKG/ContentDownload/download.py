@@ -47,7 +47,6 @@ from typing import (
     Mapping,
     Optional,
     Protocol,
-    Set,
     Tuple,
     Union,
 )
@@ -101,7 +100,6 @@ from DocsToKG.ContentDownload.networking import (
     parse_retry_after_header,
     request_with_retries,
 )
-
 from DocsToKG.ContentDownload.telemetry import RunTelemetry, normalize_manifest_path
 from DocsToKG.ContentDownload.urls import canonical_for_index, canonical_for_request
 
@@ -2020,14 +2018,31 @@ def build_download_outcome(
     else:
         # Convert DownloadOptions or other mapping to DownloadContext
         validation_context = DownloadContext.from_mapping(
-            {k: getattr(options, k, None) for k in [
-                "dry_run", "list_only", "extract_html_text", "previous",
-                "sniff_bytes", "min_pdf_bytes", "tail_check_bytes", "robots_checker",
-                "content_addressed", "verify_cache_digest", "domain_content_rules",
-                "host_accept_overrides", "progress_callback", "skip_head_precheck",
-                "head_precheck_passed", "global_manifest_index",
-                "size_warning_threshold", "chunk_size", "stream_retry_attempts", "extra"
-            ]}
+            {
+                k: getattr(options, k, None)
+                for k in [
+                    "dry_run",
+                    "list_only",
+                    "extract_html_text",
+                    "previous",
+                    "sniff_bytes",
+                    "min_pdf_bytes",
+                    "tail_check_bytes",
+                    "robots_checker",
+                    "content_addressed",
+                    "verify_cache_digest",
+                    "domain_content_rules",
+                    "host_accept_overrides",
+                    "progress_callback",
+                    "skip_head_precheck",
+                    "head_precheck_passed",
+                    "global_manifest_index",
+                    "size_warning_threshold",
+                    "chunk_size",
+                    "stream_retry_attempts",
+                    "extra",
+                ]
+            }
         )
 
     validation = validate_classification(classification_code, artifact, validation_context)
@@ -2526,7 +2541,6 @@ def process_one_work(
         )
         result["skipped"] = True
         return result
-
 
     pipeline_result = pipeline.run(
         active_client,

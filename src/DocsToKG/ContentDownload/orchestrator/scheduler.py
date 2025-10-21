@@ -53,7 +53,6 @@ from queue import Empty, Queue
 from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
-    from DocsToKG.ContentDownload.orchestrator.limits import KeyedLimiter
     from DocsToKG.ContentDownload.orchestrator.queue import WorkQueue
     from DocsToKG.ContentDownload.orchestrator.workers import Worker
     from DocsToKG.ContentDownload.pipeline import ResolverPipeline
@@ -214,18 +213,25 @@ class Orchestrator:
         logger.info("Orchestrator stopped")
 
     def _dispatcher_loop(self) -> None:
-        """Lease jobs and feed worker queue."""
+        """Lease jobs and feed worker queue.
+
+        Implements job batching to reduce database contention:
+        instead of leasing 1 job per iteration, batches lease requests
+        based on available worker slots.
+        """
         logger.debug("Dispatcher loop started")
 
         while not self._stop.is_set():
             try:
-                # Check available slots
+                # Calculate batch size: min(10, available_worker_slots)
                 free_slots = self._jobs_queue.maxsize - self._jobs_queue.qsize()
-                if free_slots > 0:
-                    # Lease jobs
+                batch_size = min(10, max(1, free_slots))
+
+                if batch_size > 0:
+                    # Batch lease jobs (reduces DB contention from 1 tx/job to ~1 tx/batch)
                     jobs = self.queue.lease(
                         self.worker_id,
-                        limit=free_slots,
+                        limit=batch_size,
                         lease_ttl_sec=self.config.lease_ttl_seconds,
                     )
 
@@ -233,13 +239,19 @@ class Orchestrator:
                         self._jobs_queue.put(job, block=False)
 
                     if jobs:
-                        logger.debug(f"Leased {len(jobs)} jobs")
+                        logger.debug(f"Leased {len(jobs)} jobs (batch_size={batch_size})")
+                    else:
+                        # Backoff if no jobs available
+                        time.sleep(0.05)
+                else:
+                    # No free slots, backoff
+                    time.sleep(0.1)
 
-                # Emit metrics
+                # Emit metrics (less frequently to avoid spam)
                 stats = self.queue.stats()
                 logger.debug(f"Queue stats: {stats}")
 
-                # Sleep before next lease
+                # Sleep before next lease attempt
                 time.sleep(1.0)
 
             except Exception as e:
@@ -249,12 +261,18 @@ class Orchestrator:
         logger.debug("Dispatcher loop stopped")
 
     def _heartbeat_loop(self) -> None:
-        """Extend leases for active workers."""
+        """Extend leases for active workers.
+
+        Sends periodic heartbeats to extend job leases, preventing
+        crashed workers' jobs from being reclaimed. Uses config.lease_ttl_seconds
+        to ensure heartbeat duration matches the configured TTL.
+        """
         logger.debug("Heartbeat loop started")
 
         while not self._stop.is_set():
             try:
-                self.queue.heartbeat(self.worker_id)
+                # Pass lease_ttl_seconds to heartbeat (critical for config sync)
+                self.queue.heartbeat(self.worker_id, self.config.lease_ttl_seconds)
                 logger.debug(f"Heartbeat sent for {self.worker_id}")
                 time.sleep(self.config.heartbeat_seconds)
 

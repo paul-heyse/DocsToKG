@@ -63,7 +63,7 @@ stats = queue.stats()  # {'queued': 100, 'in_progress': 8, 'done': 15, ...}
 from __future__ import annotations
 
 from .limits import KeyedLimiter, host_key
-from .models import JobState, JobResult
+from .models import JobResult, JobState
 from .queue import WorkQueue
 from .scheduler import Orchestrator, OrchestratorConfig
 from .workers import Worker

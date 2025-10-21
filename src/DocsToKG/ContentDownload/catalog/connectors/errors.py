@@ -7,8 +7,12 @@ for better error handling and diagnostics.
 
 from __future__ import annotations
 
-from .base import ProviderError, ProviderConnectionError, ProviderOperationError, ProviderConfigError
-
+from .base import (
+    ProviderConfigError,
+    ProviderConnectionError,
+    ProviderError,
+    ProviderOperationError,
+)
 
 __all__ = [
     "ProviderError",
@@ -23,14 +27,17 @@ __all__ = [
 
 class DevelopmentProviderError(ProviderError):
     """Error specific to Development provider (SQLite)."""
+
     pass
 
 
 class EnterpriseProviderError(ProviderError):
     """Error specific to Enterprise provider (Postgres)."""
+
     pass
 
 
 class CloudProviderError(ProviderError):
     """Error specific to Cloud provider (RDS + S3)."""
+
     pass

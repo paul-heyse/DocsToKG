@@ -143,12 +143,12 @@ import json
 import logging
 import os
 import sqlite3
-import httpx
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Dict, List
 
+import httpx
 import pytest
 
 from DocsToKG.ContentDownload import cli as downloader
@@ -1101,17 +1101,19 @@ def test_process_one_work_logs_manifest_in_dry_run(download_modules, tmp_path):
                 html_paths=[],
             )
 
-    options = DownloadContext.from_mapping({
-        "dry_run": True,
-        "list_only": False,
-        "extract_html_text": False,
-        "run_id": "test-run",
-        "previous": {},
-        "resume_completed": set(),
-        "sniff_bytes": downloader.DEFAULT_SNIFF_BYTES,
-        "min_pdf_bytes": downloader.DEFAULT_MIN_PDF_BYTES,
-        "tail_check_bytes": downloader.DEFAULT_TAIL_CHECK_BYTES,
-    })
+    options = DownloadContext.from_mapping(
+        {
+            "dry_run": True,
+            "list_only": False,
+            "extract_html_text": False,
+            "run_id": "test-run",
+            "previous": {},
+            "resume_completed": set(),
+            "sniff_bytes": downloader.DEFAULT_SNIFF_BYTES,
+            "min_pdf_bytes": downloader.DEFAULT_MIN_PDF_BYTES,
+            "tail_check_bytes": downloader.DEFAULT_TAIL_CHECK_BYTES,
+        }
+    )
     result = downloader.process_one_work(
         work,
         session,
@@ -1167,17 +1169,19 @@ def test_resume_skips_completed_work(download_modules, tmp_path):
         "open_access": {"oa_url": None},
     }
 
-    options = DownloadContext.from_mapping({
-        "dry_run": False,
-        "list_only": False,
-        "extract_html_text": False,
-        "run_id": "test-run",
-        "previous": {},
-        "resume_completed": {"W-RESUME"},
-        "sniff_bytes": downloader.DEFAULT_SNIFF_BYTES,
-        "min_pdf_bytes": downloader.DEFAULT_MIN_PDF_BYTES,
-        "tail_check_bytes": downloader.DEFAULT_TAIL_CHECK_BYTES,
-    })
+    options = DownloadContext.from_mapping(
+        {
+            "dry_run": False,
+            "list_only": False,
+            "extract_html_text": False,
+            "run_id": "test-run",
+            "previous": {},
+            "resume_completed": {"W-RESUME"},
+            "sniff_bytes": downloader.DEFAULT_SNIFF_BYTES,
+            "min_pdf_bytes": downloader.DEFAULT_MIN_PDF_BYTES,
+            "tail_check_bytes": downloader.DEFAULT_TAIL_CHECK_BYTES,
+        }
+    )
     result = downloader.process_one_work(
         work,
         session,
@@ -1861,9 +1865,11 @@ def test_cli_workers_apply_domain_jitter(download_modules, patcher, tmp_path):
     original_policies = clone_policies(manager.policies())
     original_backend = BackendConfig(
         backend=manager.backend.backend,
-        options=dict(manager.backend.options)
-        if isinstance(manager.backend.options, dict)
-        else dict(manager.backend.options or {}),
+        options=(
+            dict(manager.backend.options)
+            if isinstance(manager.backend.options, dict)
+            else dict(manager.backend.options or {})
+        ),
     )
 
     try:
@@ -1873,9 +1879,7 @@ def test_cli_workers_apply_domain_jitter(download_modules, patcher, tmp_path):
         assert policy is not None
         artifact_rates = policy.rates.get("artifact")
         assert artifact_rates is not None
-        assert [(rate.limit, int(rate.interval)) for rate in artifact_rates] == [
-            (1, 100)
-        ]
+        assert [(rate.limit, int(rate.interval)) for rate in artifact_rates] == [(1, 100)]
     finally:
         configure_rate_limits(policies=original_policies, backend=original_backend)
 
