@@ -74,7 +74,9 @@ class EventAssertions:
 
     def assert_no_errors(self) -> None:
         """Assert no error events were captured."""
-        assert not self.has_error(), f"Found error events: {[e for e in self.events if e.get('level') == 'error']}"
+        assert not self.has_error(), (
+            f"Found error events: {[e for e in self.events if e.get('level') == 'error']}"
+        )
 
     def assert_min_count(self, minimum: int) -> None:
         """Assert minimum event count."""

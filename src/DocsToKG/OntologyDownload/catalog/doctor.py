@@ -223,10 +223,7 @@ def detect_db_fs_drifts(
     """
     issues: list[DoctorIssue] = []
 
-    # Scan filesystem
-    fs_artifacts = scan_filesystem_artifacts(artifacts_root)
-    fs_files = scan_filesystem_files(extracted_root)
-
+    # Scan filesystem for artifacts (unused for now, but could be used for completeness checks)
     # Get DB artifacts
     db_artifacts = conn.execute("SELECT artifact_id, fs_relpath FROM artifacts").fetchall()
 
@@ -244,9 +241,6 @@ def detect_db_fs_drifts(
                     severity="error",
                 )
             )
-
-    # Get DB files
-    db_files = conn.execute("SELECT file_id, artifact_id FROM extracted_files").fetchall()
 
     # Check latest pointer consistency
     latest_result = conn.execute("SELECT version_id FROM latest_pointer LIMIT 1").fetchone()

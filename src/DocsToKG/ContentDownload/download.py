@@ -440,6 +440,8 @@ class DownloadPreflightPlan:
     progress_update_interval: int = 128 * 1024
     content_type_hint: str = ""
     skip_outcome: Optional[DownloadOutcome] = None
+    telemetry: Optional[Any] = None
+    run_id: Optional[str] = None
 
 
 @dataclass
@@ -466,6 +468,8 @@ def prepare_candidate_download(
     head_precheck_passed: bool = False,
     original_url: Optional[str] = None,
     origin_host: Optional[str] = None,
+    telemetry: Optional[Any] = None,
+    run_id: Optional[str] = None,
 ) -> DownloadPreflightPlan:
     """Prepare request metadata prior to streaming the download."""
 
@@ -599,7 +603,9 @@ def prepare_candidate_download(
         progress_update_interval=progress_update_interval,
         content_type_hint="",
         skip_outcome=skip_outcome,
-    )
+    telemetry=telemetry,
+            run_id=run_id,
+            )
 
 
 def stream_candidate_payload(plan: DownloadPreflightPlan) -> DownloadStreamResult:
@@ -656,6 +662,8 @@ def stream_candidate_payload(plan: DownloadPreflightPlan) -> DownloadStreamResul
                     content_policy=content_policy,
                     original_url=plan.original_url,
                     origin_host=plan.origin_host,
+                    telemetry=plan.telemetry,
+                    run_id=plan.run_id,
                 )
             except BreakerOpenError as exc:
                 elapsed_ms = (time.monotonic() - start_request) * 1000.0
@@ -2506,6 +2514,8 @@ def download_candidate(
     original_url: Optional[str] = None,
     origin_host: Optional[str] = None,
     head_precheck_passed: bool = False,
+    telemetry: Optional[Any] = None,
+    run_id: Optional[str] = None,
 ) -> DownloadOutcome:
     """Download a single candidate URL and classify the payload.
 
@@ -2535,6 +2545,8 @@ def download_candidate(
         head_precheck_passed=head_precheck_passed,
         original_url=original_url,
         origin_host=origin_host,
+        telemetry=telemetry,
+        run_id=run_id,
     )
     if plan.skip_outcome is not None:
         return plan.skip_outcome

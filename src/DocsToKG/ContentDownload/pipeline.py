@@ -2004,6 +2004,8 @@ class ResolverPipeline:
                 result.referer,
                 self.config.get_timeout(resolver_name),
                 download_context,
+                telemetry=self.logger,
+                run_id=self._run_id,
                 **kwargs,
             )
         else:
@@ -2013,6 +2015,8 @@ class ResolverPipeline:
                 url,
                 result.referer,
                 self.config.get_timeout(resolver_name),
+                telemetry=self.logger,
+                run_id=self._run_id,
                 **kwargs,
             )
 

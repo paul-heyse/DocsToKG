@@ -32,7 +32,6 @@ from DocsToKG.OntologyDownload.network.client import (
     reset_http_client,
 )
 from DocsToKG.OntologyDownload.network.instrumentation import (
-    attach_hooks_to_client,
     clear_request_context,
     emit_event,
     get_on_error_hook,
@@ -100,7 +99,6 @@ __all__ = [
     "get_on_response_hook",
     "get_on_error_hook",
     "map_httpx_exception_to_error_type",
-    "attach_hooks_to_client",
     # Retry policies
     "create_http_retry_policy",
     "create_idempotent_retry_policy",

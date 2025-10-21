@@ -1,169 +1,102 @@
-"""Rate-limiting instrumentation: Structured telemetry for rate-limit events.
+"""Rate limiter instrumentation and telemetry.
 
-Emits structured events when rate limits are acquired, blocked, or released.
-Events are emitted to Python logging with contextual information for
-observability and debugging.
-
-Event types:
-- ratelimit.acquire: Successfully acquired rate limit slot(s)
-- ratelimit.blocked: Rate limit exceeded, request blocked/delayed
-- ratelimit.release: Slots released (when available again)
-
-Example:
-    >>> from DocsToKG.OntologyDownload.ratelimit.instrumentation import emit_rate_limit_event
-    >>> emit_rate_limit_event("acquire", {
-    ...     "service": "ols",
-    ...     "host": "www.ebi.ac.uk",
-    ...     "weight": 1,
-    ... })
+Emits ratelimit.acquire, ratelimit.cooldown, and ratelimit.block events
+for observability into rate limiting behavior and pressure.
 """
 
-import logging
-from typing import Any, Dict, List, Optional
+from typing import Optional
 
-logger = logging.getLogger(__name__)
-
-
-# ============================================================================
-# Event Emission
-# ============================================================================
-
-
-def emit_rate_limit_event(event_type: str, payload: Dict[str, Any]) -> None:
-    """Emit a structured rate-limit event.
-
-    Events are emitted to Python logging with structured context.
-    Callers should configure logging to route events to observability stack.
-
-    Args:
-        event_type: Event type (acquire, blocked, release, etc.)
-        payload: Dictionary of event fields (no secrets)
-
-    Example:
-        >>> emit_rate_limit_event("ratelimit.acquire", {
-        ...     "service": "ols",
-        ...     "host": "example.com",
-        ...     "weight": 1,
-        ...     "elapsed_ms": 5,
-        ... })
-    """
-    full_event_type = f"ratelimit.{event_type}"
-    logger.info(
-        full_event_type,
-        extra={
-            "event_type": full_event_type,
-            **payload,  # Spread all fields as log context
-        },
-    )
-
-
-# ============================================================================
-# High-Level Event Helpers
-# ============================================================================
+from DocsToKG.OntologyDownload.observability.events import emit_event
 
 
 def emit_acquire_event(
-    service: str,
-    host: Optional[str] = None,
-    weight: int = 1,
-    elapsed_ms: int = 0,
+    key: str,
+    allowed: bool,
+    blocked_ms: float = 0,
+    tokens_requested: int = 1,
+    tokens_available: int = 0,
 ) -> None:
-    """Emit a rate-limit acquire event.
-
-    Called when rate limit slots are successfully acquired.
+    """Emit event when rate limiter acquire() is called.
 
     Args:
-        service: Service name
-        host: Optional host name
-        weight: Number of slots acquired
-        elapsed_ms: Milliseconds spent waiting (0 if immediate)
+        key: Rate limit key (service or host)
+        allowed: Whether the request was allowed
+        blocked_ms: Milliseconds blocked if delayed
+        tokens_requested: Tokens requested
+        tokens_available: Tokens available after acquire
     """
-    payload = {
-        "service": service,
-        "weight": weight,
-        "elapsed_ms": elapsed_ms,
-    }
-    if host:
-        payload["host"] = host
+    try:
+        emit_event(
+            type="ratelimit.acquire",
+            level="INFO",
+            payload={
+                "key": key[:40],  # Truncate for safety
+                "allowed": allowed,
+                "blocked_ms": blocked_ms,
+                "tokens_requested": tokens_requested,
+                "tokens_available": tokens_available,
+                "outcome": "allowed" if allowed else "blocked",
+            },
+        )
+    except Exception:
+        # Never fail telemetry
+        pass
 
-    emit_rate_limit_event("acquire", payload)
 
-
-def emit_blocked_event(
-    service: str,
-    host: Optional[str] = None,
-    weight: int = 1,
-    reason: str = "limit_exceeded",
+def emit_cooldown_event(
+    key: str,
+    status_code: int,
+    cooldown_sec: float,
 ) -> None:
-    """Emit a rate-limit blocked event.
-
-    Called when a request is blocked due to rate limit.
+    """Emit event when rate limiter enters cooldown (e.g., on 429).
 
     Args:
-        service: Service name
-        host: Optional host name
-        weight: Number of slots that would have been needed
-        reason: Reason for blocking (limit_exceeded, max_delay_exceeded, etc.)
+        key: Rate limit key
+        status_code: HTTP status code that triggered cooldown
+        cooldown_sec: Seconds to wait before retrying
     """
-    payload = {
-        "service": service,
-        "weight": weight,
-        "reason": reason,
-    }
-    if host:
-        payload["host"] = host
+    try:
+        emit_event(
+            type="ratelimit.cooldown",
+            level="WARN",
+            payload={
+                "key": key[:40],
+                "status_code": status_code,
+                "cooldown_sec": cooldown_sec,
+                "cooldown_ms": int(cooldown_sec * 1000),
+            },
+        )
+    except Exception:
+        # Never fail telemetry
+        pass
 
-    emit_rate_limit_event("blocked", payload)
 
-
-def emit_rate_info_event(
-    service: str,
-    rates: List[str],
-    mode: str = "block",
+def emit_head_skip_event(
+    key: str,
+    reason: str,
 ) -> None:
-    """Emit rate configuration info event.
-
-    Called when a rate limiter is created or updated.
+    """Emit event when rate limiter skips a request.
 
     Args:
-        service: Service name
-        rates: List of rate spec strings (e.g., ["4/second", "300/minute"])
-        mode: Rate limiting mode (block, fail-fast, etc.)
+        key: Rate limit key
+        reason: Reason for skip (e.g., 'cooldown_active', 'no_tokens')
     """
-    payload = {
-        "service": service,
-        "rates": rates,
-        "mode": mode,
-    }
-    emit_rate_limit_event("info", payload)
-
-
-# ============================================================================
-# Context-Aware Helpers
-# ============================================================================
-
-
-def log_rate_limit_stats(service: str, stats: Dict[str, Any]) -> None:
-    """Log rate-limiting statistics for a service.
-
-    Args:
-        service: Service name
-        stats: Statistics dictionary (from manager.get_stats())
-    """
-    logger.debug(
-        "Rate limit statistics",
-        extra={
-            "event_type": "ratelimit.stats",
-            "service": service,
-            **stats,
-        },
-    )
+    try:
+        emit_event(
+            type="ratelimit.skip",
+            level="INFO",
+            payload={
+                "key": key[:40],
+                "reason": reason,
+            },
+        )
+    except Exception:
+        # Never fail telemetry
+        pass
 
 
 __all__ = [
-    "emit_rate_limit_event",
     "emit_acquire_event",
-    "emit_blocked_event",
-    "emit_rate_info_event",
-    "log_rate_limit_stats",
+    "emit_cooldown_event",
+    "emit_head_skip_event",
 ]
