@@ -24,6 +24,7 @@ Responsibilities:
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -35,6 +36,12 @@ except ImportError as exc:  # pragma: no cover
     raise ImportError(
         "duckdb is required for catalog doctor. Ensure .venv is initialized."
     ) from exc
+
+from .observability_instrumentation import (
+    emit_doctor_begin,
+    emit_doctor_complete,
+    emit_doctor_issue_found,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -231,15 +238,21 @@ def detect_db_fs_drifts(
     for artifact_id, fs_relpath in db_artifacts:
         expected_path = artifacts_root / fs_relpath if fs_relpath else None
         if expected_path and not expected_path.exists():
-            issues.append(
-                DoctorIssue(
-                    issue_type="missing_fs_file",
-                    artifact_id=artifact_id,
-                    file_id=None,
-                    fs_path=expected_path,
-                    description=f"Artifact {artifact_id} recorded in DB but missing on FS: {fs_relpath}",
-                    severity="error",
-                )
+            issue = DoctorIssue(
+                issue_type="missing_fs_file",
+                artifact_id=artifact_id,
+                file_id=None,
+                fs_path=expected_path,
+                description=f"Artifact {artifact_id} recorded in DB but missing on FS: {fs_relpath}",
+                severity="error",
+            )
+            issues.append(issue)
+            # Emit observability event for this issue
+            emit_doctor_issue_found(
+                issue_type="missing_fs_file",
+                severity="error",
+                artifact_id=artifact_id,
+                description=issue.description,
             )
 
     # Check latest pointer consistency
@@ -250,15 +263,21 @@ def detect_db_fs_drifts(
         # In a real implementation, check LATEST.json on FS
         latest_json_path = extracted_root.parent / "LATEST.json"
         if not latest_json_path.exists():
-            issues.append(
-                DoctorIssue(
-                    issue_type="latest_mismatch",
-                    artifact_id=None,
-                    file_id=None,
-                    fs_path=latest_json_path,
-                    description=f"DB marks {db_latest_version} as latest, but LATEST.json missing on FS",
-                    severity="warning",
-                )
+            issue = DoctorIssue(
+                issue_type="latest_mismatch",
+                artifact_id=None,
+                file_id=None,
+                fs_path=latest_json_path,
+                description=f"DB marks {db_latest_version} as latest, but LATEST.json missing on FS",
+                severity="warning",
+            )
+            issues.append(issue)
+            # Emit observability event for this issue
+            emit_doctor_issue_found(
+                issue_type="latest_mismatch",
+                severity="warning",
+                artifact_id=None,
+                description=issue.description,
             )
 
     logger.info(f"Detected {len(issues)} DB↔FS drifts")

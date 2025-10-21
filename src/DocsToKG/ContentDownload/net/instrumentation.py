@@ -17,7 +17,7 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -60,46 +60,30 @@ class NetRequestEvent:
     Correlates via request_id for tracing across hops.
     """
 
-    # Event metadata
+    # Event metadata (required)
     ts: str  # ISO 8601 timestamp (UTC)
-    event_type: str = "net.request"
     request_id: str  # UUID for correlation
-
-    # Request details
     method: str  # GET, HEAD, POST, etc.
     url: str  # URL (may be redacted)
     host: str  # Hostname only
-
-    # Response
     status_code: int  # HTTP status (0 if error before response)
     status: RequestStatus  # SUCCESS, REDIRECT, ERROR, etc.
-
-    # Timing
     elapsed_ms: float  # Wall-clock duration
-    ttfb_ms: Optional[float] = None  # Time to first byte (if tracked)
 
-    # Cache
+    # Optional fields with defaults
+    event_type: str = "net.request"
+    ttfb_ms: Optional[float] = None  # Time to first byte (if tracked)
     cache: CacheStatus = CacheStatus.MISS
     from_cache: bool = False  # True if from Hishel
-
-    # Protocol
     http_version: str = "HTTP/1.1"  # HTTP/1.0, HTTP/1.1, HTTP/2
     http2: bool = False
-
-    # Data
     bytes_read: int = 0
     bytes_written: int = 0
-
-    # Error details (if status != SUCCESS)
     error_code: Optional[str] = None
     error_message: Optional[str] = None
-
-    # Context
     attempt: int = 1  # Attempt number (for retries)
     hop: int = 1  # Redirect hop number
     redirect_target: Optional[str] = None
-
-    # Additional metadata
     service: Optional[str] = None  # Service name (resolver, provider, etc.)
     role: Optional[str] = None  # Role (metadata, landing, artifact, etc.)
 
@@ -169,9 +153,7 @@ class NetRequestEventBuilder:
         self.service: Optional[str] = None
         self.role: Optional[str] = None
 
-    def with_request(
-        self, method: str, url: str, host: str
-    ) -> NetRequestEventBuilder:
+    def with_request(self, method: str, url: str, host: str) -> NetRequestEventBuilder:
         """Set request details."""
         self.method = method
         self.url = url
@@ -187,15 +169,15 @@ class NetRequestEventBuilder:
         self.http2 = http2
         return self
 
-    def with_timing(self, elapsed_ms: float, ttfb_ms: Optional[float] = None) -> NetRequestEventBuilder:
+    def with_timing(
+        self, elapsed_ms: float, ttfb_ms: Optional[float] = None
+    ) -> NetRequestEventBuilder:
         """Set timing information."""
         self.elapsed_ms = elapsed_ms
         self.ttfb_ms = ttfb_ms
         return self
 
-    def with_cache(
-        self, cache: CacheStatus, from_cache: bool = False
-    ) -> NetRequestEventBuilder:
+    def with_cache(self, cache: CacheStatus, from_cache: bool = False) -> NetRequestEventBuilder:
         """Set cache status."""
         self.cache = cache
         self.from_cache = from_cache
@@ -208,7 +190,10 @@ class NetRequestEventBuilder:
         return self
 
     def with_error(
-        self, error_code: str, error_message: str = "", status: RequestStatus = RequestStatus.ERROR
+        self,
+        error_code: str,
+        error_message: str = "",
+        status: RequestStatus = RequestStatus.ERROR,
     ) -> NetRequestEventBuilder:
         """Set error details."""
         self.error_code = error_code
@@ -228,7 +213,9 @@ class NetRequestEventBuilder:
         self.attempt = attempt
         return self
 
-    def with_context(self, service: Optional[str] = None, role: Optional[str] = None) -> NetRequestEventBuilder:
+    def with_context(
+        self, service: Optional[str] = None, role: Optional[str] = None
+    ) -> NetRequestEventBuilder:
         """Set context (service, role)."""
         self.service = service
         self.role = role
@@ -280,11 +267,11 @@ class NetRequestEmitter:
     - Custom handlers
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize emitter."""
-        self.handlers: list[callable] = [self._log_handler]
+        self.handlers: list[Callable[[NetRequestEvent], None]] = [self._log_handler]
 
-    def add_handler(self, handler: callable) -> None:
+    def add_handler(self, handler: Callable[[NetRequestEvent], None]) -> None:
         """Register a custom event handler."""
         self.handlers.append(handler)
 

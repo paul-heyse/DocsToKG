@@ -446,6 +446,16 @@ def set_latest_boundary(
         duckdb.Error: If DB fails (FS write is retried)
         IOError: If FS write fails
     """
+    # Emit observability begin event
+    emit_boundary_begin(
+        boundary="latest",
+        artifact_id="unknown",
+        version_id=version_id,
+        service="unknown",
+        extra_payload={},
+    )
+    start_time = time.time()
+    
     result = SetLatestBoundaryResult(
         version_id=version_id,
         latest_json_path=latest_json_path,
@@ -486,10 +496,33 @@ def set_latest_boundary(
 
         conn.commit()
         logger.info(f"Set latest boundary: marked {version_id} as latest")
+        
+        # Emit observability success event
+        duration_ms = (time.time() - start_time) * 1000
+        emit_boundary_success(
+            boundary="latest",
+            artifact_id="unknown",
+            version_id=version_id,
+            duration_ms=duration_ms,
+            extra_payload={
+                "pointer_updated": result.pointer_updated,
+                "json_written": result.json_written,
+            },
+        )
 
     except duckdb.Error as exc:
         conn.rollback()
         logger.error(f"Set latest boundary failed: {exc}")
+        
+        # Emit observability error event
+        duration_ms = (time.time() - start_time) * 1000
+        emit_boundary_error(
+            boundary="latest",
+            artifact_id="unknown",
+            version_id=version_id,
+            error=exc,
+            duration_ms=duration_ms,
+        )
         raise
 
     yield result
