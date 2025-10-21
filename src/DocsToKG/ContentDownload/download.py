@@ -112,7 +112,6 @@ ENABLE_FALLBACK_STRATEGY = True
 
 __all__ = [
     "ensure_dir",
-    "DownloadConfig",
     "DownloadOptions",
     "DownloadState",
     "ValidationResult",
@@ -156,188 +155,6 @@ def ensure_dir(path: Path) -> None:
         OSError: If the directory cannot be created because of permissions.
     """
     path.mkdir(parents=True, exist_ok=True)
-
-
-@dataclass
-class DownloadConfig:
-    """Unified download configuration shared by CLI, pipeline, and runner."""
-
-    dry_run: bool = False
-    list_only: bool = False
-    extract_html_text: bool = False
-    run_id: str = ""
-    previous_lookup: Mapping[str, Dict[str, Any]] = field(default_factory=dict)
-    resume_completed: Set[str] = field(default_factory=set)
-    sniff_bytes: int = DEFAULT_SNIFF_BYTES
-    min_pdf_bytes: int = DEFAULT_MIN_PDF_BYTES
-    tail_check_bytes: int = DEFAULT_TAIL_CHECK_BYTES
-    robots_checker: Optional["RobotsCache"] = None
-    content_addressed: bool = False
-    verify_cache_digest: bool = False
-    domain_content_rules: Dict[str, Dict[str, Any]] = field(default_factory=dict)
-    host_accept_overrides: Dict[str, Any] = field(default_factory=dict)
-    progress_callback: Optional[Callable[[int, Optional[int], str], None]] = None
-    skip_head_precheck: bool = False
-    head_precheck_passed: bool = False
-    global_manifest_index: Dict[str, Dict[str, Any]] = field(default_factory=dict)
-    size_warning_threshold: Optional[int] = None
-    chunk_size: Optional[int] = None
-    stream_retry_attempts: int = 0
-    extra: Dict[str, Any] = field(default_factory=dict)
-
-    def __post_init__(self) -> None:
-        self.dry_run = bool(self.dry_run)
-        self.list_only = bool(self.list_only)
-        self.extract_html_text = bool(self.extract_html_text)
-        self.content_addressed = bool(self.content_addressed)
-        self.verify_cache_digest = bool(self.verify_cache_digest)
-        self.skip_head_precheck = bool(self.skip_head_precheck)
-        self.head_precheck_passed = bool(self.head_precheck_passed)
-
-        self.previous_lookup = self._normalize_resume_lookup(self.previous_lookup)
-        self.resume_completed = self._normalize_resume_completed(self.resume_completed)
-        self.domain_content_rules = self._normalize_mapping(self.domain_content_rules)
-        self.host_accept_overrides = self._normalize_mapping(self.host_accept_overrides)
-        self.global_manifest_index = self._normalize_mapping(self.global_manifest_index)
-        self.extra = self._normalize_mapping(self.extra)
-
-        self.sniff_bytes = self._coerce_int(self.sniff_bytes, DEFAULT_SNIFF_BYTES)
-        self.min_pdf_bytes = self._coerce_int(self.min_pdf_bytes, DEFAULT_MIN_PDF_BYTES)
-        self.tail_check_bytes = self._coerce_int(self.tail_check_bytes, DEFAULT_TAIL_CHECK_BYTES)
-        self.stream_retry_attempts = max(int(self.stream_retry_attempts or 0), 0)
-
-        self.size_warning_threshold = self._coerce_optional_positive(self.size_warning_threshold)
-        self.chunk_size = self._coerce_optional_positive(self.chunk_size)
-
-    @staticmethod
-    def _normalize_mapping(value: Any) -> Dict[str, Any]:
-        if value is None:
-            return {}
-        if isinstance(value, Mapping):
-            return dict(value)
-        return {}
-
-    @staticmethod
-    def _normalize_resume_lookup(value: Any) -> Mapping[str, Dict[str, Any]]:
-        if value is None:
-            return {}
-        if isinstance(value, Mapping):
-            return value
-        return {}
-
-    @staticmethod
-    def _normalize_resume_completed(value: Any) -> Set[str]:
-        if value is None:
-            return set()
-        if isinstance(value, Set):
-            return {str(item) for item in value}
-        if isinstance(value, Iterable):
-            return {str(item) for item in value}
-        return set()
-
-    @staticmethod
-    def _coerce_int(value: Any, default: int) -> int:
-        try:
-            return max(int(value), 0)
-        except (TypeError, ValueError):
-            return default
-
-    @staticmethod
-    def _coerce_optional_positive(value: Any) -> Optional[int]:
-        if value in (None, ""):
-            return None
-        try:
-            coerced = int(value)
-        except (TypeError, ValueError):
-            return None
-        return coerced if coerced > 0 else None
-
-    def to_context(self, overrides: Optional[Mapping[str, Any]] = None) -> DownloadContext:
-        """Convert the configuration into a :class:`DownloadContext`."""
-
-        payload: Dict[str, Any] = {
-            "dry_run": self.dry_run,
-            "list_only": self.list_only,
-            "extract_html_text": self.extract_html_text,
-            "previous": self.previous_lookup,
-            "sniff_bytes": self.sniff_bytes,
-            "min_pdf_bytes": self.min_pdf_bytes,
-            "tail_check_bytes": self.tail_check_bytes,
-            "robots_checker": self.robots_checker,
-            "content_addressed": self.content_addressed,
-            "verify_cache_digest": self.verify_cache_digest,
-            "domain_content_rules": self.domain_content_rules,
-            "host_accept_overrides": self.host_accept_overrides,
-            "progress_callback": self.progress_callback,
-            "skip_head_precheck": self.skip_head_precheck,
-            "head_precheck_passed": self.head_precheck_passed,
-            "global_manifest_index": self.global_manifest_index,
-            "size_warning_threshold": self.size_warning_threshold,
-            "chunk_size": self.chunk_size,
-            "stream_retry_attempts": self.stream_retry_attempts,
-            "extra": self.extra,
-        }
-        payload[_RUN_EXTRA_REF_KEY] = self.extra
-        if overrides:
-            for key, value in overrides.items():
-                if key in {"max_bytes", "max_download_size_gb"}:
-                    continue
-                payload[key] = value
-        return DownloadContext.from_mapping(payload)
-
-    @classmethod
-    def from_options(
-        cls,
-        options: Optional[
-            Union["DownloadOptions", "DownloadConfig", DownloadContext, Mapping[str, Any]]
-        ],
-        **overrides: Any,
-    ) -> "DownloadConfig":
-        """Build a configuration instance from legacy option surfaces."""
-
-        field_names = tuple(cls.__dataclass_fields__.keys())
-
-        if isinstance(options, cls):
-            base = cls(**{name: getattr(options, name) for name in field_names})
-        elif isinstance(options, DownloadOptions):
-            base = cls(**{name: getattr(options, name) for name in field_names})
-        elif isinstance(options, DownloadContext):
-            base = cls(
-                dry_run=options.dry_run,
-                list_only=options.list_only,
-                extract_html_text=options.extract_html_text,
-                run_id=str(getattr(options, "run_id", "")),
-                previous_lookup=options.previous,
-                sniff_bytes=options.sniff_bytes,
-                min_pdf_bytes=options.min_pdf_bytes,
-                tail_check_bytes=options.tail_check_bytes,
-                robots_checker=options.robots_checker,
-                content_addressed=options.content_addressed,
-                verify_cache_digest=options.verify_cache_digest,
-                domain_content_rules=options.domain_content_rules,
-                host_accept_overrides=options.host_accept_overrides,
-                progress_callback=options.progress_callback,
-                skip_head_precheck=options.skip_head_precheck,
-                head_precheck_passed=options.head_precheck_passed,
-                global_manifest_index=options.global_manifest_index,
-                size_warning_threshold=options.size_warning_threshold,
-                chunk_size=options.chunk_size,
-                stream_retry_attempts=options.stream_retry_attempts,
-                extra=options.extra,
-            )
-        else:
-            mapping = dict(options or {})
-            mapping.pop("max_bytes", None)
-            mapping.pop("max_download_size_gb", None)
-            kwargs = {name: mapping[name] for name in field_names if name in mapping}
-            base = cls(**kwargs)
-
-        for key, value in overrides.items():
-            if hasattr(base, key):
-                setattr(base, key, value)
-        base.__post_init__()
-        return base
-
 
 
 @dataclass(frozen=True)
@@ -1881,7 +1698,7 @@ def _try_streaming_finalization(
 def validate_classification(
     classification: Union[Classification, str, None],
     artifact: WorkArtifact,
-    options: Union[DownloadConfig, DownloadOptions, DownloadContext],
+    options: Union[DownloadOptions, DownloadContext],
 ) -> ValidationResult:
     """Validate resolver classification against configured expectations."""
 
@@ -1923,7 +1740,7 @@ def validate_classification(
 def handle_resume_logic(
     artifact: WorkArtifact,
     previous_index: Mapping[str, Dict[str, Any]],
-    options: DownloadConfig,
+    options: DownloadContext,
 ) -> ResumeDecision:
     """Normalise previous attempts and detect early skip conditions."""
 
@@ -2024,7 +1841,7 @@ def handle_resume_logic(
 def cleanup_sidecar_files(
     artifact: WorkArtifact,
     classification: Classification,
-    options: Union[DownloadConfig, DownloadOptions, DownloadContext],
+    options: Union[DownloadOptions, DownloadContext],
 ) -> None:
     """Remove temporary sidecar files for the given artifact classification."""
 
@@ -2067,7 +1884,7 @@ def build_download_outcome(
     min_pdf_bytes: int,
     tail_check_bytes: int,
     retry_after: Optional[float],
-    options: Optional[Union[DownloadConfig, DownloadOptions, DownloadContext]] = None,
+    options: Optional[Union[DownloadOptions, DownloadContext]] = None,
     canonical_url: Optional[str] = None,
     canonical_index: Optional[str] = None,
     original_url: Optional[str] = None,
@@ -2201,7 +2018,17 @@ def build_download_outcome(
     if isinstance(options, DownloadContext):
         validation_context = options
     else:
-        validation_context = DownloadConfig.from_options(options).to_context({})
+        # Convert DownloadOptions or other mapping to DownloadContext
+        validation_context = DownloadContext.from_mapping(
+            {k: getattr(options, k, None) for k in [
+                "dry_run", "list_only", "extract_html_text", "previous",
+                "sniff_bytes", "min_pdf_bytes", "tail_check_bytes", "robots_checker",
+                "content_addressed", "verify_cache_digest", "domain_content_rules",
+                "host_accept_overrides", "progress_callback", "skip_head_precheck",
+                "head_precheck_passed", "global_manifest_index",
+                "size_warning_threshold", "chunk_size", "stream_retry_attempts", "extra"
+            ]}
+        )
 
     validation = validate_classification(classification_code, artifact, validation_context)
     if not validation.is_valid:
@@ -2543,7 +2370,7 @@ def process_one_work(
     logger: RunTelemetry,
     metrics: ResolverMetrics,
     *,
-    options: DownloadConfig,
+    options: DownloadContext,
     strategy_selector: Callable[
         [Classification], DownloadStrategy
     ] = get_strategy_for_classification,
@@ -2561,7 +2388,7 @@ def process_one_work(
         pipeline: Resolver pipeline orchestrating downstream resolvers.
         logger: Structured attempt logger capturing manifest records.
         metrics: Resolver metrics collector.
-        options: :class:`DownloadConfig` describing download behaviour for the work.
+        options: :class:`DownloadContext` describing download behaviour for the work.
 
     Returns:
         Dictionary summarizing the outcome (saved/html_only/skipped flags).

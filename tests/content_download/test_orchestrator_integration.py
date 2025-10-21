@@ -139,10 +139,7 @@ class TestConcurrency(unittest.TestCase):
             with lock:
                 leased_jobs.extend(jobs)
 
-        threads = [
-            threading.Thread(target=lease_jobs, args=(f"worker-{i}",))
-            for i in range(3)
-        ]
+        threads = [threading.Thread(target=lease_jobs, args=(f"worker-{i}",)) for i in range(3)]
         for t in threads:
             t.start()
         for t in threads:
@@ -154,10 +151,7 @@ class TestConcurrency(unittest.TestCase):
 
     def test_keyed_limiter_per_resolver_concurrency(self) -> None:
         """KeyedLimiter respects per-resolver concurrency limits."""
-        limiter = KeyedLimiter(
-            default_limit=10,
-            per_key={"resolver-a": 2, "resolver-b": 3}
-        )
+        limiter = KeyedLimiter(default_limit=10, per_key={"resolver-a": 2, "resolver-b": 3})
 
         # Track concurrent accesses
         concurrent_count = []
@@ -177,10 +171,7 @@ class TestConcurrency(unittest.TestCase):
         # 5 threads for resolver-a (limit 2)
         threads = []
         for i in range(5):
-            t = threading.Thread(
-                target=acquire_and_hold,
-                args=("resolver-a", 0.1)
-            )
+            t = threading.Thread(target=acquire_and_hold, args=("resolver-a", 0.1))
             threads.append(t)
 
         for t in threads:
@@ -208,10 +199,7 @@ class TestConcurrency(unittest.TestCase):
                 limiter.release(key)
 
         # Try to acquire same key 10 times concurrently (limit 3)
-        threads = [
-            threading.Thread(target=acquire_key, args=("host-a", 10))
-            for _ in range(4)
-        ]
+        threads = [threading.Thread(target=acquire_key, args=("host-a", 10)) for _ in range(4)]
         for t in threads:
             t.start()
         for t in threads:
@@ -273,12 +261,7 @@ class TestCrashRecovery(unittest.TestCase):
 
         # Attempt 1: fail and retry
         jobs = queue.lease("worker-1", 1, 600)
-        queue.fail_and_retry(
-            jobs[0]["id"],
-            backoff_sec=1,
-            max_attempts=2,
-            last_error="Error 1"
-        )
+        queue.fail_and_retry(jobs[0]["id"], backoff_sec=1, max_attempts=2, last_error="Error 1")
 
         time.sleep(1.1)
 
@@ -287,12 +270,7 @@ class TestCrashRecovery(unittest.TestCase):
         self.assertEqual(len(jobs), 1)
 
         # Attempt 2: fail and retry (max attempts exceeded)
-        queue.fail_and_retry(
-            jobs[0]["id"],
-            backoff_sec=1,
-            max_attempts=2,
-            last_error="Error 2"
-        )
+        queue.fail_and_retry(jobs[0]["id"], backoff_sec=1, max_attempts=2, last_error="Error 2")
 
         # Job should be in error state
         stats = queue.stats()
@@ -313,17 +291,9 @@ class TestConfigIntegration(unittest.TestCase):
 
     def test_orchestrator_config_with_queue(self) -> None:
         """OrchestratorConfig works with WorkQueue."""
-        config = OrchestratorConfig(
-            max_workers=4,
-            max_per_host=2,
-            lease_ttl_seconds=120
-        )
+        config = OrchestratorConfig(max_workers=4, max_per_host=2, lease_ttl_seconds=120)
 
-        queue_cfg = QueueConfig(
-            path=self.queue_path,
-            wal_mode=True,
-            timeout_sec=10
-        )
+        queue_cfg = QueueConfig(path=self.queue_path, wal_mode=True, timeout_sec=10)
 
         # Create queue with config
         queue = WorkQueue(queue_cfg.path, wal_mode=queue_cfg.wal_mode)
@@ -336,15 +306,11 @@ class TestConfigIntegration(unittest.TestCase):
     def test_keyed_limiter_with_orchestrator_config(self) -> None:
         """KeyedLimiter uses OrchestratorConfig settings."""
         config = OrchestratorConfig(
-            max_per_resolver={"resolver-a": 2, "resolver-b": 4},
-            max_per_host=3
+            max_per_resolver={"resolver-a": 2, "resolver-b": 4}, max_per_host=3
         )
 
         # Create limiter with config
-        limiter = KeyedLimiter(
-            default_limit=config.max_per_host,
-            per_key=config.max_per_resolver
-        )
+        limiter = KeyedLimiter(default_limit=config.max_per_host, per_key=config.max_per_resolver)
 
         # Verify config applied
         self.assertEqual(limiter.get_limit("resolver-a"), 2)
@@ -381,7 +347,7 @@ class TestErrorHandling(unittest.TestCase):
         artifact = {
             "doi": "10.1234/test",
             "title": "Test Document",
-            "nested": {"key": "value", "list": [1, 2, 3]}
+            "nested": {"key": "value", "list": [1, 2, 3]},
         }
 
         queue.enqueue("doi:test", artifact)
@@ -389,6 +355,7 @@ class TestErrorHandling(unittest.TestCase):
 
         # Verify artifact can be deserialized
         import json
+
         rehydrated = json.loads(jobs[0]["artifact_json"])
         self.assertEqual(rehydrated, artifact)
 

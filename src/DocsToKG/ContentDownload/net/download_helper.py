@@ -20,7 +20,7 @@ from typing import Any, Optional
 
 import httpx
 
-from .client import get_http_client, request_with_redirect_audit
+from .client import get_http_client, request_with_redirect_audit, _normalize_host_for_telemetry
 from .instrumentation import (
     CacheStatus,
     NetRequestEventBuilder,
@@ -71,7 +71,7 @@ def stream_download_to_file(
 
     # Get host for telemetry
     try:
-        host = httpx.URL(url).host or "unknown"
+        host = _normalize_host_for_telemetry(url)
     except Exception:
         host = "unknown"
 
@@ -85,7 +85,7 @@ def stream_download_to_file(
     # Temporary file in same directory (atomic rename)
     temp_fd, temp_path = tempfile.mkstemp(dir=dest.parent, prefix=".tmp-")
     try:
-        # Send request with audited redirects
+        # Send request with audited redirects; STREAM
         try:
             resp = request_with_redirect_audit(
                 client,
@@ -95,11 +95,21 @@ def stream_download_to_file(
             )
             resp.raise_for_status()
         except httpx.HTTPError as e:
-            builder.with_response(getattr(resp, "status_code", 0), "HTTP/1.1")
+            status_code = 0
+            http_version = "HTTP/1.1"
+
+            # Extract response info if available in exception
             if isinstance(e, httpx.HTTPStatusError):
-                builder.with_error("http_error", str(e), RequestStatus.ERROR)
+                status_code = e.response.status_code
+                http_version = e.response.http_version
+                error_type = "http_error"
+                error_status = RequestStatus.ERROR
             else:
-                builder.with_error("network_error", str(e), RequestStatus.NETWORK_ERROR)
+                error_type = "network_error"
+                error_status = RequestStatus.NETWORK_ERROR
+
+            builder.with_response(status_code, http_version)
+            builder.with_error(error_type, str(e), error_status)
             emitter.emit(builder.build())
             raise DownloadError(f"HTTP error: {e}") from e
 
@@ -198,7 +208,7 @@ def head_request(
     request_id = os.urandom(8).hex()
 
     try:
-        host = httpx.URL(url).host or "unknown"
+        host = _normalize_host_for_telemetry(url)
     except Exception:
         host = "unknown"
 
@@ -224,10 +234,20 @@ def head_request(
         return resp
 
     except httpx.HTTPError as e:
-        builder.with_response(getattr(resp, "status_code", 0), "HTTP/1.1")
+        status_code = 0
+        http_version = "HTTP/1.1"
+
+        # Extract response info if available in exception
         if isinstance(e, httpx.HTTPStatusError):
-            builder.with_error("http_error", str(e), RequestStatus.ERROR)
+            status_code = e.response.status_code
+            http_version = e.response.http_version
+            error_type = "http_error"
+            error_status = RequestStatus.ERROR
         else:
-            builder.with_error("network_error", str(e), RequestStatus.NETWORK_ERROR)
+            error_type = "network_error"
+            error_status = RequestStatus.NETWORK_ERROR
+
+        builder.with_response(status_code, http_version)
+        builder.with_error(error_type, str(e), error_status)
         emitter.emit(builder.build())
         raise

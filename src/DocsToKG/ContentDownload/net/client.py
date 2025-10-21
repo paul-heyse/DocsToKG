@@ -192,10 +192,14 @@ def _on_response(response: httpx.Response) -> None:
     elif "from_cache" in response.extensions and response.extensions.get("from_cache"):
         cache_status = "hit"
 
+    # Normalize host for consistent telemetry keys
+    host = _normalize_host_for_telemetry(str(req.url))
+
     # Emit telemetry
     _emit_net_request(
         method=req.method,
         url=str(req.url),
+        host=host,
         status=response.status_code,
         elapsed_ms=elapsed_ms,
         cache=cache_status,
@@ -275,3 +279,27 @@ def request_with_redirect_audit(
 
     # Too many hops
     raise httpx.TooManyRedirects(f"Exceeded {max_hops} redirect hops")
+
+
+def _normalize_host_for_telemetry(url: str) -> str:
+    """
+    Extract and normalize host from URL for consistent telemetry keys.
+
+    Handles IDN normalization and port stripping.
+
+    Args:
+        url: Full URL
+
+    Returns:
+        Normalized hostname (lowercase, punycode if IDN), or "unknown" on error
+    """
+    try:
+        parsed = httpx.URL(url)
+        host = parsed.host
+        if not host:
+            return "unknown"
+        # httpx.URL.host returns punycode automatically for IDN
+        # Just ensure lowercase for consistency
+        return host.lower()
+    except Exception:
+        return "unknown"

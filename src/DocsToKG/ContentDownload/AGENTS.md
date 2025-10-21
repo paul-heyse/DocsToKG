@@ -1804,18 +1804,21 @@ Work Orchestration provides a **persistent work queue**, **bounded-concurrency w
 ### Features
 
 **SQLite-Backed Persistence:**
+
 - Idempotent enqueue (artifact_id unique index prevents duplicates)
 - ACID state transitions (QUEUED → IN_PROGRESS → DONE/SKIPPED/ERROR)
 - Crash-safe leasing with TTL-based recovery
 - Retry logic with exponential backoff + jitter
 
 **Bounded Concurrency:**
+
 - Global cap: `max_workers` (1-256, default 8)
 - Per-resolver fairness: `max_per_resolver` dict (e.g., {"unpaywall": 2, "crossref": 4})
 - Per-host fairness: `max_per_host` (default 4)
 - Thread-safe keyed semaphores
 
 **Graceful Crash Recovery:**
+
 - Lease TTL: Jobs owned by crashed workers auto-recover after expiration (default 600s)
 - Heartbeat: Active workers extend leases every 30s (configurable)
 - Stale lease detection: Automatic promotion to available pool
@@ -1907,6 +1910,7 @@ pytest tests/content_download/test_orchestrator_integration.py -v
 ```
 
 **Coverage:**
+
 - Complete job lifecycle: enqueue → lease → process → ack
 - Idempotence: duplicate enqueues safely ignored
 - Concurrency: multi-worker contention, per-resolver/host limits
@@ -1918,16 +1922,19 @@ pytest tests/content_download/test_orchestrator_integration.py -v
 ### Performance & Tuning
 
 **Throughput:**
+
 - Increase `max_workers` for higher parallelism
 - Adjust `max_per_resolver` for resolver-specific capacity
 - Balance `lease_ttl_seconds` vs network latency (typ. 2x max download time)
 
 **Politeness:**
+
 - Rate limiter + keyed limiters work together
 - Per-resolver limits prevent burst to specific endpoints
 - Per-host limits ensure fairness across resolver pool
 
 **Monitoring:**
+
 - `queue.stats()` provides queued/in_progress/done/skipped/error counts
 - Telemetry events emitted for job transitions (if telemetry enabled)
 - OTel metrics: queue_depth, jobs_completed_total
@@ -1940,4 +1947,3 @@ pytest tests/content_download/test_orchestrator_integration.py -v
 | High ERROR count | Repeated failures | Check `queue.stats()["error"]`, inspect last_error |
 | Workers not picking up jobs | Concurrency limits exceeded | Check limiter state, increase max_workers or max_per_host |
 | Duplicate artifact IDs in manifest | Enqueue after partial run | Use idempotent enqueue; already-queued artifacts ignored |
-
