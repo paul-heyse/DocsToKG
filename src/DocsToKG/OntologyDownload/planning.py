@@ -77,11 +77,12 @@ from .errors import (
 # Optional DuckDB and catalog boundary imports
 try:
     import duckdb
+
     from DocsToKG.OntologyDownload.catalog.boundaries import (
         download_boundary,
         extraction_boundary,
-        validation_boundary,
         set_latest_boundary,
+        validation_boundary,
     )
 
     CATALOG_AVAILABLE = True
@@ -146,9 +147,9 @@ from .validation import ValidationRequest, ValidationResult, run_validators
 # Optional database plan caching for deterministic replays
 try:
     from DocsToKG.OntologyDownload.database import (
-        get_database,
-        close_database,
         PlanRow,
+        close_database,
+        get_database,
     )
 
     PLAN_CACHING_AVAILABLE = True
@@ -1217,8 +1218,8 @@ def _populate_plan_metadata(
 
     # GATE 2: URL Security Gate
     try:
-        from DocsToKG.OntologyDownload.policy.gates import url_gate
         from DocsToKG.OntologyDownload.policy.errors import PolicyReject
+        from DocsToKG.OntologyDownload.policy.gates import url_gate
 
         url_result = url_gate(
             secure_url,
@@ -1794,7 +1795,7 @@ def _get_duckdb_conn(active_config: "ResolvedConfig") -> Optional["duckdb.DuckDB
     if not CATALOG_AVAILABLE or duckdb is None:
         return None
     try:
-        from DocsToKG.OntologyDownload.catalog.connection import get_writer, DuckDBConfig
+        from DocsToKG.OntologyDownload.catalog.connection import DuckDBConfig, get_writer
 
         db_cfg = DuckDBConfig(
             path=active_config.defaults.db.path,
@@ -2452,9 +2453,9 @@ def _planned_fetch_to_dict(planned: PlannedFetch) -> Dict[str, Any]:
             "id": planned.spec.id,
             "resolver": planned.spec.resolver,
             "extras": planned.spec.extras,
-            "target_formats": list(planned.spec.target_formats)
-            if planned.spec.target_formats
-            else [],
+            "target_formats": (
+                list(planned.spec.target_formats) if planned.spec.target_formats else []
+            ),
         },
         "resolver": planned.resolver,
         "plan": {
@@ -2499,10 +2500,10 @@ def _dict_to_planned_fetch(data: Dict[str, Any], spec: FetchSpec) -> Optional[Pl
     Returns:
         PlannedFetch if reconstruction succeeds, else None.
     """
-    try:
-        if not isinstance(data, dict):
-            return None
+    if not isinstance(data, dict):
+        return None
 
+    try:
         plan_data = data.get("plan", {})
         primary_plan = FetchPlan(
             url=plan_data.get("url", ""),
@@ -2543,53 +2544,45 @@ def _dict_to_planned_fetch(data: Dict[str, Any], spec: FetchSpec) -> Optional[Pl
         return None
 
 
-def _get_cached_plan(spec: FetchSpec, use_cache: bool = True) -> Optional[PlannedFetch]:
+def _get_cached_plan(spec: FetchSpec, logger: logging.LoggerAdapter) -> Optional[PlannedFetch]:
     """Retrieve a cached plan for an ontology specification from the database.
 
     Args:
         spec: FetchSpec to look up.
-        use_cache: If False, always return None (skip cache lookup).
+        logger: Logger for diagnostics.
 
     Returns:
-        Cached PlannedFetch if available and use_cache is True, else None.
+        Cached PlannedFetch if available, else None.
     """
-    if not use_cache or not PLAN_CACHING_AVAILABLE or not get_database:
+    if not PLAN_CACHING_AVAILABLE or not get_database:
         return None
 
-    try:
-        db = get_database()
-        plan_row = db.get_current_plan(spec.id)
-        if plan_row and plan_row.plan_json:
-            plan_data = (
-                json.loads(plan_row.plan_json)
-                if isinstance(plan_row.plan_json, str)
-                else plan_row.plan_json
-            )
-            planned = _dict_to_planned_fetch(plan_data, spec)
-            if planned:
-                logger.debug(
-                    f"Using cached plan for '{spec.id}' from database",
-                    extra={"ontology_id": spec.id, "cached_at": plan_row.cached_at},
-                )
-                return planned
-    except Exception as exc:  # pragma: no cover
-        logger.warning(
-            f"Failed to retrieve cached plan for '{spec.id}': {exc}",
-            extra={"ontology_id": spec.id, "error": str(exc)},
+    db = get_database()
+    plan_row = db.get_current_plan(spec.id)
+    if plan_row and plan_row.plan_json:
+        plan_data = (
+            json.loads(plan_row.plan_json)
+            if isinstance(plan_row.plan_json, str)
+            else plan_row.plan_json
         )
-    finally:
-        if PLAN_CACHING_AVAILABLE and close_database:
-            close_database()
-
+        planned = _dict_to_planned_fetch(plan_data, spec)
+        if planned:
+            logger.debug(
+                f"Using cached plan for '{spec.id}' from database",
+                extra={"ontology_id": spec.id, "cached_at": plan_row.cached_at},
+            )
+            return planned
+    close_database()
     return None
 
 
-def _save_plan_to_db(spec: FetchSpec, planned: PlannedFetch) -> bool:
+def _save_plan_to_db(spec: FetchSpec, planned: PlannedFetch, logger: logging.LoggerAdapter) -> bool:
     """Save a PlannedFetch to the database for future caching.
 
     Args:
         spec: FetchSpec for the ontology.
         planned: PlannedFetch to cache.
+        logger: Logger for diagnostics.
 
     Returns:
         True if save succeeds, False otherwise.
@@ -2597,35 +2590,23 @@ def _save_plan_to_db(spec: FetchSpec, planned: PlannedFetch) -> bool:
     if not PLAN_CACHING_AVAILABLE or not get_database:
         return False
 
-    try:
-        db = get_database()
-        plan_dict = _planned_fetch_to_dict(planned)
-        db.upsert_plan(
-            ontology_id=spec.id,
-            resolver=planned.resolver,
-            plan_json=plan_dict,
-            is_current=True,
-        )
-        logger.debug(
-            f"Saved plan for '{spec.id}' to database",
-            extra={"ontology_id": spec.id},
-        )
-        return True
-    except Exception as exc:  # pragma: no cover
-        logger.warning(
-            f"Failed to save plan for '{spec.id}' to database: {exc}",
-            extra={"ontology_id": spec.id, "error": str(exc)},
-        )
-        return False
-    finally:
-        if PLAN_CACHING_AVAILABLE and close_database:
-            close_database()
+    db = get_database()
+    plan_dict = _planned_fetch_to_dict(planned)
+    db.upsert_plan(
+        ontology_id=spec.id,
+        resolver=planned.resolver,
+        plan_json=plan_dict,
+        is_current=True,
+    )
+    logger.debug(
+        f"Saved plan for '{spec.id}' to database",
+        extra={"ontology_id": spec.id},
+    )
+    close_database()
+    return True
 
 
-def _compare_plans(
-    older_plan: Optional[PlannedFetch],
-    newer_plan: PlannedFetch,
-) -> Dict[str, Any]:
+def _compare_plans(older_plan: Optional[PlannedFetch], newer_plan: PlannedFetch) -> Dict[str, Any]:
     """Compare two plan versions and return a diff.
 
     Args:
@@ -2719,6 +2700,7 @@ def _save_plan_diff_to_db(
     ontology_id: str,
     older_plan: Optional[PlannedFetch],
     newer_plan: PlannedFetch,
+    logger: logging.LoggerAdapter,
 ) -> bool:
     """Save a plan diff to the database for historical comparison.
 
@@ -2726,6 +2708,7 @@ def _save_plan_diff_to_db(
         ontology_id: ID of the ontology.
         older_plan: Previous plan (can be None).
         newer_plan: Current plan.
+        logger: Logger for diagnostics.
 
     Returns:
         True if save succeeds, False otherwise.
@@ -2733,39 +2716,30 @@ def _save_plan_diff_to_db(
     if not PLAN_CACHING_AVAILABLE or not get_database:
         return False
 
-    try:
-        db = get_database()
-        diff_data = _compare_plans(older_plan, newer_plan)
+    db = get_database()
+    diff_data = _compare_plans(older_plan, newer_plan)
 
-        # Only save if there are actual changes
-        if diff_data.get("modified") or diff_data.get("added") or diff_data.get("removed"):
-            db.insert_plan_diff(
-                ontology_id=ontology_id,
-                older_plan_id=None,  # TODO: implement versioning for older plans
-                newer_plan_id=None,  # TODO: implement versioning for newer plans
-                added_count=len(diff_data.get("added", [])),
-                removed_count=len(diff_data.get("removed", [])),
-                modified_count=len(diff_data.get("modified", [])),
-                diff_json=diff_data,
-            )
-            logger.debug(
-                f"Saved plan diff for '{ontology_id}' to database",
-                extra={
-                    "ontology_id": ontology_id,
-                    "modified_count": len(diff_data.get("modified", [])),
-                },
-            )
-            return True
-    except Exception as exc:  # pragma: no cover
-        logger.warning(
-            f"Failed to save plan diff for '{ontology_id}' to database: {exc}",
-            extra={"ontology_id": ontology_id, "error": str(exc)},
+    # Only save if there are actual changes
+    if diff_data.get("modified") or diff_data.get("added") or diff_data.get("removed"):
+        db.insert_plan_diff(
+            ontology_id=ontology_id,
+            older_plan_id=None,
+            newer_plan_id=None,
+            added_count=len(diff_data.get("added", [])),
+            removed_count=len(diff_data.get("removed", [])),
+            modified_count=len(diff_data.get("modified", [])),
+            diff_json=diff_data,
         )
-        return False
-    finally:
-        if PLAN_CACHING_AVAILABLE and close_database:
-            close_database()
-
+        logger.debug(
+            f"Saved plan diff for '{ontology_id}' to database",
+            extra={
+                "ontology_id": ontology_id,
+                "modified_count": len(diff_data.get("modified", [])),
+            },
+        )
+        close_database()
+        return True
+    close_database()
     return False
 
 
@@ -2776,7 +2750,6 @@ def plan_one(
     correlation_id: Optional[str] = None,
     logger: Optional[logging.Logger] = None,
     cancellation_token: Optional[CancellationToken] = None,
-    use_cache: bool = True,
 ) -> PlannedFetch:
     """Return a resolver plan for a single ontology without performing downloads.
 
@@ -2786,7 +2759,6 @@ def plan_one(
         correlation_id: Correlation identifier reused for logging context.
         logger: Logger instance used to emit resolver telemetry.
         cancellation_token: Optional token for cooperative cancellation.
-        use_cache: If True, attempt to retrieve cached plan from database.
 
     Returns:
         PlannedFetch containing the normalized spec, resolver name, and plan.
@@ -2811,18 +2783,17 @@ def plan_one(
     adapter.info("planning fetch", extra={"stage": "plan"})
 
     # Attempt to retrieve cached plan from database
-    if use_cache:
-        cached_plan = _get_cached_plan(spec, use_cache=True)
-        if cached_plan is not None:
-            adapter.info(
-                "using cached plan from database",
-                extra={
-                    "stage": "plan",
-                    "cached": True,
-                    "resolver": cached_plan.resolver,
-                },
-            )
-            return cached_plan
+    cached_plan = _get_cached_plan(spec, adapter)
+    if cached_plan is not None:
+        adapter.info(
+            "using cached plan from database",
+            extra={
+                "stage": "plan",
+                "cached": True,
+                "resolver": cached_plan.resolver,
+            },
+        )
+        return cached_plan
 
     primary, candidates = _resolve_plan_with_fallback(
         spec, active_config, adapter, cancellation_token=cancellation_token
@@ -2852,9 +2823,8 @@ def plan_one(
         planned.metadata["expected_checksum"] = expected_checksum.to_mapping()
     final_planned = _populate_plan_metadata(planned, active_config, adapter)
 
-    # Save plan to database for future caching
-    if use_cache:
-        _save_plan_to_db(spec, final_planned)
+    # Save plan to database
+    _save_plan_to_db(spec, final_planned, adapter)
 
     return final_planned
 
@@ -2867,7 +2837,6 @@ def plan_all(
     since: Optional[datetime] = None,
     total: Optional[int] = None,
     cancellation_token_group: Optional[CancellationTokenGroup] = None,
-    use_cache: bool = True,
 ) -> List[PlannedFetch]:
     """Return resolver plans for a collection of ontologies.
 
@@ -2879,7 +2848,6 @@ def plan_all(
         total: Optional total number of specifications, used for progress metadata when
             the iterable cannot be sized cheaply.
         cancellation_token_group: Optional group of cancellation tokens for cooperative cancellation.
-        use_cache: If True, attempt to use cached plans from database for each spec.
 
     Returns:
         List of PlannedFetch entries describing each ontology plan.
@@ -2946,7 +2914,6 @@ def plan_all(
             correlation_id=correlation,
             logger=log,
             cancellation_token=token,
-            use_cache=use_cache,
         )
         futures[future] = (index, spec)
         if token is not None:

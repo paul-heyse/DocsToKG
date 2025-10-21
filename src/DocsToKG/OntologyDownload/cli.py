@@ -53,7 +53,7 @@ from pydantic import ValidationError as PydanticValidationError
 
 from . import net
 from .api import _collect_plugin_details
-from .database import Database, DatabaseConfiguration, close_database, get_database
+from .database import close_database, get_database
 from .errors import ConfigError, ConfigurationError, OntologyDownloadError, UnsupportedPythonError
 from .formatters import (
     PLAN_TABLE_HEADERS,
@@ -223,12 +223,6 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Enable or disable planner metadata HTTP probes (default: enabled).",
     )
-    plan_cmd.add_argument(
-        "--use-cache",
-        action=argparse.BooleanOptionalAction,
-        default=True,
-        help="Use cached plans from database when available (default: enabled). Set --no-use-cache to disable.",
-    )
     plan_cmd.add_argument("--json", action="store_true", help="Emit plan details as JSON")
     plan_cmd.add_argument(
         "--lock-output",
@@ -280,12 +274,6 @@ def _build_parser() -> argparse.ArgumentParser:
         action=argparse.BooleanOptionalAction,
         default=None,
         help="Enable or disable planner metadata HTTP probes (default: enabled).",
-    )
-    plan_diff.add_argument(
-        "--use-cache",
-        action=argparse.BooleanOptionalAction,
-        default=True,
-        help="Use cached plans from database when available (default: enabled). Set --no-use-cache to disable.",
     )
     plan_diff.add_argument("--json", action="store_true", help="Emit plan diff as JSON")
     plan_diff.add_argument(
@@ -891,8 +879,7 @@ def _handle_plan(
 
     since = _parse_since(getattr(args, "since", None))
     config, specs = _resolve_specs_from_args(args, base_config)
-    use_cache = getattr(args, "use_cache", True)
-    plans = plan_all(specs, config=config, since=since, logger=logger, use_cache=use_cache)
+    plans = plan_all(specs, config=config, since=since, logger=logger)
     if not getattr(args, "no_lock", False):
         lock_path = getattr(args, "lock_output", DEFAULT_LOCKFILE_PATH)
         write_lockfile(plans, lock_path)
@@ -904,7 +891,6 @@ def _handle_plan_diff(args, base_config: Optional[ResolvedConfig]) -> Dict[str, 
 
     use_manifest = bool(getattr(args, "use_manifest", False))
     update_baseline = bool(getattr(args, "update_baseline", False))
-    use_cache = getattr(args, "use_cache", True)
     if use_manifest:
         baseline_payload: List[dict] = []
         baseline_path = None
@@ -925,7 +911,7 @@ def _handle_plan_diff(args, base_config: Optional[ResolvedConfig]) -> Dict[str, 
 
     since = _parse_since(getattr(args, "since", None))
     config, specs = _resolve_specs_from_args(args, base_config, allow_empty=True)
-    plans = plan_all(specs, config=config, since=since, use_cache=use_cache)
+    plans = plan_all(specs, config=config, since=since)
     current_payload = [plan_to_dict(plan) for plan in plans]
     lock_written: Optional[str] = None
     if not getattr(args, "no_lock", False):
