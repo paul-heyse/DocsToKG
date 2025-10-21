@@ -116,7 +116,7 @@ def compute_latest_summary(
     """
     # Collect with streaming for large datasets (handle both LazyFrame and DataFrame)
     if isinstance(files_df, pl.LazyFrame):
-        files_collected = files_df.collect(streaming=True)
+        files_collected = files_df.collect(engine="streaming")
     else:
         files_collected = files_df
 
@@ -160,7 +160,7 @@ def compute_latest_summary(
     validation_summary: dict[str, int] = {}
     if validations_df is not None:
         if isinstance(validations_df, pl.LazyFrame):
-            val_collected = validations_df.select("status").collect(streaming=True)
+            val_collected = validations_df.select("status").collect(engine="streaming")
         else:
             val_collected = validations_df.select("status")
 
@@ -188,9 +188,9 @@ def compute_latest_summary(
 
 
 def build_version_delta_pipeline(
-    v1_files: pl.LazyFrame,
-    v2_files: pl.LazyFrame,
-) -> tuple[pl.LazyFrame | pl.DataFrame, pl.LazyFrame | pl.DataFrame, pl.LazyFrame | pl.DataFrame]:
+    v1_files: pl.LazyFrame | pl.DataFrame,
+    v2_files: pl.LazyFrame | pl.DataFrame,
+) -> tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame]:
     """Build lazy pipelines for version delta computation.
 
     Args:
@@ -244,17 +244,17 @@ def compute_version_delta(
 
     # Ensure DataFrames
     if isinstance(added, pl.LazyFrame):
-        added_collected = added.select(["size"]).collect(streaming=True)
+        added_collected = added.select(["size"]).collect(engine="streaming")
     else:
         added_collected = added.select(["size"])
 
     if isinstance(removed, pl.LazyFrame):
-        removed_collected = removed.select(["size"]).collect(streaming=True)
+        removed_collected = removed.select(["size"]).collect(engine="streaming")
     else:
         removed_collected = removed.select(["size"])
 
     if isinstance(common, pl.LazyFrame):
-        common.select(["size"]).collect(streaming=True)
+        common.select(["size"]).collect(engine="streaming")
     else:
         common.select(["size"])
 
@@ -300,7 +300,8 @@ def arrow_to_lazy_frame(arrow_table) -> pl.LazyFrame:  # type: ignore
     Returns:
         Polars LazyFrame (lazy)
     """
-    return pl.from_arrow(arrow_table).lazy()
+    df = pl.from_arrow(arrow_table)
+    return df.lazy()
 
 
 def duckdb_to_lazy_frame(conn, sql: str) -> pl.LazyFrame:  # type: ignore
@@ -326,4 +327,4 @@ def lazy_frame_to_arrow(lf: pl.LazyFrame):  # type: ignore
     Returns:
         PyArrow Table
     """
-    return lf.collect(streaming=True).to_arrow()
+    return lf.collect(engine="streaming").to_arrow()
