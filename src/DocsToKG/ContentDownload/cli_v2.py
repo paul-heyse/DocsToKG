@@ -20,6 +20,26 @@ from DocsToKG.ContentDownload.resolvers.registry_v2 import (
     get_registry,
 )
 
+# Feature flags support
+try:
+    from DocsToKG.ContentDownload.config.feature_flags import (
+        get_feature_flags,
+        FeatureFlag,
+    )
+    FEATURE_FLAGS_AVAILABLE = True
+except ImportError:
+    FEATURE_FLAGS_AVAILABLE = False
+
+# Optional CLI config commands (when feature enabled)
+if FEATURE_FLAGS_AVAILABLE:
+    try:
+        from DocsToKG.ContentDownload.cli_config import register_config_commands
+        CLI_CONFIG_AVAILABLE = True
+    except ImportError:
+        CLI_CONFIG_AVAILABLE = False
+else:
+    CLI_CONFIG_AVAILABLE = False
+
 console = Console()
 app = typer.Typer(help="DocsToKG ContentDownload")
 
@@ -203,6 +223,37 @@ def schema(
     except Exception as e:
         console.print(f"[red]✗ Error: {e}[/red]")
         raise typer.Exit(code=1)
+
+
+# ============================================================================
+# Optional Feature: Config Commands (when enabled via DTKG_FEATURE_CLI_CONFIG_COMMANDS)
+# ============================================================================
+
+
+def _register_optional_commands() -> None:
+    """Register optional commands based on feature flags.
+    
+    When DTKG_FEATURE_CLI_CONFIG_COMMANDS=1, registers config inspection
+    subcommands. When disabled, this has no effect.
+    """
+    if not FEATURE_FLAGS_AVAILABLE or not CLI_CONFIG_AVAILABLE:
+        return
+    
+    try:
+        flags = get_feature_flags()
+        if flags.is_enabled(FeatureFlag.CLI_CONFIG_COMMANDS):
+            register_config_commands(app)
+            console.print(
+                "[yellow]ℹ Config commands registered (DTKG_FEATURE_CLI_CONFIG_COMMANDS=1)[/yellow]"
+            )
+    except Exception as e:
+        console.print(
+            f"[yellow]⚠ Could not register config commands: {e}[/yellow]"
+        )
+
+
+# Register optional commands when CLI is loaded
+_register_optional_commands()
 
 
 def main() -> None:

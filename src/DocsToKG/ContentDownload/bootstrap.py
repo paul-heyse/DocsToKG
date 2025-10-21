@@ -56,7 +56,50 @@ from DocsToKG.ContentDownload.telemetry import (
     SummarySink,
 )
 
+# Feature flags support
+try:
+    from DocsToKG.ContentDownload.config.feature_flags import (
+        get_feature_flags,
+        FeatureFlag,
+    )
+    FEATURE_FLAGS_AVAILABLE = True
+except ImportError:
+    FEATURE_FLAGS_AVAILABLE = False
+
+# New bootstrap helpers (when feature enabled)
+if FEATURE_FLAGS_AVAILABLE:
+    try:
+        from DocsToKG.ContentDownload.config.bootstrap import (
+            build_http_client,
+            build_telemetry_sinks,
+        )
+        BOOTSTRAP_HELPERS_AVAILABLE = True
+    except ImportError:
+        BOOTSTRAP_HELPERS_AVAILABLE = False
+else:
+    BOOTSTRAP_HELPERS_AVAILABLE = False
+
 LOGGER = logging.getLogger(__name__)
+
+
+def _should_use_new_bootstrap() -> bool:
+    """Check if new bootstrap helpers should be used.
+    
+    Checks the DTKG_FEATURE_UNIFIED_BOOTSTRAP environment variable.
+    Defaults to False for backward compatibility.
+    
+    Returns:
+        True if unified bootstrap feature is enabled
+    """
+    if not FEATURE_FLAGS_AVAILABLE or not BOOTSTRAP_HELPERS_AVAILABLE:
+        return False
+    
+    try:
+        flags = get_feature_flags()
+        return flags.is_enabled(FeatureFlag.UNIFIED_BOOTSTRAP)
+    except Exception as e:
+        LOGGER.debug(f"Could not check bootstrap feature flag: {e}")
+        return False
 
 
 @dataclass
@@ -187,6 +230,31 @@ def _build_telemetry(paths: Optional[Mapping[str, Path]], run_id: str) -> RunTel
     Raises:
         ValueError: If no telemetry paths are provided
     """
+    # Check if unified bootstrap should be used
+    if _should_use_new_bootstrap() and BOOTSTRAP_HELPERS_AVAILABLE:
+        try:
+            # When unified bootstrap is enabled, use Pydantic v2 config if available
+            LOGGER.debug("Using unified bootstrap for telemetry (feature enabled)")
+            # Try to import and use Pydantic v2 config
+            try:
+                from DocsToKG.ContentDownload.config.models import (
+                    ContentDownloadConfig,
+                )
+                from DocsToKG.ContentDownload.config.loader import load_config
+                
+                # Load config and use new telemetry builder
+                cfg = load_config()
+                telemetry = build_telemetry_sinks(cfg.telemetry, run_id)
+                return telemetry
+            except (ImportError, Exception) as e:
+                LOGGER.debug(
+                    f"Pydantic v2 config not available, falling back to legacy: {e}"
+                )
+                # Fall through to legacy code below
+        except Exception as e:
+            LOGGER.debug(f"Unified bootstrap failed, falling back to legacy: {e}")
+    
+    # Legacy telemetry building code (always works)
     if not paths:
         raise ValueError(
             "telemetry_paths must be provided to _build_telemetry(). "
