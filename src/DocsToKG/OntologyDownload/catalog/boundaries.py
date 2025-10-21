@@ -48,6 +48,7 @@ from .observability_instrumentation import (
     emit_boundary_error,
     emit_boundary_success,
 )
+from ..observability.events import emit_event
 
 logger = logging.getLogger(__name__)
 
@@ -188,18 +189,44 @@ def download_boundary(
             extra_payload={"size_bytes": size, "etag": etag},
         )
 
+        # Emit db.tx.commit event per acceptance criteria
+        emit_event(
+            type="db.tx.commit",
+            level="INFO",
+            payload={
+                "boundary": "download",
+                "rows_changed": 1,
+                "duration_ms": duration_ms,
+            },
+            version_id=version_id,
+            artifact_id=artifact_id,
+        )
+
     except duckdb.Error as exc:
+        duration_ms = (time.time() - start_time) * 1000
         conn.rollback()
         logger.error(f"Download boundary failed: {exc}")
 
         # Emit observability error event
-        duration_ms = (time.time() - start_time) * 1000
         emit_boundary_error(
             boundary="download",
             artifact_id=artifact_id,
             version_id=version_id,
             error=exc,
             duration_ms=duration_ms,
+        )
+
+        # Emit db.tx.rollback event per acceptance criteria
+        emit_event(
+            type="db.tx.rollback",
+            level="WARN",
+            payload={
+                "boundary": "download",
+                "reason": str(exc),
+                "duration_ms": duration_ms,
+            },
+            version_id=version_id,
+            artifact_id=artifact_id,
         )
         raise
 
@@ -289,21 +316,58 @@ def extraction_boundary(
                     "total_size": result.total_size,
                 },
             )
+
+            # Emit db.tx.commit event per acceptance criteria
+            emit_event(
+                type="db.tx.commit",
+                level="INFO",
+                payload={
+                    "boundary": "extraction",
+                    "rows_changed": result.files_inserted,
+                    "duration_ms": duration_ms,
+                },
+                artifact_id=artifact_id,
+            )
         else:
+            duration_ms = (time.time() - start_time) * 1000
             conn.rollback()
 
+            # Emit db.tx.rollback event for zero-file case
+            emit_event(
+                type="db.tx.rollback",
+                level="INFO",
+                payload={
+                    "boundary": "extraction",
+                    "reason": "no_files_extracted",
+                    "duration_ms": duration_ms,
+                },
+                artifact_id=artifact_id,
+            )
+
     except duckdb.Error as exc:
+        duration_ms = (time.time() - start_time) * 1000
         conn.rollback()
         logger.error(f"Extraction boundary failed: {exc}")
 
         # Emit observability error event
-        duration_ms = (time.time() - start_time) * 1000
         emit_boundary_error(
             boundary="extraction",
             artifact_id=artifact_id,
             version_id="unknown",
             error=exc,
             duration_ms=duration_ms,
+        )
+
+        # Emit db.tx.rollback event per acceptance criteria
+        emit_event(
+            type="db.tx.rollback",
+            level="WARN",
+            payload={
+                "boundary": "extraction",
+                "reason": str(exc),
+                "duration_ms": duration_ms,
+            },
+            artifact_id=artifact_id,
         )
         raise
 
@@ -398,18 +462,42 @@ def validation_boundary(
             extra_payload={"validator": validator, "status": status},
         )
 
+        # Emit db.tx.commit event per acceptance criteria
+        emit_event(
+            type="db.tx.commit",
+            level="INFO",
+            payload={
+                "boundary": "validation",
+                "rows_changed": 1,
+                "duration_ms": duration_ms,
+            },
+            file_id=file_id,
+        )
+
     except duckdb.Error as exc:
+        duration_ms = (time.time() - start_time) * 1000
         conn.rollback()
         logger.error(f"Validation boundary failed: {exc}")
 
         # Emit observability error event
-        duration_ms = (time.time() - start_time) * 1000
         emit_boundary_error(
             boundary="validation",
             artifact_id="unknown",
             version_id="unknown",
             error=exc,
             duration_ms=duration_ms,
+        )
+
+        # Emit db.tx.rollback event per acceptance criteria
+        emit_event(
+            type="db.tx.rollback",
+            level="WARN",
+            payload={
+                "boundary": "validation",
+                "reason": str(exc),
+                "duration_ms": duration_ms,
+            },
+            file_id=file_id,
         )
         raise
 
@@ -510,18 +598,42 @@ def set_latest_boundary(
             },
         )
 
+        # Emit db.tx.commit event per acceptance criteria
+        emit_event(
+            type="db.tx.commit",
+            level="INFO",
+            payload={
+                "boundary": "latest",
+                "rows_changed": 1,
+                "duration_ms": duration_ms,
+            },
+            version_id=version_id,
+        )
+
     except duckdb.Error as exc:
+        duration_ms = (time.time() - start_time) * 1000
         conn.rollback()
         logger.error(f"Set latest boundary failed: {exc}")
 
         # Emit observability error event
-        duration_ms = (time.time() - start_time) * 1000
         emit_boundary_error(
             boundary="latest",
             artifact_id="unknown",
             version_id=version_id,
             error=exc,
             duration_ms=duration_ms,
+        )
+
+        # Emit db.tx.rollback event per acceptance criteria
+        emit_event(
+            type="db.tx.rollback",
+            level="WARN",
+            payload={
+                "boundary": "latest",
+                "reason": str(exc),
+                "duration_ms": duration_ms,
+            },
+            version_id=version_id,
         )
         raise
 

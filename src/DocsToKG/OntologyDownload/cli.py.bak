@@ -2196,6 +2196,51 @@ def _handle_db_validations(args) -> Dict[str, object]:
         close_database()
 
 
+def _handle_db_export(args) -> Dict[str, object]:
+    """Export version metadata as manifest JSON."""
+
+    try:
+        manifest = export_manifest(args.version_id)
+        if args.output:
+            with open(args.output, "w") as f:
+                json.dump(manifest, f, indent=2)
+            return {"ok": True, "version_id": args.version_id, "output": args.output}
+        else:
+            return manifest  # type: ignore
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+def _handle_db_export_report(args) -> Dict[str, object]:
+    """Export detailed validation report for a version."""
+
+    try:
+        report = export_validation_report(args.version_id)
+        if args.output:
+            with open(args.output, "w") as f:
+                json.dump(report, f, indent=2)
+            return {"ok": True, "version_id": args.version_id, "output": args.output}
+        else:
+            return report  # type: ignore
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+def _handle_db_export_inventory(args) -> Dict[str, object]:
+    """Export artifact inventory for a version."""
+
+    try:
+        inventory = export_artifacts(args.version_id)
+        if args.output:
+            with open(args.output, "w") as f:
+                json.dump(inventory, f, indent=2)
+            return {"ok": True, "version_id": args.version_id, "output": args.output}
+        else:
+            return inventory  # type: ignore
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
 def _print_db_result(result: Dict[str, object], args) -> None:
     """Print database query result as JSON or table."""
 
