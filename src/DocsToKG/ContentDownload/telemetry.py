@@ -100,6 +100,72 @@ MANIFEST_SCHEMA_VERSION = 5
 SQLITE_SCHEMA_VERSION = 8
 CSV_HEADER_TOKENS = {"run_id", "work_id"}
 
+# ============================================================================
+# P1 Observability & Integrity: Attempt Record & Status/Reason Taxonomy
+# ============================================================================
+
+# Stable status tokens for HTTP/IO operations (P1 scope)
+ATTEMPT_STATUS_HTTP_HEAD = "http-head"
+ATTEMPT_STATUS_HTTP_GET = "http-get"
+ATTEMPT_STATUS_HTTP_200 = "http-200"
+ATTEMPT_STATUS_HTTP_304 = "http-304"
+ATTEMPT_STATUS_ROBOTS_FETCH = "robots-fetch"
+ATTEMPT_STATUS_ROBOTS_DISALLOWED = "robots-disallowed"
+ATTEMPT_STATUS_RETRY = "retry"
+ATTEMPT_STATUS_SIZE_MISMATCH = "size-mismatch"
+ATTEMPT_STATUS_CONTENT_POLICY_SKIP = "content-policy-skip"
+ATTEMPT_STATUS_DOWNLOAD_ERROR = "download-error"
+
+# Stable reason tokens for detailed status
+ATTEMPT_REASON_OK = "ok"
+ATTEMPT_REASON_ROBOTS = "robots"
+ATTEMPT_REASON_SIZE_MISMATCH = "size-mismatch"
+ATTEMPT_REASON_TIMEOUT = "timeout"
+ATTEMPT_REASON_CONN_ERROR = "conn-error"
+ATTEMPT_REASON_TLS_ERROR = "tls-error"
+ATTEMPT_REASON_NOT_MODIFIED = "not-modified"
+ATTEMPT_REASON_POLICY_TYPE = "policy-type"
+ATTEMPT_REASON_POLICY_SIZE = "policy-size"
+ATTEMPT_REASON_BACKOFF = "backoff"
+ATTEMPT_REASON_RETRY_AFTER = "retry-after"
+
+
+@dataclass(frozen=True)
+class SimplifiedAttemptRecord:
+    """Low-level attempt record for HTTP/IO operations (P1 scope).
+    
+    Complements existing AttemptRecord from pipeline.py. Used for granular
+    HTTP telemetry (HEAD, GET, retries, robots) and atomic write integrity.
+    
+    Attributes:
+        ts: UTC timestamp when the attempt occurred.
+        run_id: Run identifier; None means telemetry is disabled.
+        resolver: Resolver name (e.g., "unpaywall", "landing"); None for robots/io.
+        url: Target URL (hashed in sinks for privacy).
+        verb: HTTP verb or operation type (HEAD, GET, ROBOTS, STREAM).
+        status: Stable status token (e.g., http-head, http-get, retry).
+        http_status: HTTP status code (200, 304, 429, 500, etc); None for non-HTTP.
+        content_type: Content-Type header value.
+        reason: Stable reason token (e.g., ok, robots, timeout).
+        elapsed_ms: Wall-clock elapsed time in milliseconds.
+        bytes_written: Bytes successfully written to disk (for STREAM verb).
+        content_length_hdr: Content-Length header value (for size verification).
+        extra: Arbitrary metadata (retry attempt count, redirect chain, etc).
+    """
+    ts: datetime
+    run_id: Optional[str]
+    resolver: Optional[str]
+    url: str
+    verb: str
+    status: str
+    http_status: Optional[int] = None
+    content_type: Optional[str] = None
+    reason: Optional[str] = None
+    elapsed_ms: Optional[int] = None
+    bytes_written: Optional[int] = None
+    content_length_hdr: Optional[int] = None
+    extra: Mapping[str, Any] = field(default_factory=dict)
+
 
 logger = logging.getLogger(__name__)
 
@@ -524,6 +590,23 @@ class AttemptSink(Protocol):
             Exception: Implementations may propagate write failures.
         """
 
+    def log_io_attempt(self, record: "SimplifiedAttemptRecord") -> None:
+        """Record a low-level HTTP/IO attempt (P1 Observability & Integrity).
+
+        Called for HEAD requests, GET requests, robots.txt fetches, retries,
+        and atomic write operations. Implementations typically emit to a separate
+        log stream or aggregate with existing attempt metrics.
+
+        Args:
+            record: Simplified attempt metadata with minimal fields.
+
+        Returns:
+            None
+
+        Raises:
+            Exception: Implementations may propagate write failures.
+        """
+
     def log_manifest(self, entry: ManifestEntry) -> None:
         """Persist a manifest entry.
 
@@ -689,6 +772,14 @@ class RunTelemetry(AttemptSink):
         """
         self._update_rate_metrics(record)
         self._sink.log_attempt(record, timestamp=timestamp)
+
+    def log_io_attempt(self, record: "SimplifiedAttemptRecord") -> None:
+        """Proxy low-level attempt logging to the underlying sink.
+
+        Args:
+            record: Simplified attempt metadata with minimal fields.
+        """
+        self._sink.log_io_attempt(record)
 
     def log_manifest(self, entry: ManifestEntry) -> None:
         """Forward manifest entries to the configured sink."""
@@ -3356,4 +3447,27 @@ __all__ = [
     "load_manifest_url_index",
     "JsonlResumeLookup",
     "SqliteResumeLookup",
+    # P1 Observability & Integrity (HTTP/IO telemetry)
+    "SimplifiedAttemptRecord",
+    "ATTEMPT_STATUS_HTTP_HEAD",
+    "ATTEMPT_STATUS_HTTP_GET",
+    "ATTEMPT_STATUS_HTTP_200",
+    "ATTEMPT_STATUS_HTTP_304",
+    "ATTEMPT_STATUS_ROBOTS_FETCH",
+    "ATTEMPT_STATUS_ROBOTS_DISALLOWED",
+    "ATTEMPT_STATUS_RETRY",
+    "ATTEMPT_STATUS_SIZE_MISMATCH",
+    "ATTEMPT_STATUS_CONTENT_POLICY_SKIP",
+    "ATTEMPT_STATUS_DOWNLOAD_ERROR",
+    "ATTEMPT_REASON_OK",
+    "ATTEMPT_REASON_ROBOTS",
+    "ATTEMPT_REASON_SIZE_MISMATCH",
+    "ATTEMPT_REASON_TIMEOUT",
+    "ATTEMPT_REASON_CONN_ERROR",
+    "ATTEMPT_REASON_TLS_ERROR",
+    "ATTEMPT_REASON_NOT_MODIFIED",
+    "ATTEMPT_REASON_POLICY_TYPE",
+    "ATTEMPT_REASON_POLICY_SIZE",
+    "ATTEMPT_REASON_BACKOFF",
+    "ATTEMPT_REASON_RETRY_AFTER",
 ]
