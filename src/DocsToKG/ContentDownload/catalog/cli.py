@@ -12,17 +12,11 @@ Provides 6 commands for managing the catalog:
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 from typing import Optional
 
 import typer
 
 from DocsToKG.ContentDownload.catalog.bootstrap import CatalogBootstrap
-from DocsToKG.ContentDownload.catalog.gc import (
-    collect_referenced_paths,
-    delete_orphan_files,
-    find_orphans,
-)
 from DocsToKG.ContentDownload.catalog.migrate import import_manifest
 from DocsToKG.ContentDownload.config.loader import load_config
 
@@ -254,7 +248,7 @@ def gc(
             # For now, we'll use stats to show intent
             
             stats = bootstrap.catalog.stats()
-            typer.echo(f"\nCatalog statistics:")
+            typer.echo("\nCatalog statistics:")
             typer.echo(f"  Total documents: {stats['total_documents']}")
             typer.echo(f"  Total bytes: {stats['total_bytes']}")
             

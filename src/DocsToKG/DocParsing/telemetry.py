@@ -20,20 +20,20 @@ writers without modifying telemetry logic.
 Example:
     from DocsToKG.DocParsing.telemetry import TelemetrySink, StageTelemetry
     from pathlib import Path
-    
+
     # Create a telemetry sink for a pipeline run
     sink = TelemetrySink(
         attempts_path=Path("attempts.jsonl"),
         manifest_path=Path("manifest.jsonl")
     )
-    
+
     # Bind to a specific stage and run
     stage_telemetry = StageTelemetry(
         sink=sink,
         run_id="run-2025-10-21",
         stage="embedding"
     )
-    
+
     # Log attempt completion (uses lock-aware writer internally)
     stage_telemetry.log_attempt_success(
         file_id="doc1",

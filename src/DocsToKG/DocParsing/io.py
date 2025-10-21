@@ -20,7 +20,7 @@ atomic writes even under concurrent access.
 Example:
     from DocsToKG.DocParsing.io import DEFAULT_JSONL_WRITER
     from pathlib import Path
-    
+
     # Atomically append manifest entries using lock-aware writer
     rows = [{"id": "doc1", "status": "completed"}]
     DEFAULT_JSONL_WRITER(Path("manifest.jsonl"), rows)

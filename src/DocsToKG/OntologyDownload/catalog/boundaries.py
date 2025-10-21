@@ -32,6 +32,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Generator, Optional
 from uuid import uuid4
+import time
 
 try:  # pragma: no cover
     import duckdb
@@ -42,6 +43,11 @@ except ImportError as exc:  # pragma: no cover
 
 from ..policy.errors import PolicyReject
 from ..policy.gates import db_boundary_gate
+from .observability_instrumentation import (
+    emit_boundary_begin,
+    emit_boundary_error,
+    emit_boundary_success,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -129,6 +135,16 @@ def download_boundary(
     Raises:
         duckdb.Error: If insert fails (triggers rollback)
     """
+    # Emit observability begin event
+    emit_boundary_begin(
+        boundary="download",
+        artifact_id=artifact_id,
+        version_id=version_id,
+        service="unknown",
+        extra_payload={"fs_relpath": fs_relpath, "size": size},
+    )
+    start_time = time.time()
+
     result = DownloadBoundaryResult(
         artifact_id=artifact_id,
         version_id=version_id,
@@ -162,9 +178,29 @@ def download_boundary(
         conn.commit()
         logger.info(f"Download boundary: inserted artifact {artifact_id}")
 
+        # Emit observability success event
+        duration_ms = (time.time() - start_time) * 1000
+        emit_boundary_success(
+            boundary="download",
+            artifact_id=artifact_id,
+            version_id=version_id,
+            duration_ms=duration_ms,
+            extra_payload={"size_bytes": size, "etag": etag},
+        )
+
     except duckdb.Error as exc:
         conn.rollback()
         logger.error(f"Download boundary failed: {exc}")
+
+        # Emit observability error event
+        duration_ms = (time.time() - start_time) * 1000
+        emit_boundary_error(
+            boundary="download",
+            artifact_id=artifact_id,
+            version_id=version_id,
+            error=exc,
+            duration_ms=duration_ms,
+        )
         raise
 
     yield result
