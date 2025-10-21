@@ -211,6 +211,56 @@ class TestDownloadExecutionContracts:
         assert isinstance(result, DownloadStreamResult)
         assert result.http_status == 200
 
+    def test_stream_enforces_max_bytes_limit(
+        self, tmp_path, monkeypatch
+    ) -> None:
+        """stream_candidate_payload aborts once the size cap is exceeded."""
+
+        class StubResponse:
+            def __init__(self, *, status_code, headers, chunks=None):
+                self.status_code = status_code
+                self.headers = headers
+                self.extensions = {}
+                self._chunks = list(chunks or [])
+
+            def iter_bytes(self, chunk_size=None):
+                for chunk in self._chunks:
+                    yield chunk
+
+        plan = DownloadPlan(url="https://example.com/file.pdf", resolver_name="test")
+        session = MagicMock()
+        chunk_a = b"a" * 512
+        chunk_b = b"b" * 512
+        limit = len(chunk_a) + 100
+
+        head_response = StubResponse(
+            status_code=200,
+            headers={"Content-Type": "application/pdf"},
+        )
+        get_response = StubResponse(
+            status_code=200,
+            headers={
+                "Content-Type": "application/pdf",
+                "Content-Length": str(len(chunk_a) + len(chunk_b)),
+            },
+            chunks=[chunk_a, chunk_b],
+        )
+        session.head.return_value = head_response
+        session.get.return_value = get_response
+
+        monkeypatch.chdir(tmp_path)
+
+        with pytest.raises(DownloadError) as excinfo:
+            stream_candidate_payload(
+                plan,
+                session=session,
+                max_bytes=limit,
+                chunk_size=256,
+            )
+
+        assert excinfo.value.reason == "too-large"
+        assert list(tmp_path.iterdir()) == []
+
     def test_finalize_returns_outcome(self):
         """finalize_candidate_download returns DownloadOutcome."""
         plan = DownloadPlan(url="https://example.com/file.pdf", resolver_name="test")

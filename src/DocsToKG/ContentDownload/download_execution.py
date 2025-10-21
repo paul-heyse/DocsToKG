@@ -200,24 +200,60 @@ def stream_candidate_payload(
     cl = resp.headers.get("Content-Length")
     expected_len = int(cl) if (cl and cl.isdigit()) else None
 
+    # Determine effective byte limit (plan override wins)
+    effective_max_bytes = (
+        plan.max_bytes_override
+        if plan.max_bytes_override is not None
+        else max_bytes
+    )
+
     # Write to temporary file using atomic writer
     tmp_dir = os.getcwd()
     os.makedirs(tmp_dir, exist_ok=True)
     tmp_path = os.path.join(tmp_dir, ".download.part")
 
+    bytes_streamed = 0
+
+    def _iter_with_limit(source_iter):
+        nonlocal bytes_streamed
+        for chunk in source_iter:
+            if not chunk:
+                yield chunk
+                continue
+            new_total = bytes_streamed + len(chunk)
+            if (
+                effective_max_bytes is not None
+                and new_total > effective_max_bytes
+            ):
+                raise DownloadError(
+                    "too-large",
+                    f"Payload exceeded {effective_max_bytes} bytes",
+                )
+            bytes_streamed = new_total
+            yield chunk
+
     try:
         bytes_written = atomic_write_stream(
             dest_path=tmp_path,
-            byte_iter=resp.iter_bytes(),
+            byte_iter=_iter_with_limit(
+                resp.iter_bytes(chunk_size=chunk_size)
+            ),
             expected_len=(expected_len if verify_content_length else None),
             chunk_size=chunk_size,
         )
 
         # Check size limit
-        if max_bytes and bytes_written > max_bytes:
+        if (
+            effective_max_bytes is not None
+            and bytes_written > effective_max_bytes
+        ):
+            try:
+                os.unlink(tmp_path)
+            except FileNotFoundError:
+                pass
             raise DownloadError(
                 "too-large",
-                f"Payload exceeded {max_bytes} bytes",
+                f"Payload exceeded {effective_max_bytes} bytes",
             )
 
         # Emit final success record
@@ -254,6 +290,10 @@ def stream_candidate_payload(
         )
         raise DownloadError("size-mismatch")
     except DownloadError:
+        try:
+            os.unlink(tmp_path)
+        except FileNotFoundError:
+            pass
         raise
     except Exception as e:  # pylint: disable=broad-except
         raise DownloadError(
