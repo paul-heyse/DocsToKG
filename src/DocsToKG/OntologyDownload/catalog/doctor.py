@@ -23,12 +23,13 @@ Responsibilities:
 
 from __future__ import annotations
 
+import json
 import logging
+import time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
-import time
+from typing import Iterable, Optional
 
 try:  # pragma: no cover
     import duckdb
@@ -37,11 +38,7 @@ except ImportError as exc:  # pragma: no cover
         "duckdb is required for catalog doctor. Ensure .venv is initialized."
     ) from exc
 
-from .observability_instrumentation import (
-    emit_doctor_issue_found,
-    emit_doctor_begin,
-    emit_doctor_complete,
-)
+from .observability_instrumentation import emit_doctor_begin, emit_doctor_complete, emit_doctor_issue_found
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +58,7 @@ class DoctorIssue:
     fs_path: Optional[Path]
     description: str
     severity: str  # 'info' | 'warning' | 'error'
+    size_bytes: Optional[int] = None
 
 
 @dataclass(frozen=True)
@@ -212,6 +210,9 @@ def detect_db_fs_drifts(
     conn: duckdb.DuckDBPyConnection,
     artifacts_root: Path,
     extracted_root: Path,
+    *,
+    fs_artifacts: Optional[Iterable[tuple[Path, int]]] = None,
+    fs_files: Optional[Iterable[tuple[Path, int]]] = None,
 ) -> list[DoctorIssue]:
     """Detect mismatches between DB and filesystem.
 
@@ -230,57 +231,191 @@ def detect_db_fs_drifts(
     """
     issues: list[DoctorIssue] = []
 
-    # Scan filesystem for artifacts (unused for now, but could be used for completeness checks)
-    # Get DB artifacts
-    db_artifacts = conn.execute("SELECT artifact_id, fs_relpath FROM artifacts").fetchall()
+    artifacts_root = artifacts_root.resolve()
+    extracted_root = extracted_root.resolve()
 
-    # Check for missing FS files
-    for artifact_id, fs_relpath in db_artifacts:
-        expected_path = artifacts_root / fs_relpath if fs_relpath else None
-        if expected_path and not expected_path.exists():
+    fs_artifacts_list = list(fs_artifacts or scan_filesystem_artifacts(artifacts_root))
+    fs_files_list = list(fs_files or scan_filesystem_files(extracted_root))
+
+    fs_artifact_map = {
+        path.resolve().relative_to(artifacts_root).as_posix(): size for path, size in fs_artifacts_list
+    }
+    fs_file_map = {
+        path.resolve().relative_to(extracted_root).as_posix(): size for path, size in fs_files_list
+    }
+
+    # Artifacts in DB
+    db_artifacts = conn.execute(
+        "SELECT artifact_id, fs_relpath, size_bytes FROM artifacts"
+    ).fetchall()
+    db_artifact_map = {row[1]: (row[0], row[2]) for row in db_artifacts if row[1]}
+
+    for artifact_id, fs_relpath, size_bytes in db_artifacts:
+        if not fs_relpath:
+            continue
+        expected_path = artifacts_root / fs_relpath
+        if not expected_path.exists():
+            description = (
+                f"Artifact {artifact_id} recorded in DB but missing on FS: {fs_relpath}"
+            )
             issue = DoctorIssue(
-                issue_type="missing_fs_file",
+                issue_type="missing_fs_artifact",
                 artifact_id=artifact_id,
                 file_id=None,
                 fs_path=expected_path,
-                description=f"Artifact {artifact_id} recorded in DB but missing on FS: {fs_relpath}",
+                description=description,
                 severity="error",
+                size_bytes=size_bytes,
             )
             issues.append(issue)
-            # Emit observability event for this issue
             emit_doctor_issue_found(
-                issue_type="missing_fs_file",
+                issue_type="missing_fs_artifact",
                 severity="error",
-                artifact_id=artifact_id,
-                description=issue.description,
+                description=description,
+                extra={"artifact_id": artifact_id, "path": fs_relpath},
             )
 
-    # Check latest pointer consistency
-    latest_result = conn.execute("SELECT version_id FROM latest_pointer LIMIT 1").fetchone()
+    for relpath, size_bytes in fs_artifact_map.items():
+        if relpath not in db_artifact_map:
+            description = f"File present on FS but not in catalog: {relpath}"
+            issue = DoctorIssue(
+                issue_type="orphan_artifact_file",
+                artifact_id=None,
+                file_id=None,
+                fs_path=artifacts_root / relpath,
+                description=description,
+                severity="warning",
+                size_bytes=size_bytes,
+            )
+            issues.append(issue)
+            emit_doctor_issue_found(
+                issue_type="orphan_artifact_file",
+                severity="warning",
+                description=description,
+                extra={"path": relpath},
+            )
 
+    # Extracted files in DB with service for path reconstruction
+    db_files = conn.execute(
+        """
+        SELECT f.file_id, f.relpath_in_version, f.size_bytes, a.service, f.version_id
+        FROM extracted_files f
+        JOIN artifacts a ON f.artifact_id = a.artifact_id
+        """
+    ).fetchall()
+
+    db_file_map: dict[str, tuple[str, int]] = {}
+    for file_id, relpath_in_version, size_bytes, service, version_id in db_files:
+        rel = Path(service) / version_id / relpath_in_version
+        rel_posix = rel.as_posix()
+        db_file_map[rel_posix] = (file_id, size_bytes)
+        expected_path = extracted_root / rel
+        if not expected_path.exists():
+            description = (
+                f"Extracted file {file_id} (service={service}, version={version_id}) missing on FS: {rel_posix}"
+            )
+            issue = DoctorIssue(
+                issue_type="missing_fs_extracted_file",
+                artifact_id=None,
+                file_id=file_id,
+                fs_path=expected_path,
+                description=description,
+                severity="error",
+                size_bytes=size_bytes,
+            )
+            issues.append(issue)
+            emit_doctor_issue_found(
+                issue_type="missing_fs_extracted_file",
+                severity="error",
+                description=description,
+                extra={"file_id": file_id, "path": rel_posix},
+            )
+
+    for relpath, size_bytes in fs_file_map.items():
+        if relpath not in db_file_map:
+            description = f"Extracted file present on FS but not in catalog: {relpath}"
+            issue = DoctorIssue(
+                issue_type="orphan_extracted_file",
+                artifact_id=None,
+                file_id=None,
+                fs_path=extracted_root / relpath,
+                description=description,
+                severity="warning",
+                size_bytes=size_bytes,
+            )
+            issues.append(issue)
+            emit_doctor_issue_found(
+                issue_type="orphan_extracted_file",
+                severity="warning",
+                description=description,
+                extra={"path": relpath},
+            )
+
+    # Latest pointer consistency
+    latest_result = conn.execute("SELECT version_id FROM latest_pointer LIMIT 1").fetchone()
     if latest_result:
         db_latest_version = latest_result[0]
-        # In a real implementation, check LATEST.json on FS
-        latest_json_path = extracted_root.parent / "LATEST.json"
+        latest_json_path = artifacts_root.parent / "LATEST.json"
         if not latest_json_path.exists():
+            description = (
+                f"DB marks {db_latest_version} as latest, but LATEST.json missing on FS"
+            )
             issue = DoctorIssue(
                 issue_type="latest_mismatch",
                 artifact_id=None,
                 file_id=None,
                 fs_path=latest_json_path,
-                description=f"DB marks {db_latest_version} as latest, but LATEST.json missing on FS",
+                description=description,
                 severity="warning",
             )
             issues.append(issue)
-            # Emit observability event for this issue
             emit_doctor_issue_found(
                 issue_type="latest_mismatch",
                 severity="warning",
-                artifact_id=None,
-                description=issue.description,
+                description=description,
+                extra={"expected_latest": db_latest_version},
             )
+        else:
+            try:
+                payload = json.loads(latest_json_path.read_text(encoding="utf-8"))
+                fs_latest = payload.get("latest") or payload.get("version")
+                if fs_latest and fs_latest != db_latest_version:
+                    description = (
+                        f"LATEST.json points to {fs_latest}, but catalog latest is {db_latest_version}"
+                    )
+                    issue = DoctorIssue(
+                        issue_type="latest_mismatch",
+                        artifact_id=None,
+                        file_id=None,
+                        fs_path=latest_json_path,
+                        description=description,
+                        severity="warning",
+                    )
+                    issues.append(issue)
+                    emit_doctor_issue_found(
+                        issue_type="latest_mismatch",
+                        severity="warning",
+                        description=description,
+                        extra={"expected_latest": db_latest_version, "fs_latest": fs_latest},
+                    )
+            except json.JSONDecodeError:
+                description = "LATEST.json could not be parsed"
+                issue = DoctorIssue(
+                    issue_type="latest_invalid",
+                    artifact_id=None,
+                    file_id=None,
+                    fs_path=latest_json_path,
+                    description=description,
+                    severity="warning",
+                )
+                issues.append(issue)
+                emit_doctor_issue_found(
+                    issue_type="latest_invalid",
+                    severity="warning",
+                    description=description,
+                )
 
-    logger.info(f"Detected {len(issues)} DB↔FS drifts")
+    logger.info("Detected %s DB↔FS drift issues", len(issues))
     return issues
 
 
@@ -315,7 +450,13 @@ def generate_doctor_report(
     fs_files = scan_filesystem_files(extracted_root)
 
     # Detect drifts
-    issues = detect_db_fs_drifts(conn, artifacts_root, extracted_root)
+    issues = detect_db_fs_drifts(
+        conn,
+        artifacts_root,
+        extracted_root,
+        fs_artifacts=fs_artifacts,
+        fs_files=fs_files,
+    )
 
     # Categorize issues
     critical = sum(1 for i in issues if i.severity == "error")
@@ -339,7 +480,7 @@ def generate_doctor_report(
     duration_ms = (time.time() - start_time) * 1000
     emit_doctor_complete(
         issues_found=len(issues),
-        critical_issues=critical,
+        critical=critical,
         warnings=warnings,
         duration_ms=duration_ms,
     )
