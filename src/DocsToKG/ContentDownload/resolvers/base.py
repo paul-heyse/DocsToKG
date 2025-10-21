@@ -90,7 +90,15 @@
 #   ]
 # }
 # === /NAVMAP ===
-"""Shared resolver primitives and helpers for the content download pipeline."""
+"""Shared resolver primitives and helpers for the content download pipeline.
+
+⚠️  DEPRECATED: This module is maintained for backward compatibility only.
+Resolvers should migrate to the new registry_v2.py pattern with @register_v2 decorator.
+New resolvers should NOT inherit from RegisteredResolver or ApiResolverBase.
+
+This module will be removed in a future version after all resolvers migrate to the
+modern design pattern (Pydantic v2 config, @register_v2 decorator, explicit DI).
+"""
 
 from __future__ import annotations
 
