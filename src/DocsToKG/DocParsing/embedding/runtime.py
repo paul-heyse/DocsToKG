@@ -189,13 +189,13 @@ from DocsToKG.DocParsing.core import (
     StageOutcome,
     StagePlan,
     WorkItem,
+    safe_write,
     compute_relative_doc_id,
     compute_stable_shard,
     derive_doc_id_and_vectors_path,
     run_stage,
     should_skip_output,
 )
-from DocsToKG.DocParsing.core.concurrency import _acquire_lock
 from DocsToKG.DocParsing.core.discovery import iter_chunks
 from DocsToKG.DocParsing.embedding.backends import (
     ProviderBundle,
@@ -1821,7 +1821,8 @@ def _embedding_stage_worker(item: WorkItem) -> ItemOutcome:
         hasher = StreamingContentHasher()
     start = time.perf_counter()
     try:
-        with _acquire_lock(vectors_path):
+        # Use safe_write for atomic vector writes
+        if safe_write(vectors_path, _embed_write_vectors):
             log_event(
                 logger,
                 "debug",

@@ -28,7 +28,7 @@ from DocsToKG.ContentDownload.download import (
     stream_candidate_payload,
 )
 from DocsToKG.ContentDownload.networking import CachedResult, ConditionalRequestHelper
-from DocsToKG.ContentDownload.pipeline import PipelineResult, ResolverMetrics
+from DocsToKG.ContentDownload.api.types import DownloadOutcome
 from tests.conftest import PatchManager
 
 
@@ -422,16 +422,18 @@ def test_process_one_work_preserves_reason(patcher: PatchManager, artifact: Work
         reason=ReasonCode.HTML_TAIL_DETECTED,
         reason_detail="html-tail-detected",
     )
-    pipeline_result = PipelineResult(
-        success=False,
-        resolver_name="stub",
-        url="https://example.com/foo.pdf",
-        outcome=outcome,
-        html_paths=[],
+    pipeline_result = DownloadOutcome(
+        classification=Classification.MISS,
+        path=None,
+        http_status=200,
+        content_type="application/pdf",
+        elapsed_ms=12.0,
+        reason=ReasonCode.HTML_TAIL_DETECTED,
+        reason_detail="html-tail-detected",
     )
 
     class StubPipeline:
-        def run(self, *args: Any, **kwargs: Any) -> PipelineResult:
+        def run(self, *args: Any, **kwargs: Any) -> DownloadOutcome:
             return pipeline_result
 
     logger = StubLogger()

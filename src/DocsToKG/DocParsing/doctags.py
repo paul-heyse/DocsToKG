@@ -349,7 +349,6 @@ from DocsToKG.DocParsing.core import (
     run_stage,
     set_spawn_or_warn,
 )
-from DocsToKG.DocParsing.core.concurrency import _acquire_lock
 from DocsToKG.DocParsing.env import (
     PDF_MODEL_SUBDIR,
     data_doctags,
