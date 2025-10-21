@@ -77,12 +77,14 @@ def _write_audit_manifest(
     extract_root: Path,
     archive_path: Path,
     policy: ExtractionPolicy,
-    entries_metadata: List[tuple[str, Path, int, Optional[str]]],  # (orig_path, normalized_path, size, sha256)
+    entries_metadata: List[
+        tuple[str, Path, int, Optional[str]]
+    ],  # (orig_path, normalized_path, size, sha256)
     telemetry: "ExtractionTelemetryEvent",
     metrics: "ExtractionMetrics",
 ) -> None:
     """Write deterministic audit JSON manifest for extraction.
-    
+
     Args:
         extract_root: Root directory where files were extracted
         archive_path: Path to the source archive
@@ -93,13 +95,13 @@ def _write_audit_manifest(
     """
     try:
         import libarchive as la
-        
+
         # Compute archive SHA256
         archive_sha256 = hashlib.sha256()
         with open(archive_path, "rb") as f:
             for chunk in iter(lambda: f.read(65536), b""):
                 archive_sha256.update(chunk)
-        
+
         # Build manifest
         manifest = {
             "schema_version": "1.0",
@@ -143,16 +145,16 @@ def _write_audit_manifest(
                 for idx, (orig_path, norm_path, size, sha256) in enumerate(entries_metadata)
             ],
         }
-        
+
         # Write atomically
         manifest_path = extract_root / policy.manifest_filename
         manifest_tmp = manifest_path.with_suffix(".tmp")
-        
+
         with open(manifest_tmp, "w", encoding="utf-8") as f:
             json.dump(manifest, f, indent=2, sort_keys=True)
-        
+
         manifest_tmp.replace(manifest_path)
-        
+
     except Exception as e:
         # Log but don't fail extraction if audit manifest fails
         logger = logging.getLogger("DocsToKG.OntologyDownload")
@@ -466,7 +468,7 @@ def extract_archive_safe(
                 )
 
         extract_root.mkdir(parents=True, exist_ok=True)
-        
+
         # Compute and store config hash for provenance
         telemetry.config_hash = _compute_config_hash(policy)
 
@@ -490,25 +492,30 @@ def extract_archive_safe(
                 # Phase 1: Validate format and filters (right after opening)
                 if telemetry.format_name is None:  # First iteration
                     from .extraction_integrity import validate_archive_format
-                    
+
                     format_name = getattr(archive, "format_name", None)
                     filters = getattr(archive, "filters", None) or []
-                    
+
                     # Convert bytes to string if necessary
                     if isinstance(format_name, bytes):
                         format_name = format_name.decode("utf-8", errors="replace")
                     if isinstance(filters, (list, tuple)):
-                        filters = [f.decode("utf-8", errors="replace") if isinstance(f, bytes) else f for f in filters]
-                    
+                        filters = [
+                            f.decode("utf-8", errors="replace") if isinstance(f, bytes) else f
+                            for f in filters
+                        ]
+
                     telemetry.format_name = format_name
                     telemetry.filters = filters if isinstance(filters, list) else []
-                    
+
                     is_valid, error_msg = validate_archive_format(format_name, filters, policy)
                     if not is_valid:
-                        raise ConfigError(error_message(
-                            ExtractionErrorCode.FORMAT_NOT_ALLOWED,
-                            f"Archive format/filter validation failed: {error_msg}",
-                        ))
+                        raise ConfigError(
+                            error_message(
+                                ExtractionErrorCode.FORMAT_NOT_ALLOWED,
+                                f"Archive format/filter validation failed: {error_msg}",
+                            )
+                        )
 
                 # Phase 2: Validate against all security policies (via PreScanValidator)
                 # This includes:
@@ -585,9 +592,11 @@ def extract_archive_safe(
 
                     # Stream the file content to the target using atomic write discipline
                     # (temp file → write → fsync → rename → mtime → periodic dirfsync)
-                    temp_path = target_path.with_suffix(f".tmp-{os.getpid()}-{uuid.uuid4().hex[:8]}")
+                    temp_path = target_path.with_suffix(
+                        f".tmp-{os.getpid()}-{uuid.uuid4().hex[:8]}"
+                    )
                     file_hasher = hashlib.sha256() if policy.hash_enable else None
-                    
+
                     try:
                         with temp_path.open("wb") as temp_file:
                             bytes_written = 0
@@ -596,27 +605,27 @@ def extract_archive_safe(
                                 bytes_written += len(block)
                                 if file_hasher:
                                     file_hasher.update(block)
-                            
+
                             # Sync file to disk before rename
-                            if policy.atomic and hasattr(temp_file, 'fileno'):
+                            if policy.atomic and hasattr(temp_file, "fileno"):
                                 try:
                                     os.fsync(temp_file.fileno())
                                 except (OSError, AttributeError):
                                     pass  # fsync not supported on this platform
-                            
+
                             telemetry.bytes_written += bytes_written
-                        
+
                         # Atomic rename
                         temp_path.replace(target_path)
-                        
+
                         # Set mtime per policy
-                        if policy.timestamp_mode == "preserve" and hasattr(entry, 'mtime'):
+                        if policy.timestamp_mode == "preserve" and hasattr(entry, "mtime"):
                             try:
                                 if entry.mtime is not None:
                                     os.utime(str(target_path), (entry.mtime, entry.mtime))
                             except (OSError, TypeError):
                                 pass  # mtime not available or not supported
-                        
+
                         # Periodic directory fsync for durability
                         if policy.atomic and len(extracted_files) % policy.group_fsync == 0:
                             try:
@@ -627,13 +636,13 @@ def extract_archive_safe(
                                     os.close(parent_fd)
                             except (OSError, AttributeError):
                                 pass  # fsync not supported
-                    
+
                     except Exception:
                         # Clean up temp file on error
                         if temp_path.exists():
                             temp_path.unlink()
                         raise
-                    
+
                     # Record metadata for audit manifest
                     file_hash = file_hasher.hexdigest() if file_hasher else None
                     entries_metadata.append((orig_pathname, target_path, bytes_written, file_hash))

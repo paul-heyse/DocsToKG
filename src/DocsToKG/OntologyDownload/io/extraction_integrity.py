@@ -49,9 +49,28 @@ from .extraction_policy import ExtractionPolicy
 
 # Windows reserved device names (case-insensitive)
 _WINDOWS_RESERVED_NAMES = {
-    "con", "prn", "aux", "nul",
-    "com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8", "com9",
-    "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9",
+    "con",
+    "prn",
+    "aux",
+    "nul",
+    "com1",
+    "com2",
+    "com3",
+    "com4",
+    "com5",
+    "com6",
+    "com7",
+    "com8",
+    "com9",
+    "lpt1",
+    "lpt2",
+    "lpt3",
+    "lpt4",
+    "lpt5",
+    "lpt6",
+    "lpt7",
+    "lpt8",
+    "lpt9",
 }
 
 
@@ -529,36 +548,36 @@ class ProvenanceManifest:
 
 def check_windows_portability(path: str, policy: ExtractionPolicy) -> tuple[bool, Optional[str]]:
     """Check if a path violates Windows portability rules.
-    
+
     Args:
         path: Path to check
         policy: Extraction policy with Windows portability setting
-    
+
     Returns:
         Tuple of (is_valid, error_message)
     """
     if not policy.windows_portability_strict:
         return True, None
-    
+
     # Extract filename from path (last component)
     parts = path.rstrip("/\\").split("/")
     if not parts:
         return False, "Empty path"
-    
+
     filename = parts[-1]
     if not filename:
         return False, "Empty filename"
-    
+
     # Check for trailing space or dot
     if filename != filename.rstrip(". "):
         return False, f"Filename has trailing space or dot: {filename}"
-    
+
     # Check for Windows reserved names
     # Handle cases like "CON.txt" which are also reserved
     name_part = filename.split(".")[0].lower()
     if name_part in _WINDOWS_RESERVED_NAMES:
         return False, f"Filename is a Windows reserved name: {filename}"
-    
+
     return True, None
 
 
@@ -568,23 +587,36 @@ def validate_archive_format(
     policy: ExtractionPolicy,
 ) -> tuple[bool, Optional[str]]:
     """Validate archive format and compression filters against allow-list.
-    
+
     Args:
         format_name: Detected archive format name
         filters: List of compression filters applied
         policy: Extraction policy with allowed formats/filters
-    
+
     Returns:
         Tuple of (is_valid, error_message)
     """
     # Get defaults if not specified
     allowed_formats = policy.allowed_formats or {
-        "zip", "tar", "ustar", "pax", "gnutar", "7z", "iso9660", "cpio"
+        "zip",
+        "tar",
+        "ustar",
+        "pax",
+        "gnutar",
+        "7z",
+        "iso9660",
+        "cpio",
     }
     allowed_filters = policy.allowed_filters or {
-        "none", "gzip", "bzip2", "xz", "zstd", "lz4", "compress"
+        "none",
+        "gzip",
+        "bzip2",
+        "xz",
+        "zstd",
+        "lz4",
+        "compress",
     }
-    
+
     # Validate format (check if any allowed format is contained in the detected format name)
     if format_name:
         format_lower = format_name.lower()
@@ -593,14 +625,20 @@ def validate_archive_format(
             if allowed_format.lower() in format_lower:
                 found_match = True
                 break
-        
+
         if not found_match:
-            return False, f"Format '{format_name}' not in allow-list: {', '.join(sorted(allowed_formats))}"
-    
+            return (
+                False,
+                f"Format '{format_name}' not in allow-list: {', '.join(sorted(allowed_formats))}",
+            )
+
     # Validate filters
     if filters:
         for filter_name in filters:
             if filter_name and filter_name.lower() not in {f.lower() for f in allowed_filters}:
-                return False, f"Filter '{filter_name}' not in allow-list: {', '.join(sorted(allowed_filters))}"
-    
+                return (
+                    False,
+                    f"Filter '{filter_name}' not in allow-list: {', '.join(sorted(allowed_filters))}",
+                )
+
     return True, None

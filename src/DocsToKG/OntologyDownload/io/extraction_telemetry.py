@@ -68,13 +68,13 @@ class ExtractionErrorCode(str, Enum):
 
     # Space Budgeting
     SPACE = "E_SPACE"  # Insufficient disk space
-    
+
     # Format & Filter Validation
     FORMAT_NOT_ALLOWED = "E_FORMAT_NOT_ALLOWED"  # Archive format/filter not in allow-list
-    
+
     # Windows Portability
     PORTABILITY = "E_PORTABILITY"  # Windows reserved name or portability violation
-    
+
     # Archive Corruption
     EXTRACT_CORRUPT = "E_EXTRACT_CORRUPT"  # Archive is corrupted or truncated
     EXTRACT_IO = "E_EXTRACT_IO"  # I/O error during extraction
@@ -155,9 +155,9 @@ class ExtractionTelemetryEvent:
     partial: bool = False
 
     duration_ms: float = 0.0
-    
+
     # Provenance & reproducibility
-    run_id: str = field(default_factory=lambda: str(__import__('uuid').uuid4()))
+    run_id: str = field(default_factory=lambda: str(__import__("uuid").uuid4()))
     config_hash: str = ""
     format_name: Optional[str] = None
 

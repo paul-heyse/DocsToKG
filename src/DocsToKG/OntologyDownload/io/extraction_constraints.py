@@ -411,6 +411,7 @@ class PreScanValidator:
 
         # 5. Validate Windows portability (if policy enables it)
         from .extraction_integrity import check_windows_portability
+
         is_valid, error_msg = check_windows_portability(normalized, self.policy)
         if not is_valid:
             raise ConfigError(
