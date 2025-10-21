@@ -29,6 +29,17 @@ from DocsToKG.ContentDownload.api.exceptions import DownloadError, SkipDownload
 from DocsToKG.ContentDownload.io_utils import SizeMismatchError, atomic_write_stream
 from DocsToKG.ContentDownload.policy.path_gate import PathPolicyError, validate_path_safety
 from DocsToKG.ContentDownload.policy.url_gate import PolicyError, validate_url_security
+from DocsToKG.ContentDownload.telemetry import (
+    ATTEMPT_REASON_NOT_MODIFIED,
+    ATTEMPT_REASON_OK,
+    ATTEMPT_REASON_SIZE_MISMATCH,
+    ATTEMPT_STATUS_CACHE_HIT,
+    ATTEMPT_STATUS_HTTP_200,
+    ATTEMPT_STATUS_HTTP_304,
+    ATTEMPT_STATUS_HTTP_GET,
+    ATTEMPT_STATUS_HTTP_HEAD,
+    ATTEMPT_STATUS_SIZE_MISMATCH,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -124,7 +135,7 @@ def stream_candidate_payload(
             run_id=run_id,
             resolver_name=plan.resolver_name,
             url=url,
-            status="http-head",
+            status=ATTEMPT_STATUS_HTTP_HEAD,
             http_status=head.status_code,
             elapsed_ms=elapsed_ms,
         )
@@ -148,7 +159,7 @@ def stream_candidate_payload(
             run_id=run_id,
             resolver_name=plan.resolver_name,
             url=url,
-            status="http-get",
+            status=ATTEMPT_STATUS_HTTP_GET,
             http_status=resp.status_code,
             content_type=content_type,
             elapsed_ms=elapsed_ms,
@@ -161,10 +172,10 @@ def stream_candidate_payload(
                 run_id=run_id,
                 resolver_name=plan.resolver_name,
                 url=url,
-                status="cache-hit",
+                status=ATTEMPT_STATUS_CACHE_HIT,
                 http_status=resp.status_code,
                 content_type=content_type,
-                reason="ok",
+                reason=ATTEMPT_REASON_OK,
             )
         if revalidated and resp.status_code == 304:
             _emit(
@@ -172,10 +183,10 @@ def stream_candidate_payload(
                 run_id=run_id,
                 resolver_name=plan.resolver_name,
                 url=url,
-                status="http-304",
+                status=ATTEMPT_STATUS_HTTP_304,
                 http_status=304,
                 content_type=content_type,
-                reason="not-modified",
+                reason=ATTEMPT_REASON_NOT_MODIFIED,
             )
             return DownloadStreamResult(
                 path_tmp="",
@@ -200,24 +211,60 @@ def stream_candidate_payload(
     cl = resp.headers.get("Content-Length")
     expected_len = int(cl) if (cl and cl.isdigit()) else None
 
+    # Determine effective byte limit (plan override wins)
+    effective_max_bytes = (
+        plan.max_bytes_override
+        if plan.max_bytes_override is not None
+        else max_bytes
+    )
+
     # Write to temporary file using atomic writer
     tmp_dir = os.getcwd()
     os.makedirs(tmp_dir, exist_ok=True)
     tmp_path = os.path.join(tmp_dir, ".download.part")
 
+    bytes_streamed = 0
+
+    def _iter_with_limit(source_iter):
+        nonlocal bytes_streamed
+        for chunk in source_iter:
+            if not chunk:
+                yield chunk
+                continue
+            new_total = bytes_streamed + len(chunk)
+            if (
+                effective_max_bytes is not None
+                and new_total > effective_max_bytes
+            ):
+                raise DownloadError(
+                    "too-large",
+                    f"Payload exceeded {effective_max_bytes} bytes",
+                )
+            bytes_streamed = new_total
+            yield chunk
+
     try:
         bytes_written = atomic_write_stream(
             dest_path=tmp_path,
-            byte_iter=resp.iter_bytes(),
+            byte_iter=_iter_with_limit(
+                resp.iter_bytes(chunk_size=chunk_size)
+            ),
             expected_len=(expected_len if verify_content_length else None),
             chunk_size=chunk_size,
         )
 
         # Check size limit
-        if max_bytes and bytes_written > max_bytes:
+        if (
+            effective_max_bytes is not None
+            and bytes_written > effective_max_bytes
+        ):
+            try:
+                os.unlink(tmp_path)
+            except FileNotFoundError:
+                pass
             raise DownloadError(
                 "too-large",
-                f"Payload exceeded {max_bytes} bytes",
+                f"Payload exceeded {effective_max_bytes} bytes",
             )
 
         # Emit final success record
@@ -226,7 +273,7 @@ def stream_candidate_payload(
             run_id=run_id,
             resolver_name=plan.resolver_name,
             url=url,
-            status="http-200",
+            status=ATTEMPT_STATUS_HTTP_200,
             http_status=resp.status_code,
             bytes_written=bytes_written,
             content_type=content_type,
@@ -246,14 +293,18 @@ def stream_candidate_payload(
             run_id=run_id,
             resolver_name=plan.resolver_name,
             url=url,
-            status="size-mismatch",
+            status=ATTEMPT_STATUS_SIZE_MISMATCH,
             http_status=resp.status_code,
             content_type=content_type,
-            reason="size-mismatch",
+            reason=ATTEMPT_REASON_SIZE_MISMATCH,
             content_length_hdr=expected_len,
         )
         raise DownloadError("size-mismatch")
     except DownloadError:
+        try:
+            os.unlink(tmp_path)
+        except FileNotFoundError:
+            pass
         raise
     except Exception as e:  # pylint: disable=broad-except
         raise DownloadError(
@@ -295,23 +346,25 @@ def finalize_candidate_download(
             meta={"http_status": 304},
         )
 
-    # Validate final path safety
+    # Determine final path (in real implementation, would use storage policy)
+    if final_path:
+        dest_path = final_path
+    else:
+        base = plan.url.rsplit("/", 1)[-1] or "download.bin"
+        dest_path = os.path.join(os.getcwd(), base)
+
+    # Validate final path safety after deriving destination
     try:
-        validate_path_safety(final_path)
+        dest_path = validate_path_safety(dest_path)
     except PathPolicyError as e:
         raise SkipDownload("path-policy", f"Path policy violation: {e}")
-
-    # Determine final path (in real implementation, would use storage policy)
-    if not final_path:
-        base = plan.url.rsplit("/", 1)[-1] or "download.bin"
-        final_path = os.path.join(os.getcwd(), base)
 
     # atomic_write_stream already moved temp → dest_path, so final_path exists
     # Just verify and emit event
     try:
-        if stream.path_tmp and not os.path.exists(final_path):
+        if stream.path_tmp and not os.path.exists(dest_path):
             # If atomic_write_stream didn't finalize, move it now
-            os.replace(stream.path_tmp, final_path)
+            os.replace(stream.path_tmp, dest_path)
     except Exception as e:  # pylint: disable=broad-except
         raise DownloadError(
             "download-error",
@@ -323,15 +376,15 @@ def finalize_candidate_download(
         telemetry,
         run_id=run_id,
         resolver_name=plan.resolver_name,
-        status="http-200",
+        status=ATTEMPT_STATUS_HTTP_200,
         bytes_written=stream.bytes_written,
-        final_path=final_path,
+        final_path=dest_path,
     )
 
     return DownloadOutcome(
         ok=True,
         classification="success",
-        path=final_path,
+        path=dest_path,
         reason=None,
         meta={
             "content_type": stream.content_type,

@@ -24,7 +24,9 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 
 try:  # pragma: no cover
@@ -39,6 +41,8 @@ from .observability_instrumentation import (
 )
 
 logger = logging.getLogger(__name__)
+
+PRUNE_SCOPE = "prune"
 
 
 # ============================================================================
@@ -71,7 +75,12 @@ class PruneStats:
 # ============================================================================
 
 
-def load_staging_from_fs(cfg: duckdb.DuckDBPyConnection, root: Path) -> int:
+def load_staging_from_fs(
+    cfg: duckdb.DuckDBPyConnection,
+    root: Path,
+    *,
+    scope: str = PRUNE_SCOPE,
+) -> int:
     """
     Walk filesystem under <root> and populate staging_fs_listing table.
 
@@ -89,8 +98,8 @@ def load_staging_from_fs(cfg: duckdb.DuckDBPyConnection, root: Path) -> int:
     count = 0
     root = root.resolve()
 
-    # Truncate staging before reload
-    cfg.execute("TRUNCATE staging_fs_listing")
+    # Remove previous staging rows for this scope
+    cfg.execute("DELETE FROM staging_fs_listing WHERE scope = ?", [scope])
 
     for base, _dirs, files in os.walk(root):
         for fn in files:
@@ -100,8 +109,8 @@ def load_staging_from_fs(cfg: duckdb.DuckDBPyConnection, root: Path) -> int:
                 st = p.stat()
                 cfg.execute(
                     "INSERT INTO staging_fs_listing(scope, relpath, size_bytes, mtime) "
-                    "VALUES ('version', ?, ?, NULL)",
-                    [rel, int(st.st_size)],
+                    "VALUES (?, ?, ?, ?)",
+                    [scope, rel, int(st.st_size), datetime.fromtimestamp(st.st_mtime)],
                 )
                 count += 1
             except (OSError, ValueError) as e:
@@ -116,7 +125,11 @@ def load_staging_from_fs(cfg: duckdb.DuckDBPyConnection, root: Path) -> int:
 # ============================================================================
 
 
-def list_orphans(cfg: duckdb.DuckDBPyConnection) -> list[tuple[str, int]]:
+def list_orphans(
+    cfg: duckdb.DuckDBPyConnection,
+    *,
+    scope: str = PRUNE_SCOPE,
+) -> list[tuple[str, int]]:
     """
     Query v_fs_orphans view to find files on disk not referenced by DB.
 
@@ -128,14 +141,31 @@ def list_orphans(cfg: duckdb.DuckDBPyConnection) -> list[tuple[str, int]]:
         List of (relpath, size_bytes) tuples for orphaned files
     """
     result = cfg.execute(
-        "SELECT relpath, size_bytes FROM v_fs_orphans ORDER BY size_bytes DESC"
+        """
+        SELECT relpath, size_bytes
+        FROM staging_fs_listing
+        WHERE scope = ?
+          AND relpath NOT IN (
+            SELECT fs_relpath FROM artifacts
+            UNION ALL
+            SELECT CONCAT(service, '/', version_id, '/', relpath_in_version)
+            FROM extracted_files
+        )
+        ORDER BY size_bytes DESC
+        """,
+        [scope],
     ).fetchall()
     return result
 
 
-def count_orphans(cfg: duckdb.DuckDBPyConnection) -> int:
+def count_orphans(cfg: duckdb.DuckDBPyConnection, *, scope: str = PRUNE_SCOPE) -> int:
     """Count total orphaned files (for quick checks)."""
-    row = cfg.execute("SELECT COUNT(*) FROM v_fs_orphans").fetchone()
+    row = cfg.execute(
+        "SELECT COUNT(*) FROM staging_fs_listing WHERE scope = ? AND relpath NOT IN ("
+        "SELECT fs_relpath FROM artifacts UNION ALL SELECT CONCAT(service, '/', version_id, '/', relpath_in_version)"
+        " FROM extracted_files)",
+        [scope],
+    ).fetchone()
     return row[0] if row else 0
 
 
@@ -147,7 +177,7 @@ def count_orphans(cfg: duckdb.DuckDBPyConnection) -> int:
 def delete_orphans(
     cfg: duckdb.DuckDBPyConnection,
     root: Path,
-    relpaths: list[str],
+    entries: list[tuple[str, int]],
     batch_size: int = 100,
 ) -> PruneStats:
     """
@@ -172,22 +202,21 @@ def delete_orphans(
 
     root = root.resolve()
     stats = PruneStats()
-    stats.orphan_count = len(relpaths)
+    stats.orphan_count = len(entries)
     start_time = time.time()
-
-    emit_prune_begin(dry_run=False)
 
     deleted = 0
     total_bytes = 0
-    for i, rel in enumerate(relpaths):
+    for i, (rel, size_hint) in enumerate(entries):
         try:
             fpath = root / rel
             if fpath.exists():
-                size = fpath.stat().st_size
+                stat_size = fpath.stat().st_size
                 fpath.unlink(missing_ok=True)
                 deleted += 1
-                total_bytes += size
-                emit_prune_orphan_found(path=rel, size_bytes=size)
+                total_bytes += stat_size
+            else:
+                logger.debug("Path already missing during prune: %s", fpath)
         except Exception as e:
             msg = f"Failed to delete {rel}: {e}"
             logger.warning(msg)
@@ -196,12 +225,17 @@ def delete_orphans(
 
         # Emit intermediate progress every batch_size
         if (i + 1) % batch_size == 0:
-            logger.info(f"Prune progress: {deleted}/{len(relpaths)} deleted")
+            logger.info(f"Prune progress: {deleted}/{len(entries)} deleted")
 
     duration_ms = (time.time() - start_time) * 1000
     stats.deleted_count = deleted
     stats.total_bytes_freed = total_bytes
-    emit_prune_deleted(count=deleted, total_bytes=total_bytes, duration_ms=duration_ms)
+    emit_prune_deleted(
+        deleted_count=deleted,
+        freed_bytes=total_bytes,
+        duration_ms=duration_ms,
+        dry_run=False,
+    )
 
     return stats
 
@@ -226,28 +260,44 @@ def prune_with_staging(
     Returns:
         PruneStats with full operation summary
     """
+    emit_prune_begin(dry_run=dry_run)
+    operation_start = time.time()
+
     stats = PruneStats()
 
     # Load FS into staging
-    stats.staged_count = load_staging_from_fs(cfg, root)
+    stats.staged_count = load_staging_from_fs(cfg, root, scope=PRUNE_SCOPE)
     logger.info(f"Staged {stats.staged_count} files from {root}")
 
     # Detect orphans
-    orphans = list_orphans(cfg)
+    orphans = list_orphans(cfg, scope=PRUNE_SCOPE)
     stats.orphan_count = len(orphans)
 
     if max_items and stats.orphan_count > max_items:
         orphans = orphans[:max_items]
         logger.info(f"Limiting deletion to first {max_items} orphans")
 
+    # Emit orphan events early for observability
+    for relpath, size in orphans:
+        emit_prune_orphan_found(path=relpath, size_bytes=size)
+
+    potential_bytes = sum(size for _, size in orphans)
+
     if dry_run:
         logger.info(f"DRY-RUN: would delete {len(orphans)} orphaned files")
+        stats.total_bytes_freed = potential_bytes
+        emit_prune_deleted(
+            deleted_count=0,
+            freed_bytes=potential_bytes,
+            duration_ms=(time.time() - operation_start) * 1000,
+            dry_run=True,
+        )
         return stats
 
     # Actually delete
-    relpaths = [rel for rel, _size in orphans]
-    delete_stats = delete_orphans(cfg, root, relpaths)
+    delete_stats = delete_orphans(cfg, root, orphans)
     stats.deleted_count = delete_stats.deleted_count
+    stats.total_bytes_freed = delete_stats.total_bytes_freed
     stats.errors = delete_stats.errors
 
     return stats

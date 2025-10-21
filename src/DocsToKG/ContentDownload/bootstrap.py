@@ -59,6 +59,10 @@ from DocsToKG.ContentDownload.telemetry import (
     SqliteSink,
     SummarySink,
 )
+from DocsToKG.ContentDownload.httpx_transport import (
+    configure_http_client,
+    get_http_client,
+)
 
 # Feature flags support
 try:
@@ -181,9 +185,14 @@ def run_from_config(
     telemetry = _build_telemetry(config.telemetry_paths, run_id)
 
     try:
-        # Step 3: Get shared HTTP session
-        http_session = get_http_session(config.http)
-        LOGGER.debug("Shared HTTP session acquired")
+        # Step 3: Get shared HTTP session (httpx + hishel transport)
+        configure_http_client()
+        http_session = get_http_client()
+        _apply_http_config(http_session, config.http)
+        LOGGER.debug(
+            "Shared HTTP session acquired (httpx_transport)",
+            extra={"user_agent": http_session.headers.get("User-Agent")},
+        )
 
         # Step 4: Materialize resolvers in order
         resolver_registry = config.resolver_registry or {}
@@ -442,6 +451,23 @@ def _build_retry_configs(
         )
 
     return retry_configs
+def _apply_http_config(session: Any, http_config: HttpConfig) -> None:
+    """Apply HttpConfig headers to the shared httpx client."""
+
+    if not http_config:
+        return
+
+    user_agent = http_config.user_agent
+    if http_config.mailto and "+mailto:" not in user_agent:
+        user_agent = f"{user_agent} (+mailto:{http_config.mailto})"
+
+    # Copy headers to avoid mutating httpx frozen mapping in-place unexpectedly
+    try:
+        session.headers = session.headers.copy()
+    except AttributeError:
+        pass  # Fallback when headers not accessible
+
+    session.headers["User-Agent"] = user_agent
 
 
 def _process_artifacts(

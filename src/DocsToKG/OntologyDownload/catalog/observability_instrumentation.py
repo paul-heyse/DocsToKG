@@ -168,30 +168,28 @@ def emit_doctor_begin() -> None:
 def emit_doctor_issue_found(
     issue_type: str,
     severity: str,
-    affected_records: int,
-    details: Optional[dict] = None,
+    description: str,
+    *,
+    affected_records: int = 1,
+    extra: Optional[dict] = None,
 ) -> None:
-    """Emit doctor issue found event.
+    """Emit doctor issue found event."""
 
-    Args:
-        issue_type: Type of issue (missing_file, orphan_record, mismatch)
-        severity: Severity level (warning, error)
-        affected_records: Number of affected records
-        details: Additional issue details
-    """
     payload = {
         "operation": "doctor",
         "phase": "issue_found",
         "issue_type": issue_type,
         "severity": severity,
         "affected_records": affected_records,
+        "description": description,
     }
-    if details:
-        payload["details"] = details
+    if extra:
+        payload.update(extra)
 
+    level = "WARN" if severity.lower() == "warning" else "ERROR"
     emit_event(
         event_type="catalog.doctor.issue_found",
-        level="WARN" if severity == "warning" else "ERROR",
+        level=level,
         payload=payload,
     )
 
@@ -216,19 +214,21 @@ def emit_doctor_fixed(issue_type: str, count: int) -> None:
     )
 
 
-def emit_doctor_complete(total_issues: int, fixed: int, duration_ms: float) -> None:
+def emit_doctor_complete(issues_found: int, critical: int, warnings: int, duration_ms: float) -> None:
     """Emit doctor operation complete event.
 
     Args:
-        total_issues: Total issues found
-        fixed: Issues fixed
+        issues_found: Total issues detected
+        critical: Critical issues (severity=error)
+        warnings: Warning issues
         duration_ms: Total operation duration
     """
     payload = {
         "operation": "doctor",
         "phase": "complete",
-        "total_issues": total_issues,
-        "fixed": fixed,
+        "issues_found": issues_found,
+        "critical": critical,
+        "warnings": warnings,
         "duration_ms": round(duration_ms, 1),
     }
     emit_event(
@@ -261,23 +261,33 @@ def emit_prune_begin(dry_run: bool = False) -> None:
 
 
 def emit_prune_orphan_found(
-    path: str,
-    size_bytes: int,
+    *,
+    item_type: str = "file",
+    item_id: Optional[str] = None,
+    path: Optional[str] = None,
+    size_bytes: int = 0,
     age_days: Optional[int] = None,
 ) -> None:
     """Emit prune orphan found event.
 
     Args:
-        path: Relative path of orphan file
-        size_bytes: Size of orphan file in bytes
+        item_type: Type of orphan (file/version/etc.)
+        item_id: Identifier for the orphaned item
+        path: Relative filesystem path, if applicable
+        size_bytes: Size of orphan file in bytes (if known)
         age_days: Age of file in days
     """
     payload = {
         "operation": "prune",
         "phase": "orphan_found",
-        "path": path,
         "size_bytes": size_bytes,
     }
+    if path is not None:
+        payload["path"] = path
+    if item_id is not None:
+        payload["item_id"] = item_id
+    if item_type:
+        payload["item_type"] = item_type
     if age_days is not None:
         payload["age_days"] = age_days
 
@@ -288,21 +298,30 @@ def emit_prune_orphan_found(
     )
 
 
-def emit_prune_deleted(count: int, total_bytes: int, duration_ms: float) -> None:
+def emit_prune_deleted(
+    *,
+    deleted_count: int,
+    freed_bytes: int,
+    duration_ms: Optional[float] = None,
+    dry_run: bool = False,
+) -> None:
     """Emit prune completion event.
 
     Args:
-        count: Number of files deleted
-        total_bytes: Total bytes freed
-        duration_ms: Operation duration
+        deleted_count: Number of items deleted
+        freed_bytes: Total bytes freed
+        duration_ms: Operation duration (optional)
+        dry_run: Whether deletion was simulated
     """
     payload = {
         "operation": "prune",
         "phase": "complete",
-        "deleted_count": count,
-        "freed_bytes": total_bytes,
-        "duration_ms": round(duration_ms, 1),
+        "deleted_count": deleted_count,
+        "freed_bytes": freed_bytes,
+        "dry_run": dry_run,
     }
+    if duration_ms is not None:
+        payload["duration_ms"] = round(duration_ms, 1)
     emit_event(
         event_type="catalog.prune.complete",
         level="INFO",
@@ -504,4 +523,3 @@ class TimedOperation:
 if __name__ == "__main__":
     # Simple test of emission functions
     print("✅ Observability instrumentation module loaded")
-
