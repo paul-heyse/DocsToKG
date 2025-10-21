@@ -16,7 +16,7 @@ The current implementation has **extensively deployed libarchive** and establish
 |--------|---------------|------------------------|--------|
 | **Two-Phase Design** | Pre-scan + Extract | ✅ Implemented | ✅ ALIGNED |
 | **Public API** | `extract_archive_safe(archive, dest)` | ✅ Signature intact | ✅ ALIGNED |
-| **Settings Model** | Pydantic `ExtractionSettings` | ✅ `ExtractionPolicy` dataclass | ⚠️ EVOLVED |
+| **Settings Model** | Pydantic v2 `ExtractionSettings` | ✅ `ExtractionSettings` Pydantic v2 | ✅ **ALIGNED** |
 | **Policy Gates** | 10 gates (path, type, format, bomb, etc.) | ✅ 10+ policies + GuardianValidator | ✅ ALIGNED |
 | **Observability** | `extract.*` events + audit JSON | ✅ `ExtractionTelemetryEvent` + audit | ✅ ALIGNED |
 | **Telemetry Events** | 4 events (start, pre_scan, done, error) | ✅ All 4 + metadata | ✅ ALIGNED |
@@ -47,11 +47,19 @@ The current implementation has **extensively deployed libarchive** and establish
 
 ### ⚠️ **Evolved Components** (Review & Optional Refinement)
 
-1. **Settings Model**
+1. **Settings Model** ✅ **FIXED**
    - **Specification:** Pydantic v2 `ExtractionSettings` class
-   - **Implementation:** Dataclass `ExtractionPolicy` (non-Pydantic)
-   - **Assessment:** Functionally equivalent; dataclass is simpler
-   - **Action:** No change needed; document choice in AGENTS.md
+   - **Implementation:** Now Pydantic v2 `ExtractionSettings` BaseModel
+   - **Assessment:** ✅ ALIGNED - Full Pydantic v2 compliance achieved
+   - **Benefits Gained:**
+     - Runtime validation with type checking
+     - Automatic coercion of invalid inputs
+     - JSON schema generation for documentation
+     - Serialization consistency
+     - 10+ field constraints (ge, le, gt ranges)
+     - 5 cross-field validators
+     - Better error messages
+   - **Status:** ✅ COMPLETE (commit bd7382f1)
 
 2. **Phase Naming**
    - **Specification:** Phase A (pre-scan), Phase B (extract)
