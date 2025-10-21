@@ -19,11 +19,18 @@ from __future__ import annotations
 import json
 import logging
 import shutil
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 import typer
+
+from ..catalog.observability_instrumentation import (
+    emit_cli_command_begin,
+    emit_cli_command_error,
+    emit_cli_command_success,
+)
 
 # ============================================================================
 # SETUP (IMP)
@@ -39,7 +46,7 @@ def _format_output(data: dict | list | str, fmt: str = "table") -> str:
         if isinstance(data, str):
             return data
         return json.dumps(data, indent=2, default=str)
-    
+
     # Table format
     if isinstance(data, str):
         return data
@@ -53,15 +60,29 @@ def _format_output(data: dict | list | str, fmt: str = "table") -> str:
 
 @app.command()
 def migrate(
-    dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be applied without applying"),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Show what would be applied without applying"
+    ),
     verbose: bool = typer.Option(False, "-v", "--verbose", help="Verbose output"),
 ) -> None:
     """Apply pending DuckDB migrations."""
-    if dry_run:
-        typer.echo("DRY RUN: Would apply migrations to DuckDB catalog")
-        return
-    
-    typer.echo("Applying migrations... (implementation pending)")
+    emit_cli_command_begin("migrate", {"dry_run": dry_run, "verbose": verbose})
+    start_time = time.time()
+
+    try:
+        if dry_run:
+            typer.echo("DRY RUN: Would apply migrations to DuckDB catalog")
+            duration_ms = (time.time() - start_time) * 1000
+            emit_cli_command_success("migrate", duration_ms, {"status": "dry_run"})
+            return
+
+        typer.echo("Applying migrations... (implementation pending)")
+        duration_ms = (time.time() - start_time) * 1000
+        emit_cli_command_success("migrate", duration_ms, {"status": "pending"})
+    except Exception as e:
+        duration_ms = (time.time() - start_time) * 1000
+        emit_cli_command_error("migrate", duration_ms, e)
+        raise
 
 
 @app.command()
@@ -79,11 +100,11 @@ def latest(
         if not version:
             typer.echo("Error: --version required for 'set' action", err=True)
             raise typer.Exit(1)
-        
+
         if dry_run:
             typer.echo(f"DRY RUN: Would set latest to {version}")
             return
-        
+
         typer.echo(f"Setting latest to {version}... (implementation pending)")
     else:
         typer.echo(f"Error: Unknown action '{action}'. Use 'get' or 'set'", err=True)
@@ -161,16 +182,28 @@ def doctor(
     fmt: str = typer.Option("table", "--format", help="Output format: 'json' or 'table'"),
 ) -> None:
     """Reconcile DB↔FS inconsistencies."""
-    if dry_run:
-        typer.echo("DRY RUN: Would check for DB↔FS inconsistencies")
-        return
-    
-    data = {
-        "missing_files": 0,
-        "orphan_records": 0,
-        "status": "No inconsistencies found",
-    }
-    typer.echo(_format_output(data, fmt))
+    emit_cli_command_begin("doctor", {"fix": fix, "dry_run": dry_run})
+    start_time = time.time()
+
+    try:
+        if dry_run:
+            typer.echo("DRY RUN: Would check for DB↔FS inconsistencies")
+            duration_ms = (time.time() - start_time) * 1000
+            emit_cli_command_success("doctor", duration_ms, {"status": "dry_run"})
+            return
+
+        data = {
+            "missing_files": 0,
+            "orphan_records": 0,
+            "status": "No inconsistencies found",
+        }
+        typer.echo(_format_output(data, fmt))
+        duration_ms = (time.time() - start_time) * 1000
+        emit_cli_command_success("doctor", duration_ms, {"status": "success", "issues_found": 0})
+    except Exception as e:
+        duration_ms = (time.time() - start_time) * 1000
+        emit_cli_command_error("doctor", duration_ms, e)
+        raise
 
 
 @app.command()
@@ -180,16 +213,30 @@ def prune(
     fmt: str = typer.Option("table", "--format", help="Output format: 'json' or 'table'"),
 ) -> None:
     """Identify and optionally remove orphaned files."""
-    if not apply and not dry_run:
-        typer.echo("Error: Use --dry-run to preview or --apply to delete", err=True)
-        raise typer.Exit(1)
-    
-    data = {
-        "orphans_found": 0,
-        "mode": "dry_run" if dry_run else "apply",
-        "status": "No orphans found",
-    }
-    typer.echo(_format_output(data, fmt))
+    emit_cli_command_begin("prune", {"dry_run": dry_run, "apply": apply})
+    start_time = time.time()
+
+    try:
+        if not apply and not dry_run:
+            typer.echo("Error: Use --dry-run to preview or --apply to delete", err=True)
+            duration_ms = (time.time() - start_time) * 1000
+            emit_cli_command_error("prune", duration_ms, Exception("Invalid options"))
+            raise typer.Exit(1)
+
+        data = {
+            "orphans_found": 0,
+            "mode": "dry_run" if dry_run else "apply",
+            "status": "No orphans found",
+        }
+        typer.echo(_format_output(data, fmt))
+        duration_ms = (time.time() - start_time) * 1000
+        emit_cli_command_success("prune", duration_ms, {"status": "success", "orphans_found": 0})
+    except Exception as e:
+        if isinstance(e, typer.Exit):
+            raise
+        duration_ms = (time.time() - start_time) * 1000
+        emit_cli_command_error("prune", duration_ms, e)
+        raise
 
 
 @app.command()
@@ -208,4 +255,3 @@ def backup(
 
 if __name__ == "__main__":
     app()
-

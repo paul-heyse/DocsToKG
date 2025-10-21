@@ -27,12 +27,12 @@ from __future__ import annotations
 import contextlib
 import json
 import logging
+import time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Generator, Optional
 from uuid import uuid4
-import time
 
 try:  # pragma: no cover
     import duckdb
@@ -240,7 +240,7 @@ def extraction_boundary(
         extra_payload={},
     )
     start_time = time.time()
-    
+
     # Placeholder result; caller will update
     result = ExtractionBoundaryResult(
         artifact_id=artifact_id,
@@ -276,7 +276,7 @@ def extraction_boundary(
                 f"Extraction boundary: inserted {result.files_inserted} files "
                 f"for artifact {artifact_id}"
             )
-            
+
             # Emit observability success event
             duration_ms = (time.time() - start_time) * 1000
             emit_boundary_success(
@@ -295,7 +295,7 @@ def extraction_boundary(
     except duckdb.Error as exc:
         conn.rollback()
         logger.error(f"Extraction boundary failed: {exc}")
-        
+
         # Emit observability error event
         duration_ms = (time.time() - start_time) * 1000
         emit_boundary_error(
@@ -350,7 +350,7 @@ def validation_boundary(
         extra_payload={"file_id": file_id, "validator": validator},
     )
     start_time = time.time()
-    
+
     result = ValidationBoundaryResult(
         file_id=file_id,
         validator=validator,
@@ -387,7 +387,7 @@ def validation_boundary(
 
         conn.commit()
         logger.info(f"Validation boundary: recorded {validator}:{status} for {file_id}")
-        
+
         # Emit observability success event
         duration_ms = (time.time() - start_time) * 1000
         emit_boundary_success(
@@ -401,7 +401,7 @@ def validation_boundary(
     except duckdb.Error as exc:
         conn.rollback()
         logger.error(f"Validation boundary failed: {exc}")
-        
+
         # Emit observability error event
         duration_ms = (time.time() - start_time) * 1000
         emit_boundary_error(
@@ -455,7 +455,7 @@ def set_latest_boundary(
         extra_payload={},
     )
     start_time = time.time()
-    
+
     result = SetLatestBoundaryResult(
         version_id=version_id,
         latest_json_path=latest_json_path,
@@ -496,7 +496,7 @@ def set_latest_boundary(
 
         conn.commit()
         logger.info(f"Set latest boundary: marked {version_id} as latest")
-        
+
         # Emit observability success event
         duration_ms = (time.time() - start_time) * 1000
         emit_boundary_success(
@@ -513,7 +513,7 @@ def set_latest_boundary(
     except duckdb.Error as exc:
         conn.rollback()
         logger.error(f"Set latest boundary failed: {exc}")
-        
+
         # Emit observability error event
         duration_ms = (time.time() - start_time) * 1000
         emit_boundary_error(

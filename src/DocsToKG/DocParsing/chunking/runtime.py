@@ -133,6 +133,13 @@ Key Features:
 - Token-aware chunk merging that respects structural boundaries and image metadata.
 - Shared CLI configuration via :func:`DocsToKG.DocParsing.doctags.add_data_root_option`.
 - Manifest logging that records chunk counts, parsing engines, and durations.
+- Atomic writes using JsonlWriter for concurrent-safe JSONL appending.
+- Deterministic chunk IDs based on content hash for idempotent processing.
+
+Concurrency & Durability:
+- Chunk JSONL written atomically via JsonlWriter for concurrent-safe appending.
+- Manifest entries written atomically to prevent corruption under parallel loads.
+- Process-safe locking ensures reliable multi-worker pipelines.
 
 Dependencies:
 - docling_core: Provides chunkers, serializers, and DocTags parsing.

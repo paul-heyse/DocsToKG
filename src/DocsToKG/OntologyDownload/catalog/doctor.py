@@ -24,11 +24,11 @@ Responsibilities:
 from __future__ import annotations
 
 import logging
-import time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+import time
 
 try:  # pragma: no cover
     import duckdb
@@ -38,9 +38,9 @@ except ImportError as exc:  # pragma: no cover
     ) from exc
 
 from .observability_instrumentation import (
+    emit_doctor_issue_found,
     emit_doctor_begin,
     emit_doctor_complete,
-    emit_doctor_issue_found,
 )
 
 logger = logging.getLogger(__name__)
@@ -299,6 +299,10 @@ def generate_doctor_report(
     Returns:
         DoctorReport with full reconciliation details
     """
+    # Emit observability begin event
+    emit_doctor_begin()
+    start_time = time.time()
+
     # Get DB counts
     artifact_count_result = conn.execute("SELECT COUNT(*) FROM artifacts").fetchone()
     file_count_result = conn.execute("SELECT COUNT(*) FROM extracted_files").fetchone()
@@ -330,4 +334,14 @@ def generate_doctor_report(
     )
 
     logger.info(f"Doctor report: {len(issues)} issues ({critical} critical, {warnings} warnings)")
+
+    # Emit observability complete event
+    duration_ms = (time.time() - start_time) * 1000
+    emit_doctor_complete(
+        issues_found=len(issues),
+        critical_issues=critical,
+        warnings=warnings,
+        duration_ms=duration_ms,
+    )
+
     return report

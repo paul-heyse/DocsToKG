@@ -3,15 +3,21 @@ Parquet Writers for DocParsing Artifacts
 
 Encapsulates write logic for Chunks and Vectors (Dense, Sparse, Lexical) with:
 - Schema validation and enforcement
-- Atomic writes (temp → fsync → rename)
+- Atomic writes (temp → fsync → rename) for safe concurrent access
+  * Write to temporary file in same directory
+  * Fsync to ensure durability
+  * Atomic rename to final destination (no explicit locking needed; rename is atomic at OS level)
+  * Concurrent readers are safe via temp-file pattern
 - Parquet footer metadata for provenance
 - Row-group sizing and compression tuning
 - Manifest integration helpers
 
 Key Classes:
-- `ParquetWriter`: Abstract base with common patterns.
+- `ParquetWriter`: Abstract base with common patterns and atomic write semantics.
 - `ChunksParquetWriter`: Writes Chunks datasets.
 - `DenseVectorWriter`, `SparseVectorWriter`, `LexicalVectorWriter`: Vector writers.
+
+All writes are safe for concurrent access and preserve data durability.
 """
 
 from __future__ import annotations

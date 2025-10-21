@@ -1,9 +1,21 @@
 """Unified manifest sink for DocParsing stages.
 
 This module provides a protocol and implementation for writing stage manifest
-entries (success, skip, failure) with atomic, lock-based JSONL appending.
-All stages use this abstraction to ensure consistent base fields and
-reliable concurrent writes.
+entries (success, skip, failure) with atomic, lock-aware JSONL appending using
+the lock-aware JsonlWriter component from io.py.
+
+All stages use this abstraction to ensure consistent base fields and reliable
+concurrent writes even when multiple processes report progress simultaneously.
+The implementation leverages FileLock and atomic appends to prevent manifest
+corruption during concurrent access, making it safe for distributed pipelines.
+
+Key components:
+- ManifestSink: Protocol defining the manifest writing interface
+- JsonlManifestSink: Implementation using atomic JSONL appends
+- ManifestEntry: Dataclass for individual entries
+
+All writes are atomic and process-safe, suitable for distributed pipelines
+where multiple workers may write concurrently.
 """
 
 from __future__ import annotations

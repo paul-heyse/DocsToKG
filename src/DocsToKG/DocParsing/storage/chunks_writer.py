@@ -3,25 +3,19 @@ Atomic Parquet Writer for Chunks
 
 Encapsulates write logic for Chunks Parquet datasets with:
 - Schema validation and enforcement
-- Atomic writes (temp → fsync → rename)
+- Atomic writes (temp → fsync → rename) for safe concurrent access
+  * Write to temporary file in same directory
+  * Fsync to ensure durability
+  * Atomic rename to final destination (no explicit locking needed; rename is atomic at OS level)
+  * Concurrent readers are safe via temp-file pattern
 - Batched row accumulation to control memory
 - Parquet footer metadata for provenance
-- Deterministic span hashing
-- Manifest integration helpers
+- Deterministic span hashing for reproducible chunks
 
 Key Class:
 - `ParquetChunksWriter`: Writes Chunks datasets with optional rolling.
 
-=== NAVMAP v1 ===
-{
-  "module": "DocsToKG.DocParsing.storage.chunks_writer",
-  "purpose": "Atomic Parquet writer for Chunks datasets",
-  "sections": [
-    {"id": "types", "name": "Types", "anchor": "types", "kind": "section"},
-    {"id": "chunks-parquet-writer", "name": "ParquetChunksWriter", "anchor": "class-chunks-parquet-writer", "kind": "class"}
-  ]
-}
-=== END NAVMAP ===
+All writes are safe for concurrent access and preserve data durability.
 """
 
 from __future__ import annotations

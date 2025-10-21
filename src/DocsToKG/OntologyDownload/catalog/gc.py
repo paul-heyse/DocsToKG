@@ -23,6 +23,7 @@ Responsibilities:
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -32,6 +33,12 @@ try:  # pragma: no cover
     import duckdb
 except ImportError as exc:  # pragma: no cover
     raise ImportError("duckdb is required for catalog GC. Ensure .venv is initialized.") from exc
+
+from .observability_instrumentation import (
+    emit_prune_begin,
+    emit_prune_deleted,
+    emit_prune_orphan_found,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -315,8 +322,8 @@ def prune_keep_latest_n(
     Returns:
         PruneResult
     """
-    import time
-
+    # Emit observability begin event
+    emit_prune_begin(dry_run=dry_run)
     start_ms = time.time() * 1000
 
     # Find all versions (optionally filtered by service)
@@ -363,6 +370,13 @@ def prune_keep_latest_n(
         conn.begin()
 
         for version_id in delete_ids:
+            # Emit observability orphan_found event for each version being deleted
+            emit_prune_orphan_found(
+                item_type="version",
+                item_id=version_id,
+                size_bytes=0,
+            )
+
             # Delete latest pointer
             conn.execute(
                 "DELETE FROM latest_pointer WHERE version_id = ?",
@@ -403,6 +417,13 @@ def prune_keep_latest_n(
 
         duration_ms = (time.time() * 1000) - start_ms
         logger.info(f"Pruned {items_identified} versions, freed {bytes_to_free} bytes")
+
+        # Emit observability deleted event
+        emit_prune_deleted(
+            items_deleted=items_identified,
+            bytes_freed=bytes_to_free,
+        )
+
         return PruneResult(
             items_identified=items_identified,
             items_deleted=items_identified,
@@ -488,6 +509,10 @@ def garbage_collect(
     Returns:
         Tuple of (PruneResult, VacuumResult)
     """
+    # Emit observability begin event
+    emit_prune_begin(dry_run=dry_run)
+    gc_start_time = time.time()
+
     # Prune old versions
     prune_result = prune_keep_latest_n(conn, keep_count=keep_latest_n, dry_run=dry_run)
 
@@ -506,6 +531,13 @@ def garbage_collect(
     logger.info(
         f"GC complete: {prune_result.items_deleted} versions pruned, "
         f"{prune_result.bytes_freed} bytes freed"
+    )
+
+    # Emit observability deleted event with combined results
+    gc_duration_ms = (time.time() - gc_start_time) * 1000
+    emit_prune_deleted(
+        items_deleted=prune_result.items_deleted,
+        bytes_freed=prune_result.bytes_freed,
     )
 
     return prune_result, vacuum_result
