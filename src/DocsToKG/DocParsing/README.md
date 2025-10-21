@@ -7,6 +7,7 @@ last_updated: 2025-02-15
 > _Metadata backlog_: owning_team, stability, versioning, codeowners, related_adrs, slos, data_handling, and sbom will be populated in a future revision.
 
 ## Table of Contents
+
 - [DocsToKG • DocParsing](#docstokg--docparsing)
   - [Prerequisites & optional dependencies](#prerequisites--optional-dependencies)
   - [Quickstart](#quickstart)
@@ -35,6 +36,7 @@ Scope boundary: Handles conversion, chunking, embedding, and telemetry; does not
 ---
 
 ## Prerequisites & optional dependencies
+
 - **Runtime**: Linux, Python 3.13 or newer. GPU strongly recommended for PDF DocTags (vLLM) and Qwen embeddings; CPU-only execution is supported with lower throughput.
 - **Installation extras**:
   - Core pipeline: `pip install "DocsToKG[docparse]"`.
@@ -55,7 +57,9 @@ Scope boundary: Handles conversion, chunking, embedding, and telemetry; does not
 - **Environment overrides**: `DOCSTOKG_*` variables configure stage-specific defaults (`DOCSTOKG_DOCTAGS_INPUT`, `DOCSTOKG_CHUNK_MIN_TOKENS`, `DOCSTOKG_EMBED_QWEN_DIR`, etc.); see “Configuration” below for details.
 
 ## Quickstart
+>
 > Bootstrap environment, run DocTags → chunking → embedding on a sample corpus end to end.
+
 ```bash
 ./scripts/bootstrap_env.sh
 direnv allow                                     # or source .venv/bin/activate
@@ -85,6 +89,7 @@ direnv exec . python -m DocsToKG.DocParsing.core.cli embed \
 ```
 
 ## Common commands
+
 ```bash
 # Table stakes CLI flows
 direnv exec . python -m DocsToKG.DocParsing.core.cli doctags --help
@@ -111,6 +116,7 @@ direnv exec . python -m DocsToKG.DocParsing.core.cli plan-diff --lock-output bas
 > run can be retried after preparing the inputs.
 
 ## Core capabilities
+
 - **Pipeline orchestration** – `core.cli` exposes subcommands (`doctags`, `chunk`, `embed`, `plan`, `manifest`, `token-profiles`, `all`) that share staging, logging, and resume semantics while honouring advisory locks to prevent duplicate work.
 - **DocTags conversion** – `doctags.py` manages Docling-powered HTML/PDF conversion, vLLM lifecycle (port discovery, GPU sizing, resume/force switches), and manifest telemetry (`docparse.doctags-*.manifest.jsonl`).
 - **Chunking heuristics** – `chunking.runtime` performs hybrid structural + token-aware chunk coalescence, span hashing, and chunk UUID generation that remains consistent across reruns.
@@ -120,6 +126,7 @@ direnv exec . python -m DocsToKG.DocParsing.core.cli plan-diff --lock-output bas
 - **Developer tooling** – `core.manifest`, `core.token_profiles`, and `testing` harnesses surface manifest diffs, tokenizer statistics, and dependency fakes for reliable local and CI execution.
 
 ### CLI command matrix
+>
 > `--verify-hash` is available on stage-level commands to recompute input hashes
 > before skipping resumed work. Enable it when storage drift is possible; expect
 > additional reads against the source directories (and object stores) compared to
@@ -137,6 +144,7 @@ direnv exec . python -m DocsToKG.DocParsing.core.cli plan-diff --lock-output bas
 | `docparse all` | Orchestrate DocTags → chunk → embed + optional plan | `--resume`, `--plan-only`, `--dry-run`, `--force`, `--log-level` |
 
 ### Planner previews
+
 - `--plan-only` mode reports total document counts per bucket and shows up to
   five representative IDs for each category (`process`, `skip`, `validate`,
   etc.). Larger plans keep the counts accurate while truncating previews with a
@@ -144,6 +152,7 @@ direnv exec . python -m DocsToKG.DocParsing.core.cli plan-diff --lock-output bas
   of identifiers.
 
 ## Folder map
+
 - `cli_errors.py` – Structured CLI exception types surfaced by `core.cli`.
 - `config.py` / `config_loaders.py` – Stage configuration dataclasses plus YAML/JSON/TOML loaders that hydrate them.
 - `core/` – CLI entry points, planning helpers, manifest utilities, and shared directory discovery (`env.py`).
@@ -159,6 +168,7 @@ direnv exec . python -m DocsToKG.DocParsing.core.cli plan-diff --lock-output bas
 - `testing/` – Test doubles (Docling stubs, fake StageTelemetry sinks) and fixtures used across pytest suites.
 
 ## System overview
+
 ```mermaid
 flowchart LR
   A[Raw documents (PDF/HTML/ZIP)] --> B[DocTags conversion]
@@ -172,6 +182,7 @@ flowchart LR
   C:::boundary
   D:::boundary
 ```
+
 ```mermaid
 sequenceDiagram
   participant U as Operator/Agent
@@ -192,6 +203,7 @@ sequenceDiagram
 ```
 
 ## Entry points & contracts
+
 - Entry points: `python -m DocsToKG.DocParsing.core.cli` subcommands (`doctags`, `chunk`, `embed`, `plan`, `manifest`, `token-profiles`, `all`), programmatic APIs in `core`, `chunking`, and `embedding`.
 - Contracts/invariants:
   - DocTags → chunk → embedding outputs mirror directory hierarchy and use consistent doc IDs.
@@ -199,6 +211,7 @@ sequenceDiagram
   - Chunk and embedding schemas versioned via `formats.validate_schema_version`.
 
 ## Configuration
+
 - Config sources: environment (`DOCSTOKG_DATA_ROOT`, `DOCSTOKG_MODEL_ROOT`, optional `DOCSTOKG_SPLADE_DEVICE`, `DOCSTOKG_QWEN_DEVICE`, etc.), YAML/TOML via `config_loaders`.
 - CLI flags: shared `--resume`, `--force`, `--log-level`; stage-specific `--min-tokens`, `--max-tokens`, `--shard-count/index`, `--batch-size-*`, `--tokenizer-model`, etc. (note: vector format is Parquet only, no flag) PDF DocTags runs additionally accept `--vllm-wait-timeout` (mirrored by `docparse all`) so operators can extend the readiness window for vLLM backends.
 - Environment overrides:
@@ -211,6 +224,7 @@ sequenceDiagram
 - Validate configuration: run `python -m DocsToKG.DocParsing.core.cli chunk --validate-only` or `... embed --validate-only` before production runs.
 
 ### Content hashing defaults
+
 - **Current default:** `compute_content_hash`, `compute_chunk_uuid`, and `resolve_hash_algorithm()` use SHA-256 by default. SHA-1 remains available via `DOCSTOKG_HASH_ALG=sha1` or explicit function arguments for legacy resume scenarios.
 - **Operational impact:** Switching digest algorithms changes manifest `input_hash` values and chunk UUIDs. Set `DOCSTOKG_HASH_ALG=sha1` temporarily when resuming runs generated with the previous default, then revert to SHA-256 once caught up.
 - **Resume validation:** Pass `--verify-hash` with `--resume` on DocTags, chunk, or embed commands when artifacts may have been
@@ -219,10 +233,12 @@ sequenceDiagram
   mounts) and slowing cold cache runs.
 
 ## Data contracts & schemas
+
 - Schemas: Pydantic models in `formats.ChunkRow` / `formats.VectorRow` and manifest payloads coordinated through `telemetry.ManifestEntry`.
 - Manifests: append-only JSONL files at `Data/Manifests/docparse.*.manifest.jsonl` for each stage (`doctags`, `chunk`, `embeddings`) with companion attempt logs at `Data/Manifests/docparse.*.attempts.jsonl` resolved by [`io.resolve_manifest_path`](io.py) / [`io.resolve_attempts_path`](io.py).
 - Status taxonomy: all manifest and attempt entries record `status="success|skip|failure"` (no `error` state). Attempts include timing, byte counts, and optional reasons via [`telemetry.Attempt`](telemetry.py); manifests merge metadata from [`telemetry.StageTelemetry`](telemetry.py) and enforce the same status enum.
 - Example manifest row (with metadata merged by `StageTelemetry.write_manifest_entry`):
+
   ```json
   {
     "run_id": "2025-10-19T09:30:12Z",
@@ -239,15 +255,18 @@ sequenceDiagram
     "output_path": "Data/ChunkedDocTagFiles/doc-001.chunk.jsonl"
   }
   ```
+
 - Resume contract: [`core.manifest.ResumeController`](core/manifest.py) compares `status` and `input_hash` to decide whether to skip work, so metadata fields supplied by `StageTelemetry` (for example, `vector_format` in embedding runs) must stay in sync with their corresponding writers.
 - `telemetry.StageTelemetry` writes through a lock-aware writer (default `DEFAULT_JSONL_WRITER` from `io.py`) before appending JSON lines, guaranteeing atomic writes even with concurrent processes.
 
 ## Interactions with other packages
+
 - Upstream: consumes raw documents, optional DocTags produced by external systems.
 - Downstream: supplies chunked text and embeddings to `HybridSearch`, `OntologyDownload` is independent.
 - Guarantees: stable doc IDs across stages; chunk/embedding outputs designed for direct ingestion by hybrid search pipeline.
 
 ## Observability
+
 - Logs: `logging.py` emits structured records (JSON + console) that include `stage`, `doc_id`, elapsed durations, and correlation IDs. Output paths default to stdout plus `${DOCSTOKG_DATA_ROOT}/Logs/docparse-*.jsonl`; override using CLI `--log-level` or `DOCSTOKG_LOG_DIR`.
 - Telemetry: `telemetry.TelemetrySink` writes attempt + manifest JSON lines (`docparse.*.attempts.jsonl` / `docparse.*.manifest.jsonl`) through a shared `FileLock` writer that wraps `jsonl_append_iter(..., atomic=True)`, ensuring atomic appends even with concurrent workers. Manifest rows now capture `vector_format` for success, skip, and validate-only entries so parquet adoption can be audited downstream.
 - Metrics: `logging.telemetry_scope` and `telemetry.StageTelemetry` expose counters and histograms suitable for ingestion by dashboard jobs (see `tests/docparsing/test_chunk_manifest_resume.py` for usage).
@@ -255,6 +274,7 @@ sequenceDiagram
 - Health checks: prefer `docparse chunk --validate-only` / `docparse embed --validate-only` when validating environments—these commands read existing JSONL artifacts without mutating outputs.
 
 ## Security & data handling
+
 - ASVS level: L2 baseline for pipelines that ingest untrusted documents and invoke GPU services.
 - Threats:
   - Tampering: ensure DocTags/Chunks/Embeddings stored in controlled directories; keep manifests append-only.
@@ -264,18 +284,21 @@ sequenceDiagram
 - Data classification: `restricted-pii`; raw corpora and derived embeddings may include sensitive personal or proprietary data—scope storage and access controls accordingly.
 
 ## Development tasks
+
 ```bash
 direnv exec . ruff check src/DocsToKG/DocParsing tests/docparsing
 direnv exec . mypy src/DocsToKG/DocParsing
 direnv exec . pytest tests/docparsing -q
 direnv exec . pytest tests/docparsing/test_synthetic_benchmark.py -q  # optional perf check
 ```
+
 - Format / lint: `direnv exec . ruff format src/DocsToKG/DocParsing tests/docparsing`.
 - Fixtures: `tests/docparsing/fakes` hosts Docling and vLLM stubs for offline testing (Pydantic now uses the real package); sample corpora live under `tests/data/docparsing`.
 - Schema helpers: import `ChunkRow`, `VectorRow`, and validators from `DocsToKG.DocParsing.formats`. `DocsToKG.DocParsing.schemas` remains as a warning-emitting shim until DocsToKG 0.3.0.
 - Use dependency stubs in tests (`tests.docparsing.stubs`) to run without GPUs.
 
 ## Agent guardrails
+
 - Do:
   - Extend chunking/embedding via interfaces and keep manifests consistent.
   - Document new schema fields and migrate manifest validators.
@@ -288,6 +311,7 @@ direnv exec . pytest tests/docparsing/test_synthetic_benchmark.py -q  # optional
   - Terminating vLLM/Qwen worker processes manually can leave stale lock files; use CLI cancel/resume flags to let the manifest writer release resources cleanly.
 
 ## FAQ
+
 - Q: How do I resume after a failure?
   A: Use `--resume` on the affected stage; manifests mark completed docs. Add `--verify-hash` when inputs may have changed while
   the job was paused so the pipeline re-hashes files before skipping. Combine with `--force` (or per-doc overrides) for targeted

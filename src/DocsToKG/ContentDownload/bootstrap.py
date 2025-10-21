@@ -200,6 +200,7 @@ def run_from_config(
             pipeline=pipeline,
             artifacts=artifacts,
             telemetry=telemetry,
+            run_id=run_id,
             dry_run=dry_run,
         )
 
@@ -212,7 +213,8 @@ def run_from_config(
 
     finally:
         # Cleanup telemetry
-        telemetry.close()
+        if hasattr(telemetry, "close"):
+            telemetry.close()
 
 
 def _build_telemetry(paths: Optional[Mapping[str, Path]], run_id: str) -> RunTelemetry:
@@ -237,7 +239,7 @@ def _build_telemetry(paths: Optional[Mapping[str, Path]], run_id: str) -> RunTel
     else:
         sink = MultiSink(sinks)
 
-    return RunTelemetry(sink=sink, run_id=run_id)
+    return RunTelemetry(sink=sink)
 
 
 def _build_client_map(
@@ -273,6 +275,7 @@ def _process_artifacts(
     pipeline: ResolverPipeline,
     artifacts: Optional[Iterator[Any]],
     telemetry: RunTelemetry,
+    run_id: str,
     dry_run: bool,
 ) -> RunResult:
     """Process artifact iterator through pipeline."""
@@ -284,7 +287,7 @@ def _process_artifacts(
     if not artifacts:
         LOGGER.info("No artifacts provided; validation complete")
         return RunResult(
-            run_id=telemetry.run_id,
+            run_id=run_id,
             success_count=0,
             skip_count=0,
             error_count=0,
@@ -326,7 +329,7 @@ def _process_artifacts(
             total_attempts += 1
 
     return RunResult(
-        run_id=telemetry.run_id,
+        run_id=run_id,
         success_count=success_count,
         skip_count=skip_count,
         error_count=error_count,

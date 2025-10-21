@@ -46,8 +46,6 @@ from typing import Any, Optional, Sequence
 import httpx
 import tenacity
 
-from DocsToKG.ContentDownload.telemetry_helpers import emit_http_event
-
 LOGGER = logging.getLogger(__name__)
 
 
@@ -280,19 +278,9 @@ class PerResolverHttpClient:
         """Internal request handler with rate limit and retry."""
         start_time = time.monotonic()
 
-        # Acquire rate limit token (emits sleep telemetry if needed)
+        # Acquire rate limit token
         try:
-            sleep_s = self.rate_limiter.acquire(tokens=1.0, timeout_s=30.0)
-            if sleep_s > 0:
-                emit_http_event(
-                    self.telemetry,
-                    resolver=self.resolver_name,
-                    url=url,
-                    verb=method,
-                    status="retry",
-                    reason="backoff",
-                    elapsed_ms=int(sleep_s * 1000),
-                )
+            self.rate_limiter.acquire(tokens=1.0, timeout_s=30.0)
         except TimeoutError as e:
             LOGGER.error(f"[{self.resolver_name}] Rate limiter timeout: {e}")
             raise
@@ -302,30 +290,18 @@ class PerResolverHttpClient:
 
         # Execute with retries
         attempt_count = 0
-        last_response = None
 
         while True:
             attempt_count += 1
 
             try:
-                resp = self.session.request(method, url, timeout=req_timeout, **kwargs)
+                resp = self.session.request(
+                    method, url, timeout=req_timeout, **kwargs
+                )
 
                 # Check if we should retry this response
                 if resp.status_code in self.config.retry_statuses:
                     if attempt_count < self.config.max_attempts:
-                        last_response = resp
-                        # Emit retry telemetry
-                        emit_http_event(
-                            self.telemetry,
-                            resolver=self.resolver_name,
-                            url=url,
-                            verb=method,
-                            status="retry",
-                            reason="retry-after" if resp.status_code == 429 else "backoff",
-                            http_status=resp.status_code,
-                            elapsed_ms=int((time.monotonic() - start_time) * 1000),
-                        )
-
                         # Sleep before retry
                         retry_after_hdr = resp.headers.get("Retry-After")
                         if retry_after_hdr:
@@ -334,11 +310,15 @@ class PerResolverHttpClient:
                                 sleep_s = min(sleep_s, self.config.retry_after_cap_s)
                             except ValueError:
                                 sleep_s = int(
-                                    self.config.base_delay_ms * (2 ** (attempt_count - 1)) / 1000.0
+                                    self.config.base_delay_ms
+                                    * (2 ** (attempt_count - 1))
+                                    / 1000.0
                                 )
                         else:
                             sleep_s = int(
-                                self.config.base_delay_ms * (2 ** (attempt_count - 1)) / 1000.0
+                                self.config.base_delay_ms
+                                * (2 ** (attempt_count - 1))
+                                / 1000.0
                             )
 
                         sleep_s = min(sleep_s, self.config.max_delay_ms // 1000)
@@ -350,24 +330,14 @@ class PerResolverHttpClient:
 
             except (httpx.HTTPError, OSError) as e:
                 if attempt_count < self.config.max_attempts:
-                    last_response = None
                     LOGGER.debug(
                         f"[{self.resolver_name}] Network error (attempt {attempt_count}): {e}"
                     )
 
-                    # Emit retry telemetry
-                    emit_http_event(
-                        self.telemetry,
-                        resolver=self.resolver_name,
-                        url=url,
-                        verb=method,
-                        status="retry",
-                        reason="conn-error",
-                        elapsed_ms=int((time.monotonic() - start_time) * 1000),
-                    )
-
                     # Sleep before retry
-                    sleep_s = int(self.config.base_delay_ms * (2 ** (attempt_count - 1)) / 1000.0)
+                    sleep_s = int(
+                        self.config.base_delay_ms * (2 ** (attempt_count - 1)) / 1000.0
+                    )
                     sleep_s = min(sleep_s, self.config.max_delay_ms // 1000)
                     time.sleep(sleep_s)
                     continue
