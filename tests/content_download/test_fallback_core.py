@@ -134,9 +134,7 @@ class TestFallbackPlan:
                 TierPlan(name="tier2", parallel=3, sources=["arxiv"]),
             ],
             policies={
-                "unpaywall": AttemptPolicy(
-                    name="unpaywall", timeout_ms=5000, retries_max=3
-                ),
+                "unpaywall": AttemptPolicy(name="unpaywall", timeout_ms=5000, retries_max=3),
                 "arxiv": AttemptPolicy(name="arxiv", timeout_ms=3000, retries_max=3),
             },
             gates={},
@@ -192,12 +190,8 @@ class TestFallbackOrchestrator:
                 )
             ],
             policies={
-                "source1": AttemptPolicy(
-                    name="source1", timeout_ms=2000, retries_max=3
-                ),
-                "source2": AttemptPolicy(
-                    name="source2", timeout_ms=2000, retries_max=3
-                ),
+                "source1": AttemptPolicy(name="source1", timeout_ms=2000, retries_max=3),
+                "source2": AttemptPolicy(name="source2", timeout_ms=2000, retries_max=3),
             },
         )
 
@@ -251,9 +245,8 @@ class TestFallbackOrchestrator:
 
     def test_resolution_with_success(self, simple_plan):
         """Test resolution finds success."""
-        def mock_success_adapter(
-            policy: AttemptPolicy, context: Dict[str, Any]
-        ) -> AttemptResult:
+
+        def mock_success_adapter(policy: AttemptPolicy, context: Dict[str, Any]) -> AttemptResult:
             return AttemptResult(
                 outcome="success",
                 url="https://example.org/paper.pdf",
@@ -274,9 +267,7 @@ class TestFallbackOrchestrator:
         """Test concurrent execution within tier."""
         called_threads = []
 
-        def recording_adapter(
-            policy: AttemptPolicy, context: Dict[str, Any]
-        ) -> AttemptResult:
+        def recording_adapter(policy: AttemptPolicy, context: Dict[str, Any]) -> AttemptResult:
             called_threads.append(threading.current_thread().ident)
             return AttemptResult(outcome="error", reason="test")
 
@@ -307,9 +298,7 @@ class TestFallbackOrchestrator:
             },
         )
 
-        def slow_adapter(
-            policy: AttemptPolicy, context: Dict[str, Any]
-        ) -> AttemptResult:
+        def slow_adapter(policy: AttemptPolicy, context: Dict[str, Any]) -> AttemptResult:
             time.sleep(0.2)  # Sleep less than budget
             return AttemptResult(outcome="error", reason="test")
 
@@ -329,7 +318,7 @@ class TestResolutionOutcomes:
         """Test all valid outcome strings."""
         # Success requires URL
         AttemptResult(outcome="success", url="https://example.org/paper.pdf")
-        
+
         # Other outcomes don't
         for outcome in ("no_pdf", "nonretryable", "retryable", "timeout", "skipped", "error"):
             AttemptResult(outcome=outcome)  # type: ignore[arg-type]

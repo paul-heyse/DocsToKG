@@ -131,9 +131,7 @@ class FallbackOrchestrator:
             )
 
         # All tiers exhausted
-        self.logger.warning(
-            f"All tiers exhausted, no PDF found (attempts={self._attempt_count})"
-        )
+        self.logger.warning(f"All tiers exhausted, no PDF found (attempts={self._attempt_count})")
         return AttemptResult(
             outcome="error",
             reason="all_tiers_exhausted",
@@ -171,9 +169,7 @@ class FallbackOrchestrator:
             # Health gate check
             gate_result = self._health_gate(source_name, context)
             if gate_result is not None:
-                self.logger.debug(
-                    f"Source '{source_name}' skipped: {gate_result.reason}"
-                )
+                self.logger.debug(f"Source '{source_name}' skipped: {gate_result.reason}")
                 self._emit_telemetry(tier.name, gate_result, context)
                 self._attempt_count += 1
                 continue
@@ -193,9 +189,7 @@ class FallbackOrchestrator:
             )
 
         # Parallel execution
-        with ThreadPoolExecutor(
-            max_workers=min(tier.parallel, len(available_sources))
-        ) as executor:
+        with ThreadPoolExecutor(max_workers=min(tier.parallel, len(available_sources))) as executor:
             futures = {}
             for source_name in available_sources:
                 if self._is_budget_exhausted():
@@ -240,9 +234,7 @@ class FallbackOrchestrator:
             meta={"tier": tier.name, "sources_tried": len(available_sources)},
         )
 
-    def _health_gate(
-        self, source_name: str, context: Dict[str, Any]
-    ) -> Optional[AttemptResult]:
+    def _health_gate(self, source_name: str, context: Dict[str, Any]) -> Optional[AttemptResult]:
         """Check health gate for a source.
 
         Evaluates:
@@ -324,16 +316,11 @@ class FallbackOrchestrator:
         """
         with self._budget_lock:
             # Attempt budget
-            if (
-                self._attempt_count
-                >= self.plan.budgets.get("total_attempts", float("inf"))
-            ):
+            if self._attempt_count >= self.plan.budgets.get("total_attempts", float("inf")):
                 return True
 
             # Time budget
-            if self._elapsed_ms() >= self.plan.budgets.get(
-                "total_timeout_ms", float("inf")
-            ):
+            if self._elapsed_ms() >= self.plan.budgets.get("total_timeout_ms", float("inf")):
                 return True
 
         return False
