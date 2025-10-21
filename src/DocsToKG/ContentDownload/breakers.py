@@ -512,10 +512,10 @@ class BreakerRegistry:
     ) -> None:
         """
         Safely update the policy for a host by rebuilding its circuit breaker.
-        
+
         Called by auto-tuning to apply recommendations while preserving cooldown state.
         All parameters are optional; only specified values are updated.
-        
+
         Parameters
         ----------
         host : str
@@ -530,7 +530,7 @@ class BreakerRegistry:
             New trial_calls for metadata role. If None, no change.
         trial_calls_artifact : Optional[int]
             New trial_calls for artifact role. If None, no change.
-        
+
         Raises
         ------
         ValueError
@@ -539,19 +539,19 @@ class BreakerRegistry:
         from DocsToKG.ContentDownload.breakers_loader import (
             _normalize_host_key,
         )  # Deferred to avoid circular
-        
+
         host_key = _normalize_host_key(host)
-        
+
         with self._lock:
             # Fetch current policy
             base = self._policy_for_host(host_key)
             if base is None:
                 raise ValueError(f"Unknown host: {host_key}")
-            
+
             # Build new policy with specified updates
             new_fail_max = fail_max if fail_max is not None else base.fail_max
             new_reset = reset_timeout_s if reset_timeout_s is not None else base.reset_timeout_s
-            
+
             # Update roles if specified
             new_roles = dict(base.roles) if base.roles else {}
             if trial_calls_metadata is not None:
@@ -570,7 +570,7 @@ class BreakerRegistry:
                     success_threshold=success_threshold or artifact_pol.success_threshold,
                     trial_calls=trial_calls_artifact,
                 )
-            
+
             # Create new policy
             new_policy = BreakerPolicy(
                 fail_max=new_fail_max,
@@ -580,28 +580,26 @@ class BreakerRegistry:
                 half_open=base.half_open,
                 roles=new_roles or base.roles,
             )
-            
+
             # Update config (in-memory only; not persisted to YAML)
             if host_key in self.config.hosts:
                 self.config.hosts[host_key] = new_policy
             else:
                 # Host was using defaults; add override
                 self.config.hosts[host_key] = new_policy
-            
+
             # Preserve cooldown, rebuild breaker with new policy
             old_cb = self._host_breakers.get(host_key)
             old_cooldown = self.cooldowns.get_until(host_key) if old_cb else None
-            
+
             # Create new breaker with updated policy
             del self._host_breakers[host_key]  # Remove old
             new_cb = self._get_or_create_host_breaker(host_key)  # Build new
-            
+
             # Restore cooldown if there was one
             if old_cooldown:
                 self.cooldowns.set_until(
-                    host_key,
-                    old_cooldown,
-                    reason="auto-tune:preserve-cooldown"
+                    host_key, old_cooldown, reason="auto-tune:preserve-cooldown"
                 )
 
     # ── Internals ─────────────────────────────────────────────────────────────

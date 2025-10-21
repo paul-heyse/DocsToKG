@@ -172,7 +172,7 @@ class BreakerAutoTuner:
         M = advisor.read_metrics()
         A = advisor.advise(M)
         plans: list[AutoTunePlan] = []
-        
+
         for host, adv in A.items():
             changes = []
             try:
@@ -180,66 +180,61 @@ class BreakerAutoTuner:
                 if adv.suggest_fail_max is not None:
                     self._br.update_host_policy(
                         host,
-                        fail_max=self._clamp(
-                            adv.suggest_fail_max,
-                            2, 10
-                        ) if self._clamp else adv.suggest_fail_max
+                        fail_max=self._clamp(adv.suggest_fail_max, 2, 10)
+                        if self._clamp
+                        else adv.suggest_fail_max,
                     )
                     changes.append(f"fail_max → {adv.suggest_fail_max}")
-                
+
                 if adv.suggest_reset_timeout_s is not None:
                     self._br.update_host_policy(
                         host,
-                        reset_timeout_s=self._clamp(
-                            adv.suggest_reset_timeout_s,
-                            15, 600
-                        ) if self._clamp else adv.suggest_reset_timeout_s
+                        reset_timeout_s=self._clamp(adv.suggest_reset_timeout_s, 15, 600)
+                        if self._clamp
+                        else adv.suggest_reset_timeout_s,
                     )
                     changes.append(f"reset_timeout_s → {adv.suggest_reset_timeout_s}")
-                
+
                 if adv.suggest_success_threshold is not None:
                     self._br.update_host_policy(
                         host,
-                        success_threshold=self._clamp(
-                            adv.suggest_success_threshold,
-                            1, 3
-                        ) if self._clamp else adv.suggest_success_threshold
+                        success_threshold=self._clamp(adv.suggest_success_threshold, 1, 3)
+                        if self._clamp
+                        else adv.suggest_success_threshold,
                     )
                     changes.append(f"success_threshold → {adv.suggest_success_threshold}")
-                
+
                 if adv.suggest_trial_calls_metadata is not None:
                     self._br.update_host_policy(
-                        host,
-                        trial_calls_metadata=adv.suggest_trial_calls_metadata
+                        host, trial_calls_metadata=adv.suggest_trial_calls_metadata
                     )
                     changes.append(f"trial_calls(metadata) → {adv.suggest_trial_calls_metadata}")
-                
+
                 if adv.suggest_trial_calls_artifact is not None:
                     self._br.update_host_policy(
-                        host,
-                        trial_calls_artifact=adv.suggest_trial_calls_artifact
+                        host, trial_calls_artifact=adv.suggest_trial_calls_artifact
                     )
                     changes.append(f"trial_calls(artifact) → {adv.suggest_trial_calls_artifact}")
-                
+
                 # Apply rate limiter changes if configured
                 if self._rr and adv.suggest_metadata_rps_multiplier:
                     # Rate registry updates would go here
                     mult = adv.suggest_metadata_rps_multiplier
                     pct = (mult - 1.0) * 100
                     changes.append(f"metadata RPS × {mult:.2f} ({pct:+.0f}%)")
-                
+
                 if self._rr and adv.suggest_artifact_rps_multiplier:
                     mult = adv.suggest_artifact_rps_multiplier
                     pct = (mult - 1.0) * 100
                     changes.append(f"artifact RPS × {mult:.2f} ({pct:+.0f}%)")
-            
+
             except Exception as e:
                 changes.append(f"ERROR: {e}")
-            
+
             if changes:
                 changes += [f"reason: {r}" for r in (adv.reasons or [])]
                 plans.append(AutoTunePlan(host=host, changes=changes))
-        
+
         return plans
 
     @staticmethod

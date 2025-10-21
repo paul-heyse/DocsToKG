@@ -49,12 +49,12 @@ class TestUrlGateIntegration:
     def test_url_gate_tracks_statistics(self):
         """URL gate should track invocation statistics."""
         from DocsToKG.OntologyDownload.policy.registry import get_registry
-        
+
         registry = get_registry()
-        
+
         # Clear stats
         registry.reset_stats("url_gate")
-        
+
         # Invoke with valid URL
         try:
             url_gate("https://example.org/data")
@@ -94,16 +94,16 @@ class TestUrlGateErrorHandling:
         """Error messages should be helpful for debugging."""
         with pytest.raises(URLPolicyException) as exc_info:
             url_gate("ftp://invalid.com")
-        
+
         error = exc_info.value
-        assert hasattr(error, 'error_code')
+        assert hasattr(error, "error_code")
         assert error.error_code is not None
 
     def test_url_gate_preserves_details_without_secrets(self):
         """Error details should not contain sensitive information."""
         with pytest.raises(URLPolicyException) as exc_info:
             url_gate("https://user:password@malicious.com")
-        
+
         error = exc_info.value
         error_str = str(error)
         assert "password" not in error_str.lower()
@@ -118,7 +118,7 @@ class TestUrlGateIntegrationWithValidation:
         valid_url = "https://example.org/paper.pdf"
         result = url_gate(valid_url)
         assert result is not None
-        
+
         # Invalid URL should fail before download attempt
         invalid_url = "ftp://example.com"
         with pytest.raises(URLPolicyException):
@@ -127,12 +127,12 @@ class TestUrlGateIntegrationWithValidation:
     def test_url_gate_metrics_available(self):
         """Metrics should be available after gate invocations."""
         from DocsToKG.OntologyDownload.policy.registry import get_registry
-        
+
         registry = get_registry()
-        
+
         # After running tests, metrics should be available
         stats = registry.get_stats("url_gate")
-        
+
         # Stats should have expected keys
         expected_keys = {"passes", "rejects", "avg_ms", "min_ms", "max_ms", "pass_rate"}
         assert expected_keys.issubset(set(stats.keys()))
@@ -144,9 +144,9 @@ class TestUrlGatePerformance:
     def test_url_gate_is_fast(self):
         """URL gate validation should be fast (<1ms per URL)."""
         import time
-        
+
         url = "https://api.example.com/data"
-        
+
         start = time.time()
         for _ in range(100):
             try:
@@ -154,7 +154,7 @@ class TestUrlGatePerformance:
             except Exception:
                 pass
         elapsed = time.time() - start
-        
+
         # 100 validations should take < 100ms (1ms each)
         assert elapsed < 0.1, f"URL validation too slow: {elapsed}s for 100 calls"
 
@@ -166,7 +166,7 @@ class TestUrlGatePerformance:
             "https://arxiv.org/api",
             "https://www.ncbi.nlm.nih.gov/pmc/",
         ]
-        
+
         results = []
         for url in urls:
             try:
@@ -174,8 +174,7 @@ class TestUrlGatePerformance:
                 results.append((url, "PASS", result))
             except URLPolicyException as e:
                 results.append((url, "REJECT", str(e)))
-        
+
         # Most should pass
         passed = sum(1 for _, status, _ in results if status == "PASS")
         assert passed >= 2, f"Expected at least 2 passes, got {passed}"
-

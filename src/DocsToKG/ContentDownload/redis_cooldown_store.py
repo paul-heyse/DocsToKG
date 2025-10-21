@@ -6,7 +6,7 @@ conversion to ensure immunity to clock drift.
 
 Example:
     from DocsToKG.ContentDownload.redis_cooldown_store import RedisCooldownStore
-    
+
     store = RedisCooldownStore("redis://localhost:6379/3")
     store.set_until(host="api.example.org", until_monotonic=150.5, reason="429-timeout")
     deadline = store.get_until(host="api.example.org")  # returns monotonic time
@@ -50,6 +50,7 @@ class RedisCooldownStore:
     Keys stored as JSON: {"until_wall": <float>, "reason": "<str>"}
     TTL automatically set to ceil(until_wall - now)
     """
+
     dsn: str
     key_prefix: str = "breaker:cooldown:"
     now_wall: Callable[[], float] = time.time
@@ -102,15 +103,15 @@ class RedisCooldownStore:
             until_wall = float(obj.get("until_wall", 0.0))
         except (json.JSONDecodeError, ValueError, TypeError):
             return None
-        
+
         now_w = self.now_wall()
         now_m = self.now_mono()
-        
+
         if until_wall <= now_w:
             # Expired → clean it up (best-effort)
             self.clear(host)
             return None
-        
+
         # Convert wall-clock → monotonic so callers compare apples-to-apples
         return now_m + max(0.0, until_wall - now_w)
 
@@ -129,16 +130,18 @@ class RedisCooldownStore:
         """
         now_w = self.now_wall()
         now_m = self.now_mono()
-        
+
         # Convert monotonic → wall-clock for cross-process sharing
         until_wall = now_w + max(0.0, until_monotonic - now_m)
         ttl = max(1, int(round(until_wall - now_w)))
-        
-        obj = json.dumps({
-            "until_wall": until_wall,
-            "reason": str(reason)[:128],
-        }).encode("utf-8")
-        
+
+        obj = json.dumps(
+            {
+                "until_wall": until_wall,
+                "reason": str(reason)[:128],
+            }
+        ).encode("utf-8")
+
         self._client.set(self._key(host), obj, ex=ttl)
 
     def clear(self, host: str) -> None:
