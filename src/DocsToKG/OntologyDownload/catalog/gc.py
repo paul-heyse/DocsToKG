@@ -229,8 +229,7 @@ def prune_by_retention_days(
     if dry_run:
         duration_ms = (time.time() * 1000) - start_ms
         logger.info(
-            f"DRY RUN: Would prune {len(old_version_ids)} versions, "
-            f"freeing {bytes_to_free} bytes"
+            f"DRY RUN: Would prune {len(old_version_ids)} versions, freeing {bytes_to_free} bytes"
         )
         return PruneResult(
             items_identified=len(old_version_ids),
@@ -349,7 +348,7 @@ def prune_keep_latest_n(
     if dry_run:
         duration_ms = (time.time() * 1000) - start_ms
         logger.info(
-            f"DRY RUN: Would delete {items_identified} versions, " f"freeing {bytes_to_free} bytes"
+            f"DRY RUN: Would delete {items_identified} versions, freeing {bytes_to_free} bytes"
         )
         return PruneResult(
             items_identified=items_identified,
