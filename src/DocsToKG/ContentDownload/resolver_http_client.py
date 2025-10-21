@@ -135,7 +135,11 @@ class TokenBucket:
                 raise TimeoutError(f"Could not acquire {tokens} tokens within {timeout_s}s")
 
             # Sleep a bit before retrying
-            sleep_ms = min(100, (tokens - self.tokens) / self.refill_per_sec * 1000)
+            if self.refill_per_sec > 0:
+                sleep_ms = min(100, (tokens - self.tokens) / self.refill_per_sec * 1000)
+            else:
+                # No refill, just wait a bit before retrying
+                sleep_ms = 100
             time.sleep(sleep_ms / 1000.0)
 
             elapsed = time.monotonic() - start

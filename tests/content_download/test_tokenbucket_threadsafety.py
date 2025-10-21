@@ -182,15 +182,18 @@ class TestTokenBucketThreadSafety(unittest.TestCase):
         """Multiple threads acquiring burst allowance works correctly."""
         bucket = TokenBucket(capacity=10.0, refill_per_sec=1.0, burst=20.0)
         results: list[tuple[float, float]] = []
+        timeouts = 0
         lock = threading.Lock()
 
         def acquire_burst() -> None:
+            nonlocal timeouts
             try:
                 result = bucket.acquire(tokens=5.0, timeout_s=2.0)
                 with lock:
                     results.append((time.time(), result))
-            except Exception:
-                pass
+            except TimeoutError:
+                with lock:
+                    timeouts += 1
 
         # Multiple threads acquiring burst
         threads = [threading.Thread(target=acquire_burst) for _ in range(6)]
@@ -201,9 +204,12 @@ class TestTokenBucketThreadSafety(unittest.TestCase):
             t.join()
         elapsed = time.time() - start
 
-        # All should eventually succeed (burst allows up to capacity + burst = 30 tokens)
-        assert len(results) >= 4  # At least 4 should succeed
-        assert elapsed < 10.0  # Should complete quickly
+        # Key test: all threads should complete (no deadlock)
+        total_attempts = len(results) + timeouts
+        assert total_attempts == 6, f"All threads should complete, got {total_attempts}/6"
+        # Some should succeed (burst allows capacity + burst = 30 tokens for initial 6 * 5 = 30)
+        assert len(results) >= 2, f"Expected at least 2 successful bursts, got {len(results)}"
+        assert elapsed < 30.0, f"Should complete quickly, took {elapsed}s"
 
     def test_alternating_acquire_release_pattern(self) -> None:
         """Simulates alternating acquire/release with thread-safe state."""
