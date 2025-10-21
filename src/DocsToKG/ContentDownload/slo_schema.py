@@ -165,12 +165,11 @@ def evaluate_slo_status(actual: float, target: float, error_budget: float) -> st
     str
         Status: "pass", "warning", or "fail"
     """
-    lower_bound = target - error_budget
-    upper_bound = target + error_budget
+    deviation = abs(actual - target)
 
-    if lower_bound <= actual <= upper_bound:
+    if deviation <= error_budget:
         return "pass"
-    elif abs(actual - target) <= (error_budget * 2):
+    elif deviation <= (error_budget * 2):
         return "warning"
     else:
         return "fail"

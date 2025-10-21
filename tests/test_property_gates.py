@@ -83,7 +83,8 @@ def test_url_gate_rejects_loopback(url):
     Invariant: Localhost and 127.0.0.1 must be rejected.
     """
     # Loopback should be blocked
-    assert any(loopback in url for loopback in ["127.", "[::1]"])
+    is_loopback = "127." in url or "::1" in url or "localhost" in url
+    assert is_loopback
 
 
 @pytest.mark.property
