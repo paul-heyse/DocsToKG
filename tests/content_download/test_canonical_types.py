@@ -12,9 +12,15 @@ Tests for:
 
 from __future__ import annotations
 
-import pytest
+import os
+import shutil
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import FrozenInstanceError
+from pathlib import Path
 from unittest.mock import MagicMock
+
+import pytest
 
 from DocsToKG.ContentDownload.api import (
     DownloadPlan,
@@ -234,6 +240,94 @@ class TestDownloadExecutionContracts:
             assert outcome.classification == "success"
         finally:
             os.replace = original_replace
+
+    def test_parallel_streams_use_isolated_temp_files(self):
+        """Parallel streams should land in distinct staging files and directories."""
+
+        barrier = threading.Barrier(2)
+
+        class FakeResponse:
+            def __init__(self, payload: bytes, sync: bool) -> None:
+                self.status_code = 200
+                self.headers = {
+                    "Content-Type": "application/pdf",
+                    "Content-Length": str(len(payload)),
+                }
+                self.extensions: dict[str, object] = {}
+                self._payload = payload
+                self._sync = sync
+
+            def iter_bytes(self):  # type: ignore[override]
+                if self._sync:
+                    barrier.wait()
+                yield self._payload
+
+        class FakeSession:
+            def __init__(self) -> None:
+                self._counter = 0
+                self._lock = threading.Lock()
+
+            def head(self, url, allow_redirects=True, timeout=None):  # noqa: D401
+                return FakeResponse(b"", sync=False)
+
+            def get(self, url, stream=True, allow_redirects=True, timeout=None):  # noqa: D401
+                with self._lock:
+                    self._counter += 1
+                    idx = self._counter
+                payload = f"payload-{idx}".encode()
+                return FakeResponse(payload, sync=True)
+
+        session = FakeSession()
+        plan = DownloadPlan(url="https://example.com/file.pdf", resolver_name="resolver")
+
+        def _download(_: int):
+            return stream_candidate_payload(
+                plan,
+                session=session,
+                run_id="parallel-run",
+            )
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            futures = [executor.submit(_download, idx) for idx in range(2)]
+            results = [future.result() for future in futures]
+
+        assert results[0].path_tmp != results[1].path_tmp
+        assert results[0].staging_path != results[1].staging_path
+
+        for result in results:
+            assert result.staging_path is not None
+            assert os.path.exists(result.path_tmp)
+            assert os.path.dirname(result.path_tmp) == result.staging_path
+
+        final_root = Path(os.getcwd()) / "tmp-downloads-test"
+        final_root.mkdir(parents=True, exist_ok=True)
+        final_paths: list[Path] = []
+
+        try:
+            for idx, result in enumerate(results):
+                final_path = final_root / f"final-{idx}.bin"
+                final_paths.append(final_path)
+                outcome = finalize_candidate_download(
+                    plan,
+                    result,
+                    final_path=str(final_path),
+                )
+                assert outcome.ok is True
+                assert final_path.exists()
+
+            for result in results:
+                if result.staging_path:
+                    assert not os.path.exists(result.staging_path)
+
+            staging_run_root = Path(os.getcwd()) / ".download-staging" / "parallel-run"
+            assert not staging_run_root.exists()
+        finally:
+            for final_path in final_paths:
+                if final_path.exists():
+                    final_path.unlink()
+            if final_root.exists():
+                shutil.rmtree(final_root)
+
 
 
 # ============================================================================
