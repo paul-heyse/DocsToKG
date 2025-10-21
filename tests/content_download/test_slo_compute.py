@@ -17,7 +17,7 @@ from tempfile import TemporaryDirectory
 
 import pytest
 
-from DocsToKG.ContentDownload import slo_compute, slo_schema
+from DocsToKG.ContentDownload import slo_compute
 from DocsToKG.ContentDownload.schema_migration import apply_migration
 
 
@@ -218,12 +218,13 @@ class TestComputeAllMetrics:
     """Test all-metrics computation."""
 
     def test_compute_all_metrics(self, slo_db):
-        """Compute all SLO metrics returns dict with 6 metrics."""
+        """Compute all SLO metrics returns dict with 7 metrics."""
         metrics = slo_compute.compute_all_slo_metrics(slo_db)
-        assert len(metrics) == 6
+        assert len(metrics) == 7
         assert "job_completion_rate" in metrics
         assert "time_to_complete_p50" in metrics
         assert "time_to_complete_p95" in metrics
+        assert "time_to_complete_p99" in metrics
         assert "crash_recovery_success_rate" in metrics
         assert "lease_acquisition_latency" in metrics
         assert "operation_replay_rate" in metrics
