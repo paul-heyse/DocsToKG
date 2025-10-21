@@ -230,8 +230,8 @@ def test_queue_run_creates_orchestrator() -> None:
         tmpdir_path = Path(tmpdir)
         queue_path = str(tmpdir_path / "test.sqlite")
 
-        # Create queue
-        queue = WorkQueue(queue_path)
+        # Create queue (path initialized)
+        _ = WorkQueue(queue_path)
 
         # Run with timeout to prevent hanging
         result = runner.invoke(
@@ -260,7 +260,7 @@ def test_queue_retry_failed_no_failed_jobs() -> None:
         queue_path = str(tmpdir_path / "test.sqlite")
 
         # Create empty queue
-        queue = WorkQueue(queue_path)
+        _ = WorkQueue(queue_path)
 
         result = runner.invoke(
             app,
@@ -314,8 +314,8 @@ def test_queue_retry_failed_actually_retries() -> None:
         queue.fail_and_retry(jobs[0]["id"], 60, 1, "test error")  # Second fail puts in ERROR
 
         # Verify job is in error state before retry
-        stats_before = queue.stats()
-        initial_error_count = stats_before.get("error", 0)
+        _ = queue.stats()
+        # initial_error_count = stats_before.get("error", 0)
 
         # Run retry (should actually retry)
         result = runner.invoke(
