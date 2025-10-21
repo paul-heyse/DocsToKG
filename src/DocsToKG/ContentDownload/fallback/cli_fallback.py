@@ -192,9 +192,8 @@ def cmd_fallback_dryrun(args: Optional[Dict[str, Any]] = None) -> None:
         orchestrator = FallbackOrchestrator(
             plan=plan,
             breaker=None,  # No breaker for dryrun
-            rate=None,  # No rate limiter for dryrun
-            head_client=None,  # No clients needed
-            raw_client=None,
+            rate_limiter=None,  # No rate limiter for dryrun
+            clients={},  # No clients needed for dryrun
             telemetry=None,  # No telemetry for dryrun
             logger=logger,
         )
@@ -216,7 +215,7 @@ def cmd_fallback_dryrun(args: Optional[Dict[str, Any]] = None) -> None:
             "offline": False,
         }
 
-        result = orchestrator.resolve_pdf(context=context, adapters=adapters)
+        result = orchestrator.resolve_pdf(context=context, adapters=adapters)  # type: ignore[arg-type]
 
         print("\n📊 DRY-RUN RESULT:")
         print(f"  Outcome: {result.outcome}")

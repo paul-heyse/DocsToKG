@@ -30,7 +30,7 @@ import os
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 from DocsToKG.ContentDownload.fallback.types import (
     AttemptPolicy,
@@ -116,7 +116,7 @@ def load_from_env() -> Dict[str, Any]:
         config["budgets"] = budgets
 
     # Gate overrides
-    gates = {}
+    gates: Dict[str, Any] = {}
     if "DOCSTOKG_FALLBACK_OFFLINE_BEHAVIOR" in os.environ:
         gates["offline_behavior"] = os.environ["DOCSTOKG_FALLBACK_OFFLINE_BEHAVIOR"]
         logger.debug("Loaded offline_behavior from env")
@@ -343,7 +343,7 @@ def build_fallback_plan(config: Dict[str, Any]) -> FallbackPlan:
         tier = TierPlan(
             name=tier_config["name"],
             parallel=tier_config["parallel"],
-            sources=tuple(tier_config["sources"]),
+            sources=tier_config["sources"],  # Changed from tuple() to list
         )
         tiers.append(tier)
 
@@ -361,7 +361,7 @@ def build_fallback_plan(config: Dict[str, Any]) -> FallbackPlan:
     # Build plan
     plan = FallbackPlan(
         budgets=config["budgets"],
-        tiers=tuple(tiers),
+        tiers=tiers,  # Changed from tuple(tiers) to tiers (already a list)
         policies=policies,
         gates=config.get("gates", {}),
     )

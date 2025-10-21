@@ -28,7 +28,7 @@ def adapter_doi_redirect_pdf(
     doi = context.get("doi")
     if not doi:
         return AttemptResult(
-            outcome="skipped",
+            outcome="skipped",  # type: ignore[arg-type]
             reason="no_doi",
             elapsed_ms=0,
         )
@@ -37,7 +37,7 @@ def adapter_doi_redirect_pdf(
 
     if not raw_client:
         return AttemptResult(
-            outcome="error",
+            outcome="error",  # type: ignore[arg-type]
             reason="missing_client",
             elapsed_ms=0,
             meta={"source": "doi_redirect"},
@@ -55,7 +55,7 @@ def adapter_doi_redirect_pdf(
         if resp.status_code != 200:
             outcome = "retryable" if resp.status_code in (429, 503) else "nonretryable"
             return AttemptResult(
-                outcome=outcome,
+                outcome=outcome,  # type: ignore[arg-type]
                 reason="doi_redirect_failed",
                 elapsed_ms=0,
                 status=resp.status_code,
@@ -75,7 +75,7 @@ def adapter_doi_redirect_pdf(
 
             if ok:
                 return AttemptResult(
-                    outcome="success",
+                    outcome="success",  # type: ignore[arg-type]
                     reason="doi_redirect_pdf",
                     elapsed_ms=0,
                     url=final_url,
@@ -120,7 +120,7 @@ def adapter_doi_redirect_pdf(
 
                         if ok:
                             return AttemptResult(
-                                outcome="success",
+                                outcome="success",  # type: ignore[arg-type]
                                 reason="doi_redirect_extracted_pdf",
                                 elapsed_ms=0,
                                 url=candidate_url,
@@ -131,7 +131,7 @@ def adapter_doi_redirect_pdf(
 
         # No PDF found after following redirects
         return AttemptResult(
-            outcome="no_pdf",
+            outcome="no_pdf",  # type: ignore[arg-type]
             reason="no_pdf_after_redirect",
             elapsed_ms=0,
             status=200,
@@ -141,7 +141,7 @@ def adapter_doi_redirect_pdf(
 
     except Exception as e:  # pylint: disable=broad-except
         return AttemptResult(
-            outcome="error",
+            outcome="error",  # type: ignore[arg-type]
             reason="exception",
             elapsed_ms=0,
             meta={"source": "doi_redirect", "error": str(e)},

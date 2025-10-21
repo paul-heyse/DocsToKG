@@ -25,7 +25,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Callable, Dict, Optional
 
-from .types import AttemptResult, FallbackPlan, ResolutionOutcome
+from .types import AttemptResult, FallbackPlan
 
 LOGGER = logging.getLogger(__name__)
 

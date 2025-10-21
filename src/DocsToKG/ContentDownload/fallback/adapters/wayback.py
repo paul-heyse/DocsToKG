@@ -40,7 +40,7 @@ def adapter_wayback_pdf(
 
     if not head_client or not raw_client:
         return AttemptResult(
-            outcome="error",
+            outcome="error",  # type: ignore[arg-type]
             reason="missing_client",
             elapsed_ms=0,
             meta={"source": "wayback"},
@@ -51,7 +51,7 @@ def adapter_wayback_pdf(
 
     if not landing_url:
         return AttemptResult(
-            outcome="skipped",
+            outcome="skipped",  # type: ignore[arg-type]
             reason="no_landing_url",
             elapsed_ms=0,
         )
@@ -74,7 +74,7 @@ def adapter_wayback_pdf(
         if resp.status_code != 200:
             outcome = "retryable" if resp.status_code in (429, 503) else "nonretryable"
             return AttemptResult(
-                outcome=outcome,
+                outcome=outcome,  # type: ignore[arg-type]
                 reason="cdx_api_error",
                 elapsed_ms=0,
                 status=resp.status_code,
@@ -88,7 +88,7 @@ def adapter_wayback_pdf(
 
         if not snapshots:
             return AttemptResult(
-                outcome="no_pdf",
+                outcome="no_pdf",  # type: ignore[arg-type]
                 reason="no_snapshots",
                 elapsed_ms=0,
                 status=200,
@@ -100,7 +100,7 @@ def adapter_wayback_pdf(
         closest = snapshots.get("closest")
         if not closest:
             return AttemptResult(
-                outcome="no_pdf",
+                outcome="no_pdf",  # type: ignore[arg-type]
                 reason="no_closest_snapshot",
                 elapsed_ms=0,
                 status=200,
@@ -112,7 +112,7 @@ def adapter_wayback_pdf(
         wayback_url = closest.get("url")
         if not wayback_url:
             return AttemptResult(
-                outcome="no_pdf",
+                outcome="no_pdf",  # type: ignore[arg-type]
                 reason="no_wayback_url",
                 elapsed_ms=0,
                 status=200,
@@ -130,7 +130,7 @@ def adapter_wayback_pdf(
 
             if ok:
                 return AttemptResult(
-                    outcome="success",
+                    outcome="success",  # type: ignore[arg-type]
                     reason="wayback_pdf",
                     elapsed_ms=0,
                     url=wayback_url,
@@ -151,7 +151,7 @@ def adapter_wayback_pdf(
             content_type = snapshot_resp.headers.get("Content-Type", "").lower()
             if "pdf" in content_type:
                 return AttemptResult(
-                    outcome="success",
+                    outcome="success",  # type: ignore[arg-type]
                     reason="wayback_pdf_content",
                     elapsed_ms=0,
                     url=wayback_url,
@@ -184,7 +184,7 @@ def adapter_wayback_pdf(
 
                         if ok:
                             return AttemptResult(
-                                outcome="success",
+                                outcome="success",  # type: ignore[arg-type]
                                 reason="wayback_extracted_pdf",
                                 elapsed_ms=0,
                                 url=candidate_url,
@@ -199,7 +199,7 @@ def adapter_wayback_pdf(
 
         # No PDF found in Wayback
         return AttemptResult(
-            outcome="no_pdf",
+            outcome="no_pdf",  # type: ignore[arg-type]
             reason="no_wayback_pdf",
             elapsed_ms=0,
             status=200,
@@ -212,7 +212,7 @@ def adapter_wayback_pdf(
 
     except Exception as e:  # pylint: disable=broad-except
         return AttemptResult(
-            outcome="error",
+            outcome="error",  # type: ignore[arg-type]
             reason="exception",
             elapsed_ms=0,
             meta={"source": "wayback", "error": str(e)},

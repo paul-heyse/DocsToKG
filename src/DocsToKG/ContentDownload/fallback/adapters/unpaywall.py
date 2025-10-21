@@ -28,7 +28,7 @@ def adapter_unpaywall_pdf(
     doi = context.get("doi")
     if not doi:
         return AttemptResult(
-            outcome="skipped",
+            outcome="skipped",  # type: ignore[arg-type]
             reason="no_doi",
             elapsed_ms=0,
         )
@@ -39,7 +39,7 @@ def adapter_unpaywall_pdf(
 
     if not head_client or not raw_client:
         return AttemptResult(
-            outcome="error",
+            outcome="error",  # type: ignore[arg-type]
             reason="missing_client",
             elapsed_ms=0,
             meta={"source": "unpaywall"},
@@ -57,7 +57,7 @@ def adapter_unpaywall_pdf(
         if resp.status_code != 200:
             outcome = "retryable" if resp.status_code in (429, 503) else "nonretryable"
             return AttemptResult(
-                outcome=outcome,
+                outcome=outcome,  # type: ignore[arg-type]
                 reason="api_error",
                 elapsed_ms=0,
                 status=resp.status_code,
@@ -71,7 +71,7 @@ def adapter_unpaywall_pdf(
 
         if not best_oa or not best_oa.get("url_for_pdf"):
             return AttemptResult(
-                outcome="no_pdf",
+                outcome="no_pdf",  # type: ignore[arg-type]
                 reason="no_oa_pdf",
                 elapsed_ms=0,
                 status=200,
@@ -90,7 +90,7 @@ def adapter_unpaywall_pdf(
 
         if ok:
             return AttemptResult(
-                outcome="success",
+                outcome="success",  # type: ignore[arg-type]
                 reason="oa_pdf",
                 elapsed_ms=0,
                 url=pdf_url,
@@ -100,7 +100,7 @@ def adapter_unpaywall_pdf(
             )
         else:
             return AttemptResult(
-                outcome="nonretryable",
+                outcome="nonretryable",  # type: ignore[arg-type]
                 reason=reason,
                 elapsed_ms=0,
                 status=status,
@@ -110,7 +110,7 @@ def adapter_unpaywall_pdf(
 
     except Exception as e:  # pylint: disable=broad-except
         return AttemptResult(
-            outcome="error",
+            outcome="error",  # type: ignore[arg-type]
             reason="exception",
             elapsed_ms=0,
             meta={"source": "unpaywall", "error": str(e)},

@@ -62,13 +62,19 @@ def try_fallback_resolution(
     # Load fallback plan
     plan = load_fallback_plan(yaml_path=fallback_plan_path)
 
+    # Create clients dict
+    clients = {}
+    if head_client:
+        clients["head"] = head_client
+    if raw_client:
+        clients["raw"] = raw_client
+
     # Create orchestrator
     orchestrator = FallbackOrchestrator(
         plan=plan,
         breaker=breaker,
-        rate=rate,
-        head_client=head_client,
-        raw_client=raw_client,
+        rate_limiter=rate,
+        clients=clients,
         telemetry=telemetry,
         logger=logger,
     )
@@ -78,7 +84,7 @@ def try_fallback_resolution(
         result = orchestrator.resolve_pdf(context=context, adapters=adapters)
 
         # Success: return the result
-        if result.is_success:
+        if result.is_success():  # Fixed: is_success is a method, not property
             logger.info(
                 f"Fallback strategy succeeded for {context.get('work_id')}: {result.reason}"
             )

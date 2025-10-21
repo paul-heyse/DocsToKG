@@ -48,7 +48,7 @@ def adapter_arxiv_pdf(
 
     if not arxiv_id:
         return AttemptResult(
-            outcome="skipped",
+            outcome="skipped",  # type: ignore[arg-type]
             reason="no_arxiv_id",
             elapsed_ms=0,
         )
@@ -57,7 +57,7 @@ def adapter_arxiv_pdf(
 
     if not raw_client:
         return AttemptResult(
-            outcome="error",
+            outcome="error",  # type: ignore[arg-type]
             reason="missing_client",
             elapsed_ms=0,
             meta={"source": "arxiv"},
@@ -76,7 +76,7 @@ def adapter_arxiv_pdf(
 
         if ok:
             return AttemptResult(
-                outcome="success",
+                outcome="success",  # type: ignore[arg-type]
                 reason="arxiv_pdf",
                 elapsed_ms=0,
                 url=pdf_url,
@@ -87,7 +87,7 @@ def adapter_arxiv_pdf(
         else:
             outcome = "retryable" if status in (429, 503) else "nonretryable"
             return AttemptResult(
-                outcome=outcome,
+                outcome=outcome,  # type: ignore[arg-type]
                 reason=reason,
                 elapsed_ms=0,
                 status=status,
@@ -97,7 +97,7 @@ def adapter_arxiv_pdf(
 
     except Exception as e:  # pylint: disable=broad-except
         return AttemptResult(
-            outcome="error",
+            outcome="error",  # type: ignore[arg-type]
             reason="exception",
             elapsed_ms=0,
             meta={"source": "arxiv", "error": str(e)},
