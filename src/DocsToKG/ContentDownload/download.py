@@ -58,6 +58,10 @@ import httpcore
 import httpx
 
 from DocsToKG.ContentDownload import locks
+from DocsToKG.ContentDownload.api.types import (
+    AttemptRecord,
+    DownloadOutcome,
+)
 from DocsToKG.ContentDownload.core import (
     DEFAULT_MIN_PDF_BYTES,
     DEFAULT_SNIFF_BYTES,
@@ -98,8 +102,6 @@ from DocsToKG.ContentDownload.networking import (
     request_with_retries,
 )
 from DocsToKG.ContentDownload.pipeline import (
-    AttemptRecord,
-    DownloadOutcome,
     ResolverMetrics,
     ResolverPipeline,
 )
