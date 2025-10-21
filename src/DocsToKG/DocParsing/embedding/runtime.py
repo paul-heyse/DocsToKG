@@ -1780,6 +1780,30 @@ def _embedding_stage_worker(item: WorkItem) -> ItemOutcome:
     cfg_hash: str = state["cfg_hash"]
     stub_vectors_enabled: bool = state.get("stub_vectors", False)
     stub_counters: Optional[Dict[str, int]] = state.get("stub_counters")
+
+    # Extract provider identities for manifest metadata
+    provider_identities = bundle.identities()
+    provider_metadata_extras: Dict[str, object] = {}
+    if bundle.dense and "dense" in provider_identities:
+        dense_id = provider_identities["dense"]
+        provider_metadata_extras["dense_provider_name"] = dense_id.name
+        if dense_id.extra:
+            if "model_id" in dense_id.extra:
+                provider_metadata_extras["dense_model_id"] = dense_id.extra["model_id"]
+            if "dimension" in dense_id.extra:
+                provider_metadata_extras["dense_dim"] = int(dense_id.extra["dimension"])
+    if bundle.sparse and "sparse" in provider_identities:
+        sparse_id = provider_identities["sparse"]
+        provider_metadata_extras["sparse_provider_name"] = sparse_id.name
+        if sparse_id.extra and "model_id" in sparse_id.extra:
+            provider_metadata_extras["sparse_model_id"] = sparse_id.extra["model_id"]
+    if bundle.lexical and "lexical" in provider_identities:
+        lexical_id = provider_identities["lexical"]
+        provider_metadata_extras["lexical_provider_name"] = lexical_id.name
+
+    # Store in state so hooks can access it
+    state["provider_metadata_extras"] = provider_metadata_extras
+
     log_event(
         logger,
         "debug",
@@ -2050,6 +2074,7 @@ def _make_embedding_stage_hooks(
                     output_path=output_path,
                     vector_format=vector_format,
                     vector_count=vector_count,
+                    **state.get("provider_metadata_extras", {}),
                 )
                 avg_nnz_file = statistics.mean(nnz) if nnz else 0.0
                 avg_norm_file = statistics.mean(norms) if norms else 0.0
