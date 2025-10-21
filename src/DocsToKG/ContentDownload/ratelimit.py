@@ -134,10 +134,12 @@ class RateLimitRegistry:
         cfg: RateConfig,
         *,
         telemetry: Optional[RateTelemetrySink] = None,
+        run_id: Optional[str] = None,
         now: Callable[[], float] = time.monotonic,
     ) -> None:
         self._cfg = cfg
         self._tele = telemetry
+        self._run_id = run_id
         self._now = now
 
         self._lock = threading.RLock()
@@ -299,6 +301,18 @@ class RateLimitRegistry:
                     self._tele.emit_block(
                         host=host, role=role, waited_ms=elapsed_ms, max_delay_ms=policy.max_delay_ms
                     )
+                # Emit structured rate event
+                from DocsToKG.ContentDownload.telemetry_helpers import emit_rate_event
+
+                emit_rate_event(
+                    telemetry=self._tele,
+                    run_id=self._run_id or "unknown",
+                    host=host,
+                    role=role,
+                    action="block",
+                    delay_ms=elapsed_ms,
+                    max_delay_ms=policy.max_delay_ms,
+                )
                 raise RateLimitExceeded(
                     f"Rate limit exceeded for {host}/{role} after {elapsed_ms}ms"
                 )
@@ -306,6 +320,18 @@ class RateLimitRegistry:
             elapsed_ms = int((self._now() - start_time) * 1000)
             if self._tele:
                 self._tele.emit_acquire(host=host, role=role, delay_ms=elapsed_ms)
+            # Emit structured rate event
+            from DocsToKG.ContentDownload.telemetry_helpers import emit_rate_event
+
+            emit_rate_event(
+                telemetry=self._tele,
+                run_id=self._run_id or "unknown",
+                host=host,
+                role=role,
+                action="acquire",
+                delay_ms=elapsed_ms,
+                max_delay_ms=policy.max_delay_ms,
+            )
 
             return RateAcquisition(
                 acquired=True, delay_ms=elapsed_ms, policy_max_delay_ms=policy.max_delay_ms
@@ -445,12 +471,14 @@ def get_rate_limiter_manager(
     cfg: Optional[RateConfig] = None,
     *,
     telemetry: Optional[RateTelemetrySink] = None,
+    run_id: Optional[str] = None,
 ) -> RateLimitRegistry:
     """Get or create the global rate limiter manager.
 
     Args:
         cfg: Configuration (used only on first call)
         telemetry: Optional telemetry sink
+        run_id: Optional run identifier for telemetry
 
     Returns:
         Global RateLimitRegistry instance
@@ -475,7 +503,7 @@ def get_rate_limiter_manager(
                 hosts={},
             )
 
-        manager = RateLimitRegistry(cfg, telemetry=telemetry)
+        manager = RateLimitRegistry(cfg, telemetry=telemetry, run_id=run_id)
         _GLOBAL_RATE_LIMITER_MANAGER = manager
         return manager
 

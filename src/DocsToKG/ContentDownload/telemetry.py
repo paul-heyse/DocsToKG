@@ -709,6 +709,43 @@ class RunTelemetry(AttemptSink):
         if hasattr(self._sink, "log_breaker_event"):
             self._sink.log_breaker_event(event)
 
+    def log_http_event(self, event: Mapping[str, Any]) -> None:
+        """Forward HTTP telemetry events to the underlying sink.
+
+        Parameters
+        ----------
+        event : Mapping[str, Any]
+            HTTP event dict with keys: run_id, ts, host, role, method, status,
+            url_hash, from_cache, revalidated, stale, retry_count, retry_after_s,
+            rate_delay_ms, breaker_state, breaker_recorded, elapsed_ms, error
+        """
+        if hasattr(self._sink, "log_http_event"):
+            self._sink.log_http_event(event)
+
+    def log_rate_event(self, event: Mapping[str, Any]) -> None:
+        """Forward rate limiter telemetry events to the underlying sink.
+
+        Parameters
+        ----------
+        event : Mapping[str, Any]
+            Rate event dict with keys: run_id, ts, host, role, action,
+            delay_ms, max_delay_ms
+        """
+        if hasattr(self._sink, "log_rate_event"):
+            self._sink.log_rate_event(event)
+
+    def log_breaker_transition(self, event: Mapping[str, Any]) -> None:
+        """Forward circuit breaker transition events to the underlying sink.
+
+        Parameters
+        ----------
+        event : Mapping[str, Any]
+            Breaker transition dict with keys: run_id, ts, host, scope,
+            old_state, new_state, reset_timeout_s
+        """
+        if hasattr(self._sink, "log_breaker_transition"):
+            self._sink.log_breaker_transition(event)
+
     def log_fallback_attempt(self, event: Mapping[str, Any]) -> None:
         """Forward fallback attempt events to the underlying sink."""
         if hasattr(self._sink, "log_fallback_attempt"):
@@ -904,7 +941,9 @@ class JsonlSink:
                 "reason": (
                     record.reason.value
                     if isinstance(record.reason, ReasonCode)
-                    else record.reason if record.reason is not None else None
+                    else record.reason
+                    if record.reason is not None
+                    else None
                 ),
                 "reason_detail": getattr(record, "reason_detail", None),
                 "metadata": record.metadata,
@@ -1133,7 +1172,9 @@ class CsvSink:
             "reason": (
                 record.reason.value
                 if isinstance(record.reason, ReasonCode)
-                else record.reason if record.reason is not None else None
+                else record.reason
+                if record.reason is not None
+                else None
             ),
             "reason_detail": getattr(record, "reason_detail", None) or "",
             "sha256": record.sha256,
@@ -1595,7 +1636,9 @@ class SqliteSink:
                     (
                         record.reason.value
                         if isinstance(record.reason, ReasonCode)
-                        else record.reason if record.reason is not None else None
+                        else record.reason
+                        if record.reason is not None
+                        else None
                     ),
                     getattr(record, "reason_detail", None),
                     metadata_json,
@@ -2164,6 +2207,120 @@ class SqliteSink:
             )
         self._conn.commit()
 
+    def log_http_event(self, event: Mapping[str, Any]) -> None:
+        """Persist HTTP telemetry events to http_events table."""
+
+        timestamp = event.get("timestamp") or _utc_timestamp()
+        run_id = event.get("run_id") or event.get("ts")  # Use ts if run_id not present
+        host = event.get("host")
+        role = event.get("role")
+        method = event.get("method")
+        status = event.get("status")
+        url_hash = event.get("url_hash")
+        from_cache = event.get("from_cache")
+        revalidated = event.get("revalidated")
+        stale = event.get("stale")
+        retry_count = event.get("retry_count")
+        retry_after_s = event.get("retry_after_s")
+        rate_delay_ms = event.get("rate_delay_ms")
+        breaker_state = event.get("breaker_state")
+        breaker_recorded = event.get("breaker_recorded")
+        elapsed_ms = event.get("elapsed_ms")
+        error = event.get("error")
+
+        with locks.sqlite_lock(self._path):
+            with self._lock:
+                self._conn.execute(
+                    """
+                    INSERT INTO http_events
+                    (timestamp, run_id, host, role, method, status, url_hash, from_cache,
+                     revalidated, stale, retry_count, retry_after_s, rate_delay_ms,
+                     breaker_state, breaker_recorded, elapsed_ms, error)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        timestamp,
+                        run_id,
+                        host,
+                        role,
+                        method,
+                        status,
+                        url_hash,
+                        from_cache,
+                        revalidated,
+                        stale,
+                        retry_count,
+                        retry_after_s,
+                        rate_delay_ms,
+                        breaker_state,
+                        breaker_recorded,
+                        elapsed_ms,
+                        error,
+                    ),
+                )
+                self._conn.commit()
+
+    def log_rate_event(self, event: Mapping[str, Any]) -> None:
+        """Persist rate limiter telemetry events to rate_events table."""
+
+        timestamp = event.get("timestamp") or _utc_timestamp()
+        run_id = event.get("run_id") or event.get("ts")
+        host = event.get("host")
+        role = event.get("role")
+        action = event.get("action")
+        delay_ms = event.get("delay_ms")
+        max_delay_ms = event.get("max_delay_ms")
+
+        with locks.sqlite_lock(self._path):
+            with self._lock:
+                self._conn.execute(
+                    """
+                    INSERT INTO rate_events (timestamp, run_id, host, role, action, delay_ms, max_delay_ms)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        timestamp,
+                        run_id,
+                        host,
+                        role,
+                        action,
+                        delay_ms,
+                        max_delay_ms,
+                    ),
+                )
+                self._conn.commit()
+
+    def log_breaker_transition(self, event: Mapping[str, Any]) -> None:
+        """Persist circuit breaker state transition events to breaker_transitions table."""
+
+        timestamp = event.get("timestamp") or _utc_timestamp()
+        run_id = event.get("run_id") or event.get("ts")
+        host = event.get("host")
+        scope = event.get("scope")
+        old_state = event.get("old_state")
+        new_state = event.get("new_state")
+        reset_timeout_s = event.get("reset_timeout_s")
+
+        with locks.sqlite_lock(self._path):
+            with self._lock:
+                self._conn.execute(
+                    """
+                    INSERT INTO breaker_transitions
+                    (timestamp, run_id, host, scope, old_state, new_state, reset_timeout_s)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        timestamp,
+                        run_id,
+                        host,
+                        scope,
+                        old_state,
+                        new_state,
+                        reset_timeout_s,
+                    ),
+                )
+                self._conn.commit()
+
 
 def _manifest_entry_from_sqlite_row(
     run_id: Any,
@@ -2453,7 +2610,9 @@ def iter_previous_manifest_entries(
                         qualifier = (
                             "newer"
                             if schema_version > MANIFEST_SCHEMA_VERSION
-                            else "older" if schema_version < MANIFEST_SCHEMA_VERSION else "unknown"
+                            else "older"
+                            if schema_version < MANIFEST_SCHEMA_VERSION
+                            else "unknown"
                         )
                         raise ValueError(
                             "Unsupported manifest schema_version {observed} ({qualifier}); expected version {expected}. "

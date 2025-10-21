@@ -105,6 +105,17 @@ from DocsToKG.ContentDownload.pipeline import (
     ResolverPipeline,
 )
 from DocsToKG.ContentDownload.telemetry import RunTelemetry, normalize_manifest_path
+from DocsToKG.ContentDownload.idempotency import (
+    job_key,
+    op_key,
+    acquire_lease,
+    release_lease,
+    renew_lease,
+    advance_state,
+    run_effect,
+    reconcile_stale_leases,
+)
+
 
 __all__ = [
     "ensure_dir",
