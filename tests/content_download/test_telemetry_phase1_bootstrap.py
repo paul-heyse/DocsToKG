@@ -320,6 +320,16 @@ class TestBootstrapOrchestration(unittest.TestCase):
 class TestEndToEndBootstrap(unittest.TestCase):
     """End-to-end bootstrap tests (smoke tests)."""
 
+    def setUp(self):
+        """Create temporary directory for telemetry paths."""
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.temp_path = Path(self.temp_dir.name)
+
+    def tearDown(self):
+        """Cleanup temporary directory and HTTP session."""
+        self.temp_dir.cleanup()
+        reset_http_session()
+
     def test_e2e_bootstrap_session_client_pipeline(self):
         """E2E: Bootstrap → Session → Client → Pipeline."""
         # Reset session
@@ -328,7 +338,7 @@ class TestEndToEndBootstrap(unittest.TestCase):
         # Create config
         config = BootstrapConfig(
             http=HttpConfig(user_agent="TestBot/1.0"),
-            telemetry_paths=None,
+            telemetry_paths={"csv": self.temp_path / "attempts.csv"},
             resolver_registry={},
             resolver_retry_configs={},
         )
@@ -339,9 +349,6 @@ class TestEndToEndBootstrap(unittest.TestCase):
         # Verify result
         assert result.run_id is not None
         assert result.success_count == 0
-
-        # Cleanup
-        reset_http_session()
 
 
 if __name__ == "__main__":

@@ -13,6 +13,7 @@ Version History:
 from __future__ import annotations
 
 import logging
+import os
 import sqlite3
 from pathlib import Path
 from typing import Any, Optional
@@ -21,6 +22,21 @@ LOGGER = logging.getLogger(__name__)
 
 # Schema version constant
 SCHEMA_VERSION = 1
+
+# Default manifest database path
+DEFAULT_MANIFEST_DB_PATH = "Data/Manifests/manifest.sqlite3"
+
+
+def _get_manifest_db_path() -> Path:
+    """Get the manifest database path from environment or use default.
+
+    Returns:
+        Path to the manifest database file
+    """
+    data_root = os.environ.get("DOCSTOKG_DATA_ROOT", "")
+    if data_root:
+        return Path(data_root) / DEFAULT_MANIFEST_DB_PATH
+    return Path(DEFAULT_MANIFEST_DB_PATH)
 
 
 # ============================================================================
@@ -198,10 +214,7 @@ def ensure_schema(db_path: Optional[str | Path] = None) -> sqlite3.Connection:
         SQLite database connection with schema initialized
     """
     if db_path is None:
-        from DocsToKG.ContentDownload.download import DownloadConfig
-
-        cfg = DownloadConfig()
-        db_path = cfg.manifest_db_path
+        db_path = _get_manifest_db_path()
 
     db_path = Path(db_path)
     db_path.parent.mkdir(parents=True, exist_ok=True)
