@@ -695,6 +695,39 @@ class CatalogConfig(BaseModel):
     )
 
 
+class FeatureGatesConfig(BaseModel):
+    """Experimental feature flags for Phase 1 optimizations.
+
+    These flags control opt-in behaviors for contextual error recovery
+    and per-provider rate limit learning. All features default to OFF
+    for backward compatibility and zero-risk deployment.
+
+    Usage:
+        config = ContentDownloadConfig()
+        if config.feature_gates.enable_contextual_retry:
+            # Use contextual retry policies
+            policy = create_contextual_retry_policy(operation=op_type)
+        else:
+            # Use standard retry policy
+            policy = create_http_retry_policy()
+    """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
+
+    enable_contextual_retry: bool = Field(
+        default=False,
+        description="Enable context-aware retry policies (DOWNLOAD/VALIDATE/RESOLVE)",
+    )
+    enable_provider_learning: bool = Field(
+        default=False,
+        description="Enable per-provider rate limit learning with progressive reduction",
+    )
+    provider_learning_path: Optional[str] = Field(
+        default=None,
+        description="Optional path to persist provider learning state (JSON file)",
+    )
+
+
 # ============================================================================
 # Top-Level Configuration
 # ============================================================================
@@ -740,6 +773,9 @@ class ContentDownloadConfig(BaseModel):
     )
     resolvers: ResolversConfig = Field(
         default_factory=ResolversConfig, description="Resolver configuration"
+    )
+    feature_gates: FeatureGatesConfig = Field(
+        default_factory=FeatureGatesConfig, description="Feature gates configuration"
     )
 
     def config_hash(self) -> str:

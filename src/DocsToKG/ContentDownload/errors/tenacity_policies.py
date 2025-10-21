@@ -18,13 +18,13 @@ Usage:
         OperationType,
         create_contextual_retry_policy,
     )
-    
+
     policy = create_contextual_retry_policy(
         operation=OperationType.DOWNLOAD,
         max_attempts=6,
         max_delay_seconds=60,
     )
-    
+
     for attempt in policy:
         with attempt:
             response = client.get(url)
@@ -214,16 +214,14 @@ def create_contextual_retry_policy(
         return 0
 
     # Build retry condition: network errors + operation-specific HTTP handling
-    retry_condition = retry_if_exception_type(
-        (httpx.ConnectError, httpx.ConnectTimeout, httpx.ReadTimeout)
-    ) | retry_if_result(_should_retry_on_429(operation)) | retry_if_result(
-        _should_retry_on_timeout(operation)
+    retry_condition = (
+        retry_if_exception_type((httpx.ConnectError, httpx.ConnectTimeout, httpx.ReadTimeout))
+        | retry_if_result(_should_retry_on_429(operation))
+        | retry_if_result(_should_retry_on_timeout(operation))
     )
 
     # Also retry on 5xx for all operations (server errors)
-    retry_condition |= retry_if_result(
-        lambda r: hasattr(r, "status_code") and r.status_code >= 500
-    )
+    retry_condition |= retry_if_result(lambda r: hasattr(r, "status_code") and r.status_code >= 500)
 
     return Retrying(
         stop=stop_after_delay(max_delay_seconds),

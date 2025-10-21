@@ -30,7 +30,7 @@ class Test429Predicate:
             max_attempts=3,
             max_delay_seconds=1,
         )
-        
+
         attempt_count = 0
         last_error = None
         try:
@@ -39,13 +39,17 @@ class Test429Predicate:
                     attempt_count += 1
                     if attempt_count < 3:
                         # Create a mock response with 429 status
-                        response = httpx.Response(429, request=httpx.Request("GET", "http://example.com"))
+                        response = httpx.Response(
+                            429, request=httpx.Request("GET", "http://example.com")
+                        )
                         # Raise HTTPStatusError which carries the response
-                        raise httpx.HTTPStatusError("429", request=response.request, response=response)
+                        raise httpx.HTTPStatusError(
+                            "429", request=response.request, response=response
+                        )
                     return "success"
         except httpx.HTTPStatusError as e:
             last_error = e
-        
+
         # Should have retried multiple times (last_error means we got to max attempts)
         assert attempt_count >= 2, f"Expected at least 2 attempts, got {attempt_count}"
 
@@ -56,15 +60,17 @@ class Test429Predicate:
             max_attempts=3,
             max_delay_seconds=1,
         )
-        
+
         attempt_count = 0
         with pytest.raises(httpx.HTTPStatusError):
             for attempt in policy:
                 with attempt:
                     attempt_count += 1
-                    response = httpx.Response(429, request=httpx.Request("GET", "http://example.com"))
+                    response = httpx.Response(
+                        429, request=httpx.Request("GET", "http://example.com")
+                    )
                     raise httpx.HTTPStatusError("429", request=response.request, response=response)
-        
+
         # Should fail on first attempt (no retry on 429)
         assert attempt_count == 1
 
@@ -75,15 +81,17 @@ class Test429Predicate:
             max_attempts=3,
             max_delay_seconds=1,
         )
-        
+
         attempt_count = 0
         with pytest.raises(httpx.HTTPStatusError):
             for attempt in policy:
                 with attempt:
                     attempt_count += 1
-                    response = httpx.Response(429, request=httpx.Request("GET", "http://example.com"))
+                    response = httpx.Response(
+                        429, request=httpx.Request("GET", "http://example.com")
+                    )
                     raise httpx.HTTPStatusError("429", request=response.request, response=response)
-        
+
         # Should fail on first attempt (no retry on 429)
         assert attempt_count == 1
 
@@ -94,15 +102,17 @@ class Test429Predicate:
             max_attempts=3,
             max_delay_seconds=1,
         )
-        
+
         attempt_count = 0
         with pytest.raises(httpx.HTTPStatusError):
             for attempt in policy:
                 with attempt:
                     attempt_count += 1
-                    response = httpx.Response(429, request=httpx.Request("GET", "http://example.com"))
+                    response = httpx.Response(
+                        429, request=httpx.Request("GET", "http://example.com")
+                    )
                     raise httpx.HTTPStatusError("429", request=response.request, response=response)
-        
+
         # Should fail on first attempt (no retry on 429)
         assert attempt_count == 1
 
@@ -117,7 +127,7 @@ class TestTimeoutPredicate:
             max_attempts=3,
             max_delay_seconds=1,
         )
-        
+
         attempt_count = 0
         last_error = None
         try:
@@ -129,7 +139,7 @@ class TestTimeoutPredicate:
                     return "success"
         except httpx.ConnectTimeout as e:
             last_error = e
-        
+
         # Should have retried (last_error means we exhausted retries)
         assert attempt_count >= 2
 
@@ -140,14 +150,14 @@ class TestTimeoutPredicate:
             max_attempts=3,
             max_delay_seconds=1,
         )
-        
+
         attempt_count = 0
         with pytest.raises(httpx.ConnectTimeout):
             for attempt in policy:
                 with attempt:
                     attempt_count += 1
                     raise httpx.ConnectTimeout("timeout")
-        
+
         # Should fail on first attempt (no retry on timeout)
         assert attempt_count == 1, f"Expected 1 attempt, got {attempt_count}"
 
@@ -158,7 +168,7 @@ class TestTimeoutPredicate:
             max_attempts=3,
             max_delay_seconds=1,
         )
-        
+
         attempt_count = 0
         last_error = None
         try:
@@ -170,7 +180,7 @@ class TestTimeoutPredicate:
                     return "success"
         except httpx.ConnectTimeout as e:
             last_error = e
-        
+
         assert attempt_count >= 2
 
     def test_extract_retries_on_timeout(self):
@@ -180,7 +190,7 @@ class TestTimeoutPredicate:
             max_attempts=3,
             max_delay_seconds=1,
         )
-        
+
         attempt_count = 0
         last_error = None
         try:
@@ -192,7 +202,7 @@ class TestTimeoutPredicate:
                     return "success"
         except httpx.ReadTimeout as e:
             last_error = e
-        
+
         assert attempt_count >= 2
 
 
@@ -217,7 +227,7 @@ class TestPolicyCreation:
             max_attempts=2,
             max_delay_seconds=10,
         )
-        
+
         attempt_count = 0
         last_error = None
         try:
@@ -227,7 +237,7 @@ class TestPolicyCreation:
                     raise httpx.ConnectError("error")
         except httpx.ConnectError as e:
             last_error = e
-        
+
         # Should exhaust max_attempts
         assert attempt_count == 2
 
@@ -239,7 +249,7 @@ class TestPolicyCreation:
                 max_attempts=3,
                 max_delay_seconds=1,
             )
-            
+
             attempt_count = 0
             last_error = None
             try:
@@ -247,13 +257,19 @@ class TestPolicyCreation:
                     with attempt:
                         attempt_count += 1
                         if attempt_count < 3:
-                            response = httpx.Response(500, request=httpx.Request("GET", "http://example.com"))
-                            raise httpx.HTTPStatusError("500", request=response.request, response=response)
+                            response = httpx.Response(
+                                500, request=httpx.Request("GET", "http://example.com")
+                            )
+                            raise httpx.HTTPStatusError(
+                                "500", request=response.request, response=response
+                            )
                         return "success"
             except httpx.HTTPStatusError as e:
                 last_error = e
-            
-            assert attempt_count >= 2, f"Failed for operation {op_type.name}: only {attempt_count} attempts"
+
+            assert attempt_count >= 2, (
+                f"Failed for operation {op_type.name}: only {attempt_count} attempts"
+            )
 
 
 class TestRetryableExceptions:
@@ -266,7 +282,7 @@ class TestRetryableExceptions:
             max_attempts=3,
             max_delay_seconds=1,
         )
-        
+
         attempt_count = 0
         for attempt in policy:
             with attempt:
@@ -274,7 +290,7 @@ class TestRetryableExceptions:
                 if attempt_count < 3:
                     raise httpx.ConnectError("connection failed")
                 return "success"
-        
+
         assert attempt_count == 3
 
     def test_read_timeout_retried_for_download(self):
@@ -284,7 +300,7 @@ class TestRetryableExceptions:
             max_attempts=3,
             max_delay_seconds=1,
         )
-        
+
         attempt_count = 0
         for attempt in policy:
             with attempt:
@@ -292,7 +308,7 @@ class TestRetryableExceptions:
                 if attempt_count < 3:
                     raise httpx.ReadTimeout("read timeout")
                 return "success"
-        
+
         assert attempt_count == 3
 
 

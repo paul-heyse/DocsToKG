@@ -19,25 +19,25 @@ Usage:
         ProviderBehaviorTracker,
         create_learning_retry_policy,
     )
-    
+
     tracker = ProviderBehaviorTracker(
         persistence_path=Path.home() / ".cache" / "docstokg" / "provider_learns.json"
     )
-    
+
     policy = create_learning_retry_policy(
         provider="crossref",
         host="api.crossref.org",
         tracker=tracker,
         max_delay_seconds=60,
     )
-    
+
     for attempt in policy:
         with attempt:
             response = client.get(url)
-    
+
     # After success
     tracker.on_success("crossref", "api.crossref.org")
-    
+
     # Get effective limit
     effective_limit = tracker.get_effective_limit("crossref", "api.crossref.org", 10)
     print(effective_limit)  # May be 7 (30% reduction) if provider congested
@@ -192,9 +192,7 @@ class ProviderBehaviorTracker:
             reduction = 30.0
 
         old_reduction = behavior.applied_reduction_pct
-        behavior.applied_reduction_pct = min(
-            behavior.applied_reduction_pct + reduction, 80.0
-        )
+        behavior.applied_reduction_pct = min(behavior.applied_reduction_pct + reduction, 80.0)
 
         if behavior.applied_reduction_pct > old_reduction:
             logger.warning(
@@ -203,9 +201,7 @@ class ProviderBehaviorTracker:
                 f"consecutive_429s: {behavior.consecutive_429s})"
             )
 
-    def get_effective_limit(
-        self, provider: str, host: str, config_limit: int
-    ) -> int:
+    def get_effective_limit(self, provider: str, host: str, config_limit: int) -> int:
         """Get effective rate limit with learned reductions.
 
         Args:
@@ -246,9 +242,7 @@ class ProviderBehaviorTracker:
 
         behavior = self.behaviors[key]
         return {
-            "status": "reducing"
-            if behavior.applied_reduction_pct > 0
-            else "normal",
+            "status": "reducing" if behavior.applied_reduction_pct > 0 else "normal",
             "consecutive_429s": behavior.consecutive_429s,
             "reduction_pct": behavior.applied_reduction_pct,
             "recovery_time_estimate": behavior.estimate_recovery_time(),
@@ -259,10 +253,7 @@ class ProviderBehaviorTracker:
         if not self.persistence_path:
             return
 
-        data = {
-            f"{k[0]}@{k[1]}": v.to_dict()
-            for k, v in self.behaviors.items()
-        }
+        data = {f"{k[0]}@{k[1]}": v.to_dict() for k, v in self.behaviors.items()}
         self.persistence_path.parent.mkdir(parents=True, exist_ok=True)
         self.persistence_path.write_text(json.dumps(data, indent=2))
         logger.debug(f"Saved learned config to {self.persistence_path}")
@@ -282,9 +273,7 @@ class ProviderBehaviorTracker:
                 b.recovery_times = behavior_dict.get("recovery_times", [])
                 self.behaviors[(provider, host)] = b
 
-            logger.info(
-                f"Loaded learned config for {len(self.behaviors)} providers"
-            )
+            logger.info(f"Loaded learned config for {len(self.behaviors)} providers")
         except Exception as e:
             logger.error(f"Failed to load learned config: {e}")
 
@@ -346,9 +335,7 @@ def create_learning_retry_policy(
             max=min(60, max_delay_seconds),
         ),
         retry=(
-            retry_if_exception_type(
-                (httpx.ConnectError, httpx.ConnectTimeout, httpx.ReadTimeout)
-            )
+            retry_if_exception_type((httpx.ConnectError, httpx.ConnectTimeout, httpx.ReadTimeout))
             | retry_if_result(retry_on_429_or_5xx)
         ),
         before_sleep=before_sleep_learning,
