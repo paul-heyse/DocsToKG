@@ -42,7 +42,7 @@ from ..policy.errors import PolicyReject
 from ..policy.gates import extraction_gate, filesystem_gate
 from ..settings import get_default_config
 from .extraction_constraints import ExtractionGuardian, PreScanValidator
-from .extraction_policy import ExtractionPolicy, safe_defaults
+from .extraction_policy import ExtractionPolicy, ExtractionSettings, safe_defaults
 from .extraction_telemetry import (
     ExtractionErrorCode,
     ExtractionMetrics,
@@ -112,18 +112,7 @@ def _write_audit_manifest(
             "archive_size_bytes": archive_path.stat().st_size,
             "encapsulation_root": str(extract_root),
             "config_hash": _compute_config_hash(policy),
-            "policy": {
-                "encapsulate": policy.encapsulate,
-                "encapsulation_name": policy.encapsulation_name,
-                "max_depth": policy.max_depth,
-                "max_components_len": policy.max_components_len,
-                "max_path_len": policy.max_path_len,
-                "normalize_unicode": policy.normalize_unicode,
-                "casefold_collision_policy": policy.casefold_collision_policy,
-                "max_entries": policy.max_entries,
-                "max_file_size_bytes": policy.max_file_size_bytes,
-                "max_entry_ratio": policy.max_entry_ratio,
-            },
+            "policy": policy.model_dump(),  # Gap 3: Full policy snapshot for complete provenance
             "metrics": {
                 "entries_total": metrics.total_entries,
                 "entries_allowed": metrics.entries_allowed,
@@ -452,9 +441,12 @@ def extract_archive_safe(
         raise ConfigError(f"Archive not found: {archive_path}")
 
     policy = extraction_policy or safe_defaults()
-    if not policy.is_valid():
-        errors = policy.validate()
-        raise ConfigError(f"Invalid extraction policy: {'; '.join(errors)}")
+    # Pydantic v2 validates automatically on initialization; re-validate to provide clear error messages
+    try:
+        # Re-validate policy using Pydantic v2's validation
+        _ = ExtractionSettings.model_validate(policy.model_dump())
+    except Exception as e:
+        raise ConfigError(f"Invalid extraction policy: {str(e)}")
 
     destination.mkdir(parents=True, exist_ok=True)
 
@@ -570,6 +562,16 @@ def extract_archive_safe(
                 # - Entry count budget
                 # - Per-file size limits
                 # - Per-entry compression ratio
+
+                # Get compressed size if available (ZIP archives expose this)
+                entry_compressed_size = None
+                try:
+                    # For ZIP and some other formats, libarchive may provide compressed size
+                    if hasattr(entry, "compressed_size") and entry.compressed_size:
+                        entry_compressed_size = entry.compressed_size
+                except (AttributeError, TypeError):
+                    pass  # Fallback: compressed_size not available (e.g., TAR formats)
+
                 prescan_validator.validate_entry(
                     original_path=orig_pathname,
                     is_dir=is_dir,
@@ -580,7 +582,7 @@ def extract_archive_safe(
                     is_char_dev=entry.ischr,
                     is_socket=entry.issock,
                     uncompressed_size=entry_size if entry_size > 0 else None,
-                    compressed_size=None,  # libarchive entry doesn't directly expose this
+                    compressed_size=entry_compressed_size,  # Now passing actual compressed size (ZIP-only)
                 )
 
                 # Validate and normalize the path
@@ -613,6 +615,11 @@ def extract_archive_safe(
         telemetry.entries_total = metrics.total_entries
         telemetry.entries_allowed = metrics.entries_allowed
         telemetry.bytes_declared = total_uncompressed
+
+        # Apply deterministic ordering if configured (Gap 2: deterministic_order setting)
+        if policy.deterministic_order == "path_asc":
+            # Sort entries lexicographically by normalized path for reproducibility
+            entries_to_extract.sort(key=lambda x: str(x[1]))  # x[1] is validated_path
 
         # Phase 3: Verify disk space before extraction (Phase 3-4)
         guardian.verify_space_available(total_uncompressed, extract_root)
