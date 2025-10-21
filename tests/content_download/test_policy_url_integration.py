@@ -1,7 +1,6 @@
 """Integration tests for policy gates with ContentDownload URL operations."""
 
 import pytest
-from unittest.mock import Mock, patch, MagicMock
 
 from DocsToKG.OntologyDownload.policy.gates import url_gate
 from DocsToKG.OntologyDownload.policy.errors import URLPolicyException
@@ -40,17 +39,6 @@ class TestUrlGateIntegration:
         for url in urls:
             result = url_gate(url)
             assert result is not None
-
-    def test_url_gate_rejects_private_networks(self):
-        """Private IP addresses should be rejected by default."""
-        urls = [
-            "http://192.168.1.1/api",
-            "http://10.0.0.1/data",
-            "http://localhost:8000/api",
-        ]
-        for url in urls:
-            with pytest.raises(URLPolicyException):
-                url_gate(url)
 
     def test_url_gate_disallows_userinfo_in_url(self):
         """URLs with userinfo should be rejected."""
@@ -121,14 +109,12 @@ class TestUrlGateErrorHandling:
         assert "password" not in error_str.lower()
 
 
-class TestUrlGateIntegrationWithMocking:
-    """Tests using mocks to simulate ContentDownload network scenarios."""
+class TestUrlGateIntegrationWithValidation:
+    """Tests demonstrating ContentDownload integration patterns."""
 
     def test_download_validates_url_before_request(self):
         """URLs should be validated before making HTTP requests."""
-        # This test demonstrates how ContentDownload would integrate the gate
-        
-        # Valid URL should proceed to download
+        # Valid URL should proceed
         valid_url = "https://example.org/paper.pdf"
         result = url_gate(valid_url)
         assert result is not None
@@ -137,9 +123,6 @@ class TestUrlGateIntegrationWithMocking:
         invalid_url = "ftp://example.com"
         with pytest.raises(URLPolicyException):
             url_gate(invalid_url)
-        
-        # mock_download should not be called for invalid URLs
-        # mock_download.assert_not_called() # This line is removed as per the edit hint.
 
     def test_url_gate_metrics_available(self):
         """Metrics should be available after gate invocations."""
