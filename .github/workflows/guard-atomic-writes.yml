@@ -1,0 +1,85 @@
+name: Guard against manual file writes
+
+on:
+    pull_request:
+        paths:
+            - "src/DocsToKG/ContentDownload/download_execution.py"
+            - "src/DocsToKG/ContentDownload/streaming.py"
+            - ".github/workflows/guard-atomic-writes.yml"
+    push:
+        branches:
+            - main
+        paths:
+            - "src/DocsToKG/ContentDownload/download_execution.py"
+            - "src/DocsToKG/ContentDownload/streaming.py"
+
+jobs:
+    guard-atomic-writes:
+        runs-on: ubuntu-latest
+        name: Enforce atomic write patterns
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Check for manual open(wb) in download_execution
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  if grep -n 'open([^)]*"wb"' src/DocsToKG/ContentDownload/download_execution.py 2>/dev/null | \
+                     grep -v "atomic_write_stream" | grep -v "#"; then
+                    echo "❌ FAILED: Found manual open(..., 'wb') in download_execution.py"
+                    echo "   Use atomic_write_stream() instead for crash-safe writes"
+                    exit 1
+                  fi
+                  echo "✅ PASSED: No manual open(wb) writes in download_execution.py"
+
+            - name: Check for atomic_write_stream import
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  if grep -q "atomic_write_stream" src/DocsToKG/ContentDownload/download_execution.py; then
+                    echo "✅ PASSED: atomic_write_stream is imported"
+                  else
+                    echo "⚠️  WARNING: atomic_write_stream not found in imports"
+                    echo "   Verify if manual writes are being used instead"
+                  fi
+
+            - name: Check for write loops without atomic protection
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  # Look for patterns like: for chunk in ... f.write(chunk)
+                  # that are NOT inside atomic_write_stream calls
+                  # This is a heuristic and may have false positives in comments
+                  if grep -n "\.write(" src/DocsToKG/ContentDownload/download_execution.py 2>/dev/null | \
+                     grep -v "atomic_write_stream" | grep -v "telemetry" | grep -v "#"; then
+                    echo "⚠️  WARNING: Found .write() calls - verify they are inside atomic_write_stream"
+                  else
+                    echo "✅ PASSED: All write operations appear to be wrapped"
+                  fi
+
+            - name: Verify SizeMismatchError is handled
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  if grep -q "SizeMismatchError" src/DocsToKG/ContentDownload/download_execution.py; then
+                    echo "✅ PASSED: SizeMismatchError is handled"
+                  else
+                    echo "⚠️  WARNING: SizeMismatchError handling not found"
+                    echo "   Ensure Content-Length verification errors are caught"
+                  fi
+
+            - name: Check that streaming uses atomic write
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  if [ -f src/DocsToKG/ContentDownload/streaming.py ]; then
+                    if grep -q "atomic" src/DocsToKG/ContentDownload/streaming.py || \
+                       grep -q "atomic_write_stream" src/DocsToKG/ContentDownload/streaming.py; then
+                      echo "✅ PASSED: streaming.py uses atomic writes"
+                    else
+                      echo "⚠️  WARNING: streaming.py may not use atomic writes"
+                    fi
+                  else
+                    echo "ℹ️  INFO: streaming.py not found (may be consolidated)"
+                  fi

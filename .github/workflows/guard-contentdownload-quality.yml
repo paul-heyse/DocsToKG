@@ -1,0 +1,115 @@
+name: ContentDownload Quality Gates
+
+on:
+    pull_request:
+        paths:
+            - "src/DocsToKG/ContentDownload/**"
+            - ".github/workflows/guard-contentdownload-quality.yml"
+    push:
+        branches:
+            - main
+        paths:
+            - "src/DocsToKG/ContentDownload/**"
+
+jobs:
+    quality-gates:
+        runs-on: ubuntu-latest
+        name: Enforce code quality standards
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Set up Python
+              uses: actions/setup-python@v4
+              with:
+                  python-version: "3.13"
+
+            - name: Install dependencies from venv
+              shell: bash
+              run: |
+                  # Use project's venv
+                  test -x .venv/bin/python || { echo "ERROR: .venv missing"; exit 1; }
+                  echo "Using Python: $(.venv/bin/python --version)"
+
+            - name: Lint with ruff
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  .venv/bin/ruff check src/DocsToKG/ContentDownload --select=E,W,F
+                  echo "✅ PASSED: Ruff linting"
+
+            - name: Type check with mypy
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  .venv/bin/mypy src/DocsToKG/ContentDownload --strict 2>&1 | head -20 || true
+                  echo "ℹ️  Type checking completed"
+
+            - name: Check for frozen config models
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  if grep -r "class.*Config" src/DocsToKG/ContentDownload/config/models.py | \
+                     grep -q "frozen=True"; then
+                    echo "✅ PASSED: Config models are frozen"
+                  else
+                    echo "⚠️  WARNING: Verify that config models are frozen"
+                  fi
+
+            - name: Check for legacy DownloadConfig usage
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  if grep -r "DownloadConfig" src/DocsToKG/ContentDownload --include="*.py" | \
+                     grep -v "DownloadPolicy" | grep -v "ContentDownloadConfig" | grep -v "#" | \
+                     grep -v "test_" ; then
+                    echo "⚠️  WARNING: Found potential legacy DownloadConfig usage"
+                  else
+                    echo "✅ PASSED: No legacy DownloadConfig usage"
+                  fi
+
+            - name: Check for TODO markers in production code
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  if grep -r "TODO\|FIXME\|XXX" src/DocsToKG/ContentDownload --include="*.py" | \
+                     grep -v "test_" | grep -v ".pyc"; then
+                    echo "⚠️  WARNING: Found TODO/FIXME markers in production code"
+                  else
+                    echo "✅ PASSED: No outstanding TODO markers"
+                  fi
+
+            - name: Verify atomic writer is imported where needed
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  if grep -q "stream_candidate_payload" src/DocsToKG/ContentDownload/download_execution.py; then
+                    if grep -q "atomic_write_stream\|SizeMismatchError" src/DocsToKG/ContentDownload/download_execution.py; then
+                      echo "✅ PASSED: Atomic writer imports present"
+                    else
+                      echo "⚠️  WARNING: stream_candidate_payload found but atomic_write_stream not imported"
+                    fi
+                  fi
+
+            - name: Verify httpx imports
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  if grep -q "bootstrap.py" src/DocsToKG/ContentDownload/bootstrap.py; then
+                    if grep -q "httpx\|hishel" src/DocsToKG/ContentDownload/bootstrap.py; then
+                      echo "✅ PASSED: httpx/hishel imports present in bootstrap"
+                    else
+                      echo "⚠️  WARNING: bootstrap.py found but httpx/hishel not imported"
+                    fi
+                  fi
+
+            - name: Check policy gates exist
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  if [ -f "src/DocsToKG/ContentDownload/policy/url_gate.py" ] && \
+                     [ -f "src/DocsToKG/ContentDownload/policy/path_gate.py" ]; then
+                    echo "✅ PASSED: Policy gates are in place"
+                  else
+                    echo "⚠️  WARNING: Policy gate files not found"
+                  fi

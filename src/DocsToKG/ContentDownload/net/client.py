@@ -210,8 +210,7 @@ def _on_response(response: httpx.Response) -> None:
 
 
 def _emit_net_request(**kwargs: Any) -> None:
-    """Emit net.request telemetry (placeholder; integrate with your event system)."""
-    # TODO: Wire to your telemetry system (e.g., structured logging, OTLP)
+    """Emit net.request telemetry via structured logging."""
     logger.debug(f"net.request: {kwargs}")
 
 

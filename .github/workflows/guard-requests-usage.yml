@@ -1,0 +1,76 @@
+name: Guard against direct requests usage
+
+on:
+    pull_request:
+        paths:
+            - "src/DocsToKG/ContentDownload/**"
+            - ".github/workflows/guard-requests-usage.yml"
+    push:
+        branches:
+            - main
+        paths:
+            - "src/DocsToKG/ContentDownload/**"
+
+jobs:
+    guard-requests:
+        runs-on: ubuntu-latest
+        name: Forbid direct requests library usage
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Check for requests.get usage
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  if grep -r "requests\.get(" src/DocsToKG/ContentDownload --include="*.py" 2>/dev/null; then
+                    echo "❌ FAILED: Found direct requests.get() usage in ContentDownload"
+                    echo "   Use session.get() from RateRetryClient instead"
+                    exit 1
+                  fi
+                  echo "✅ PASSED: No direct requests.get() found"
+
+            - name: Check for requests.Session usage
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  if grep -r "requests\.Session" src/DocsToKG/ContentDownload --include="*.py" 2>/dev/null; then
+                    echo "❌ FAILED: Found requests.Session creation in ContentDownload"
+                    echo "   Use injected session parameter from pipeline instead"
+                    exit 1
+                  fi
+                  echo "✅ PASSED: No requests.Session creation found"
+
+            - name: Check for requests.post usage
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  if grep -r "requests\.post(" src/DocsToKG/ContentDownload --include="*.py" 2>/dev/null; then
+                    echo "❌ FAILED: Found direct requests.post() usage in ContentDownload"
+                    echo "   Use session.post() from RateRetryClient instead"
+                    exit 1
+                  fi
+                  echo "✅ PASSED: No direct requests.post() found"
+
+            - name: Check for requests.head usage
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  if grep -r "requests\.head(" src/DocsToKG/ContentDownload --include="*.py" 2>/dev/null; then
+                    echo "❌ FAILED: Found direct requests.head() usage in ContentDownload"
+                    echo "   Use session.head() from RateRetryClient instead"
+                    exit 1
+                  fi
+                  echo "✅ PASSED: No direct requests.head() found"
+
+            - name: Check for unchecked requests imports
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  # Allow imports only in legacy shims or test files (marked with # type: ignore)
+                  if grep -r "^import requests$" src/DocsToKG/ContentDownload --include="*.py" 2>/dev/null | grep -v "# type: ignore"; then
+                    echo "⚠️  WARNING: Found 'import requests' statement (may be in legacy shim)"
+                    echo "   Consider if this is truly necessary"
+                  else
+                    echo "✅ PASSED: Bare import requests statements properly marked"
+                  fi

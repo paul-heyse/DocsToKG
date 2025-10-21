@@ -161,6 +161,31 @@ MIGRATIONS: List[Tuple[str, str]] = [
         INSERT OR IGNORE INTO schema_version VALUES ('0005_latest_pointer', now());
         """,
     ),
+    (
+        "0006_staging_prune",
+        """
+        CREATE TABLE IF NOT EXISTS staging_fs_listing (
+            scope TEXT NOT NULL,
+            relpath TEXT NOT NULL,
+            size_bytes BIGINT NOT NULL,
+            mtime TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_staging_fs_listing_scope
+            ON staging_fs_listing(scope);
+
+        CREATE OR REPLACE VIEW v_fs_orphans AS
+        SELECT s.relpath, s.size_bytes
+        FROM staging_fs_listing s
+        LEFT JOIN (
+            SELECT fs_relpath AS rel FROM artifacts
+            UNION ALL
+            SELECT relpath AS rel FROM extracted_files
+        ) cat ON cat.rel = s.relpath
+        WHERE cat.rel IS NULL;
+
+        INSERT OR IGNORE INTO schema_version VALUES ('0006_staging_prune', now());
+        """,
+    ),
 ]
 
 

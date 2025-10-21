@@ -97,7 +97,6 @@ except ImportError:  # pragma: no cover
 from .io import (
     RDF_MIME_ALIASES,
     RDF_MIME_FORMAT_LABELS,
-    apply_retry_after,
     download_stream,
     extract_archive_safe,
     generate_correlation_id,
@@ -1042,17 +1041,10 @@ def planner_http_probe(
                 status_code = response.status_code
                 if status_code in {429, 503}:
                     retry_delay = _parse_retry_after(response.headers.get("Retry-After"))
-                    if retry_delay is not None:
-                        retry_delay = apply_retry_after(
-                            http_config=http_config,
-                            service=service,
-                            host=host,
-                            delay=retry_delay,
-                        )
                     http_error = httpx.HTTPStatusError(
                         f"HTTP error {status_code}", request=response.request, response=response
                     )
-                    if retry_delay is not None:
+                    if retry_delay is not None and retry_delay > 0:
                         setattr(http_error, "_retry_after_delay", retry_delay)
                     raise http_error
                 if status_code == 416 and range_header:

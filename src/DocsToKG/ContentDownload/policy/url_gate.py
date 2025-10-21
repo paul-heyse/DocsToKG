@@ -17,6 +17,7 @@ from __future__ import annotations
 import logging
 from typing import Optional
 from urllib.parse import urlparse, urlunparse
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -60,9 +61,11 @@ def validate_url_security(url: str, http_config: Optional[object] = None) -> str
     # For now, accept any port; strengthen if needed
     port = parsed.port or (443 if parsed.scheme == "https" else 80)
 
-    # 4. HTTP→HTTPS upgrade (optional policy; default: allow plain http)
+    # 4. HTTP→HTTPS upgrade (enforced for production)
     scheme = parsed.scheme
-    # TODO: Add config flag to enforce https upgrade
+    if scheme == "http" and os.getenv("ENFORCE_HTTPS_URLS") != "false":
+        scheme = "https"
+        port = 443
 
     # 5. Reconstruct URL with normalized host
     normalized = urlunparse(

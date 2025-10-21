@@ -65,7 +65,7 @@ from ..errors import ConfigError, DownloadFailure, OntologyDownloadError, Policy
 from ..net import get_http_client
 from ..settings import DownloadConfiguration
 from .filesystem import _compute_file_hash, _materialize_cached_file, sanitize_filename, sha256_file
-from .rate_limit import RateLimiterHandle, apply_retry_after, get_bucket
+from .rate_limit import RateLimiterHandle, get_bucket
 
 IPAddress = ipaddress.IPv4Address | ipaddress.IPv6Address
 
@@ -1009,16 +1009,13 @@ def _apply_retry_after_from_response(
     service: Optional[str],
     host: Optional[str],
 ) -> Optional[float]:
+    """Parse Retry-After header and return delay in seconds.
+
+    Modern rate-limiting (pyrate_limiter) doesn't mutate buckets on 429;
+    instead, Tenacity sleeps for this duration before retrying.
+    """
     retry_after_header = response.headers.get("Retry-After")
-    retry_delay = _parse_retry_after(retry_after_header)
-    if retry_delay is not None:
-        retry_delay = apply_retry_after(
-            http_config=http_config,
-            service=service,
-            host=host,
-            delay=retry_delay,
-        )
-    return retry_delay
+    return _parse_retry_after(retry_after_header)
 
 
 def _validate_media_type(

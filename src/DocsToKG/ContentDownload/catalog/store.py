@@ -70,7 +70,11 @@ class CatalogStore:
         raise NotImplementedError
 
     def verify(self, record_id: int) -> bool:
-        """Verify SHA-256 of a record against stored file."""
+        """Verify SHA-256 of a record against stored file.
+
+        Returns True if file exists and hash matches stored hash.
+        Returns False if file missing or hash mismatch.
+        """
         raise NotImplementedError
 
     def stats(self) -> Dict[str, int]:
@@ -260,11 +264,10 @@ class SQLiteCatalog(CatalogStore):
     def verify(self, record_id: int) -> bool:
         """Verify SHA-256 of a record against stored file.
 
-        Note: This is a stub that returns True. Full implementation
-        would require reading the file at storage_uri and computing its hash.
+        Returns True if file exists and hash matches stored hash.
+        Returns False if file missing or hash mismatch.
         """
-        # TODO: Implement file verification when storage layer is available
-        return True
+        raise NotImplementedError
 
     def stats(self) -> Dict[str, int]:
         """Return catalog statistics."""

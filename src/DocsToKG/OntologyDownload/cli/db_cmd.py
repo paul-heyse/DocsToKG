@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import json
 import logging
-import shutil
 import time
 from datetime import datetime
 from pathlib import Path
@@ -26,11 +25,18 @@ from typing import Optional
 
 import typer
 
+try:
+    import duckdb
+except ImportError as exc:
+    raise ImportError("duckdb required for catalog CLI") from exc
+
+from ..catalog.doctor import generate_doctor_report
 from ..catalog.observability_instrumentation import (
     emit_cli_command_begin,
     emit_cli_command_error,
     emit_cli_command_success,
 )
+from ..catalog.prune import PruneStats, prune_with_staging
 
 # ============================================================================
 # SETUP (IMP)
@@ -38,6 +44,21 @@ from ..catalog.observability_instrumentation import (
 
 app = typer.Typer(help="DuckDB catalog utilities for OntologyDownload")
 logger = logging.getLogger(__name__)
+
+
+def _get_duckdb_connection(db_path: Path | None = None) -> duckdb.DuckDBPyConnection:
+    """Get DuckDB connection, optionally to a specific database file.
+
+    Args:
+        db_path: Optional path to DuckDB file. If None, uses in-memory DB.
+
+    Returns:
+        DuckDB connection
+    """
+    if db_path:
+        return duckdb.connect(str(db_path))
+    # In-memory for testing; production would use configured path
+    return duckdb.connect()
 
 
 def _format_output(data: dict | list | str, fmt: str = "table") -> str:
@@ -237,30 +258,86 @@ def delta(
 
 @app.command()
 def doctor(
+    artifacts_root: Path = typer.Option(
+        ..., "--artifacts-root", help="Root directory for artifacts"
+    ),
+    extracted_root: Path = typer.Option(
+        ..., "--extracted-root", help="Root directory for extracted files"
+    ),
+    db_path: Path | None = typer.Option(None, "--db", help="Path to DuckDB catalog file"),
     fix: bool = typer.Option(False, "--fix", help="Automatically fix inconsistencies"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Dry run without making changes"),
     fmt: str = typer.Option("table", "--format", help="Output format: 'json' or 'table'"),
 ) -> None:
-    """Reconcile DB↔FS inconsistencies."""
-    emit_cli_command_begin("doctor", {"fix": fix, "dry_run": dry_run})
+    """Reconcile DB↔FS inconsistencies.
+
+    Scans both artifact and extracted file directories, compares against DuckDB catalog,
+    and reports any mismatches or orphaned files.
+    """
+    emit_cli_command_begin(
+        "doctor",
+        {
+            "fix": fix,
+            "dry_run": dry_run,
+            "artifacts_root": str(artifacts_root),
+            "extracted_root": str(extracted_root),
+        },
+    )
     start_time = time.time()
 
     try:
-        if dry_run:
-            typer.echo("DRY RUN: Would check for DB↔FS inconsistencies")
+        if not artifacts_root.exists():
+            typer.echo(f"Error: Artifacts root does not exist: {artifacts_root}", err=True)
             duration_ms = (time.time() - start_time) * 1000
-            emit_cli_command_success("doctor", duration_ms, {"status": "dry_run"})
-            return
+            emit_cli_command_error("doctor", duration_ms, Exception("Artifacts root not found"))
+            raise typer.Exit(1)
 
-        data = {
-            "missing_files": 0,
-            "orphan_records": 0,
-            "status": "No inconsistencies found",
+        if not extracted_root.exists():
+            typer.echo(f"Error: Extracted root does not exist: {extracted_root}", err=True)
+            duration_ms = (time.time() - start_time) * 1000
+            emit_cli_command_error("doctor", duration_ms, Exception("Extracted root not found"))
+            raise typer.Exit(1)
+
+        # Get DuckDB connection and generate report
+        conn = _get_duckdb_connection(db_path)
+        report = generate_doctor_report(conn, artifacts_root, extracted_root)
+
+        # Format output
+        output = {
+            "timestamp": report.timestamp.isoformat(),
+            "total_artifacts_in_db": report.total_artifacts,
+            "total_files_in_db": report.total_files,
+            "fs_artifacts_scanned": report.fs_artifacts_scanned,
+            "fs_files_scanned": report.fs_files_scanned,
+            "issues_found": report.issues_found,
+            "critical_issues": report.critical_issues,
+            "warnings": report.warnings,
         }
-        typer.echo(_format_output(data, fmt))
+
+        if report.issues:
+            output["issues"] = [
+                {
+                    "type": issue.issue_type,
+                    "severity": issue.severity,
+                    "description": issue.description,
+                }
+                for issue in report.issues
+            ]
+
+        typer.echo(_format_output(output, fmt))
         duration_ms = (time.time() - start_time) * 1000
-        emit_cli_command_success("doctor", duration_ms, {"status": "success", "issues_found": 0})
+        emit_cli_command_success(
+            "doctor",
+            duration_ms,
+            {
+                "status": "success" if report.critical_issues == 0 else "issues_found",
+                "issues_found": report.issues_found,
+                "critical": report.critical_issues,
+            },
+        )
     except Exception as e:
+        if isinstance(e, typer.Exit):
+            raise
         duration_ms = (time.time() - start_time) * 1000
         emit_cli_command_error("doctor", duration_ms, e)
         raise
@@ -268,12 +345,19 @@ def doctor(
 
 @app.command()
 def prune(
+    root: Path = typer.Option(..., "--root", help="Filesystem root to scan for orphans"),
+    db_path: Path | None = typer.Option(None, "--db", help="Path to DuckDB catalog file"),
     dry_run: bool = typer.Option(True, "--dry-run", help="Show what would be deleted"),
     apply: bool = typer.Option(False, "--apply", help="Actually delete orphaned files"),
+    max_items: int | None = typer.Option(None, "--max-items", help="Limit deletion to N items"),
     fmt: str = typer.Option("table", "--format", help="Output format: 'json' or 'table'"),
 ) -> None:
-    """Identify and optionally remove orphaned files."""
-    emit_cli_command_begin("prune", {"dry_run": dry_run, "apply": apply})
+    """Identify and optionally remove orphaned files.
+
+    Scans filesystem under --root and queries v_fs_orphans view to find files
+    not referenced by the DuckDB catalog.
+    """
+    emit_cli_command_begin("prune", {"dry_run": dry_run, "apply": apply, "root": str(root)})
     start_time = time.time()
 
     try:
@@ -283,14 +367,41 @@ def prune(
             emit_cli_command_error("prune", duration_ms, Exception("Invalid options"))
             raise typer.Exit(1)
 
-        data = {
-            "orphans_found": 0,
-            "mode": "dry_run" if dry_run else "apply",
-            "status": "No orphans found",
+        if not root.exists():
+            typer.echo(f"Error: Root directory does not exist: {root}", err=True)
+            duration_ms = (time.time() - start_time) * 1000
+            emit_cli_command_error("prune", duration_ms, Exception(f"Root not found: {root}"))
+            raise typer.Exit(1)
+
+        # Get DuckDB connection and run prune
+        conn = _get_duckdb_connection(db_path)
+        stats: PruneStats = prune_with_staging(
+            conn, root, max_items=max_items, dry_run=dry_run or not apply
+        )
+
+        # Format output
+        output: dict[str, int | str | list[str]] = {
+            "staged_count": stats.staged_count,
+            "orphan_count": stats.orphan_count,
+            "deleted_count": stats.deleted_count,
+            "freed_bytes": stats.total_bytes_freed,
+            "errors": len(stats.errors),
+            "mode": "dry_run" if (dry_run or not apply) else "apply",
         }
-        typer.echo(_format_output(data, fmt))
+        if stats.errors:
+            output["error_details"] = stats.errors
+
+        typer.echo(_format_output(output, fmt))
         duration_ms = (time.time() - start_time) * 1000
-        emit_cli_command_success("prune", duration_ms, {"status": "success", "orphans_found": 0})
+        emit_cli_command_success(
+            "prune",
+            duration_ms,
+            {
+                "orphans_found": stats.orphan_count,
+                "deleted": stats.deleted_count,
+                "errors": len(stats.errors),
+            },
+        )
     except Exception as e:
         if isinstance(e, typer.Exit):
             raise

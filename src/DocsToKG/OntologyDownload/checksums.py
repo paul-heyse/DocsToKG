@@ -37,7 +37,6 @@ import httpx
 
 from .errors import ConfigError, OntologyDownloadError
 from .io import (
-    apply_retry_after,
     get_bucket,
     is_retryable_error,
     retry_with_backoff,
@@ -202,17 +201,10 @@ def _fetch_checksum_from_url(
             status_code = response.status_code
             if status_code in {429, 503}:
                 retry_delay = _parse_retry_after(response.headers.get("Retry-After"))
-                if retry_delay is not None:
-                    retry_delay = apply_retry_after(
-                        http_config=http_config,
-                        service=None,
-                        host=host,
-                        delay=retry_delay,
-                    )
                 http_error = httpx.HTTPStatusError(
                     f"HTTP error {status_code}", request=response.request, response=response
                 )
-                if retry_delay is not None:
+                if retry_delay is not None and retry_delay > 0:
                     setattr(http_error, "_retry_after_delay", retry_delay)
                 raise http_error
             response.raise_for_status()
@@ -275,7 +267,6 @@ def _fetch_checksum_from_url(
         raise
     except httpx.RequestError as exc:  # pragma: no cover - exercised via retry logic
         raise OntologyDownloadError(f"Failed to fetch checksum from {secure_url}: {exc}") from exc
-
 
 
 def resolve_expected_checksum(

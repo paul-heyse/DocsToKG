@@ -19,7 +19,6 @@ from .extraction_constraints import (
     validate_entry_compression_ratio,
     validate_entry_count,
     validate_entry_type,
-    validate_file_size,
     validate_path_constraints,
     validate_streaming_file_size,
 )
@@ -58,7 +57,8 @@ from .network import (
     retry_with_backoff,
     validate_url_security,
 )
-from .rate_limit import RateLimiterHandle, apply_retry_after, get_bucket, reset
+from .probe import ProbeResult, probe_url
+from .rate_limit import RateLimiterHandle, get_bucket, reset
 
 __all__ = [
     "extract_archive_safe",
@@ -78,8 +78,9 @@ __all__ = [
     "log_memory_usage",
     "retry_with_backoff",
     "validate_url_security",
+    "ProbeResult",
+    "probe_url",
     "RateLimiterHandle",
-    "apply_retry_after",
     "get_bucket",
     "reset",
     "reset_http_client",
