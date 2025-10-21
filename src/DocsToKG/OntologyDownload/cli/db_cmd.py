@@ -93,22 +93,42 @@ def latest(
     fmt: str = typer.Option("table", "--format", help="Output format: 'json' or 'table'"),
 ) -> None:
     """Get or set the latest version pointer."""
-    if action == "get":
-        output = {"latest": None, "status": "No latest version set"}
-        typer.echo(_format_output(output, fmt))
-    elif action == "set":
-        if not version:
-            typer.echo("Error: --version required for 'set' action", err=True)
+    emit_cli_command_begin("latest", {"action": action, "version": version, "dry_run": dry_run})
+    start_time = time.time()
+
+    try:
+        if action == "get":
+            output = {"latest": None, "status": "No latest version set"}
+            typer.echo(_format_output(output, fmt))
+            duration_ms = (time.time() - start_time) * 1000
+            emit_cli_command_success("latest", duration_ms, {"action": "get", "found": False})
+        elif action == "set":
+            if not version:
+                typer.echo("Error: --version required for 'set' action", err=True)
+                duration_ms = (time.time() - start_time) * 1000
+                emit_cli_command_error("latest", duration_ms, Exception("Missing --version"))
+                raise typer.Exit(1)
+
+            if dry_run:
+                typer.echo(f"DRY RUN: Would set latest to {version}")
+                duration_ms = (time.time() - start_time) * 1000
+                emit_cli_command_success("latest", duration_ms, {"action": "set", "dry_run": True})
+                return
+
+            typer.echo(f"Setting latest to {version}... (implementation pending)")
+            duration_ms = (time.time() - start_time) * 1000
+            emit_cli_command_success("latest", duration_ms, {"action": "set", "version": version})
+        else:
+            typer.echo(f"Error: Unknown action '{action}'. Use 'get' or 'set'", err=True)
+            duration_ms = (time.time() - start_time) * 1000
+            emit_cli_command_error("latest", duration_ms, Exception(f"Unknown action: {action}"))
             raise typer.Exit(1)
-
-        if dry_run:
-            typer.echo(f"DRY RUN: Would set latest to {version}")
-            return
-
-        typer.echo(f"Setting latest to {version}... (implementation pending)")
-    else:
-        typer.echo(f"Error: Unknown action '{action}'. Use 'get' or 'set'", err=True)
-        raise typer.Exit(1)
+    except Exception as e:
+        if isinstance(e, typer.Exit):
+            raise
+        duration_ms = (time.time() - start_time) * 1000
+        emit_cli_command_error("latest", duration_ms, e)
+        raise
 
 
 @app.command()
@@ -118,13 +138,23 @@ def versions(
     fmt: str = typer.Option("table", "--format", help="Output format: 'json' or 'table'"),
 ) -> None:
     """List all versions in the catalog."""
-    data = {
-        "versions_count": 0,
-        "service_filter": service,
-        "limit": limit,
-        "status": "No versions found",
-    }
-    typer.echo(_format_output(data, fmt))
+    emit_cli_command_begin("versions", {"service": service, "limit": limit})
+    start_time = time.time()
+
+    try:
+        data = {
+            "versions_count": 0,
+            "service_filter": service,
+            "limit": limit,
+            "status": "No versions found",
+        }
+        typer.echo(_format_output(data, fmt))
+        duration_ms = (time.time() - start_time) * 1000
+        emit_cli_command_success("versions", duration_ms, {"versions_count": 0})
+    except Exception as e:
+        duration_ms = (time.time() - start_time) * 1000
+        emit_cli_command_error("versions", duration_ms, e)
+        raise
 
 
 @app.command()
@@ -134,13 +164,23 @@ def files(
     fmt: str = typer.Option("table", "--format-output", help="Output format: 'json' or 'table'"),
 ) -> None:
     """List files in a version."""
-    data = {
-        "version": version,
-        "files_count": 0,
-        "format_filter": format_filter,
-        "status": "No files found",
-    }
-    typer.echo(_format_output(data, fmt))
+    emit_cli_command_begin("files", {"version": version, "format_filter": format_filter})
+    start_time = time.time()
+
+    try:
+        data = {
+            "version": version,
+            "files_count": 0,
+            "format_filter": format_filter,
+            "status": "No files found",
+        }
+        typer.echo(_format_output(data, fmt))
+        duration_ms = (time.time() - start_time) * 1000
+        emit_cli_command_success("files", duration_ms, {"files_count": 0})
+    except Exception as e:
+        duration_ms = (time.time() - start_time) * 1000
+        emit_cli_command_error("files", duration_ms, e)
+        raise
 
 
 @app.command()
@@ -149,14 +189,24 @@ def stats(
     fmt: str = typer.Option("table", "--format", help="Output format: 'json' or 'table'"),
 ) -> None:
     """Get statistics for a version."""
-    data = {
-        "version": version,
-        "file_count": 0,
-        "total_size_bytes": 0,
-        "format_distribution": {},
-        "validation": {"passed": 0, "failed": 0},
-    }
-    typer.echo(_format_output(data, fmt))
+    emit_cli_command_begin("stats", {"version": version})
+    start_time = time.time()
+
+    try:
+        data = {
+            "version": version,
+            "file_count": 0,
+            "total_size_bytes": 0,
+            "format_distribution": {},
+            "validation": {"passed": 0, "failed": 0},
+        }
+        typer.echo(_format_output(data, fmt))
+        duration_ms = (time.time() - start_time) * 1000
+        emit_cli_command_success("stats", duration_ms, {"file_count": 0})
+    except Exception as e:
+        duration_ms = (time.time() - start_time) * 1000
+        emit_cli_command_error("stats", duration_ms, e)
+        raise
 
 
 @app.command()
@@ -166,13 +216,23 @@ def delta(
     fmt: str = typer.Option("table", "--format", help="Output format: 'json' or 'table'"),
 ) -> None:
     """Compare two versions and show differences."""
-    data = {
-        "comparing": f"{version_a} → {version_b}",
-        "new_files": 0,
-        "deleted_files": 0,
-        "format_changes": 0,
-    }
-    typer.echo(_format_output(data, fmt))
+    emit_cli_command_begin("delta", {"version_a": version_a, "version_b": version_b})
+    start_time = time.time()
+
+    try:
+        data = {
+            "comparing": f"{version_a} → {version_b}",
+            "new_files": 0,
+            "deleted_files": 0,
+            "format_changes": 0,
+        }
+        typer.echo(_format_output(data, fmt))
+        duration_ms = (time.time() - start_time) * 1000
+        emit_cli_command_success("delta", duration_ms, {"new_files": 0, "deleted_files": 0})
+    except Exception as e:
+        duration_ms = (time.time() - start_time) * 1000
+        emit_cli_command_error("delta", duration_ms, e)
+        raise
 
 
 @app.command()
@@ -244,13 +304,23 @@ def backup(
     fmt: str = typer.Option("table", "--format", help="Output format: 'json' or 'table'"),
 ) -> None:
     """Create a timestamped backup of the DuckDB catalog."""
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    data = {
-        "backup_created": True,
-        "timestamp": timestamp,
-        "status": "Backup complete",
-    }
-    typer.echo(_format_output(data, fmt))
+    emit_cli_command_begin("backup", {})
+    start_time = time.time()
+
+    try:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        data = {
+            "backup_created": True,
+            "timestamp": timestamp,
+            "status": "Backup complete",
+        }
+        typer.echo(_format_output(data, fmt))
+        duration_ms = (time.time() - start_time) * 1000
+        emit_cli_command_success("backup", duration_ms, {"timestamp": timestamp})
+    except Exception as e:
+        duration_ms = (time.time() - start_time) * 1000
+        emit_cli_command_error("backup", duration_ms, e)
+        raise
 
 
 if __name__ == "__main__":
