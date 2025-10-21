@@ -1,349 +1,222 @@
-"""Stock SQL queries for operational dashboards and analytics.
+"""Stock queries for observability analytics.
 
-Provides pre-built queries for answering common operational questions:
-- SLO metrics (latencies, error rates)
-- Cache performance (hit ratios)
-- Rate-limit pressure (blocked time)
-- Safety gates (policy rejections)
-- Capacity trends (bytes, entries)
+Pre-built SQL queries for DuckDB that answer common operational questions:
+- SLO performance metrics (p50, p95, p99 latencies)
+- Cache hit ratios by service
+- Rate limiter pressure (top keys)
+- Safety gate rejections (error codes)
+- Zip bomb detection (compression ratios)
 """
 
-from typing import Dict, List
-
-# ============================================================================
-# Query Registry (for documentation)
-# ============================================================================
-
-STOCK_QUERIES: Dict[str, Dict[str, str]] = {}
-
-
-def register_query(name: str, description: str):
-    """Decorator to register a query for documentation."""
-
-    def decorator(query: str) -> str:
-        STOCK_QUERIES[name] = {"query": query, "description": description}
-        return query
-
-    return decorator
+from typing import Optional
 
 
 # ============================================================================
-# SLO Metrics Queries
+# SLO Queries (Performance)
 # ============================================================================
 
-
-QUERY_NET_REQUEST_P95_LATENCY = """
-SELECT
+QUERY_SLO_NETWORK_LATENCY = """
+SELECT 
     service,
-    APPROX_QUANTILE(payload.elapsed_ms, 0.95) as p95_latency_ms,
-    APPROX_QUANTILE(payload.elapsed_ms, 0.50) as p50_latency_ms,
-    MAX(payload.elapsed_ms) as max_latency_ms,
-    COUNT(*) as request_count
+    COUNT(*) as request_count,
+    PERCENTILE_CONT(0.50) WITHIN GROUP (ORDER BY payload.elapsed_ms) as p50_ms,
+    PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY payload.elapsed_ms) as p95_ms,
+    PERCENTILE_CONT(0.99) WITHIN GROUP (ORDER BY payload.elapsed_ms) as p99_ms,
+    AVG(payload.elapsed_ms) as avg_ms,
+    MAX(payload.elapsed_ms) as max_ms
 FROM events
 WHERE type = 'net.request'
-    AND ts >= now() - interval '1 hour'
 GROUP BY service
-ORDER BY p95_latency_ms DESC;
+ORDER BY p95_ms DESC
 """
-STOCK_QUERIES["net_request_p95_latency"] = {
-    "description": "Network request SLO: p95/p50 latencies by service (last hour)",
-    "query": QUERY_NET_REQUEST_P95_LATENCY,
-}
-
-
-QUERY_ERROR_RATE_BY_SERVICE = """
-SELECT
-    service,
-    COUNT(*) FILTER (WHERE level = 'ERROR') as error_count,
-    COUNT(*) as total_events,
-    ROUND(100.0 * COUNT(*) FILTER (WHERE level = 'ERROR') / COUNT(*), 2) as error_rate_pct
-FROM events
-WHERE ts >= now() - interval '1 hour'
-GROUP BY service
-ORDER BY error_rate_pct DESC;
-"""
-STOCK_QUERIES["error_rate_by_service"] = {
-    "description": "Error rate by service (last hour)",
-    "query": QUERY_ERROR_RATE_BY_SERVICE,
-}
-
-
-# ============================================================================
-# Cache Performance Queries
-# ============================================================================
-
 
 QUERY_CACHE_HIT_RATIO = """
-SELECT
+SELECT 
     service,
-    COUNT(*) FILTER (WHERE payload.cache IN ('hit', 'revalidated')) as cache_hits,
     COUNT(*) as total_requests,
-    ROUND(
-        100.0 * COUNT(*) FILTER (WHERE payload.cache IN ('hit', 'revalidated')) / COUNT(*),
-        2
-    ) as cache_hit_ratio_pct
+    SUM(CASE WHEN payload.cache IN ('hit', 'revalidated') THEN 1 ELSE 0 END) as cached_requests,
+    ROUND(100.0 * SUM(CASE WHEN payload.cache IN ('hit', 'revalidated') THEN 1 ELSE 0 END) / COUNT(*), 2) as hit_ratio_percent
 FROM events
 WHERE type = 'net.request'
-    AND ts >= now() - interval '1 hour'
 GROUP BY service
-ORDER BY cache_hit_ratio_pct DESC;
+ORDER BY hit_ratio_percent DESC
 """
-STOCK_QUERIES["cache_hit_ratio"] = {
-    "description": "HTTP cache hit ratio by service (last hour)",
-    "query": QUERY_CACHE_HIT_RATIO,
-}
 
 
 # ============================================================================
-# Rate-Limit Pressure Queries
+# Rate Limiting Queries
 # ============================================================================
-
 
 QUERY_RATE_LIMIT_PRESSURE = """
-SELECT
+SELECT 
     SUBSTR(payload.key, 1, 40) as key,
+    COUNT(*) as acquire_count,
+    SUM(CASE WHEN payload.allowed = false THEN 1 ELSE 0 END) as blocked_count,
     SUM(payload.blocked_ms) as total_blocked_ms,
-    COUNT(*) as acquire_attempts,
-    ROUND(100.0 * SUM(payload.blocked_ms) / NULLIF(SUM(payload.elapsed_ms), 0), 2) as blocked_pct
+    ROUND(100.0 * SUM(CASE WHEN payload.allowed = false THEN 1 ELSE 0 END) / COUNT(*), 2) as block_rate_percent
 FROM events
 WHERE type = 'ratelimit.acquire'
-    AND ts >= now() - interval '1 hour'
-GROUP BY key
+GROUP BY SUBSTR(payload.key, 1, 40)
+HAVING SUM(payload.blocked_ms) > 0
 ORDER BY total_blocked_ms DESC
-LIMIT 20;
+LIMIT 10
 """
-STOCK_QUERIES["rate_limit_pressure"] = {
-    "description": "Top 20 rate-limited keys by blocked time (last hour)",
-    "query": QUERY_RATE_LIMIT_PRESSURE,
-}
 
-
-QUERY_429_RESPONSES = """
-SELECT
-    payload.host,
-    COUNT(*) as count_429,
-    AVG(payload.retry_after_s) as avg_retry_after_s,
-    MAX(payload.retry_after_s) as max_retry_after_s
+QUERY_RATE_LIMIT_COOLDOWNS = """
+SELECT 
+    SUBSTR(payload.key, 1, 40) as key,
+    payload.status_code,
+    COUNT(*) as cooldown_count,
+    SUM(payload.cooldown_ms) as total_cooldown_ms,
+    AVG(payload.cooldown_sec) as avg_cooldown_sec
 FROM events
-WHERE type = 'net.request'
-    AND payload.status = 429
-    AND ts >= now() - interval '1 hour'
-GROUP BY payload.host
-ORDER BY count_429 DESC;
+WHERE type = 'ratelimit.cooldown'
+GROUP BY SUBSTR(payload.key, 1, 40), payload.status_code
+ORDER BY cooldown_count DESC
 """
-STOCK_QUERIES["http_429_responses"] = {
-    "description": "HTTP 429 responses by host (last hour)",
-    "query": QUERY_429_RESPONSES,
-}
 
 
 # ============================================================================
-# Safety Gate Queries
+# Safety & Policy Queries
 # ============================================================================
 
-
-QUERY_POLICY_REJECTIONS = """
-SELECT
+QUERY_POLICY_GATE_REJECTIONS = """
+SELECT 
     payload.error_code,
     COUNT(*) as rejection_count,
-    COUNT(DISTINCT run_id) as distinct_runs
+    ROUND(AVG(payload.elapsed_ms), 2) as avg_gate_ms,
+    MAX(payload.elapsed_ms) as max_gate_ms
 FROM events
 WHERE type LIKE '%.error'
-    AND payload.error_code LIKE 'E_%'
-    AND ts >= now() - interval '1 hour'
 GROUP BY payload.error_code
-ORDER BY rejection_count DESC;
+ORDER BY rejection_count DESC
 """
-STOCK_QUERIES["policy_rejections"] = {
-    "description": "Policy gate rejections by error code (last hour)",
-    "query": QUERY_POLICY_REJECTIONS,
-}
 
-
-QUERY_EXTRACTION_FAILURES = """
-SELECT
-    payload.error_code,
-    COUNT(*) as failure_count,
-    AVG(payload.ratio_total) as avg_ratio,
-    MAX(payload.ratio_total) as max_ratio
+QUERY_SAFETY_HEATMAP = """
+SELECT 
+    ts::DATE as date,
+    type,
+    COUNT(*) as error_count
 FROM events
-WHERE type = 'extract.error'
-    AND ts >= now() - interval '24 hours'
-GROUP BY payload.error_code
-ORDER BY failure_count DESC;
+WHERE type LIKE '%.error'
+GROUP BY ts::DATE, type
+ORDER BY ts DESC, error_count DESC
+LIMIT 50
 """
-STOCK_QUERIES["extraction_failures"] = {
-    "description": "Extraction failures by error code (last 24 hours)",
-    "query": QUERY_EXTRACTION_FAILURES,
-}
 
 
 # ============================================================================
-# Capacity & Throughput Queries
+# Extraction Queries
 # ============================================================================
 
-
-QUERY_BYTES_WRITTEN_BY_SERVICE = """
-SELECT
+QUERY_ZIP_BOMB_SENTINEL = """
+SELECT 
+    ts,
     service,
-    SUM(payload.bytes_written) as total_bytes_written,
-    COUNT(*) as extract_jobs,
-    ROUND(SUM(payload.bytes_written) / 1024.0 / 1024.0, 2) as total_mb
+    payload.entries_total,
+    payload.entries_included,
+    ROUND(payload.bytes_written / NULLIF(payload.entries_included, 0), 2) as bytes_per_entry,
+    payload.duration_ms
 FROM events
 WHERE type = 'extract.done'
-    AND ts >= now() - interval '1 hour'
-GROUP BY service
-ORDER BY total_bytes_written DESC;
+    AND (payload.entries_total > 1000 OR ROUND(payload.bytes_written / NULLIF(payload.entries_included, 0), 2) > 10.0)
+ORDER BY ts DESC
+LIMIT 20
 """
-STOCK_QUERIES["bytes_written_by_service"] = {
-    "description": "Throughput: bytes written by service (last hour)",
-    "query": QUERY_BYTES_WRITTEN_BY_SERVICE,
-}
-
 
 QUERY_EXTRACTION_STATS = """
-SELECT
-    COUNT(*) as total_extracts,
-    AVG(payload.entries_total) as avg_entries,
-    AVG(payload.duration_ms) as avg_duration_ms,
-    AVG(payload.ratio_total) as avg_compression_ratio,
-    MAX(payload.ratio_total) as max_ratio_hint
+SELECT 
+    DATE(ts) as date,
+    COUNT(*) as extraction_count,
+    SUM(payload.entries_total) as total_entries,
+    SUM(payload.bytes_written) as total_bytes,
+    AVG(payload.duration_ms) as avg_duration_ms
 FROM events
 WHERE type = 'extract.done'
-    AND ts >= now() - interval '1 hour';
+GROUP BY DATE(ts)
+ORDER BY date DESC
 """
-STOCK_QUERIES["extraction_stats"] = {
-    "description": "Aggregate extraction statistics (last hour)",
-    "query": QUERY_EXTRACTION_STATS,
-}
-
-
-# ============================================================================
-# Anomaly Detection Queries
-# ============================================================================
-
-
-QUERY_ZIP_BOMB_CANDIDATES = """
-SELECT
-    ts,
-    payload.ratio_total,
-    payload.entries_total,
-    payload.bytes_declared,
-    payload.bytes_written
-FROM events
-WHERE type = 'extract.done'
-    AND payload.ratio_total > 10.0
-    AND ts >= now() - interval '7 days'
-ORDER BY payload.ratio_total DESC
-LIMIT 20;
-"""
-STOCK_QUERIES["zip_bomb_candidates"] = {
-    "description": "Potential zip-bomb detections (high compression ratio > 10.0)",
-    "query": QUERY_ZIP_BOMB_CANDIDATES,
-}
-
-
-QUERY_SLOW_REQUESTS = """
-SELECT
-    ts,
-    payload.url_redacted,
-    payload.host,
-    payload.elapsed_ms,
-    payload.status
-FROM events
-WHERE type = 'net.request'
-    AND payload.elapsed_ms > 30000
-    AND ts >= now() - interval '24 hours'
-ORDER BY payload.elapsed_ms DESC
-LIMIT 20;
-"""
-STOCK_QUERIES["slow_requests"] = {
-    "description": "Slow HTTP requests (> 30s) in last 24 hours",
-    "query": QUERY_SLOW_REQUESTS,
-}
 
 
 # ============================================================================
 # Query Functions
 # ============================================================================
 
-
-def get_stock_queries() -> Dict[str, Dict[str, str]]:
-    """Get all registered stock queries.
-
-    Returns:
-        Dict mapping query name to {description, query}
-    """
-    return STOCK_QUERIES.copy()
-
-
-def get_query(name: str) -> str:
-    """Get a stock query by name.
-
+def get_slo_query(metric: str = "network") -> Optional[str]:
+    """Get SLO query by metric name.
+    
     Args:
-        name: Query name (e.g., 'net_request_p95_latency')
-
+        metric: 'network' for latency, 'cache' for hit ratio
+    
     Returns:
-        SQL query string or raises KeyError if not found
-
-    Raises:
-        KeyError: If query name not found
+        SQL query string or None
     """
-    if name not in STOCK_QUERIES:
-        available = ", ".join(sorted(STOCK_QUERIES.keys()))
-        raise KeyError(f"Query '{name}' not found. Available: {available}")
-    return STOCK_QUERIES[name]["query"]
+    queries = {
+        "network": QUERY_SLO_NETWORK_LATENCY,
+        "cache": QUERY_CACHE_HIT_RATIO,
+    }
+    return queries.get(metric)
 
 
-def list_queries() -> List[str]:
-    """List all available stock query names.
-
-    Returns:
-        Sorted list of query names
-    """
-    return sorted(STOCK_QUERIES.keys())
-
-
-def describe_query(name: str) -> str:
-    """Get human-readable description of a query.
-
+def get_rate_limit_query(metric: str = "pressure") -> Optional[str]:
+    """Get rate limiting query by metric name.
+    
     Args:
-        name: Query name
-
+        metric: 'pressure' for blocked keys, 'cooldowns' for 429s
+    
     Returns:
-        Description string or raises KeyError if not found
+        SQL query string or None
     """
-    if name not in STOCK_QUERIES:
-        raise KeyError(f"Query '{name}' not found")
-    return STOCK_QUERIES[name]["description"]
+    queries = {
+        "pressure": QUERY_RATE_LIMIT_PRESSURE,
+        "cooldowns": QUERY_RATE_LIMIT_COOLDOWNS,
+    }
+    return queries.get(metric)
 
 
-def query_summary() -> Dict[str, str]:
-    """Get a summary of all queries.
-
+def get_safety_query(metric: str = "rejections") -> Optional[str]:
+    """Get safety/policy query by metric name.
+    
+    Args:
+        metric: 'rejections' for error codes, 'heatmap' for timeline
+    
     Returns:
-        Dict mapping query name to description
+        SQL query string or None
     """
-    return {name: info["description"] for name, info in STOCK_QUERIES.items()}
+    queries = {
+        "rejections": QUERY_POLICY_GATE_REJECTIONS,
+        "heatmap": QUERY_SAFETY_HEATMAP,
+    }
+    return queries.get(metric)
+
+
+def get_extraction_query(metric: str = "bombs") -> Optional[str]:
+    """Get extraction query by metric name.
+    
+    Args:
+        metric: 'bombs' for zip bomb detection, 'stats' for summary
+    
+    Returns:
+        SQL query string or None
+    """
+    queries = {
+        "bombs": QUERY_ZIP_BOMB_SENTINEL,
+        "stats": QUERY_EXTRACTION_STATS,
+    }
+    return queries.get(metric)
 
 
 __all__ = [
-    "STOCK_QUERIES",
-    "get_stock_queries",
-    "get_query",
-    "list_queries",
-    "describe_query",
-    "query_summary",
-    # Query constants for direct access
-    "QUERY_NET_REQUEST_P95_LATENCY",
-    "QUERY_ERROR_RATE_BY_SERVICE",
+    "QUERY_SLO_NETWORK_LATENCY",
     "QUERY_CACHE_HIT_RATIO",
     "QUERY_RATE_LIMIT_PRESSURE",
-    "QUERY_429_RESPONSES",
-    "QUERY_POLICY_REJECTIONS",
-    "QUERY_EXTRACTION_FAILURES",
-    "QUERY_BYTES_WRITTEN_BY_SERVICE",
+    "QUERY_RATE_LIMIT_COOLDOWNS",
+    "QUERY_POLICY_GATE_REJECTIONS",
+    "QUERY_SAFETY_HEATMAP",
+    "QUERY_ZIP_BOMB_SENTINEL",
     "QUERY_EXTRACTION_STATS",
-    "QUERY_ZIP_BOMB_CANDIDATES",
-    "QUERY_SLOW_REQUESTS",
+    "get_slo_query",
+    "get_rate_limit_query",
+    "get_safety_query",
+    "get_extraction_query",
 ]
