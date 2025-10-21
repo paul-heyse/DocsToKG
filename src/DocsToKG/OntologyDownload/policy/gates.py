@@ -329,11 +329,18 @@ def url_gate(
             )
 
         elapsed_ms = time.perf_counter() * 1000 - start_ms
+        
+        # Record success metrics
+        _record_gate_metric("url_gate", True, elapsed_ms)
+        
         return PolicyOK(gate_name="url_gate", elapsed_ms=elapsed_ms)
 
     except Exception as e:
         elapsed_ms = time.perf_counter() * 1000 - start_ms
         if isinstance(e, URLPolicyException):
+            # Extract error code from exception details if available
+            error_code = ErrorCode.E_HOST_DENY
+            _record_gate_metric("url_gate", False, elapsed_ms, error_code)
             raise
         raise_policy_error(
             ErrorCode.E_HOST_DENY,

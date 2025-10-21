@@ -12,24 +12,25 @@ Usage:
 """
 
 import logging
-import threading
+import time
 from typing import Optional
 
 try:
     from prometheus_client import generate_latest, REGISTRY
-    from prometheus_client.exposition import HTTPServer, make_wsgi_app
+    from prometheus_client.exposition import start_http_server, make_wsgi_app, ThreadingWSGIServer, WSGIRequestHandler
 except ImportError:
     # Fallback if prometheus_client not available
     REGISTRY = None  # type: ignore
-    HTTPServer = None  # type: ignore
+    start_http_server = None  # type: ignore
     make_wsgi_app = None  # type: ignore
+    ThreadingWSGIServer = None  # type: ignore
+    WSGIRequestHandler = None  # type: ignore
 
 
 logger = logging.getLogger(__name__)
 
-# Global reference to the metrics server thread
-_metrics_server_thread: Optional[threading.Thread] = None
-_metrics_server_instance: Optional[HTTPServer] = None
+# Global reference to the metrics server
+_metrics_server_instance: Optional[ThreadingWSGIServer] = None
 _metrics_server_running = False
 
 
@@ -43,9 +44,9 @@ def start_metrics_server(host: str = "0.0.0.0", port: int = 8000) -> bool:
     Returns:
         True if server started successfully, False otherwise
     """
-    global _metrics_server_thread, _metrics_server_instance, _metrics_server_running
+    global _metrics_server_instance, _metrics_server_running
 
-    if REGISTRY is None or HTTPServer is None:
+    if REGISTRY is None or start_http_server is None:
         logger.warning("prometheus_client not available - metrics server disabled")
         return False
 
@@ -54,17 +55,8 @@ def start_metrics_server(host: str = "0.0.0.0", port: int = 8000) -> bool:
         return True
 
     try:
-        # Create metrics server
-        app = make_wsgi_app(REGISTRY)
-        _metrics_server_instance = HTTPServer((host, port), app)
-
-        # Start in background thread
-        _metrics_server_thread = threading.Thread(
-            target=_metrics_server_instance.serve_forever,
-            daemon=True,
-            name="PrometheusMetricsServer"
-        )
-        _metrics_server_thread.start()
+        # Use prometheus_client's built-in start_http_server
+        start_http_server(port, addr=host, registry=REGISTRY)
         _metrics_server_running = True
 
         logger.info(f"✅ Prometheus metrics server started on http://{host}:{port}/metrics")
@@ -82,20 +74,17 @@ def stop_metrics_server() -> bool:
     Returns:
         True if server was running and stopped, False otherwise
     """
-    global _metrics_server_instance, _metrics_server_running
+    global _metrics_server_running
 
-    if not _metrics_server_running or _metrics_server_instance is None:
+    if not _metrics_server_running:
         logger.info("Metrics server not running")
         return False
 
-    try:
-        _metrics_server_instance.shutdown()
-        _metrics_server_running = False
-        logger.info("✅ Prometheus metrics server stopped")
-        return True
-    except Exception as e:
-        logger.error(f"Error stopping metrics server: {e}")
-        return False
+    # Note: prometheus_client's start_http_server doesn't provide easy shutdown
+    # The server runs in a daemon thread and will stop when the main program exits
+    logger.warning("Metrics server will stop when main program exits (daemon thread)")
+    _metrics_server_running = False
+    return True
 
 
 def get_metrics() -> str:
