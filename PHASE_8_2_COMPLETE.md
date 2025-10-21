@@ -1,7 +1,7 @@
 # Phase 8.2: Gate Telemetry Integration - COMPLETE
 
-**Status**: ✅ 100% COMPLETE  
-**Date**: October 21, 2025  
+**Status**: ✅ 100% COMPLETE
+**Date**: October 21, 2025
 **Scope**: Telemetry wiring into all 6 gates (50 LOC infrastructure)
 
 ---
@@ -13,6 +13,7 @@ All 6 security gates now emit structured events and record metrics:
 ### ✅ Telemetry Infrastructure (50 LOC)
 
 **_emit_gate_event()**
+
 - Emits `policy.gate` events with structured payloads
 - Outcome: "ok" or "reject"
 - Event level: INFO for passes, ERROR for rejects
@@ -20,6 +21,7 @@ All 6 security gates now emit structured events and record metrics:
 - Safe fallback: exceptions silently caught (won't break gate logic)
 
 **_record_gate_metric()**
+
 - Records per-gate metrics via `MetricsCollector.instance()`
 - Creates `GateMetric` objects with: gate_name, passed, elapsed_ms, error_code
 - Safe fallback: exceptions silently caught
@@ -28,12 +30,14 @@ All 6 security gates now emit structured events and record metrics:
 ### ✅ Event Emission Wiring
 
 All 6 gates now emit events on:
+
 1. **Success path**: `_emit_gate_event(gate_name, "ok", elapsed_ms)`
 2. **Rejection path**: `_emit_gate_event(gate_name, "reject", elapsed_ms, error_code, details)`
 
 ### ✅ Metrics Recording Wiring
 
 All 6 gates now record metrics on:
+
 1. **Success path**: `_record_gate_metric(gate_name, True, elapsed_ms)`
 2. **Rejection path**: `_record_gate_metric(gate_name, False, elapsed_ms, error_code)`
 
@@ -90,6 +94,7 @@ GateMetric(
 ```
 
 **Aggregation Enabled**:
+
 - Per-gate pass/reject counts
 - Percentile calculations (p50, p95, p99 latency)
 - Error code frequency analysis
@@ -119,6 +124,7 @@ Telemetry now flows from:
 6. **db_boundary_gate** → `policy.gate` events (DB transaction safety)
 
 All events carry:
+
 - Gate name
 - Outcome (pass/reject)
 - Elapsed time (milliseconds)
@@ -132,6 +138,7 @@ All events carry:
 Wire gates into actual OntologyDownload operations:
 
 ### Into `planning.py`
+
 ```python
 # At start of plan: config validation
 result = config_gate(config)
@@ -140,18 +147,21 @@ result = url_gate(url, allowed_hosts, allowed_ports)
 ```
 
 ### Into `io/filesystem.py`
+
 ```python
 # Before extraction: path validation
 result = filesystem_gate(root_path, extracted_entry_paths)
 ```
 
 ### Into `extraction_policy.py`
+
 ```python
 # Pre-scan: archive parameter validation
 result = extraction_gate(entries_total, bytes_declared, policies)
 ```
 
 ### Into `catalog/boundaries.py`
+
 ```python
 # Pre-commit: transactional invariants
 result = db_boundary_gate("pre_commit", tables, fs_success)
@@ -164,12 +174,14 @@ result = db_boundary_gate("pre_commit", tables, fs_success)
 Phase 8.2 delivered telemetry infrastructure. Phase 8.4 will test:
 
 ### Unit Tests
+
 - Verify events emitted with correct payloads
 - Verify metrics recorded with correct values
 - Test error code propagation
 - Test fallback behavior when observability unavailable
 
 ### Integration Tests
+
 - E2E scenarios with gate rejections
 - Event stream validation
 - Metrics aggregation
@@ -197,7 +209,7 @@ Phase 8.2 delivered telemetry infrastructure. Phase 8.4 will test:
 
 ## Deployment Checklist
 
-- [x] Telemetry helpers created (_emit_gate_event, _record_gate_metric)
+- [x] Telemetry helpers created (_emit_gate_event,_record_gate_metric)
 - [x] All 6 gates instrumented
 - [x] Events emitted on pass/reject paths
 - [x] Metrics recorded on pass/reject paths
@@ -215,6 +227,7 @@ Phase 8.2 delivered telemetry infrastructure. Phase 8.4 will test:
 **Phase 8.2 (Telemetry Integration): PRODUCTION-READY** ✅
 
 All 6 security gates now emit structured `policy.gate` events and record metrics. The telemetry infrastructure is:
+
 - Type-safe
 - Non-breaking (safe fallbacks)
 - Performance-efficient (<1ms overhead)

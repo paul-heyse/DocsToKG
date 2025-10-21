@@ -624,14 +624,58 @@ def inspect(
     [bold yellow]Example:[/bold yellow]
     [cyan]docparse inspect --dataset chunks --limit 10[/cyan]
     """
+    from DocsToKG.DocParsing.storage.dataset_view import open_chunks, open_vectors, summarize
+
     app_ctx: AppContext = ctx.obj
     if not app_ctx:
         typer.secho("[red]✗ Configuration not initialized[/red]", err=True)
         raise typer.Exit(code=1)
 
-    typer.secho("[yellow]⚠ Dataset inspection not yet implemented in Phase 2[/yellow]")
-    typer.echo(f"[dim]Dataset: {dataset}[/dim]")
-    typer.echo(f"[dim]Limit: {limit} rows[/dim]")
+    data_root = root or app_ctx.data_root or Path("Data")
+
+    try:
+        # Route by dataset type
+        if dataset == "chunks":
+            dataset_obj = open_chunks(data_root)
+            summary = summarize(dataset_obj, dataset_type="chunks")
+        elif dataset.startswith("vectors-"):
+            family = dataset.replace("vectors-", "")
+            if family not in ("dense", "sparse", "lexical"):
+                typer.secho(f"[red]✗ Invalid vector family: {family}[/red]", err=True)
+                raise typer.Exit(code=1)
+            dataset_obj = open_vectors(data_root, family)
+            summary = summarize(dataset_obj, dataset_type=family)
+        else:
+            typer.secho(f"[red]✗ Unknown dataset: {dataset}[/red]", err=True)
+            raise typer.Exit(code=1)
+
+        # Display summary
+        typer.secho(f"\n[bold]Dataset: {summary.dataset_type}[/bold]", fg="cyan")
+        typer.echo(f"  Files: {summary.file_count}")
+        typer.echo(
+            f"  Total Size: {summary.total_bytes:,} bytes ({summary.total_bytes / (1024**2):.1f} MB)"
+        )
+        if summary.approx_rows:
+            typer.echo(f"  Approx Rows: {summary.approx_rows:,}")
+
+        if summary.partitions:
+            typer.echo(f"  Partitions: {', '.join(sorted(summary.partitions.keys()))}")
+
+        if summary.sample_doc_ids:
+            typer.echo(f"  Sample doc_ids: {', '.join(summary.sample_doc_ids[:5])}")
+
+        typer.echo("\n[bold]Schema[/bold]")
+        for i, field in enumerate(summary.schema):
+            typer.echo(f"  {field.name}: {field.type}")
+
+        typer.secho("\n✓ Dataset inspection complete", fg="green")
+
+    except FileNotFoundError as e:
+        typer.secho(f"[red]✗ Dataset not found: {e}[/red]", err=True)
+        raise typer.Exit(code=1)
+    except Exception as e:
+        typer.secho(f"[red]✗ Error inspecting dataset: {e}[/red]", err=True)
+        raise typer.Exit(code=1)
 
 
 # ============================================================================

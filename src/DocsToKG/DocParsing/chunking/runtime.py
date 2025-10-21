@@ -272,9 +272,9 @@ from DocsToKG.DocParsing.logging import (
     manifest_log_success,
     telemetry_scope,
 )
-from DocsToKG.DocParsing.telemetry import StageTelemetry, TelemetrySink
-from DocsToKG.DocParsing.storage.chunks_writer import ParquetChunksWriter
 from DocsToKG.DocParsing.storage import paths as storage_paths
+from DocsToKG.DocParsing.storage.chunks_writer import ParquetChunksWriter
+from DocsToKG.DocParsing.telemetry import StageTelemetry, TelemetrySink
 
 from .cli import build_parser, parse_args
 from .config import CHUNK_PROFILE_PRESETS, ChunkerCfg
@@ -659,45 +659,78 @@ def _process_chunk_task(task: ChunkTask) -> ChunkResult:
         chunk_count = len(merged)
         total_tokens = sum(rec.n_tok for rec in merged)
 
-        with atomic_write(output_path) as handle:
-            for chunk_id, rec in enumerate(merged):
-                text_body = rec.text
-                if cfg.inject_anchors:
-                    anchor = f"<<chunk:{task.doc_id}:{chunk_id}>>"
-                    if not text_body.startswith(anchor):
-                        text_body = f"{anchor}\n{text_body}"
+        # Collect chunk rows (shared for both formats)
+        chunk_rows = []
+        for chunk_id, rec in enumerate(merged):
+            text_body = rec.text
+            if cfg.inject_anchors:
+                anchor = f"<<chunk:{task.doc_id}:{chunk_id}>>"
+                if not text_body.startswith(anchor):
+                    text_body = f"{anchor}\n{text_body}"
 
-                provenance = ProvenanceMetadata(
-                    parse_engine=task.parse_engine,
-                    docling_version=cfg.docling_version,
-                    has_image_captions=rec.has_image_captions,
-                    has_image_classification=rec.has_image_classification,
-                    num_images=rec.num_images,
-                    image_confidence=rec.image_confidence,
+            provenance = ProvenanceMetadata(
+                parse_engine=task.parse_engine,
+                docling_version=cfg.docling_version,
+                has_image_captions=rec.has_image_captions,
+                has_image_classification=rec.has_image_classification,
+                num_images=rec.num_images,
+                image_confidence=rec.image_confidence,
+            )
+
+            row = ChunkRow(
+                doc_id=task.doc_id,
+                source_path=relative_path(task.doc_path, cfg.data_root),
+                chunk_id=chunk_id,
+                source_chunk_idxs=rec.src_idxs,
+                num_tokens=rec.n_tok,
+                text=text_body,
+                doc_items_refs=rec.refs,
+                page_nos=rec.pages,
+                schema_version=CHUNK_SCHEMA_VERSION,
+                start_offset=rec.start_offset,
+                has_image_captions=rec.has_image_captions,
+                has_image_classification=rec.has_image_classification,
+                num_images=rec.num_images,
+                image_confidence=rec.image_confidence,
+                provenance=provenance,
+                uuid=compute_chunk_uuid(task.doc_id, rec.start_offset or 0, text_body),
+            ).model_dump(mode="python")
+
+            validate_chunk_row(row)
+            chunk_rows.append(row)
+
+        # Route by format (Parquet default, JSONL legacy)
+        if cfg.format == "parquet":
+            try:
+                # Use ParquetChunksWriter for Parquet output
+                from DocsToKG.DocParsing.storage.chunks_writer import ParquetChunksWriter
+
+                writer = ParquetChunksWriter()
+                rel_id = storage_paths.normalize_rel_id(output_path.stem)
+                # Compute cfg_hash for this worker config
+                cfg_hash = _compute_worker_cfg_hash(cfg)
+                writer.write(
+                    chunk_rows,
+                    data_root=cfg.data_root,
+                    rel_id=rel_id,
+                    cfg_hash=cfg_hash,
+                    created_by="DocsToKG-DocParsing",
                 )
-
-                row = ChunkRow(
-                    doc_id=task.doc_id,
-                    source_path=relative_path(task.doc_path, cfg.data_root),
-                    chunk_id=chunk_id,
-                    source_chunk_idxs=rec.src_idxs,
-                    num_tokens=rec.n_tok,
-                    text=text_body,
-                    doc_items_refs=rec.refs,
-                    page_nos=rec.pages,
-                    schema_version=CHUNK_SCHEMA_VERSION,
-                    start_offset=rec.start_offset,
-                    has_image_captions=rec.has_image_captions,
-                    has_image_classification=rec.has_image_classification,
-                    num_images=rec.num_images,
-                    image_confidence=rec.image_confidence,
-                    provenance=provenance,
-                    uuid=compute_chunk_uuid(task.doc_id, rec.start_offset or 0, text_body),
-                ).model_dump(mode="python")
-
-                validate_chunk_row(row)
-                handle.write(json.dumps(row, ensure_ascii=False))
-                handle.write("\n")
+            except Exception as exc:
+                # Fallback to JSONL on Parquet write failure
+                _LOGGER.warning(
+                    f"Parquet write failed for {task.doc_id}, falling back to JSONL: {exc}"
+                )
+                with atomic_write(output_path) as handle:
+                    for row in chunk_rows:
+                        handle.write(json.dumps(row, ensure_ascii=False))
+                        handle.write("\n")
+        else:
+            # Legacy JSONL format
+            with atomic_write(output_path) as handle:
+                for row in chunk_rows:
+                    handle.write(json.dumps(row, ensure_ascii=False))
+                    handle.write("\n")
 
         duration = time.perf_counter() - start_time
         return ChunkResult(
