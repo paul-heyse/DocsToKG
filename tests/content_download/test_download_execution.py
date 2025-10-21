@@ -32,6 +32,11 @@ from DocsToKG.ContentDownload.api.types import DownloadOutcome
 from tests.conftest import PatchManager
 
 
+class ResolverMetrics:
+    """Stub metrics collector for tests (original was legacy code)."""
+    pass
+
+
 def _build_mock_client() -> httpx.Client:
     transport = httpx.MockTransport(lambda request: httpx.Response(200, request=request))
     return httpx.Client(transport=transport)
@@ -414,22 +419,16 @@ def test_process_one_work_preserves_reason(patcher: PatchManager, artifact: Work
             return None
 
     outcome = DownloadOutcome(
-        classification=Classification.MISS,
+        ok=False,
+        classification="error",
         path=None,
-        http_status=200,
-        content_type="application/pdf",
-        elapsed_ms=12.0,
         reason=ReasonCode.HTML_TAIL_DETECTED,
-        reason_detail="html-tail-detected",
     )
     pipeline_result = DownloadOutcome(
-        classification=Classification.MISS,
+        ok=False,
+        classification="error",
         path=None,
-        http_status=200,
-        content_type="application/pdf",
-        elapsed_ms=12.0,
         reason=ReasonCode.HTML_TAIL_DETECTED,
-        reason_detail="html-tail-detected",
     )
 
     class StubPipeline:
