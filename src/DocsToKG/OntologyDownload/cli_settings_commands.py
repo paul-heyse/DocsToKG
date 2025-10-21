@@ -18,7 +18,7 @@ from typing import Optional
 
 import typer
 
-from DocsToKG.OntologyDownload.settings import get_settings
+from DocsToKG.OntologyDownload.settings import get_default_config
 from DocsToKG.OntologyDownload.settings_schema import (
     generate_settings_schema,
     write_schemas_to_disk,
@@ -61,7 +61,7 @@ def show(
         $ ontofetch settings show --no-redact-secrets --format json
     """
     try:
-        settings = get_settings()
+        settings = get_default_config()
         fingerprint = get_source_fingerprint()
         
         # Build output data

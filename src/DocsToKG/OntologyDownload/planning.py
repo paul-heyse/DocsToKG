@@ -139,6 +139,23 @@ from .settings import (
 )
 from .validation import ValidationRequest, ValidationResult, run_validators
 
+# ============================================================================
+# PLAN CACHING & DATABASE INTEGRATION (Phase 4)
+# ============================================================================
+# Optional database plan caching for deterministic replays
+try:
+    from DocsToKG.OntologyDownload.database import (
+        get_database,
+        close_database,
+        PlanRow,
+    )
+    PLAN_CACHING_AVAILABLE = True
+except ImportError:  # pragma: no cover
+    PLAN_CACHING_AVAILABLE = False
+    get_database = None  # type: ignore
+    close_database = None  # type: ignore
+    PlanRow = None  # type: ignore
+
 
 def _log_with_extra(
     logger: logging.Logger,

@@ -23,7 +23,7 @@ from rich.console import Console
 
 from DocsToKG.OntologyDownload import __version__
 from DocsToKG.OntologyDownload.cli_settings_commands import settings_app
-from DocsToKG.OntologyDownload.settings import get_settings
+from DocsToKG.OntologyDownload.settings import get_default_config
 
 # CLI argument normalization constants and functions
 _DEFAULT_SUBCOMMAND = "pull"
@@ -123,7 +123,7 @@ class CliContext:
         # Load settings (will respect config path if provided)
         # For now, use defaults since settings integration is separate
         try:
-            self.settings = get_settings()
+            self.settings = get_default_config()
         except Exception as e:
             self.console.print(f"[red]Error loading settings: {e}[/red]")
             self.settings = None
