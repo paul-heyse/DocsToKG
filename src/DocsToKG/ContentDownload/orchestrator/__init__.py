@@ -65,6 +65,7 @@ from __future__ import annotations
 from .limits import KeyedLimiter, host_key
 from .models import JobState, JobResult
 from .queue import WorkQueue
+from .scheduler import Orchestrator, OrchestratorConfig
 from .workers import Worker
 
 __all__ = [
@@ -73,5 +74,7 @@ __all__ = [
     "JobState",
     "JobResult",
     "WorkQueue",
+    "Orchestrator",
+    "OrchestratorConfig",
     "Worker",
 ]
