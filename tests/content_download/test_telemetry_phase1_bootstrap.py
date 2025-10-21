@@ -9,8 +9,7 @@ Tests the full stack for:
 
 import time
 import unittest
-from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, patch
 
 import httpx
 import pytest
@@ -94,7 +93,7 @@ class TestTokenBucket(unittest.TestCase):
 
     def test_token_bucket_capacity_limit(self):
         """Bucket respects capacity limit."""
-        bucket = TokenBucket(capacity=5.0, refill_per_sec=10.0)
+        TokenBucket(capacity=5.0, refill_per_sec=10.0)
         time.sleep(0.2)  # Would produce 2 tokens, but capped at capacity
         # Tokens should be capped at capacity=5.0
 
@@ -300,10 +299,9 @@ class TestBootstrapOrchestration(unittest.TestCase):
         )
 
         # Run with artifact iterator
-        result = run_from_config(config, artifacts=iter([mock_artifact]))
+        run_from_config(config, artifacts=iter([mock_artifact]))
 
         # Note: Full execution requires complete pipeline implementation
-        # This test validates the bootstrap orchestration layer
 
 
 class TestEndToEndBootstrap(unittest.TestCase):

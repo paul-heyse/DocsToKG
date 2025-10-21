@@ -47,7 +47,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterator, Mapping, Optional
 
-from DocsToKG.ContentDownload.api import DownloadOutcome, ResolverResult
 from DocsToKG.ContentDownload.http_session import HttpConfig, get_http_session
 from DocsToKG.ContentDownload.pipeline import ResolverPipeline
 from DocsToKG.ContentDownload.resolver_http_client import (
@@ -303,9 +302,11 @@ def _process_artifacts(
                 artifact_id=getattr(artifact, "artifact_id", None),
                 url=getattr(outcome, "url", None),
                 resolver=getattr(outcome, "resolver", None),
-                outcome="success"
-                if outcome.ok
-                else ("skip" if outcome.classification == "skip" else "error"),
+                outcome=(
+                    "success"
+                    if outcome.ok
+                    else ("skip" if outcome.classification == "skip" else "error")
+                ),
                 ok=outcome.ok,
                 reason=getattr(outcome, "reason", None),
                 path=str(outcome.path) if hasattr(outcome, "path") and outcome.path else None,

@@ -276,8 +276,6 @@ class PerResolverHttpClient:
         **kwargs: Any,
     ) -> httpx.Response:
         """Internal request handler with rate limit and retry."""
-        start_time = time.monotonic()
-
         # Acquire rate limit token
         try:
             self.rate_limiter.acquire(tokens=1.0, timeout_s=30.0)
@@ -295,9 +293,7 @@ class PerResolverHttpClient:
             attempt_count += 1
 
             try:
-                resp = self.session.request(
-                    method, url, timeout=req_timeout, **kwargs
-                )
+                resp = self.session.request(method, url, timeout=req_timeout, **kwargs)
 
                 # Check if we should retry this response
                 if resp.status_code in self.config.retry_statuses:
@@ -310,15 +306,11 @@ class PerResolverHttpClient:
                                 sleep_s = min(sleep_s, self.config.retry_after_cap_s)
                             except ValueError:
                                 sleep_s = int(
-                                    self.config.base_delay_ms
-                                    * (2 ** (attempt_count - 1))
-                                    / 1000.0
+                                    self.config.base_delay_ms * (2 ** (attempt_count - 1)) / 1000.0
                                 )
                         else:
                             sleep_s = int(
-                                self.config.base_delay_ms
-                                * (2 ** (attempt_count - 1))
-                                / 1000.0
+                                self.config.base_delay_ms * (2 ** (attempt_count - 1)) / 1000.0
                             )
 
                         sleep_s = min(sleep_s, self.config.max_delay_ms // 1000)
@@ -335,9 +327,7 @@ class PerResolverHttpClient:
                     )
 
                     # Sleep before retry
-                    sleep_s = int(
-                        self.config.base_delay_ms * (2 ** (attempt_count - 1)) / 1000.0
-                    )
+                    sleep_s = int(self.config.base_delay_ms * (2 ** (attempt_count - 1)) / 1000.0)
                     sleep_s = min(sleep_s, self.config.max_delay_ms // 1000)
                     time.sleep(sleep_s)
                     continue
