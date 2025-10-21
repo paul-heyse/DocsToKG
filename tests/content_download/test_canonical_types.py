@@ -24,6 +24,7 @@ from DocsToKG.ContentDownload.api import (
     AttemptRecord,
 )
 from DocsToKG.ContentDownload.api.exceptions import SkipDownload, DownloadError
+import DocsToKG.ContentDownload.download_execution as download_exec
 from DocsToKG.ContentDownload.download_execution import (
     prepare_candidate_download,
     stream_candidate_payload,
@@ -234,6 +235,51 @@ class TestDownloadExecutionContracts:
             assert outcome.classification == "success"
         finally:
             os.replace = original_replace
+
+    def test_finalize_invokes_path_gate_with_resolved_path(self, monkeypatch):
+        """Path gate receives the derived destination path (not None)."""
+        plan = DownloadPlan(url="https://example.com/subdir/file.pdf", resolver_name="test")
+        stream = DownloadStreamResult(
+            path_tmp="/tmp/file.part",
+            bytes_written=128,
+            http_status=200,
+            content_type="application/pdf",
+        )
+
+        observed = {}
+
+        def fake_validate(path: str, artifact_root=None) -> str:
+            observed["path"] = path
+            return path
+
+        monkeypatch.setattr(download_exec, "validate_path_safety", fake_validate)
+        monkeypatch.setattr(download_exec.os, "replace", MagicMock())
+
+        outcome = finalize_candidate_download(plan, stream)
+
+        assert isinstance(outcome, DownloadOutcome)
+        assert observed["path"].endswith("file.pdf")
+
+    def test_finalize_rejects_unsafe_final_path(self, monkeypatch):
+        """Unsafe final paths trigger SkipDownload via the path gate."""
+        plan = DownloadPlan(url="https://example.com/file.pdf", resolver_name="test")
+        stream = DownloadStreamResult(
+            path_tmp="/tmp/file.part",
+            bytes_written=64,
+            http_status=200,
+            content_type="application/pdf",
+        )
+
+        def fake_validate(path: str, artifact_root=None) -> str:
+            raise download_exec.PathPolicyError("escapes artifact root")
+
+        monkeypatch.setattr(download_exec, "validate_path_safety", fake_validate)
+        monkeypatch.setattr(download_exec.os, "replace", MagicMock())
+
+        with pytest.raises(SkipDownload) as exc_info:
+            finalize_candidate_download(plan, stream, final_path="/etc/passwd")
+
+        assert exc_info.value.reason == "path-policy"
 
 
 # ============================================================================

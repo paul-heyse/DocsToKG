@@ -3,14 +3,16 @@
 import json
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import typer
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
+from DocsToKG.ContentDownload.bootstrap import BootstrapConfig, run_from_config
 from DocsToKG.ContentDownload.config import (
+    ContentDownloadConfig,
     export_config_schema,
     load_config,
     validate_config_file,
@@ -19,6 +21,7 @@ from DocsToKG.ContentDownload.resolvers.registry_v2 import (
     build_resolvers,
     get_registry,
 )
+from DocsToKG.ContentDownload.http_session import HttpConfig
 
 # Feature flags support
 try:
@@ -105,6 +108,23 @@ def run(
 
         resolvers = build_resolvers(cfg)
         console.print(f"[green]✓ Built {len(resolvers)} resolvers[/green]")
+
+        bootstrap_cfg = _build_bootstrap_config(cfg, resolvers)
+        run_result = run_from_config(
+            bootstrap_cfg,
+            artifacts=None,
+            dry_run=dry_run,
+        )
+
+        console.print(
+            Panel(
+                f"[bold green]Pipeline ready[/bold green]\n"
+                f"Success: {run_result.success_count}\n"
+                f"Skipped: {run_result.skip_count}\n"
+                f"Errors: {run_result.error_count}",
+                title="Execution Summary",
+            )
+        )
 
         if dry_run:
             console.print("[yellow]Dry run mode[/yellow]")
@@ -225,6 +245,60 @@ def schema(
     except Exception as e:
         console.print(f"[red]✗ Error: {e}[/red]")
         raise typer.Exit(code=1)
+
+
+# ============================================================================
+# Helpers
+# ============================================================================
+
+
+def _build_bootstrap_config(
+    cfg: ContentDownloadConfig,
+    resolvers: list[Any],
+) -> BootstrapConfig:
+    """Bridge ContentDownloadConfig to runtime BootstrapConfig."""
+
+    telemetry_paths: dict[str, Path] = {}
+    tele_cfg = cfg.telemetry
+
+    if "csv" in tele_cfg.sinks:
+        csv_path = Path(tele_cfg.csv_path)
+        csv_path.parent.mkdir(parents=True, exist_ok=True)
+        telemetry_paths["csv"] = csv_path
+        telemetry_paths.setdefault("last_attempt", csv_path.with_name("last.csv"))
+
+    if "jsonl" in tele_cfg.sinks:
+        manifest_path = Path(tele_cfg.manifest_path)
+        manifest_path.parent.mkdir(parents=True, exist_ok=True)
+        telemetry_paths["manifest_index"] = manifest_path.with_name("index.json")
+        telemetry_paths["summary"] = manifest_path.with_name("summary.json")
+        telemetry_paths["sqlite"] = manifest_path.with_name("manifest.sqlite")
+
+    http_cfg = HttpConfig(
+        user_agent=cfg.http.user_agent,
+        mailto=cfg.http.mailto,
+        timeout_connect_s=cfg.http.timeout_connect_s,
+        timeout_read_s=cfg.http.timeout_read_s,
+        pool_connections=cfg.http.max_keepalive_connections,
+        pool_maxsize=cfg.http.max_connections,
+        verify_tls=cfg.http.verify_tls,
+        proxies=dict(cfg.http.proxies) if cfg.http.proxies else None,
+    )
+
+    resolver_registry: dict[str, Any] = {}
+    for resolver in resolvers:
+        name = getattr(resolver, "name", None) or getattr(resolver, "_registry_name", None)
+        if not name:
+            name = f"resolver_{len(resolver_registry) + 1}"
+        resolver_registry[name] = resolver
+
+    return BootstrapConfig(
+        http=http_cfg,
+        telemetry_paths=telemetry_paths or None,
+        resolver_registry=resolver_registry,
+        resolver_retry_configs={},
+        policy_knobs={},
+    )
 
 
 # ============================================================================
