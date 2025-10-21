@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import json
 import logging
-import sys
 from pathlib import Path
 from typing import Optional
 
@@ -24,7 +23,6 @@ from rich.panel import Panel
 from rich.table import Table
 
 from DocsToKG.ContentDownload.config import (
-    ContentDownloadConfig,
     export_config_schema,
     load_config,
     validate_config_file,
@@ -71,58 +69,41 @@ def run(
     resolver_order: Optional[str] = typer.Option(
         None,
         "--resolver-order",
-        help="Comma-separated resolver order (e.g., 'arxiv,landing_page,wayback')",
+        help="Comma-separated resolver order",
     ),
-    max_workers: Optional[int] = typer.Option(
-        None, "--workers", help="Number of parallel workers"
-    ),
-    dry_run: bool = typer.Option(False, "--dry-run", help="Dry run (no downloads)"),
-    verbose: bool = typer.Option(False, "-v", "--verbose", help="Verbose logging"),
+    max_workers: Optional[int] = typer.Option(None, "--workers", help="Number of parallel workers"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Dry run"),
+    verbose: bool = typer.Option(False, "-v", "--verbose", help="Verbose"),
 ) -> None:
-    """
-    Run ContentDownload with artifact resolution and acquisition.
-
-    Loads config from file (--config) + environment ($DTKG_*) + CLI flags.
-    Precedence: file < environment < CLI.
-    """
+    """Run ContentDownload with artifact resolution."""
     _setup_logging(verbose)
 
     try:
-        # Build CLI overrides
         cli_overrides: dict = {"dry_run": dry_run}
         if resolver_order:
-            cli_overrides["resolvers"] = {
-                "order": [r.strip() for r in resolver_order.split(",")]
-            }
+            cli_overrides["resolvers"] = {"order": [r.strip() for r in resolver_order.split(",")]}
         if max_workers:
             cli_overrides["max_workers"] = max_workers
 
-        # Load config with full precedence
         cfg = load_config(path=config, cli_overrides=cli_overrides)
 
         console.print(
             Panel(
                 f"[bold green]✓ Config loaded[/bold green]\n"
                 f"Hash: {cfg.config_hash()[:8]}...\n"
-                f"Resolvers: {len(cfg.resolvers.order)}\n"
-                f"Dry run: {dry_run}",
+                f"Resolvers: {len(cfg.resolvers.order)}",
                 title="ContentDownload",
             )
         )
 
-        # Build resolvers from config
         resolvers = build_resolvers(cfg)
         console.print(f"[green]✓ Built {len(resolvers)} resolvers[/green]")
 
         if dry_run:
-            console.print("[yellow]Dry run mode - no downloads will occur[/yellow]")
-            return
-
-        # TODO: Implement actual download pipeline
-        console.print("[yellow]Pipeline execution coming soon[/yellow]")
+            console.print("[yellow]Dry run mode[/yellow]")
 
     except Exception as e:
-        console.print(f"[red]✗ Error: {e}[/red]", style="bold red")
+        console.print(f"[red]✗ Error: {e}[/red]")
         if verbose:
             raise
         raise typer.Exit(code=1)
@@ -134,25 +115,19 @@ def print_config(
         None,
         "--config",
         "-c",
-        help="Path to config file (YAML/JSON)",
+        help="Path to config file",
         envvar="DTKG_CONFIG",
     ),
-    raw: bool = typer.Option(False, "--raw", help="Print raw YAML/JSON"),
+    raw: bool = typer.Option(False, "--raw", help="Raw JSON"),
 ) -> None:
-    """
-    Print merged effective config (file + environment + CLI).
-
-    Useful for debugging and understanding what config will be used.
-    """
+    """Print merged effective config."""
     try:
         cfg = load_config(path=config)
 
         if raw:
-            # Export as JSON
             data = cfg.model_dump(mode="json")
             typer.echo(json.dumps(data, indent=2))
         else:
-            # Pretty print with Rich
             data = cfg.model_dump(mode="json")
             console.print(
                 Panel(
@@ -172,11 +147,7 @@ def print_config(
 def validate_config(
     config: str = typer.Argument(..., help="Path to config file"),
 ) -> None:
-    """
-    Validate a config file without running.
-
-    Exits with code 0 if valid, 1 if invalid.
-    """
+    """Validate a config file."""
     try:
         validate_config_file(config)
         console.print(f"[green]✓ {config} is valid[/green]")
@@ -195,16 +166,11 @@ def explain(
         envvar="DTKG_CONFIG",
     ),
 ) -> None:
-    """
-    Explain resolver configuration and ordering.
-
-    Shows which resolvers will be used, in what order, and their settings.
-    """
+    """Explain resolver configuration and ordering."""
     try:
         cfg = load_config(path=config)
         registry = get_registry()
 
-        # Build table
         table = Table(title="Resolver Configuration")
         table.add_column("Order", style="cyan")
         table.add_column("Resolver", style="magenta")
@@ -220,16 +186,10 @@ def explain(
 
         console.print(table)
 
-        # Summary
         enabled_count = sum(
-            1
-            for name in cfg.resolvers.order
-            if getattr(cfg.resolvers, name).enabled
+            1 for name in cfg.resolvers.order if getattr(cfg.resolvers, name).enabled
         )
-        console.print(
-            f"\n[cyan]Enabled: {enabled_count}/{len(cfg.resolvers.order)}[/cyan]"
-        )
-        console.print(f"[cyan]Registered: {len(registry)} total[/cyan]")
+        console.print(f"\n[cyan]Enabled: {enabled_count}/{len(cfg.resolvers.order)}[/cyan]")
 
     except Exception as e:
         console.print(f"[red]✗ Error: {e}[/red]")
@@ -238,15 +198,9 @@ def explain(
 
 @app.command()
 def schema(
-    output: Optional[Path] = typer.Option(
-        None, "--output", "-o", help="Save schema to file"
-    ),
+    output: Optional[Path] = typer.Option(None, "--output", "-o", help="Save schema to file"),
 ) -> None:
-    """
-    Export JSON Schema for ContentDownloadConfig.
-
-    Useful for documentation, IDE integration, and config validation.
-    """
+    """Export JSON Schema for ContentDownloadConfig."""
     try:
         schema_data = export_config_schema()
 
@@ -259,11 +213,6 @@ def schema(
     except Exception as e:
         console.print(f"[red]✗ Error: {e}[/red]")
         raise typer.Exit(code=1)
-
-
-# ============================================================================
-# Main
-# ============================================================================
 
 
 def main() -> None:
