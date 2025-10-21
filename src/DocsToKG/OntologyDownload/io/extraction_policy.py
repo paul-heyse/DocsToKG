@@ -429,6 +429,25 @@ class ExtractionSettings(BaseModel):
                 result[field_name] = field_value
         return result
 
+    def is_valid(self) -> bool:
+        """Check if policy is valid (backward compatibility with old API).
+        
+        In Pydantic v2, validation happens automatically on initialization,
+        so if the object exists, it's always valid.
+        """
+        return True
+
+    def validate(self) -> list[str]:
+        """Validate policy configuration (backward compatibility with old API).
+        
+        In Pydantic v2, validation happens automatically on initialization,
+        so this returns an empty list (all valid).
+        
+        Returns:
+            Empty list (all validation happens at init via field_validator)
+        """
+        return []
+
     def summary(self) -> dict[str, str]:
         """Get a human-readable summary of all policies.
 

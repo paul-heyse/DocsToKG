@@ -302,17 +302,3 @@ def emit_fallback_attempt(
         "elapsed_ms": elapsed_ms,
     }
     telemetry.log_fallback_attempt(event)
-
-
-# Type stubs for telemetry methods (for IDE support)
-# These are the methods that telemetry.log_* will call
-def _telemetry_interface_stub() -> None:
-    """
-    Expected telemetry interface (RunTelemetry or equivalent):
-
-    - log_http_event(event: Mapping[str, Any]) -> None
-    - log_rate_event(event: Mapping[str, Any]) -> None
-    - log_breaker_transition(event: Mapping[str, Any]) -> None
-    - log_fallback_attempt(event: Mapping[str, Any]) -> None
-    """
-    pass

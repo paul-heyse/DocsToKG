@@ -350,23 +350,6 @@ class DownloadConfig:
         return base
 
 
-@dataclass
-class DownloadOptions(DownloadConfig):
-    """Compatibility shim preserving the legacy ``DownloadOptions`` surface."""
-
-    def to_context(self, overrides: Optional[Mapping[str, Any]] = None) -> DownloadContext:  # type: ignore[override]
-        """Return a `DownloadContext` derived from this options payload.
-
-        Args:
-            overrides: Optional mapping of field names to values that should
-                replace the existing attributes when constructing the context.
-
-        Returns:
-            DownloadContext: Fully-populated context object consumed by the
-            content download pipeline.
-        """
-        return super().to_context(overrides)
-
 
 @dataclass(frozen=True)
 class ValidationResult:

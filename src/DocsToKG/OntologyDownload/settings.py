@@ -643,7 +643,7 @@ class StorageSettings(BaseModel):
     @classmethod
     def validate_latest_name(cls, v: str) -> str:
         """Ensure latest_name is a valid filename."""
-        if "/" in v or "\" in v:
+        if "/" in v or "\\" in v:
             raise ValueError("latest_name must be a filename, not a path")
         if not v.strip():
             raise ValueError("latest_name cannot be empty")
