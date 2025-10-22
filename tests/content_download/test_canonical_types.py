@@ -256,7 +256,7 @@ class TestDownloadExecutionContracts:
         response = MagicMock()
         response.status_code = 200
         response.headers = {"Content-Type": "application/pdf"}
-        response.iter_content = lambda chunk_size: [b"test data"]
+        response.iter_bytes.return_value = [b"test data"]
         session.head.return_value = response
         session.get.return_value = response
 
@@ -265,6 +265,61 @@ class TestDownloadExecutionContracts:
         assert isinstance(result, DownloadStreamResult)
         assert result.http_status == 200
 
+    def test_stream_passes_headers_and_override(self, monkeypatch):
+        """stream_candidate_payload forwards headers and max-byte override."""
+
+        session = MagicMock()
+
+        head_response = MagicMock()
+        head_response.status_code = 200
+        head_response.headers = {"Content-Type": "application/pdf"}
+
+        get_response = MagicMock()
+        get_response.status_code = 200
+        get_response.headers = {
+            "Content-Type": "application/pdf",
+            "Content-Length": "12",
+        }
+        get_response.iter_bytes.return_value = [b"x" * 12]
+
+        session.head.return_value = head_response
+        session.get.return_value = get_response
+
+        plan = DownloadPlan(
+            url="https://example.com/file.pdf",
+            resolver_name="test",
+            referer="https://resolver.example.org",
+            etag="etag-value",
+            last_modified="Wed, 01 Jan 2025 00:00:00 GMT",
+            max_bytes_override=10,
+        )
+
+        def fake_atomic(dest_path, byte_iter, *, expected_len=None, chunk_size=1048576):
+            data = b"".join(byte_iter)
+            return len(data)
+
+        monkeypatch.setattr(
+            "DocsToKG.ContentDownload.download_execution.atomic_write_stream",
+            fake_atomic,
+        )
+
+        with pytest.raises(DownloadError) as excinfo:
+            stream_candidate_payload(plan, session=session, max_bytes=25)
+
+        assert excinfo.value.reason == "too-large"
+
+        expected_headers = {
+            "Referer": "https://resolver.example.org",
+            "If-None-Match": "etag-value",
+            "If-Modified-Since": "Wed, 01 Jan 2025 00:00:00 GMT",
+        }
+
+        head_kwargs = session.head.call_args.kwargs
+        get_kwargs = session.get.call_args.kwargs
+
+        assert head_kwargs["headers"] == expected_headers
+        assert get_kwargs["headers"] == expected_headers
+        assert get_kwargs["stream"] is True
     def test_stream_enforces_max_bytes_limit(
         self, tmp_path, monkeypatch
     ) -> None:
