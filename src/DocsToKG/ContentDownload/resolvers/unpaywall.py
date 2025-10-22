@@ -24,25 +24,13 @@ import httpx
 from DocsToKG.ContentDownload.core import dedupe, normalize_doi
 from DocsToKG.ContentDownload.urls import canonical_for_index
 
-    RegisteredResolver,
+from DocsToKG.ContentDownload.resolvers.base import (
     ResolverEvent,
     ResolverEventReason,
     ResolverResult,
     _fetch_unpaywall_data,
 )
 from .registry_v2 import register_v2
-
-class ResolverResult:
-    """Result from resolver attempt."""
-    def __init__(self, url=None, referer=None, metadata=None, 
-                 event=None, event_reason=None, **kwargs):
-        self.url = url
-        self.referer = referer
-        self.metadata = metadata or {}
-        self.event = event
-        self.event_reason = event_reason
-        for k, v in kwargs.items():
-            setattr(self, k, v)
 
 
 

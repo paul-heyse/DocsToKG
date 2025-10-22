@@ -16,23 +16,16 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Iterable
+from typing import TYPE_CHECKING, Any, Iterable
 
 from DocsToKG.ContentDownload.core import strip_prefix
 
+from DocsToKG.ContentDownload.resolvers.base import (
+    ResolverEvent,
+    ResolverEventReason,
+    ResolverResult,
+)
 from .registry_v2 import register_v2
-
-class ResolverResult:
-    """Result from resolver attempt."""
-    def __init__(self, url=None, referer=None, metadata=None, 
-                 event=None, event_reason=None, **kwargs):
-        self.url = url
-        self.referer = referer
-        self.metadata = metadata or {}
-        self.event = event
-        self.event_reason = event_reason
-        for k, v in kwargs.items():
-            setattr(self, k, v)
 
 
 

@@ -16,25 +16,19 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Dict, Iterable, List
+from typing import TYPE_CHECKING, Any, Dict, Iterable, List
 
 import httpx
 
 from DocsToKG.ContentDownload.core import dedupe, normalize_doi
 
+from DocsToKG.ContentDownload.resolvers.base import (
+    ApiResolverBase,
+    ResolverEvent,
+    ResolverEventReason,
+    ResolverResult,
+)
 from .registry_v2 import register_v2
-
-class ResolverResult:
-    """Result from resolver attempt."""
-    def __init__(self, url=None, referer=None, metadata=None, 
-                 event=None, event_reason=None, **kwargs):
-        self.url = url
-        self.referer = referer
-        self.metadata = metadata or {}
-        self.event = event
-        self.event_reason = event_reason
-        for k, v in kwargs.items():
-            setattr(self, k, v)
 
 
 
@@ -43,7 +37,7 @@ if TYPE_CHECKING:  # pragma: no cover
     
 
 @register_v2("doaj")
-class DoajResolver:
+class DoajResolver(ApiResolverBase):
     """Resolve Open Access links using the DOAJ API."""
 
     name = "doaj"
