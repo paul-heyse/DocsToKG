@@ -15,9 +15,13 @@ Design:
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import os
+import tempfile
 import time
+import uuid
+from pathlib import Path
 from typing import Any, Optional
 
 from DocsToKG.ContentDownload.api import (
@@ -40,6 +44,34 @@ def _emit(telemetry: Any, **kw: Any) -> None:
             telemetry.log_attempt(**kw)
         except Exception as e:  # pylint: disable=broad-except
             LOGGER.debug(f"Telemetry emission failed: {e}")
+
+
+def _resolve_storage_tmp_root() -> Path:
+    """Return the base directory for temporary download artifacts."""
+
+    override = os.environ.get("DOCSTOKG_STORAGE_TMP")
+    if override:
+        root = Path(override).expanduser()
+    else:
+        data_root = os.environ.get("DOCSTOKG_DATA_ROOT")
+        if data_root:
+            root = Path(data_root).expanduser() / "tmp" / "downloads"
+        else:
+            root = Path(tempfile.gettempdir()) / "docstokg" / "downloads"
+    root.mkdir(parents=True, exist_ok=True)
+    return root
+
+
+def _plan_temp_path(plan: DownloadPlan) -> Path:
+    """Derive a collision-resistant temporary path for a download plan."""
+
+    base = _resolve_storage_tmp_root()
+    digest = hashlib.sha256(plan.url.encode("utf-8")).hexdigest()
+    shard_dir = base / digest[:2]
+    shard_dir.mkdir(parents=True, exist_ok=True)
+    resolver_token = "".join(ch if ch.isalnum() else "-" for ch in plan.resolver_name) or "plan"
+    filename = f"{resolver_token}-{digest[:12]}-{uuid.uuid4().hex}.download.part"
+    return shard_dir / filename
 
 
 def prepare_candidate_download(
@@ -200,24 +232,42 @@ def stream_candidate_payload(
     cl = resp.headers.get("Content-Length")
     expected_len = int(cl) if (cl and cl.isdigit()) else None
 
+    effective_max_bytes = (
+        plan.max_bytes_override
+        if plan.max_bytes_override is not None
+        else max_bytes
+    )
+
+    if (
+        effective_max_bytes is not None
+        and expected_len is not None
+        and expected_len > effective_max_bytes
+    ):
+        raise DownloadError(
+            "too-large",
+            f"Content-Length {expected_len} exceeds cap {effective_max_bytes} bytes",
+        )
+
     # Write to temporary file using atomic writer
-    tmp_dir = os.getcwd()
-    os.makedirs(tmp_dir, exist_ok=True)
-    tmp_path = os.path.join(tmp_dir, ".download.part")
+    tmp_path = _plan_temp_path(plan)
 
     try:
         bytes_written = atomic_write_stream(
-            dest_path=tmp_path,
+            dest_path=str(tmp_path),
             byte_iter=resp.iter_bytes(),
             expected_len=(expected_len if verify_content_length else None),
             chunk_size=chunk_size,
         )
 
         # Check size limit
-        if max_bytes and bytes_written > max_bytes:
+        if effective_max_bytes is not None and bytes_written > effective_max_bytes:
+            try:
+                tmp_path.unlink()
+            except FileNotFoundError:
+                pass
             raise DownloadError(
                 "too-large",
-                f"Payload exceeded {max_bytes} bytes",
+                f"Payload exceeded {effective_max_bytes} bytes",
             )
 
         # Emit final success record
@@ -234,7 +284,7 @@ def stream_candidate_payload(
         )
 
         return DownloadStreamResult(
-            path_tmp=tmp_path,
+            path_tmp=str(tmp_path),
             bytes_written=bytes_written,
             http_status=resp.status_code,
             content_type=content_type,
