@@ -267,6 +267,8 @@ def finalize_candidate_download(
     stream: DownloadStreamResult,
     *,
     final_path: Optional[str] = None,
+    storage_settings: Any = None,
+    storage_root: Optional[str] = None,
     telemetry: Any = None,
     run_id: Optional[str] = None,
 ) -> DownloadOutcome:
@@ -295,23 +297,34 @@ def finalize_candidate_download(
             meta={"http_status": 304},
         )
 
-    # Validate final path safety
-    try:
-        validate_path_safety(final_path)
-    except PathPolicyError as e:
-        raise SkipDownload("path-policy", f"Path policy violation: {e}")
+    # Determine artifact root from storage configuration
+    artifact_root = storage_root
+    if artifact_root is None and storage_settings is not None:
+        artifact_root = getattr(storage_settings, "root_dir", None)
+    if artifact_root is None:
+        artifact_root = os.getcwd()
 
     # Determine final path (in real implementation, would use storage policy)
-    if not final_path:
+    candidate_final_path = final_path
+    if candidate_final_path:
+        if not os.path.isabs(candidate_final_path):
+            candidate_final_path = os.path.join(artifact_root, candidate_final_path)
+    else:
         base = plan.url.rsplit("/", 1)[-1] or "download.bin"
-        final_path = os.path.join(os.getcwd(), base)
+        candidate_final_path = os.path.join(artifact_root, base)
+
+    # Validate final path safety
+    try:
+        safe_final_path = validate_path_safety(candidate_final_path, artifact_root=artifact_root)
+    except PathPolicyError as e:
+        raise SkipDownload("path-policy", f"Path policy violation: {e}")
 
     # atomic_write_stream already moved temp → dest_path, so final_path exists
     # Just verify and emit event
     try:
-        if stream.path_tmp and not os.path.exists(final_path):
+        if stream.path_tmp and not os.path.exists(safe_final_path):
             # If atomic_write_stream didn't finalize, move it now
-            os.replace(stream.path_tmp, final_path)
+            os.replace(stream.path_tmp, safe_final_path)
     except Exception as e:  # pylint: disable=broad-except
         raise DownloadError(
             "download-error",
@@ -325,13 +338,13 @@ def finalize_candidate_download(
         resolver_name=plan.resolver_name,
         status="http-200",
         bytes_written=stream.bytes_written,
-        final_path=final_path,
+        final_path=safe_final_path,
     )
 
     return DownloadOutcome(
         ok=True,
         classification="success",
-        path=final_path,
+        path=safe_final_path,
         reason=None,
         meta={
             "content_type": stream.content_type,

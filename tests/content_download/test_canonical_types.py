@@ -30,6 +30,7 @@ from DocsToKG.ContentDownload.download_execution import (
     finalize_candidate_download,
 )
 from DocsToKG.ContentDownload.pipeline import ResolverPipeline
+from DocsToKG.ContentDownload.config.models import StorageConfig
 
 
 # ============================================================================
@@ -234,6 +235,34 @@ class TestDownloadExecutionContracts:
             assert outcome.classification == "success"
         finally:
             os.replace = original_replace
+
+    def test_finalize_uses_storage_root(self, tmp_path):
+        """finalize_candidate_download places files under the configured storage root."""
+        plan = DownloadPlan(url="https://example.com/file.pdf", resolver_name="test")
+        payload = b"payload"
+        part_path = tmp_path / "file.part"
+        part_path.write_bytes(payload)
+        stream = DownloadStreamResult(
+            path_tmp=str(part_path),
+            bytes_written=len(payload),
+            http_status=200,
+            content_type="application/pdf",
+        )
+
+        storage_cfg = StorageConfig(root_dir=str(tmp_path))
+
+        outcome = finalize_candidate_download(
+            plan,
+            stream,
+            storage_settings=storage_cfg,
+        )
+
+        expected_final = tmp_path / "file.pdf"
+        assert outcome.ok is True
+        assert outcome.classification == "success"
+        assert outcome.path == str(expected_final)
+        assert expected_final.exists()
+        assert not part_path.exists()
 
 
 # ============================================================================
