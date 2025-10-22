@@ -113,6 +113,7 @@ class BootstrapConfig:
     resolver_registry: Optional[dict[str, Any]] = None
     resolver_retry_configs: Optional[dict[str, RetryConfig]] = None
     policy_knobs: Optional[dict[str, Any]] = None
+    run_id: Optional[str] = None
 
 
 @dataclass
@@ -149,7 +150,7 @@ def run_from_config(
         RunResult with counts and run_id
     """
     # Step 1: Generate or validate run_id
-    run_id = str(uuid4())
+    run_id = config.run_id or str(uuid4())
     LOGGER.info(f"Starting run {run_id}")
 
     # Step 2: Build telemetry sinks

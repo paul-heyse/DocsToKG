@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Iterable, Optional
 
 from DocsToKG.ContentDownload.bootstrap import (
@@ -42,7 +43,10 @@ from DocsToKG.ContentDownload.bootstrap import (
     RunResult as BootstrapRunResult,
 )
 from DocsToKG.ContentDownload.config import ContentDownloadConfig, load_config
+from DocsToKG.ContentDownload.http_session import HttpConfig
 from DocsToKG.ContentDownload.pipeline import ResolverPipeline
+from DocsToKG.ContentDownload.resolver_http_client import RetryConfig
+from DocsToKG.ContentDownload.resolvers.registry_v2 import build_resolvers
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -125,9 +129,11 @@ class DownloadRun:
         Returns:
             Summary of the run
         """
+        bootstrap_config = self._build_bootstrap_config()
+
         # Delegate to canonical bootstrap orchestrator
         bootstrap_result = run_from_config(
-            config=BootstrapConfig(),  # Uses defaults; can be customized
+            config=bootstrap_config,
             artifacts=iter(artifacts),
             dry_run=False,
         )
@@ -141,6 +147,99 @@ class DownloadRun:
             failed=bootstrap_result.error_count,
             skipped=bootstrap_result.skip_count,
         )
+
+    def _build_bootstrap_config(self) -> BootstrapConfig:
+        """Translate ContentDownloadConfig into BootstrapConfig."""
+
+        http_cfg = self.config.http
+        http = HttpConfig(
+            user_agent=http_cfg.user_agent,
+            mailto=http_cfg.mailto,
+            timeout_connect_s=http_cfg.timeout_connect_s,
+            timeout_read_s=http_cfg.timeout_read_s,
+            pool_connections=http_cfg.max_keepalive_connections,
+            pool_maxsize=http_cfg.max_connections,
+            verify_tls=http_cfg.verify_tls,
+            proxies=http_cfg.proxies or None,
+        )
+
+        telemetry_paths = self._build_telemetry_paths()
+        resolver_registry, retry_configs = self._build_resolvers()
+        policy_knobs = self._build_policy_knobs()
+
+        return BootstrapConfig(
+            http=http,
+            telemetry_paths=telemetry_paths,
+            resolver_registry=resolver_registry,
+            resolver_retry_configs=retry_configs,
+            policy_knobs=policy_knobs,
+            run_id=self.config.run_id,
+        )
+
+    def _build_telemetry_paths(self) -> dict[str, Path]:
+        telemetry_cfg = self.config.telemetry
+        telemetry_paths: dict[str, Path] = {}
+
+        if "csv" in telemetry_cfg.sinks:
+            csv_path = Path(telemetry_cfg.csv_path)
+            telemetry_paths["csv"] = csv_path
+            telemetry_paths["last_attempt"] = csv_path.with_name("last.csv")
+
+        if "jsonl" in telemetry_cfg.sinks:
+            manifest_path = Path(telemetry_cfg.manifest_path)
+            telemetry_paths["manifest_index"] = manifest_path.with_name("index.json")
+            telemetry_paths["summary"] = manifest_path.with_name("summary.json")
+            telemetry_paths["sqlite"] = manifest_path.with_suffix(".sqlite")
+
+        return telemetry_paths
+
+    def _build_resolvers(self) -> tuple[dict[str, Any], dict[str, RetryConfig]]:
+        resolver_registry: dict[str, Any] = {}
+        retry_configs: dict[str, RetryConfig] = {}
+
+        for resolver in build_resolvers(self.config):
+            resolver_name = getattr(
+                resolver,
+                "_registry_name",
+                getattr(resolver, "name", resolver.__class__.__name__.lower()),
+            )
+            resolver_registry[resolver_name] = resolver
+
+            resolver_cfg = getattr(self.config.resolvers, resolver_name, None)
+            if resolver_cfg is None:
+                continue
+
+            retry_policy = resolver_cfg.retry
+            rate_policy = resolver_cfg.rate_limit
+
+            retry_configs[resolver_name] = RetryConfig(
+                max_attempts=retry_policy.max_attempts,
+                retry_statuses=tuple(retry_policy.retry_statuses),
+                base_delay_ms=retry_policy.base_delay_ms,
+                max_delay_ms=retry_policy.max_delay_ms,
+                jitter_ms=retry_policy.jitter_ms,
+                rate_capacity=rate_policy.capacity,
+                rate_refill_per_sec=rate_policy.refill_per_sec,
+                rate_burst=rate_policy.burst,
+            )
+
+        return resolver_registry, retry_configs
+
+    def _build_policy_knobs(self) -> dict[str, Any]:
+        download_cfg = self.config.download
+        http_cfg = self.config.http
+
+        policy_knobs: dict[str, Any] = {}
+
+        if download_cfg.max_bytes is not None:
+            policy_knobs["max_bytes"] = download_cfg.max_bytes
+
+        policy_knobs["chunk_size_bytes"] = download_cfg.chunk_size_bytes
+        policy_knobs["atomic_write"] = download_cfg.atomic_write
+        policy_knobs["verify_content_length"] = download_cfg.verify_content_length
+        policy_knobs["timeout_s"] = http_cfg.timeout_read_s
+
+        return policy_knobs
 
 
 def run(
