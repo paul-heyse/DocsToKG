@@ -339,6 +339,104 @@ class TestDownloadExecutionContracts:
         finally:
             os.replace = original_replace
 
+    def test_stream_uses_configured_tmp_dir_and_unique_paths(
+        self, monkeypatch, tmp_path
+    ) -> None:
+        """stream_candidate_payload writes to storage tmp dir with unique paths."""
+
+        monkeypatch.setenv("DOCSTOKG_DATA_ROOT", str(tmp_path))
+
+        class FakeResponse:
+            def __init__(self, content: bytes) -> None:
+                self._content = content
+                self.status_code = 200
+                self.headers = {
+                    "Content-Type": "application/pdf",
+                    "Content-Length": str(len(content)),
+                }
+                self.extensions = {}
+
+            def iter_bytes(self, chunk_size: int = 1 << 20):
+                yield self._content
+
+        class FakeSession:
+            def __init__(self, response: FakeResponse) -> None:
+                self._response = response
+
+            def head(self, url: str, allow_redirects: bool = True, timeout=None):
+                return self._response
+
+            def get(self, url: str, stream: bool = True, allow_redirects: bool = True, timeout=None):
+                return self._response
+
+        response = FakeResponse(b"payload-bytes")
+        session = FakeSession(response)
+
+        plan1 = DownloadPlan(url="https://example.com/a.pdf", resolver_name="resolver")
+        plan2 = DownloadPlan(url="https://example.com/a.pdf", resolver_name="resolver")
+
+        result1 = stream_candidate_payload(plan1, session=session)
+        result2 = stream_candidate_payload(plan2, session=session)
+
+        path1 = Path(result1.path_tmp)
+        path2 = Path(result2.path_tmp)
+
+        tmp_root = tmp_path / "tmp" / "downloads"
+        assert path1.parents[1] == tmp_root
+        assert path2.parents[1] == tmp_root
+        assert path1 != path2
+        assert path1.exists()
+        assert path2.exists()
+
+        path1.unlink()
+        path2.unlink()
+
+    def test_stream_enforces_plan_max_bytes_override(
+        self, monkeypatch, tmp_path
+    ) -> None:
+        """Plan-level max_bytes_override is enforced during streaming."""
+
+        monkeypatch.setenv("DOCSTOKG_DATA_ROOT", str(tmp_path))
+
+        class FakeResponse:
+            def __init__(self, content: bytes) -> None:
+                self._content = content
+                self.status_code = 200
+                self.headers = {
+                    "Content-Type": "application/pdf",
+                    "Content-Length": str(len(content)),
+                }
+                self.extensions = {}
+
+            def iter_bytes(self, chunk_size: int = 1 << 20):
+                yield self._content
+
+        class FakeSession:
+            def __init__(self, response: FakeResponse) -> None:
+                self._response = response
+
+            def head(self, url: str, allow_redirects: bool = True, timeout=None):
+                return self._response
+
+            def get(self, url: str, stream: bool = True, allow_redirects: bool = True, timeout=None):
+                return self._response
+
+        response = FakeResponse(b"x" * 64)
+        session = FakeSession(response)
+        plan = DownloadPlan(
+            url="https://example.com/limited.pdf",
+            resolver_name="resolver",
+            max_bytes_override=32,
+        )
+
+        with pytest.raises(DownloadError) as excinfo:
+            stream_candidate_payload(plan, session=session, max_bytes=128)
+
+        assert excinfo.value.reason == "too-large"
+
+        tmp_root = tmp_path / "tmp" / "downloads"
+        remaining = list(tmp_root.rglob("*.download.part"))
+        assert not remaining
     def test_finalize_uses_storage_root(self, tmp_path):
         """finalize_candidate_download places files under the configured storage root."""
         plan = DownloadPlan(url="https://example.com/file.pdf", resolver_name="test")
