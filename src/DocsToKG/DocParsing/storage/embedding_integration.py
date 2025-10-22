@@ -22,13 +22,20 @@ from typing import Any, Iterator, List, Optional, Sequence
 from . import parquet_schemas
 
 
-class UnifiedVectorWriter:
-    """
-    Parquet-only vector writer for embedding vectors.
+class VectorWriterError(RuntimeError):
+    """Raised when a vector artifact cannot be written."""
 
-    All embedding vectors are written exclusively in Parquet columnar format
-    for efficiency, compression, and analytics compatibility.
-    """
+    def __init__(self, fmt: str, output_path: Path, original: BaseException) -> None:
+        super().__init__(
+            f"Failed to write vectors in {fmt} format to {output_path}: {original}"
+        )
+        self.format = fmt
+        self.output_path = Path(output_path)
+        self.original = original
+
+
+class UnifiedVectorWriter:
+    """Vector writer supporting Parquet with a JSONL fallback path."""
 
     def __init__(
         self,
@@ -36,75 +43,124 @@ class UnifiedVectorWriter:
         fmt: str = "parquet",
         vector_format_override: Optional[str] = None,
         **writer_kwargs: Any,
-    ):
-        """
-        Initialize Parquet writer.
+    ) -> None:
+        """Initialise the writer with atomic write semantics."""
 
-        Args:
-            output_path: Path where vectors will be written.
-            fmt: Format string; must be 'parquet' (hardcoded).
-            vector_format_override: Optional override (enforced to 'parquet').
-            **writer_kwargs: Additional kwargs for writer initialization.
-        """
         self.output_path = Path(output_path)
-        fmt = str(vector_format_override or fmt or "parquet").lower()
-        if fmt != "parquet":
-            raise ValueError("Parquet is the only supported format for embedding vectors")
-        self.fmt = "parquet"
-        self.writer_kwargs = writer_kwargs
-        self._context = None
-        self._writer = None
+        fmt_normalised = str(vector_format_override or fmt or "parquet").lower()
+        if fmt_normalised not in {"parquet", "jsonl"}:
+            raise ValueError("Supported formats: parquet, jsonl")
+        self.fmt = fmt_normalised
+        defaults = {
+            "compression": "zstd",
+            "compression_level": 5,
+            "write_statistics": True,
+        }
+        defaults.update(writer_kwargs)
+        self.writer_kwargs = defaults
+        self._rows_buffer: List[dict] = []
+        self._jsonl_handle: Optional[Any] = None
+        self._tmp_path: Optional[Path] = None
 
     def __enter__(self) -> UnifiedVectorWriter:
-        """Enter context manager and initialize underlying writer."""
+        """Prepare temporary resources prior to writing."""
+
         self.output_path.parent.mkdir(parents=True, exist_ok=True)
-
-        # Parquet: note that Parquet writer will be created when write_rows is called
-        # This matches the legacy interface where writers are context managers
-        pass
-
+        if self.fmt == "jsonl":
+            tmp = self.output_path.with_name(
+                f"{self.output_path.name}.tmp.{uuid.uuid4().hex}"
+            )
+            self._tmp_path = tmp
+            self._jsonl_handle = open(tmp, "w", encoding="utf-8")
         return self
 
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> bool:
-        """Exit context manager and finalize underlying writer."""
-        if self._context is not None:
-            return self._context.__exit__(exc_type, exc_val, exc_tb)
-        return False
+        """Flush buffered data to disk or clean up on error."""
 
-    def write_rows(self, rows: Sequence[dict]) -> None:
-        """
-        Write a batch of vector rows to the underlying storage.
+        if exc_type is not None:
+            self._discard_temp()
+            return False
 
-        Args:
-            rows: List of vector row dictionaries.
-        """
-        if not rows:
-            return
-
-        # Parquet: Convert rows to Arrow table and write with footer metadata
-        table = self._rows_to_arrow_table(rows)
-        # Write directly (file will be created on first write)
-        import pyarrow.parquet as pq
-
-        self.output_path.parent.mkdir(parents=True, exist_ok=True)
-        tmp_path = self.output_path.with_name(f"{self.output_path.name}.tmp.{uuid.uuid4().hex}")
-        try:
-            pq.write_table(
-                table,
-                str(tmp_path),
-                compression="zstd",
-                compression_level=5,
-                write_statistics=True,
-            )
+        if self.fmt == "jsonl":
+            handle = self._jsonl_handle
+            tmp_path = self._tmp_path
+            if handle is None or tmp_path is None:
+                return False
             try:
-                with open(tmp_path, "rb") as f:
-                    os.fsync(f.fileno())
+                handle.flush()
+                os.fsync(handle.fileno())
+            except OSError:
+                # Some filesystems may not support fsync; continue anyway.
+                pass
+            finally:
+                handle.close()
+                self._jsonl_handle = None
+            try:
+                tmp_path.replace(self.output_path)
+            except Exception as exc:  # pragma: no cover - defensive
+                tmp_path.unlink(missing_ok=True)
+                raise VectorWriterError(self.fmt, self.output_path, exc) from exc
+            finally:
+                self._tmp_path = None
+            return False
+
+        if not self._rows_buffer:
+            return False
+
+        tmp_path = self.output_path.with_name(
+            f"{self.output_path.name}.tmp.{uuid.uuid4().hex}"
+        )
+        try:
+            table = self._rows_to_arrow_table(self._rows_buffer)
+            import pyarrow.parquet as pq
+
+            pq.write_table(table, str(tmp_path), **self.writer_kwargs)
+            try:
+                with open(tmp_path, "rb") as fh:
+                    os.fsync(fh.fileno())
             except OSError:
                 pass
             tmp_path.replace(self.output_path)
-        except Exception:
+        except Exception as exc:
             tmp_path.unlink(missing_ok=True)
-            raise
+            raise VectorWriterError(self.fmt, self.output_path, exc) from exc
+        finally:
+            self._rows_buffer.clear()
+
+        return False
+
+    def _discard_temp(self) -> None:
+        """Clean up any temporary artifacts when aborting the write."""
+
+        if self._jsonl_handle is not None:
+            try:
+                self._jsonl_handle.close()
+            except Exception:  # pragma: no cover - best effort cleanup
+                pass
+            self._jsonl_handle = None
+        if self._tmp_path is not None:
+            self._tmp_path.unlink(missing_ok=True)
+            self._tmp_path = None
+        self._rows_buffer.clear()
+
+    def write_rows(self, rows: Sequence[dict]) -> None:
+        """Buffer vector rows for later flush or stream JSONL content."""
+
+        if not rows:
+            return
+
+        if self.fmt == "jsonl":
+            handle = self._jsonl_handle
+            if handle is None:
+                raise RuntimeError(
+                    "JSONL writer is not initialised; use as a context manager"
+                )
+            for row in rows:
+                handle.write(json.dumps(row, ensure_ascii=False))
+                handle.write("\n")
+            return
+
+        self._rows_buffer.extend(rows)
 
     @staticmethod
     def _rows_to_arrow_table(rows: Sequence[dict]) -> Any:
