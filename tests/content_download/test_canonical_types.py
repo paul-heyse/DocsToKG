@@ -698,45 +698,93 @@ class TestResolverPipeline:
 class TestHappyPath:
     """End-to-end happy path tests."""
 
-    def test_full_pipeline_success_flow(self):
-        """Complete successful download flow."""
-        # Create resolver returning one plan
+    def test_full_pipeline_success_flow(self, tmp_path, monkeypatch):
+        """Complete successful download flow using default final_path."""
+
         resolver = MagicMock()
         resolver.name = "test"
-        plan = DownloadPlan(url="https://example.com/file.pdf", resolver_name="test")
+        plan = DownloadPlan(url="https://example.com/full.pdf", resolver_name="test")
         resolver.resolve.return_value = ResolverResult(plans=[plan])
 
-        # Create mock session
-        session = MagicMock()
-        response = MagicMock()
-        response.status_code = 200
-        response.headers = {"Content-Type": "application/pdf"}
-        response.iter_content = lambda chunk_size: [b"test data"]
-        session.head.return_value = response
-        session.get.return_value = response
+        pipeline = ResolverPipeline([resolver], MagicMock())
 
-        # Create pipeline
-        pipeline = ResolverPipeline([resolver], session)
-
-        # Mock artifacts and context
         artifact = MagicMock()
         artifact.work_id = "work_123"
         artifact.final_path = None
         ctx = MagicMock()
 
-        # Mock file operations
-        import os
+        part_path = tmp_path / "full.pdf.part"
+        part_path.write_bytes(b"payload")
 
-        original_replace = os.replace
-        os.replace = MagicMock()
+        stream_result = DownloadStreamResult(
+            path_tmp=str(part_path),
+            bytes_written=7,
+            http_status=200,
+            content_type="application/pdf",
+        )
 
-        try:
-            outcome = pipeline.run(artifact, ctx)
-            # Note: outcome.ok may be False due to missing final_path handling
-            # This test verifies the pipeline executes without crashing
-            assert isinstance(outcome, DownloadOutcome)
-        finally:
-            os.replace = original_replace
+        monkeypatch.setattr(
+            "DocsToKG.ContentDownload.pipeline.prepare_candidate_download",
+            lambda plan, **_: plan,
+        )
+        monkeypatch.setattr(
+            "DocsToKG.ContentDownload.pipeline.stream_candidate_payload",
+            lambda plan, **_: stream_result,
+        )
+
+        monkeypatch.chdir(tmp_path)
+
+        outcome = pipeline.run(artifact, ctx)
+
+        assert outcome.ok is True
+        assert outcome.classification == "success"
+        assert outcome.path == str(tmp_path / "full.pdf")
+
+    def test_pipeline_converts_skip_on_finalize(self, tmp_path, monkeypatch):
+        """Pipeline returns skip outcome when finalize raises SkipDownload."""
+
+        resolver = MagicMock()
+        resolver.name = "test"
+        plan = DownloadPlan(url="https://example.com/skip.pdf", resolver_name="test")
+        resolver.resolve.return_value = ResolverResult(plans=[plan])
+
+        pipeline = ResolverPipeline([resolver], MagicMock())
+
+        artifact = MagicMock()
+        artifact.work_id = "work_456"
+        artifact.final_path = None
+        ctx = MagicMock()
+
+        part_path = tmp_path / "skip.pdf.part"
+        part_path.write_bytes(b"payload")
+
+        stream_result = DownloadStreamResult(
+            path_tmp=str(part_path),
+            bytes_written=7,
+            http_status=200,
+            content_type="application/pdf",
+        )
+
+        monkeypatch.setattr(
+            "DocsToKG.ContentDownload.pipeline.prepare_candidate_download",
+            lambda plan, **_: plan,
+        )
+        monkeypatch.setattr(
+            "DocsToKG.ContentDownload.pipeline.stream_candidate_payload",
+            lambda plan, **_: stream_result,
+        )
+        monkeypatch.setattr(
+            "DocsToKG.ContentDownload.pipeline.finalize_candidate_download",
+            lambda *args, **kwargs: (_ for _ in ()).throw(
+                SkipDownload("path-policy", "Path blocked")
+            ),
+        )
+
+        outcome = pipeline.run(artifact, ctx)
+
+        assert outcome.ok is False
+        assert outcome.classification == "skip"
+        assert outcome.reason == "path-policy"
 
 
 # ============================================================================

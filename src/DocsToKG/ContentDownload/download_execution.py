@@ -659,15 +659,15 @@ def finalize_candidate_download(
     try:
         safe_final_path = validate_path_safety(candidate_final_path, artifact_root=artifact_root)
     # Determine final path (in real implementation, would use storage policy)
-    if final_path:
-        dest_path = final_path
-    else:
+    destination = final_path
+    if not destination:
         base = plan.url.rsplit("/", 1)[-1] or "download.bin"
-        dest_path = os.path.join(os.getcwd(), base)
+        destination = os.path.join(os.getcwd(), base)
 
-    # Validate final path safety after deriving destination
+    # Validate final path safety (initial + resolved)
     try:
-        dest_path = validate_path_safety(dest_path)
+        safe_path = validate_path_safety(destination)
+        final_path = validate_path_safety(safe_path)
     except PathPolicyError as e:
         raise SkipDownload("path-policy", f"Path policy violation: {e}")
 

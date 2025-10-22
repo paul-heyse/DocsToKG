@@ -19,7 +19,7 @@ import httpx
 import pytest
 
 from DocsToKG.ContentDownload import download as downloader
-from DocsToKG.ContentDownload.api import DownloadPlan
+from DocsToKG.ContentDownload.api import DownloadPlan, DownloadStreamResult
 from DocsToKG.ContentDownload.core import Classification, ReasonCode, WorkArtifact
 from DocsToKG.ContentDownload.download import (
     DownloadConfig,
@@ -342,6 +342,30 @@ def test_stream_candidate_payload_streams_pdf(
     assert outcome.path is not None
     assert Path(outcome.path).exists()
     assert progress
+
+
+def test_finalize_candidate_download_uses_default_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    plan = DownloadPlan(url="https://example.com/default.bin", resolver_name="test")
+    part_path = tmp_path / "default.bin.part"
+    part_path.write_bytes(b"payload")
+
+    stream = DownloadStreamResult(
+        path_tmp=str(part_path),
+        bytes_written=7,
+        http_status=200,
+        content_type="application/octet-stream",
+    )
+
+    monkeypatch.chdir(tmp_path)
+
+    outcome = finalize_candidate_download(plan, stream)
+
+    assert outcome.ok is True
+    assert outcome.classification == "success"
+    assert outcome.path is not None
+    assert Path(outcome.path).exists()
 
 
 def test_download_candidate_retries_and_cleans_partial(
