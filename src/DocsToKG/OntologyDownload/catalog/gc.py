@@ -371,11 +371,7 @@ def prune_keep_latest_n(
 
         for version_id in delete_ids:
             # Emit observability orphan_found event for each version being deleted
-            emit_prune_orphan_found(
-                item_type="version",
-                item_id=version_id,
-                size_bytes=0,
-            )
+            emit_prune_orphan_found(item_type="version", item_id=version_id, size_bytes=0)
 
             # Delete latest pointer
             conn.execute(
@@ -420,8 +416,10 @@ def prune_keep_latest_n(
 
         # Emit observability deleted event
         emit_prune_deleted(
-            items_deleted=items_identified,
-            bytes_freed=bytes_to_free,
+            deleted_count=items_identified,
+            freed_bytes=bytes_to_free,
+            duration_ms=duration_ms,
+            dry_run=False,
         )
 
         return PruneResult(
@@ -536,8 +534,10 @@ def garbage_collect(
     # Emit observability deleted event with combined results
     gc_duration_ms = (time.time() - gc_start_time) * 1000
     emit_prune_deleted(
-        items_deleted=prune_result.items_deleted,
-        bytes_freed=prune_result.bytes_freed,
+        deleted_count=prune_result.items_deleted,
+        freed_bytes=prune_result.bytes_freed,
+        duration_ms=gc_duration_ms,
+        dry_run=dry_run,
     )
 
     return prune_result, vacuum_result
