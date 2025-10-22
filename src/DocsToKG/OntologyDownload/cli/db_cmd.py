@@ -285,6 +285,7 @@ def doctor(
     )
     start_time = time.time()
 
+    conn: duckdb.DuckDBPyConnection | None = None
     try:
         if not artifacts_root.exists():
             typer.echo(f"Error: Artifacts root does not exist: {artifacts_root}", err=True)
@@ -297,6 +298,9 @@ def doctor(
             duration_ms = (time.time() - start_time) * 1000
             emit_cli_command_error("doctor", duration_ms, Exception("Extracted root not found"))
             raise typer.Exit(1)
+
+        if fix and dry_run:
+            typer.secho("Note: --dry-run ignores --fix; previewing only.", fg="yellow")
 
         # Get DuckDB connection and generate report
         conn = _get_duckdb_connection(db_path)
@@ -320,9 +324,19 @@ def doctor(
                     "type": issue.issue_type,
                     "severity": issue.severity,
                     "description": issue.description,
+                    "artifact_id": issue.artifact_id,
+                    "file_id": issue.file_id,
+                    "path": str(issue.fs_path) if issue.fs_path else None,
+                    "size_bytes": issue.size_bytes,
                 }
                 for issue in report.issues
             ]
+
+        if fix and not dry_run:
+            typer.secho(
+                "Auto-fix not yet implemented; run `docdb prune` for filesystem cleanup.",
+                fg="yellow",
+            )
 
         typer.echo(_format_output(output, fmt))
         duration_ms = (time.time() - start_time) * 1000
@@ -341,6 +355,9 @@ def doctor(
         duration_ms = (time.time() - start_time) * 1000
         emit_cli_command_error("doctor", duration_ms, e)
         raise
+    finally:
+        if conn is not None:
+            conn.close()
 
 
 @app.command()
@@ -360,6 +377,7 @@ def prune(
     emit_cli_command_begin("prune", {"dry_run": dry_run, "apply": apply, "root": str(root)})
     start_time = time.time()
 
+    conn: duckdb.DuckDBPyConnection | None = None
     try:
         if not apply and not dry_run:
             typer.echo("Error: Use --dry-run to preview or --apply to delete", err=True)
@@ -408,6 +426,9 @@ def prune(
         duration_ms = (time.time() - start_time) * 1000
         emit_cli_command_error("prune", duration_ms, e)
         raise
+    finally:
+        if conn is not None:
+            conn.close()
 
 
 @app.command()

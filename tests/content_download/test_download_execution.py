@@ -33,6 +33,106 @@ from DocsToKG.ContentDownload.api.types import DownloadOutcome
 from tests.conftest import PatchManager
 
 
+class _FakeTelemetry:
+    def __init__(self) -> None:
+        self.records: list[Any] = []
+
+    def log_attempt(self, record: Any, *, timestamp: Any = None) -> None:  # pragma: no cover - signature parity
+        del timestamp
+        self.records.append(record)
+
+
+def test_stream_and_finalize_emit_attempt_records(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    plan = DownloadPlan(url="https://example.com/foo.pdf", resolver_name="resolver")
+    telemetry = _FakeTelemetry()
+    payload = b"payload"
+
+    class _HeadResponse:
+        def __init__(self, status_code: int) -> None:
+            self.status_code = status_code
+
+    class _Response:
+        def __init__(self, body: bytes) -> None:
+            self.status_code = 200
+            self.headers = {
+                "Content-Type": "application/pdf",
+                "Content-Length": str(len(body)),
+            }
+            self.extensions = {"from_cache": True, "revalidated": False}
+            self._body = body
+
+        def iter_bytes(self) -> Iterator[bytes]:
+            yield self._body
+
+    class _Session:
+        def head(
+            self,
+            url: str,
+            *,
+            allow_redirects: bool = True,
+            timeout: Optional[float] = None,
+        ) -> _HeadResponse:
+            assert allow_redirects is True
+            assert url == plan.url
+            return _HeadResponse(200)
+
+        def get(
+            self,
+            url: str,
+            *,
+            stream: bool = True,
+            allow_redirects: bool = True,
+            timeout: Optional[float] = None,
+        ) -> _Response:
+            assert allow_redirects is True
+            assert stream is True
+            assert url == plan.url
+            return _Response(payload)
+
+    result = stream_candidate_payload(
+        plan,
+        session=_Session(),
+        telemetry=telemetry,
+        run_id="run",
+    )
+
+    final_path = tmp_path / "final.pdf"
+    finalize_candidate_download(
+        plan,
+        result,
+        final_path=str(final_path),
+        telemetry=telemetry,
+        run_id="run",
+    )
+
+    statuses = [record.status for record in telemetry.records]
+    assert statuses == ["http-head", "http-get", "cache-hit", "http-200", "http-200"]
+
+    get_record = telemetry.records[1]
+    assert get_record.http_status == 200
+    assert get_record.meta["content_type"] == "application/pdf"
+    assert get_record.meta["from_cache"] is True
+    assert get_record.meta["revalidated"] is False
+
+    cache_record = telemetry.records[2]
+    assert cache_record.meta["reason"] == "ok"
+
+    stream_record = telemetry.records[3]
+    assert stream_record.http_status == 200
+    assert stream_record.meta["bytes"] == len(payload)
+    assert stream_record.meta["content_length_hdr"] == len(payload)
+    assert stream_record.meta["from_cache"] is True
+
+    finalize_record = telemetry.records[-1]
+    assert finalize_record.http_status == 200
+    assert finalize_record.meta["bytes"] == len(payload)
+    assert finalize_record.meta["final_path"] == str(final_path)
+
+
 class ResolverMetrics:
     """Stub metrics collector for tests (original was legacy code)."""
 
