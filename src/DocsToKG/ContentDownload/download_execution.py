@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import logging
 import os
+import tempfile
 import time
 from typing import Any, Optional
 
@@ -51,6 +52,69 @@ def _emit(telemetry: Any, **kw: Any) -> None:
             telemetry.log_attempt(**kw)
         except Exception as e:  # pylint: disable=broad-except
             LOGGER.debug(f"Telemetry emission failed: {e}")
+
+
+def _sanitize_component(component: Optional[str]) -> str:
+    """Sanitize arbitrary identifiers for filesystem usage."""
+
+    if not component:
+        return "default"
+
+    sanitized = "".join(
+        ch if ch.isalnum() or ch in {"-", "_", "."} else "_" for ch in component
+    ).strip("_")
+
+    if not sanitized:
+        return "id"
+
+    return sanitized[:64]
+
+
+def _prepare_staging_destination(
+    run_id: Optional[str], resolver_name: str
+) -> tuple[str, str]:
+    """Create a unique staging directory and destination path for this attempt."""
+
+    base_dir = os.path.join(os.getcwd(), ".download-staging")
+    run_component = _sanitize_component(run_id) if run_id else "default"
+    base_dir = os.path.join(base_dir, run_component)
+    os.makedirs(base_dir, exist_ok=True)
+
+    prefix = f"{_sanitize_component(resolver_name)}-"
+    staging_dir = tempfile.mkdtemp(prefix=prefix, dir=base_dir)
+    tmp_path = os.path.join(staging_dir, "payload.download.part")
+    return staging_dir, tmp_path
+
+
+def _cleanup_staging_artifacts(
+    path: Optional[str], staging_dir: Optional[str]
+) -> None:
+    """Best-effort cleanup of staging files/directories."""
+
+    if path:
+        try:
+            os.unlink(path)
+        except FileNotFoundError:
+            pass
+        except OSError as exc:  # pragma: no cover - diagnostic only
+            LOGGER.debug(f"Failed to remove staging file {path}: {exc}")
+
+    if not staging_dir:
+        return
+
+    try:
+        os.rmdir(staging_dir)
+    except OSError:
+        return
+
+    parent = os.path.dirname(staging_dir)
+    for candidate in (parent, os.path.dirname(parent)):
+        if not candidate or os.path.basename(candidate) == "":
+            continue
+        try:
+            os.rmdir(candidate)
+        except OSError:
+            break
 
 
 def prepare_candidate_download(
@@ -211,6 +275,8 @@ def stream_candidate_payload(
     cl = resp.headers.get("Content-Length")
     expected_len = int(cl) if (cl and cl.isdigit()) else None
 
+    staging_dir: Optional[str] = None
+    tmp_path: Optional[str] = None
     # Determine effective byte limit (plan override wins)
     effective_max_bytes = (
         plan.max_bytes_override
@@ -244,6 +310,7 @@ def stream_candidate_payload(
             yield chunk
 
     try:
+        staging_dir, tmp_path = _prepare_staging_destination(run_id, plan.resolver_name)
         bytes_written = atomic_write_stream(
             dest_path=tmp_path,
             byte_iter=_iter_with_limit(
@@ -254,6 +321,8 @@ def stream_candidate_payload(
         )
 
         # Check size limit
+        if max_bytes and bytes_written > max_bytes:
+            _cleanup_staging_artifacts(tmp_path, staging_dir)
         if (
             effective_max_bytes is not None
             and bytes_written > effective_max_bytes
@@ -285,9 +354,11 @@ def stream_candidate_payload(
             bytes_written=bytes_written,
             http_status=resp.status_code,
             content_type=content_type,
+            staging_path=staging_dir,
         )
 
     except SizeMismatchError:
+        _cleanup_staging_artifacts(tmp_path, staging_dir)
         _emit(
             telemetry,
             run_id=run_id,
@@ -301,12 +372,14 @@ def stream_candidate_payload(
         )
         raise DownloadError("size-mismatch")
     except DownloadError:
+        _cleanup_staging_artifacts(tmp_path, staging_dir)
         try:
             os.unlink(tmp_path)
         except FileNotFoundError:
             pass
         raise
     except Exception as e:  # pylint: disable=broad-except
+        _cleanup_staging_artifacts(tmp_path, staging_dir)
         raise DownloadError(
             "download-error",
             f"Atomic write failed: {e}",
@@ -361,7 +434,18 @@ def finalize_candidate_download(
 
     # atomic_write_stream already moved temp → dest_path, so final_path exists
     # Just verify and emit event
+    cleanup_dirs = False
+    same_destination = False
     try:
+        if stream.path_tmp:
+            same_destination = os.path.abspath(stream.path_tmp) == os.path.abspath(final_path)
+
+            if not same_destination and not os.path.exists(final_path):
+                # If atomic_write_stream didn't finalize, move it now
+                os.replace(stream.path_tmp, final_path)
+            elif not same_destination:
+                _cleanup_staging_artifacts(stream.path_tmp, None)
+        cleanup_dirs = not same_destination
         if stream.path_tmp and not os.path.exists(dest_path):
             # If atomic_write_stream didn't finalize, move it now
             os.replace(stream.path_tmp, dest_path)
@@ -370,6 +454,9 @@ def finalize_candidate_download(
             "download-error",
             f"Failed to finalize: {e}",
         ) from e
+    finally:
+        if cleanup_dirs and stream.staging_path:
+            _cleanup_staging_artifacts(None, stream.staging_path)
 
     # Emit finalization event
     _emit(
