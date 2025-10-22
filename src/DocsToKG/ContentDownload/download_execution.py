@@ -115,9 +115,26 @@ def stream_candidate_payload(
         raise SkipDownload("security-policy", f"URL security policy violation: {e}")
 
     # HEAD request (optional, for validation)
+    base_headers: dict[str, str] = {}
+    if plan.referer:
+        base_headers["Referer"] = plan.referer
+    if plan.etag:
+        base_headers["If-None-Match"] = plan.etag
+    if plan.last_modified:
+        base_headers["If-Modified-Since"] = plan.last_modified
+
+    effective_max_bytes = (
+        plan.max_bytes_override
+        if plan.max_bytes_override is not None
+        else max_bytes
+    )
+
     t0 = time.monotonic_ns()
     try:
-        head = session.head(url, allow_redirects=True, timeout=timeout_s)
+        head_kwargs = {"allow_redirects": True, "timeout": timeout_s}
+        if base_headers:
+            head_kwargs["headers"] = dict(base_headers)
+        head = session.head(url, **head_kwargs)
         elapsed_ms = (time.monotonic_ns() - t0) // 1_000_000
         _emit(
             telemetry,
@@ -135,7 +152,14 @@ def stream_candidate_payload(
     # GET request via httpx + hishel
     t0 = time.monotonic_ns()
     try:
-        resp = session.get(url, stream=True, allow_redirects=True, timeout=timeout_s)
+        get_kwargs = {
+            "stream": True,
+            "allow_redirects": True,
+            "timeout": timeout_s,
+        }
+        if base_headers:
+            get_kwargs["headers"] = dict(base_headers)
+        resp = session.get(url, **get_kwargs)
         elapsed_ms = (time.monotonic_ns() - t0) // 1_000_000
         content_type = resp.headers.get("Content-Type", "").lower()
 
@@ -214,10 +238,10 @@ def stream_candidate_payload(
         )
 
         # Check size limit
-        if max_bytes and bytes_written > max_bytes:
+        if effective_max_bytes and bytes_written > effective_max_bytes:
             raise DownloadError(
                 "too-large",
-                f"Payload exceeded {max_bytes} bytes",
+                f"Payload exceeded {effective_max_bytes} bytes",
             )
 
         # Emit final success record
