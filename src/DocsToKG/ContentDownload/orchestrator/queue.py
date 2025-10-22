@@ -83,6 +83,7 @@ CREATE TABLE IF NOT EXISTS jobs (
   resolver_hint TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
+  available_at TEXT,
   lease_expires_at TEXT,
   worker_id TEXT
 );
@@ -90,6 +91,7 @@ CREATE TABLE IF NOT EXISTS jobs (
 CREATE INDEX IF NOT EXISTS idx_jobs_state ON jobs(state);
 CREATE INDEX IF NOT EXISTS idx_jobs_lease ON jobs(lease_expires_at);
 CREATE INDEX IF NOT EXISTS idx_jobs_created ON jobs(created_at);
+CREATE INDEX IF NOT EXISTS idx_jobs_state_available ON jobs(state, available_at);
 """
 
 
@@ -117,15 +119,38 @@ class WorkQueue:
 
         # Initialize database with WAL mode if requested
         conn = sqlite3.connect(path, timeout=10.0)
+        conn.row_factory = sqlite3.Row
         if wal_mode:
             conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA foreign_keys=ON")
         conn.execute("PRAGMA busy_timeout=5000")  # 5 second timeout
         conn.executescript(_SCHEMA_SQL)
+        self._run_schema_migrations(conn)
         conn.commit()
         conn.close()
 
         logger.info(f"WorkQueue initialized at {path} (wal_mode={wal_mode})")
+
+    def _run_schema_migrations(self, conn: sqlite3.Connection) -> None:
+        """Apply lightweight schema migrations for existing queue databases."""
+
+        columns = {
+            row["name"]
+            for row in conn.execute("PRAGMA table_info(jobs)").fetchall()
+        }
+
+        if "available_at" not in columns:
+            conn.execute("ALTER TABLE jobs ADD COLUMN available_at TEXT")
+            # Existing jobs should be immediately available for leasing.
+            conn.execute(
+                "UPDATE jobs SET available_at = created_at WHERE available_at IS NULL"
+            )
+
+        # Ensure supporting indexes exist even if table predates this version.
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_jobs_state_available"
+            " ON jobs(state, available_at)"
+        )
 
     def _get_connection(self) -> sqlite3.Connection:
         """Get thread-local database connection.
@@ -189,20 +214,30 @@ class WorkQueue:
         """
         conn = self._get_connection()
         try:
-            now_iso = datetime.now(timezone.utc).isoformat()
+            now = datetime.now(timezone.utc)
+            now_iso = now.isoformat()
             artifact_json = json.dumps(dict(artifact))
 
             cursor = conn.execute(
                 """
                 INSERT OR IGNORE INTO jobs
-                (artifact_id, artifact_json, state, resolver_hint, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?)
+                (
+                    artifact_id,
+                    artifact_json,
+                    state,
+                    resolver_hint,
+                    created_at,
+                    updated_at,
+                    available_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     artifact_id,
                     artifact_json,
                     JobState.QUEUED.value,
                     resolver_hint,
+                    now_iso,
                     now_iso,
                     now_iso,
                 ),
@@ -244,19 +279,31 @@ class WorkQueue:
         """
         conn = self._get_connection()
         try:
-            now_iso = datetime.now(timezone.utc).isoformat()
-            lease_expires = datetime.now(timezone.utc) + timedelta(seconds=lease_ttl_sec)
+            now = datetime.now(timezone.utc)
+            now_iso = now.isoformat()
+            lease_expires = now + timedelta(seconds=lease_ttl_sec)
             lease_expires_iso = lease_expires.isoformat()
 
             # Atomically lease queued jobs and stale in-progress jobs
             conn.execute(
                 """
                 UPDATE jobs
-                SET state = ?, worker_id = ?, lease_expires_at = ?, updated_at = ?
+                SET state = ?,
+                    worker_id = ?,
+                    lease_expires_at = ?,
+                    updated_at = ?,
+                    available_at = NULL
                 WHERE id IN (
-                    SELECT id FROM jobs
-                    WHERE (state = ? OR (state = ? AND lease_expires_at < ?))
-                    ORDER BY created_at ASC
+                    SELECT id
+                    FROM jobs
+                    WHERE (
+                        state = ?
+                        AND (available_at IS NULL OR available_at <= ?)
+                    )
+                    OR (
+                        state = ? AND lease_expires_at < ?
+                    )
+                    ORDER BY COALESCE(available_at, created_at) ASC, created_at ASC
                     LIMIT ?
                 )
                 """,
@@ -266,6 +313,7 @@ class WorkQueue:
                     lease_expires_iso,
                     now_iso,
                     JobState.QUEUED.value,
+                    now_iso,
                     JobState.IN_PROGRESS.value,
                     now_iso,
                     limit,
@@ -376,12 +424,13 @@ class WorkQueue:
 
         conn = self._get_connection()
         try:
-            now_iso = datetime.now(timezone.utc).isoformat()
+            now = datetime.now(timezone.utc)
+            now_iso = now.isoformat()
 
             cursor = conn.execute(
                 """
                 UPDATE jobs
-                SET state = ?, last_error = ?, worker_id = NULL, lease_expires_at = NULL, updated_at = ?
+                SET state = ?, last_error = ?, worker_id = NULL, lease_expires_at = NULL, available_at = NULL, updated_at = ?
                 WHERE id = ?
                 """,
                 (state.value, last_error, now_iso, job_id),
@@ -418,7 +467,8 @@ class WorkQueue:
         """
         conn = self._get_connection()
         try:
-            now_iso = datetime.now(timezone.utc).isoformat()
+            now = datetime.now(timezone.utc)
+            now_iso = now.isoformat()
 
             # Increment attempts
             conn.execute(
@@ -442,17 +492,21 @@ class WorkQueue:
 
             if attempts < max_attempts:
                 # Re-queue with exponential backoff (simple: just use backoff_sec)
-                delay_expires = (
-                    datetime.now(timezone.utc) + timedelta(seconds=backoff_sec)
-                ).isoformat()
+                retry_time = datetime.now(timezone.utc)
+                retry_time_iso = retry_time.isoformat()
+                delay_expires = (retry_time + timedelta(seconds=backoff_sec)).isoformat()
 
                 conn.execute(
                     """
                     UPDATE jobs
-                    SET state = ?, worker_id = NULL, lease_expires_at = ?, updated_at = ?
+                    SET state = ?,
+                        worker_id = NULL,
+                        lease_expires_at = NULL,
+                        available_at = ?,
+                        updated_at = ?
                     WHERE id = ?
                     """,
-                    (JobState.QUEUED.value, delay_expires, now_iso, job_id),
+                    (JobState.QUEUED.value, delay_expires, retry_time_iso, job_id),
                 )
                 logger.debug(
                     f"Job {job_id} retry scheduled (attempts={attempts}/{max_attempts}, "
@@ -460,13 +514,19 @@ class WorkQueue:
                 )
             else:
                 # Mark as error
+                error_time = datetime.now(timezone.utc).isoformat()
+
                 conn.execute(
                     """
                     UPDATE jobs
-                    SET state = ?, worker_id = NULL, lease_expires_at = NULL, updated_at = ?
+                    SET state = ?,
+                        worker_id = NULL,
+                        lease_expires_at = NULL,
+                        available_at = NULL,
+                        updated_at = ?
                     WHERE id = ?
                     """,
-                    (JobState.ERROR.value, now_iso, job_id),
+                    (JobState.ERROR.value, error_time, job_id),
                 )
                 logger.warning(
                     f"Job {job_id} marked ERROR after {attempts} attempts. Error: {last_error}"

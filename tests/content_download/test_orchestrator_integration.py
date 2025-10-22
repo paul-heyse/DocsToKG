@@ -110,6 +110,41 @@ class TestJobLifecycle(unittest.TestCase):
         stats = queue.stats()
         self.assertEqual(stats["error"], 1)
 
+    def test_retry_respects_backoff(self) -> None:
+        """Jobs scheduled for retry should not be leased until the backoff expires."""
+
+        queue = WorkQueue(self.queue_path)
+        queue.enqueue("doi:test-1", {"doi": "test-1"})
+
+        leased = queue.lease("worker-1", 1, 600)
+        self.assertEqual(len(leased), 1)
+        job = leased[0]
+
+        queue.fail_and_retry(job["id"], backoff_sec=2, max_attempts=3, last_error="boom")
+
+        # Immediate lease attempt should not return the deferred job.
+        self.assertEqual(
+            queue.lease("worker-2", 1, 600),
+            [],
+        )
+
+        time.sleep(2.1)
+
+        retried = queue.lease("worker-2", 1, 600)
+        self.assertEqual(len(retried), 1)
+        self.assertEqual(retried[0]["id"], job["id"])
+
+        # The job should have its delay metadata cleared once leased again.
+        conn = sqlite3.connect(self.queue_path)
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT available_at FROM jobs WHERE id = ?", (job["id"],)
+        ).fetchone()
+        conn.close()
+
+        self.assertIsNotNone(row)
+        self.assertIsNone(row["available_at"])
+
 
 class TestConcurrency(unittest.TestCase):
     """Tests for concurrent job processing."""
