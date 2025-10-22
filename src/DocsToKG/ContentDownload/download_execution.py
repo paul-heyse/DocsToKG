@@ -542,6 +542,8 @@ def finalize_candidate_download(
     stream: DownloadStreamResult,
     *,
     final_path: Optional[str] = None,
+    storage_settings: Any = None,
+    storage_root: Optional[str] = None,
     telemetry: Any = None,
     run_id: Optional[str] = None,
 ) -> DownloadOutcome:
@@ -570,6 +572,25 @@ def finalize_candidate_download(
             meta={"http_status": 304},
         )
 
+    # Determine artifact root from storage configuration
+    artifact_root = storage_root
+    if artifact_root is None and storage_settings is not None:
+        artifact_root = getattr(storage_settings, "root_dir", None)
+    if artifact_root is None:
+        artifact_root = os.getcwd()
+
+    # Determine final path (in real implementation, would use storage policy)
+    candidate_final_path = final_path
+    if candidate_final_path:
+        if not os.path.isabs(candidate_final_path):
+            candidate_final_path = os.path.join(artifact_root, candidate_final_path)
+    else:
+        base = plan.url.rsplit("/", 1)[-1] or "download.bin"
+        candidate_final_path = os.path.join(artifact_root, base)
+
+    # Validate final path safety
+    try:
+        safe_final_path = validate_path_safety(candidate_final_path, artifact_root=artifact_root)
     # Determine final path (in real implementation, would use storage policy)
     if final_path:
         dest_path = final_path
@@ -588,6 +609,9 @@ def finalize_candidate_download(
     cleanup_dirs = False
     same_destination = False
     try:
+        if stream.path_tmp and not os.path.exists(safe_final_path):
+            # If atomic_write_stream didn't finalize, move it now
+            os.replace(stream.path_tmp, safe_final_path)
         if stream.path_tmp:
             same_destination = os.path.abspath(stream.path_tmp) == os.path.abspath(final_path)
 
@@ -616,6 +640,8 @@ def finalize_candidate_download(
         resolver_name=plan.resolver_name,
         url=plan.url,
         status="http-200",
+        bytes_written=stream.bytes_written,
+        final_path=safe_final_path,
         http_status=stream.http_status,
         meta={
             "bytes": stream.bytes_written,
@@ -627,7 +653,7 @@ def finalize_candidate_download(
     return DownloadOutcome(
         ok=True,
         classification="success",
-        path=dest_path,
+        path=safe_final_path,
         reason=None,
         meta={
             "content_type": stream.content_type,

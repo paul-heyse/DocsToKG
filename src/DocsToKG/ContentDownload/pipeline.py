@@ -243,10 +243,18 @@ class ResolverPipeline:
 
             # Stage 3: Finalize (move to final, manifest record)
             try:
+                storage_settings = getattr(ctx, "storage", None)
+                if storage_settings is None:
+                    config = getattr(ctx, "config", None)
+                    if config is not None:
+                        storage_settings = getattr(config, "storage", None)
+                storage_root = getattr(ctx, "storage_root", None)
                 outcome = finalize_candidate_download(
                     adj_plan,
                     stream,
                     final_path=getattr(artifact, "final_path", None),
+                    storage_settings=storage_settings,
+                    storage_root=storage_root,
                     telemetry=self._telemetry,
                     run_id=self._run_id,
                 )
