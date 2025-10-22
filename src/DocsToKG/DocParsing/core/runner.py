@@ -12,20 +12,15 @@ import json
 import math
 import random
 import time
+import concurrent.futures as cf
 from collections import deque
-from concurrent.futures import (
-    FIRST_COMPLETED,
-    Future,
-    ProcessPoolExecutor,
-    ThreadPoolExecutor,
-    TimeoutError as FutureTimeoutError,
-    wait,
-)
+from concurrent.futures import FIRST_COMPLETED, Future, TimeoutError as FutureTimeoutError, wait
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Deque, Dict, Iterable, Iterator, List, Mapping, Optional, Sequence, Tuple, Union
 
 from DocsToKG.DocParsing.logging import get_logger, log_event
+from DocsToKG.concurrency.executors import create_executor
 
 __all__ = [
     "ItemFingerprint",
@@ -290,15 +285,11 @@ def _percentile(values: Sequence[float], pct: float) -> float:
     return float(ordered[index])
 
 
-def _create_executor(options: StageOptions) -> Tuple[Optional[Union[ThreadPoolExecutor, ProcessPoolExecutor]], bool]:
+def _create_executor(options: StageOptions) -> Tuple[Optional[cf.Executor], bool]:
     workers = max(1, int(options.workers))
-    policy = (options.policy or "io").lower()
     if workers <= 1:
         return None, False
-    if policy == "cpu":
-        mp = __import__("multiprocessing").get_context("spawn")
-        return ProcessPoolExecutor(max_workers=workers, mp_context=mp), True
-    return ThreadPoolExecutor(max_workers=workers, thread_name_prefix="docparse-stage"), False
+    return create_executor(options.policy or "io", workers)
 
 
 def run_stage(
@@ -410,7 +401,7 @@ def run_stage(
                 )
         return outcome
 
-    executor, needs_shutdown = _create_executor(options)
+    executor, _ = _create_executor(options)
     pending: Dict[Future, _Submission] = {}
 
     def _handle_worker_payload(
