@@ -30,6 +30,7 @@ from DocsToKG.ContentDownload.api import (
     AttemptRecord,
 )
 from DocsToKG.ContentDownload.api.exceptions import SkipDownload, DownloadError
+import DocsToKG.ContentDownload.download_execution as download_exec
 from DocsToKG.ContentDownload.download_execution import (
     prepare_candidate_download,
     stream_candidate_payload,
@@ -217,6 +218,56 @@ class TestDownloadExecutionContracts:
         assert isinstance(result, DownloadStreamResult)
         assert result.http_status == 200
 
+    def test_stream_enforces_max_bytes_limit(
+        self, tmp_path, monkeypatch
+    ) -> None:
+        """stream_candidate_payload aborts once the size cap is exceeded."""
+
+        class StubResponse:
+            def __init__(self, *, status_code, headers, chunks=None):
+                self.status_code = status_code
+                self.headers = headers
+                self.extensions = {}
+                self._chunks = list(chunks or [])
+
+            def iter_bytes(self, chunk_size=None):
+                for chunk in self._chunks:
+                    yield chunk
+
+        plan = DownloadPlan(url="https://example.com/file.pdf", resolver_name="test")
+        session = MagicMock()
+        chunk_a = b"a" * 512
+        chunk_b = b"b" * 512
+        limit = len(chunk_a) + 100
+
+        head_response = StubResponse(
+            status_code=200,
+            headers={"Content-Type": "application/pdf"},
+        )
+        get_response = StubResponse(
+            status_code=200,
+            headers={
+                "Content-Type": "application/pdf",
+                "Content-Length": str(len(chunk_a) + len(chunk_b)),
+            },
+            chunks=[chunk_a, chunk_b],
+        )
+        session.head.return_value = head_response
+        session.get.return_value = get_response
+
+        monkeypatch.chdir(tmp_path)
+
+        with pytest.raises(DownloadError) as excinfo:
+            stream_candidate_payload(
+                plan,
+                session=session,
+                max_bytes=limit,
+                chunk_size=256,
+            )
+
+        assert excinfo.value.reason == "too-large"
+        assert list(tmp_path.iterdir()) == []
+
     def test_finalize_returns_outcome(self):
         """finalize_candidate_download returns DownloadOutcome."""
         plan = DownloadPlan(url="https://example.com/file.pdf", resolver_name="test")
@@ -328,6 +379,50 @@ class TestDownloadExecutionContracts:
             if final_root.exists():
                 shutil.rmtree(final_root)
 
+    def test_finalize_invokes_path_gate_with_resolved_path(self, monkeypatch):
+        """Path gate receives the derived destination path (not None)."""
+        plan = DownloadPlan(url="https://example.com/subdir/file.pdf", resolver_name="test")
+        stream = DownloadStreamResult(
+            path_tmp="/tmp/file.part",
+            bytes_written=128,
+            http_status=200,
+            content_type="application/pdf",
+        )
+
+        observed = {}
+
+        def fake_validate(path: str, artifact_root=None) -> str:
+            observed["path"] = path
+            return path
+
+        monkeypatch.setattr(download_exec, "validate_path_safety", fake_validate)
+        monkeypatch.setattr(download_exec.os, "replace", MagicMock())
+
+        outcome = finalize_candidate_download(plan, stream)
+
+        assert isinstance(outcome, DownloadOutcome)
+        assert observed["path"].endswith("file.pdf")
+
+    def test_finalize_rejects_unsafe_final_path(self, monkeypatch):
+        """Unsafe final paths trigger SkipDownload via the path gate."""
+        plan = DownloadPlan(url="https://example.com/file.pdf", resolver_name="test")
+        stream = DownloadStreamResult(
+            path_tmp="/tmp/file.part",
+            bytes_written=64,
+            http_status=200,
+            content_type="application/pdf",
+        )
+
+        def fake_validate(path: str, artifact_root=None) -> str:
+            raise download_exec.PathPolicyError("escapes artifact root")
+
+        monkeypatch.setattr(download_exec, "validate_path_safety", fake_validate)
+        monkeypatch.setattr(download_exec.os, "replace", MagicMock())
+
+        with pytest.raises(SkipDownload) as exc_info:
+            finalize_candidate_download(plan, stream, final_path="/etc/passwd")
+
+        assert exc_info.value.reason == "path-policy"
 
 
 # ============================================================================
