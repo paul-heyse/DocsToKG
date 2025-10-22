@@ -267,6 +267,7 @@ from DocsToKG.DocParsing.logging import (
     manifest_log_success as _logging_manifest_log_success,
 )
 from DocsToKG.DocParsing.storage.embedding_integration import (
+    VectorWriterError,
     create_unified_vector_writer,
     iter_vector_rows,
 )
@@ -291,6 +292,12 @@ manifest_log_failure = _logging_manifest_log_failure
 manifest_log_success = _logging_manifest_log_success
 manifest_log_skip = _logging_manifest_log_skip
 manifest_append = _manifest_append
+
+
+def _embed_write_vectors() -> None:
+    """Placeholder used with :func:`safe_write` for vector artefacts."""
+
+    return None
 
 
 def _build_bm25_vector(**kwargs):
@@ -1388,26 +1395,34 @@ def write_vectors(
     try:
         writer.write_rows(payloads)
     except Exception as exc:
-        output_ref = str(output_path) if output_path is not None else ""
-        failure_logger = getattr(sys.modules[__name__], "manifest_log_failure")
-        for row in rows:
-            doc_id = row.get("doc_id", "unknown") if isinstance(row, dict) else "unknown"
-            failure_logger(
-                stage="embeddings",
-                doc_id=doc_id,
-                duration_s=0.0,
-                schema_version=VECTOR_SCHEMA_VERSION,
-                input_path=(
-                    row.get("source_path", "unknown") if isinstance(row, dict) else "unknown"
-                ),
-                input_hash=row.get("input_hash", "") if isinstance(row, dict) else "",
-                output_path=output_ref,
-                vector_format=vector_format,
-                error=str(exc),
-            )
-        raise
+        output_ref = Path(output_path) if output_path is not None else Path("")
+        raise VectorWriterError(vector_format, output_ref, exc) from exc
 
     return len(uuids), splade_nnz, dense_norms
+
+
+def _vector_output_path_for_format(path: Path, target_format: str) -> Path:
+    """Return ``path`` rewritten for ``target_format`` while preserving layout."""
+
+    fmt = str(target_format or "parquet").lower()
+    if fmt not in {"parquet", "jsonl"}:
+        raise ValueError(f"Unsupported vector format: {target_format}")
+
+    parts = []
+    replaced = False
+    for part in path.parts:
+        if part.startswith("fmt="):
+            parts.append(f"fmt={fmt}")
+            replaced = True
+        else:
+            parts.append(part)
+
+    if not replaced:
+        raise ValueError(f"Vector path missing fmt partition: {path}")
+
+    updated = Path(*parts)
+    suffix = ".parquet" if fmt == "parquet" else ".jsonl"
+    return updated.with_suffix(suffix)
 
 
 def _handle_embedding_quarantine(
@@ -1820,67 +1835,138 @@ def _embedding_stage_worker(item: WorkItem) -> ItemOutcome:
     if not input_hash:
         hasher = StreamingContentHasher()
     start = time.perf_counter()
-    try:
-        # Use safe_write for atomic vector writes
-        if safe_write(vectors_path, _embed_write_vectors):
-            log_event(
-                logger,
-                "debug",
-                "Embedding worker invoke process_chunk_file_vectors",
-                stage=EMBED_STAGE,
-                doc_id=item.item_id,
+    fallback_from: Optional[str] = None
+    fallback_reason: Optional[str] = None
+    effective_vector_format = vector_format
+    original_vectors_path = vectors_path
+    fallback_error: Optional[VectorWriterError] = None
+    result_tuple: Optional[Tuple[int, List[int], List[float]]] = None
+
+    def _execute_vector_generation(
+        target_path: Path, fmt: str
+    ) -> Tuple[int, List[int], List[float]]:
+        if stub_vectors_enabled:
+            return _process_stub_vectors(
+                chunk_path,
+                target_path,
+                cfg=cfg,
+                vector_format=fmt,
+                content_hasher=hasher,
+                counters=stub_counters,
             )
-            if stub_vectors_enabled:
-                count, nnz, norms = _process_stub_vectors(
-                    chunk_path,
-                    vectors_path,
-                    cfg=cfg,
-                    vector_format=vector_format,
-                    content_hasher=hasher,
-                    counters=stub_counters,
-                )
-            else:
-                signature = inspect.signature(process_chunk_file_vectors)
+
+        signature = inspect.signature(process_chunk_file_vectors)
+        log_event(
+            logger,
+            "debug",
+            "Embedding worker process_chunk_file_vectors signature",
+            stage=EMBED_STAGE,
+            doc_id=item.item_id,
+            params=list(signature.parameters.keys()),
+            has_closure=process_chunk_file_vectors.__closure__ is not None,
+        )
+        if "vector_format" in signature.parameters:
+            return process_chunk_file_vectors(
+                chunk_path,
+                target_path,
+                bundle,
+                cfg,
+                stats,
+                validator,
+                logger,
+                content_hasher=hasher,
+                vector_format=fmt,
+            )
+        return process_chunk_file_vectors(
+            chunk_path,
+            target_path,
+            bundle,
+            cfg,
+            stats,
+            validator,
+            logger,
+            content_hasher=hasher,
+        )
+
+    try:
+        try:
+            # Use safe_write for atomic vector writes
+            if safe_write(vectors_path, _embed_write_vectors):
                 log_event(
                     logger,
                     "debug",
-                    "Embedding worker process_chunk_file_vectors signature",
+                    "Embedding worker invoke process_chunk_file_vectors",
                     stage=EMBED_STAGE,
                     doc_id=item.item_id,
-                    params=list(signature.parameters.keys()),
-                    has_closure=process_chunk_file_vectors.__closure__ is not None,
+                    vector_format=effective_vector_format,
                 )
-                if "vector_format" in signature.parameters:
-                    count, nnz, norms = process_chunk_file_vectors(
-                        chunk_path,
-                        vectors_path,
-                        bundle,
-                        cfg,
-                        stats,
-                        validator,
-                        logger,
-                        content_hasher=hasher,
-                        vector_format=vector_format,
-                    )
-                else:
-                    count, nnz, norms = process_chunk_file_vectors(
-                        chunk_path,
-                        vectors_path,
-                        bundle,
-                        cfg,
-                        stats,
-                        validator,
-                        logger,
-                        content_hasher=hasher,
-                    )
+                result_tuple = _execute_vector_generation(
+                    vectors_path, effective_vector_format
+                )
+        except VectorWriterError as exc:
+            fallback_error = exc
+            fallback_from = vector_format
+            fallback_reason = str(exc.original)
+
+        if fallback_error is not None and vector_format == "parquet":
+            effective_vector_format = "jsonl"
+            fallback_path = _vector_output_path_for_format(
+                original_vectors_path, "jsonl"
+            )
             log_event(
                 logger,
-                "debug",
-                "Embedding worker completed process_chunk_file_vectors",
+                "warning",
+                "Parquet vector write failed; retrying with JSONL fallback",
                 stage=EMBED_STAGE,
                 doc_id=item.item_id,
-                vectors=count,
+                vector_format_requested=vector_format,
+                vector_format_fallback=effective_vector_format,
+                error=fallback_reason,
             )
+            item.metadata["output_path"] = str(fallback_path)
+            item.metadata["output_relpath"] = relative_path(fallback_path, resolved_root)
+            fingerprint_path = fallback_path.with_suffix(fallback_path.suffix + ".fp.json")
+            item.metadata["fingerprint_path"] = str(fingerprint_path)
+            item.metadata["vector_format"] = effective_vector_format
+            vectors_path = fallback_path
+            original_vectors_path = fallback_path
+            try:
+                if safe_write(vectors_path, _embed_write_vectors, skip_if_exists=False):
+                    log_event(
+                        logger,
+                        "debug",
+                        "Embedding worker retry with JSONL",
+                        stage=EMBED_STAGE,
+                        doc_id=item.item_id,
+                        vector_format=effective_vector_format,
+                    )
+                    result_tuple = _execute_vector_generation(
+                        vectors_path, effective_vector_format
+                    )
+                    fallback_error = None
+                else:
+                    raise VectorWriterError(
+                        effective_vector_format,
+                        vectors_path,
+                        RuntimeError("fallback target already exists"),
+                    )
+            except VectorWriterError as exc:
+                fallback_error = exc
+                fallback_reason = str(exc.original)
+
+        if result_tuple is None:
+            if fallback_error is not None:
+                raise fallback_error
+            raise StageError(
+                stage=EMBED_STAGE,
+                item_id=item.item_id,
+                category="runtime",
+                message="Vector write skipped unexpectedly",
+                retryable=False,
+            )
+
+        count, nnz, norms = result_tuple
+        vector_format = effective_vector_format
     except ValueError as exc:
         duration = time.perf_counter() - start
         resolved_hash = input_hash or (hasher.hexdigest() if hasher else "")
@@ -1892,7 +1978,7 @@ def _embedding_stage_worker(item: WorkItem) -> ItemOutcome:
             reason=str(exc),
             logger=logger,
             data_root=resolved_root,
-            vector_format=vector_format,
+            vector_format=effective_vector_format,
         )
         return ItemOutcome(
             status="skip",
@@ -1910,7 +1996,7 @@ def _embedding_stage_worker(item: WorkItem) -> ItemOutcome:
             input_path=chunk_path,
             input_hash=exc.input_hash,
             output_path=vectors_path,
-            vector_format=vector_format,
+            vector_format=effective_vector_format,
             error=str(exc.original),
         )
         raise StageError(
@@ -1931,7 +2017,7 @@ def _embedding_stage_worker(item: WorkItem) -> ItemOutcome:
             input_path=chunk_path,
             input_hash=resolved_hash,
             output_path=vectors_path,
-            vector_format=vector_format,
+            vector_format=effective_vector_format,
             error=str(exc),
         )
         raise StageError(
@@ -1949,35 +2035,29 @@ def _embedding_stage_worker(item: WorkItem) -> ItemOutcome:
         input_sha256=resolved_hash,
         cfg_hash=cfg_hash,
     )
-    return ItemOutcome(
-        status="success",
-        duration_s=duration,
-        manifest={
-            "vector_count": count,
-            "nnz": nnz,
-            "norms": norms,
-            "resolved_hash": resolved_hash,
-        },
-        result={"quarantined": False},
-    )
 
-    duration = time.perf_counter() - start
-    resolved_hash = input_hash or (hasher.hexdigest() if hasher else "")
-    _write_fingerprint(
-        Path(item.metadata["fingerprint_path"]),
-        input_sha256=resolved_hash,
-        cfg_hash=cfg_hash,
-    )
+    manifest_payload: Dict[str, Any] = {
+        "vector_count": count,
+        "nnz": nnz,
+        "norms": norms,
+        "resolved_hash": resolved_hash,
+        "vector_format": effective_vector_format,
+    }
+    result_payload: Dict[str, Any] = {
+        "quarantined": False,
+        "vector_format": effective_vector_format,
+    }
+    if fallback_from:
+        manifest_payload["vector_format_fallback_from"] = fallback_from
+        result_payload["vector_format_fallback_from"] = fallback_from
+        if fallback_reason:
+            manifest_payload["vector_format_fallback_error"] = fallback_reason
+
     return ItemOutcome(
         status="success",
         duration_s=duration,
-        manifest={
-            "vector_count": count,
-            "nnz": nnz,
-            "norms": norms,
-            "resolved_hash": resolved_hash,
-        },
-        result={"quarantined": False},
+        manifest=manifest_payload,
+        result=result_payload,
     )
 
 
@@ -2058,10 +2138,19 @@ def _make_embedding_stage_hooks(
 
         if isinstance(outcome_or_error, ItemOutcome):
             if outcome_or_error.status == "success":
-                vector_count = int(outcome_or_error.manifest.get("vector_count", 0))
-                nnz = list(outcome_or_error.manifest.get("nnz", []))
-                norms = list(outcome_or_error.manifest.get("norms", []))
-                resolved_hash = str(outcome_or_error.manifest.get("resolved_hash", ""))
+                manifest_meta = outcome_or_error.manifest
+                vector_count = int(manifest_meta.get("vector_count", 0))
+                nnz = list(manifest_meta.get("nnz", []))
+                norms = list(manifest_meta.get("norms", []))
+                resolved_hash = str(manifest_meta.get("resolved_hash", ""))
+                actual_format = str(
+                    manifest_meta.get("vector_format", vector_format)
+                ).lower()
+                fallback_from = manifest_meta.get("vector_format_fallback_from")
+                if fallback_from:
+                    state["vector_format_fallbacks"] = (
+                        state.get("vector_format_fallbacks", 0) + 1
+                    )
                 state["total_vectors"] = state.get("total_vectors", 0) + vector_count
                 state.setdefault("splade_nnz_all", []).extend(nnz)
                 state.setdefault("dense_norms_all", []).extend(norms)
@@ -2073,7 +2162,8 @@ def _make_embedding_stage_hooks(
                     input_path=input_path,
                     input_hash=resolved_hash,
                     output_path=output_path,
-                    vector_format=vector_format,
+                    vector_format=actual_format,
+                    vector_format_fallback=fallback_from,
                     vector_count=vector_count,
                     **state.get("provider_metadata_extras", {}),
                 )
@@ -2096,7 +2186,8 @@ def _make_embedding_stage_hooks(
                     vectors=vector_count,
                     splade_avg_nnz=round(avg_nnz_file, 3),
                     qwen_avg_norm=round(avg_norm_file, 4),
-                    vector_format=vector_format,
+                    vector_format=actual_format,
+                    vector_format_fallback=fallback_from,
                 )
                 return
 
@@ -2119,6 +2210,7 @@ def _make_embedding_stage_hooks(
         quarantined_files = state.get("quarantined_files", 0)
         files_parallel_effective = state.get("files_parallel", files_parallel)
         vectors_dir_state: Path = state.get("vectors_dir", vectors_dir)
+        fallback_total = state.get("vector_format_fallbacks", 0)
         bundle_summary: Dict[str, ProviderIdentity] = {}
         bundle_ref = state.get("bundle")
         if bundle_ref is not None:
@@ -2182,6 +2274,7 @@ def _make_embedding_stage_hooks(
             dense_provider_version=dense_identity.version if dense_identity else None,
             sparse_provider=sparse_identity.name if sparse_identity else None,
             lexical_provider=lexical_identity.name if lexical_identity else None,
+            vector_format_fallbacks=fallback_total,
         )
         logger.info("Peak memory: %.2f GB", peak / 1024**3)
 
@@ -2214,6 +2307,7 @@ def _make_embedding_stage_hooks(
             files_parallel=files_parallel_effective,
             splade_attn_backend_used=cfg.sparse_splade_st_attn_backend or "auto",
             sparsity_warn_threshold_pct=float(cfg.sparsity_warn_threshold_pct),
+            vector_format_fallbacks=fallback_total,
         )
 
         log_event(
@@ -2227,6 +2321,7 @@ def _make_embedding_stage_hooks(
             skipped_files=skipped_total,
             quarantined_files=quarantined_files,
             total_vectors=total_vectors,
+            vector_format_fallbacks=fallback_total,
         )
 
         if exit_stack is not None:
