@@ -54,7 +54,7 @@ beautifulsoup4>=4.14.2
 # ML/Embeddings (lazy imports - consider making optional)
 # ============================================================================
 transformers>=4.57.1
-#sentence-transformers>=5.1.1
+sentence-transformers>=5.1.1
 
 # ============================================================================
 # Observability & Reliability
@@ -83,24 +83,20 @@ jsonschema>=4.25.1
 # Testing Framework (if tests are in src/)
 # ============================================================================
 pytest>=8.4.2
-pytest-cov>=7.0.0
-pytest-logging>=2015.11.4
-hypothesis>=6.141.0
-requests>=2.32.5
-psutil>=7.1.0
 
 # ============================================================================
 # OPTIONAL: Cloud & Databases (lazy imports - only install if needed)
 # ============================================================================
 # Uncomment only the backends you actually use:
-boto3  # for AWS S3 storage
-psycopg>=3  # for PostgreSQL
-psycopg-pool  # for PostgreSQL connection pooling
-sqlalchemy>=2.0.44  # for PostgreSQL via ORM
-redis>=6.4.0  # for Redis caching
+# boto3  # for AWS S3 storage
+# psycopg>=3  # for PostgreSQL
+# psycopg-pool  # for PostgreSQL connection pooling
+# sqlalchemy>=2.0.44  # for PostgreSQL via ORM
+# redis>=6.4.0  # for Redis caching
 
 # ============================================================================
-# Advanced Analytics (lazy imports - only install if needed)
+# OPTIONAL: Advanced Analytics (lazy imports - only install if needed)
 # ============================================================================
-polars  # if using Polars DataFrames
-duckdb>=1.4.1  # if using DuckDB analytics
+# polars  # if using Polars DataFrames
+# duckdb>=1.4.1  # if using DuckDB analytics
+
