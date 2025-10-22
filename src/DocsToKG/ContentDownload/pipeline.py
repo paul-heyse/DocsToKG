@@ -19,6 +19,7 @@ Design:
 from __future__ import annotations
 
 import logging
+from types import SimpleNamespace
 from typing import Any, Optional, Sequence
 
 from DocsToKG.ContentDownload.api import (
@@ -54,6 +55,7 @@ class ResolverPipeline:
         telemetry: Optional[Any] = None,
         run_id: Optional[str] = None,
         client_map: Optional[dict[str, Any]] = None,
+        **policy_knobs: Any,
         **policy_overrides: Any,
     ):
         """
@@ -72,6 +74,7 @@ class ResolverPipeline:
         self._telemetry = telemetry
         self._run_id = run_id
         self._client_map = client_map or {}
+        self._policy_knobs = policy_knobs
         self._policy_overrides = policy_overrides
 
     def run(self, artifact: Any, ctx: Any) -> DownloadOutcome:
@@ -98,6 +101,9 @@ class ResolverPipeline:
         Returns:
             DownloadOutcome (success, skip, or error)
         """
+        if ctx is None and self._policy_knobs:
+            ctx = SimpleNamespace(**self._policy_knobs)
+
         outcomes = []
 
         # Try each resolver in order
