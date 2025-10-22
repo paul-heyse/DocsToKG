@@ -50,6 +50,7 @@ if TYPE_CHECKING:
     from DocsToKG.ContentDownload.orchestrator.queue import WorkQueue
     from DocsToKG.ContentDownload.pipeline import ResolverPipeline
 
+from DocsToKG.ContentDownload.orchestrator.limits import host_key
 from DocsToKG.ContentDownload.core import DownloadContext, WorkArtifact
 
 __all__ = ["Worker"]
@@ -166,8 +167,24 @@ class Worker:
                 )
                 return
 
-            # Run through pipeline (without concurrency guards for now)
-            # The limiter guards will be applied in Phase 5 (Orchestrator)
+            limiter_tokens: list[tuple["KeyedLimiter", str]] = []
+            try:
+                limiter_tokens = self._acquire_limiter_slots(job, artifact)
+            except Exception as e:
+                logger.error(
+                    "Failed to acquire limiter slots for job %s (%s): %s",
+                    job_id,
+                    artifact_id,
+                    e,
+                )
+                self.queue.fail_and_retry(
+                    job_id,
+                    backoff_sec=self.retry_backoff,
+                    max_attempts=self.max_job_attempts,
+                    last_error=f"limiter_acquire_failed: {str(e)[:100]}",
+                )
+                return
+
             try:
                 outcome = self.pipeline.run(artifact, ctx)
 
@@ -196,6 +213,9 @@ class Worker:
                     last_error=f"pipeline_error: {str(e)[:100]}",
                 )
 
+            finally:
+                self._release_limiter_slots(limiter_tokens)
+
         finally:
             with self._lock:
                 self._running_jobs.discard(job_id)
@@ -208,6 +228,149 @@ class Worker:
         """
         return self.retry_backoff + random.randint(0, self.jitter)
 
+    def _acquire_limiter_slots(
+        self, job: Mapping[str, Any], artifact: Any
+    ) -> list[tuple["KeyedLimiter", str]]:
+        """Acquire resolver and host limiter slots for this job.
+
+        Returns a list of (limiter, key) tuples representing acquired slots.
+        Slots are released in LIFO order via :meth:`_release_limiter_slots`.
+        """
+
+        tokens: list[tuple["KeyedLimiter", str]] = []
+
+        resolver_key = self._extract_resolver_key(job, artifact)
+        host_key_value = self._extract_host_key(job, artifact)
+
+        try:
+            if resolver_key:
+                logger.debug(
+                    "Worker %s acquiring resolver limiter for key=%s",
+                    self.worker_id,
+                    resolver_key,
+                )
+                self.resolver_limiter.acquire(resolver_key)
+                tokens.append((self.resolver_limiter, resolver_key))
+
+            if host_key_value:
+                logger.debug(
+                    "Worker %s acquiring host limiter for key=%s",
+                    self.worker_id,
+                    host_key_value,
+                )
+                self.host_limiter.acquire(host_key_value)
+                tokens.append((self.host_limiter, host_key_value))
+        except Exception:
+            # Release any already-acquired slots before propagating
+            self._release_limiter_slots(tokens)
+            raise
+
+        return tokens
+
+    def _release_limiter_slots(
+        self, tokens: list[tuple["KeyedLimiter", str]]
+    ) -> None:
+        """Release limiter slots acquired for this job."""
+
+        while tokens:
+            limiter, key = tokens.pop()
+            try:
+                limiter.release(key)
+                logger.debug(
+                    "Worker %s released limiter for key=%s",
+                    self.worker_id,
+                    key,
+                )
+            except Exception as exc:  # pragma: no cover - defensive logging
+                logger.warning(
+                    "Worker %s failed releasing limiter key=%s: %s",
+                    self.worker_id,
+                    key,
+                    exc,
+                )
+
+    def _extract_resolver_key(
+        self, job: Mapping[str, Any], artifact: Any
+    ) -> Optional[str]:
+        """Determine resolver limiter key for the job if available."""
+
+        candidates: list[Mapping[str, Any]] = [job]
+        if isinstance(artifact, Mapping):
+            candidates.append(artifact)
+
+        resolver_fields = ("resolver_hint", "resolver", "resolver_name")
+
+        for candidate in candidates:
+            for field in resolver_fields:
+                value = candidate.get(field) if isinstance(candidate, Mapping) else None
+                if isinstance(value, str) and value.strip():
+                    return value.strip()
+
+        return None
+
+    def _extract_host_key(
+        self, job: Mapping[str, Any], artifact: Any
+    ) -> Optional[str]:
+        """Determine host limiter key for the job if available."""
+
+        for mapping in (job, artifact if isinstance(artifact, Mapping) else None):
+            if not isinstance(mapping, Mapping):
+                continue
+
+            url = self._first_url(mapping)
+            if url:
+                return host_key(url)
+
+        return None
+
+    def _first_url(self, payload: Mapping[str, Any]) -> Optional[str]:
+        """Return the first URL candidate found in payload."""
+
+        url_fields = (
+            "url",
+            "source_url",
+            "origin_url",
+            "download_url",
+            "landing_url",
+            "pdf_url",
+        )
+
+        list_fields = ("urls", "landing_urls", "pdf_urls")
+
+        for field in url_fields:
+            value = payload.get(field)
+            url = self._coerce_url(value)
+            if url:
+                return url
+
+        for field in list_fields:
+            value = payload.get(field)
+            url = self._coerce_url(value)
+            if url:
+                return url
+
+        # Nested plan metadata
+        plan = payload.get("plan")
+        if isinstance(plan, Mapping):
+            url = self._coerce_url(plan.get("url"))
+            if url:
+                return url
+
+        return None
+
+    @staticmethod
+    def _coerce_url(value: Any) -> Optional[str]:
+        """Normalize different URL field shapes to a string."""
+
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+
+        if isinstance(value, (list, tuple)):
+            for item in value:
+                if isinstance(item, str) and item.strip():
+                    return item.strip()
+
+        return None
     def _deserialize_job(
         self, job: Mapping[str, Any]
     ) -> Tuple[WorkArtifact, Optional[DownloadContext]]:

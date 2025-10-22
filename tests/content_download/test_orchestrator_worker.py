@@ -22,6 +22,7 @@ import pytest
 from DocsToKG.ContentDownload.api.types import DownloadOutcome
 from DocsToKG.ContentDownload.core import DownloadContext, ReasonCode, WorkArtifact
 from DocsToKG.ContentDownload.orchestrator.models import JobState
+from DocsToKG.ContentDownload.orchestrator.limits import KeyedLimiter
 from DocsToKG.ContentDownload.orchestrator.queue import WorkQueue
 from DocsToKG.ContentDownload.orchestrator.workers import Worker
 
@@ -66,6 +67,56 @@ class MockLimiter:
         pass
 
 
+class ThreadSafeMockQueue(MockWorkQueue):
+    """Thread-safe variant of MockWorkQueue for concurrency tests."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._lock = threading.Lock()
+
+    def ack(self, job_id: int, outcome: str, last_error: Any = None) -> None:
+        with self._lock:
+            super().ack(job_id, outcome, last_error)
+
+    def fail_and_retry(
+        self, job_id: int, backoff_sec: int, max_attempts: int, last_error: str
+    ) -> None:
+        with self._lock:
+            super().fail_and_retry(job_id, backoff_sec, max_attempts, last_error)
+
+
+class BlockingPipeline(MockPipeline):
+    """Pipeline that blocks until released to test limiter coordination."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._lock = threading.Lock()
+        self.concurrent = 0
+        self.max_concurrency = 0
+        self.first_started = threading.Event()
+        self.second_started = threading.Event()
+        self.release_event = threading.Event()
+
+    def process(self, artifact: Any, ctx: Any = None) -> DownloadOutcome:
+        with self._lock:
+            self.processed_artifacts.append(artifact)
+            self.concurrent += 1
+            if self.concurrent > self.max_concurrency:
+                self.max_concurrency = self.concurrent
+
+            call_index = len(self.processed_artifacts)
+            if call_index == 1:
+                self.first_started.set()
+            elif call_index == 2:
+                self.second_started.set()
+
+        if not self.release_event.wait(timeout=2):
+            raise RuntimeError("release_event was not set in time")
+
+        with self._lock:
+            self.concurrent -= 1
+
+        return self.outcome_to_return
 def _artifact_payload(
     tmp_path: Path,
     *,
@@ -423,6 +474,22 @@ def test_worker_empty_artifact_json_triggers_retry() -> None:
 
     worker.run_one(job)
 
+    # Should handle gracefully and pass empty dict to pipeline
+    assert len(pipeline.processed_artifacts) == 1
+    assert pipeline.processed_artifacts[0] == {}
+    assert len(queue.acked_jobs) == 1
+
+
+def test_worker_limiters_enforce_serial_execution() -> None:
+    """Jobs targeting same resolver/host should serialize via limiters."""
+
+    queue = ThreadSafeMockQueue()
+    pipeline = BlockingPipeline()
+    resolver_limiter = KeyedLimiter(default_limit=1)
+    host_limiter = KeyedLimiter(default_limit=1)
+
+    worker = Worker(
+        worker_id="worker-1",
     # Should retry due to validation failure
     assert len(pipeline.run_calls) == 0
     assert len(queue.failed_jobs) == 1
@@ -449,6 +516,35 @@ def test_worker_processes_leased_job(tmp_path: Path) -> None:
         jitter=15,
     )
 
+    artifact_payload = {"url": "https://api.example.org/file.pdf"}
+    job_template = {
+        "artifact_id": "doi:10.5555/limiter",
+        "artifact_json": json.dumps(artifact_payload),
+        "resolver_hint": "resolver-a",
+    }
+
+    job1 = dict(job_template, id=4000)
+    job2 = dict(job_template, id=4001)
+
+    t1 = threading.Thread(target=worker.run_one, args=(job1,))
+    t2 = threading.Thread(target=worker.run_one, args=(job2,))
+
+    t1.start()
+    t2.start()
+
+    assert pipeline.first_started.wait(1.0)
+    # Second pipeline invocation should not start until the first completes
+    assert not pipeline.second_started.wait(0.1)
+
+    pipeline.release_event.set()
+
+    t1.join(timeout=1.0)
+    t2.join(timeout=1.0)
+
+    assert pipeline.second_started.wait(1.0)
+    assert pipeline.max_concurrency == 1
+    assert len(queue.acked_jobs) == 2
+    assert not queue.failed_jobs
     payload = _artifact_payload(tmp_path, artifact_overrides={"work_id": "W-lease"})
     queue.enqueue("doi:lease", payload)
     leased_jobs = queue.lease("worker-lease", 1, lease_ttl_sec=60)
