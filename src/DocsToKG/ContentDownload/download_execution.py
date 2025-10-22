@@ -321,7 +321,14 @@ def prepare_candidate_download(
 
     if robots_checker is not None and session is not None:
         user_agent = _infer_user_agent(ctx)
-        if not robots_checker.is_allowed(session, url, user_agent):
+        if not robots_checker.is_allowed(
+            session,
+            url,
+            user_agent,
+            telemetry=telemetry,
+            run_id=run_id,
+            resolver=getattr(plan, "resolver_name", None),
+        ):
             raise SkipDownload("robots", f"Blocked by robots.txt: {url}")
 
     # Content policy enforcement via domain rules
