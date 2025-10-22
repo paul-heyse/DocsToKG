@@ -9,6 +9,9 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock
 
+import pytest
+
+from DocsToKG.DocParsing.app_context import build_app_context
 from DocsToKG.DocParsing.chunking.config import ChunkerCfg
 from DocsToKG.DocParsing.config_adapter import ConfigurationAdapter
 from DocsToKG.DocParsing.doctags import DoctagsCfg
@@ -139,3 +142,58 @@ class TestConfigurationAdapterSmoke:
         embed_sig = inspect.signature(embedding_runtime._main_inner)
         assert "args" in embed_sig.parameters
         assert embed_sig.parameters["args"].default is None
+
+
+class TestConfigurationAdapterSettingsIntegration:
+    """Integration tests using real AppContext objects."""
+
+    @pytest.fixture()
+    def data_root(self, tmp_path: Path) -> Path:
+        """Create an isolated data root for config finalization."""
+
+        root = tmp_path / "data"
+        root.mkdir()
+        return root
+
+    def test_adapter_preserves_resume_defaults(self, data_root: Path) -> None:
+        """Adapter should carry resume toggles from AppContext settings."""
+
+        ctx = build_app_context(data_root=data_root)
+
+        doctags_cfg = ConfigurationAdapter.to_doctags(ctx, mode="pdf")
+        assert doctags_cfg.resume is ctx.settings.doctags.resume
+
+        chunk_cfg = ConfigurationAdapter.to_chunk(ctx)
+        assert chunk_cfg.resume is ctx.settings.chunk.resume
+
+        embed_cfg = ConfigurationAdapter.to_embed(ctx)
+        assert embed_cfg.resume is ctx.settings.embed.resume
+
+    def test_adapter_honours_force_and_format_overrides(self, data_root: Path) -> None:
+        """Adapter should respect force toggles and format choices."""
+
+        ctx = build_app_context(
+            data_root=data_root,
+            chunk_format="jsonl",
+            embed_vector_format="parquet",
+            **{
+                "doctags.force": True,
+                "doctags.resume": False,
+                "chunk.force": True,
+                "embed.force": True,
+            },
+        )
+
+        doctags_cfg = ConfigurationAdapter.to_doctags(ctx, mode="pdf")
+        assert doctags_cfg.force is True
+        assert doctags_cfg.resume is False
+
+        chunk_cfg = ConfigurationAdapter.to_chunk(ctx)
+        assert chunk_cfg.force is True
+        assert chunk_cfg.resume is True
+        assert chunk_cfg.format == "jsonl"
+
+        embed_cfg = ConfigurationAdapter.to_embed(ctx)
+        assert embed_cfg.force is True
+        assert embed_cfg.resume is True
+        assert embed_cfg.vector_format == "parquet"
