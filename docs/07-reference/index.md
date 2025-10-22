@@ -16,6 +16,7 @@ This section contains subsystem deep-dives, integration guides, and operational 
 ## 4. Advanced Topics
 
 - 🚀 **[Performance Optimization](./performance/index.md)** – Chunking heuristics, FAISS tuning, and Docling configuration tweaks validated through the latest benchmarks.
+- 🗃️ **[ContentDownload Artifact Catalog & Storage Index](./contentdownload/pr9-artifact-catalog-storage-index.md)** – Deep dive into PR #9, covering catalog schema, storage layout strategies, retention/GC workflows, and CLI tooling.
 - 🔒 **[Security Considerations](./security/index.md)** – Secrets management, artifact isolation, and supply-chain controls mapped to the current module layout.
 - 🧪 **[Testing Strategies](./testing/index.md)** – Marker definitions, suite breakdowns, and CI recommendations for exercising optional GPU-backed flows.
 
