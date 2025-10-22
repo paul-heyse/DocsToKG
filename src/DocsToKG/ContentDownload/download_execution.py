@@ -15,15 +15,14 @@ Design:
 
 from __future__ import annotations
 
-import hashlib
 import logging
 import os
+import shutil
 import tempfile
 import time
 import uuid
-from pathlib import Path
-from typing import Any, Optional
 from dataclasses import replace
+from pathlib import Path
 from typing import Any, Mapping, Optional
 from urllib.parse import urlsplit
 
@@ -229,16 +228,42 @@ def _resolve_storage_tmp_root() -> Path:
     return root
 
 
-def _plan_temp_path(plan: DownloadPlan) -> Path:
-    """Derive a collision-resistant temporary path for a download plan."""
+def _prepare_staging_destination(
+    run_id: Optional[str],
+    resolver_name: str,
+    *,
+    filename: Optional[str] = None,
+) -> tuple[Path, Path]:
+    """Allocate a dedicated staging directory for a download attempt."""
 
-    base = _resolve_storage_tmp_root()
-    digest = hashlib.sha256(plan.url.encode("utf-8")).hexdigest()
-    shard_dir = base / digest[:2]
-    shard_dir.mkdir(parents=True, exist_ok=True)
-    resolver_token = "".join(ch if ch.isalnum() else "-" for ch in plan.resolver_name) or "plan"
-    filename = f"{resolver_token}-{digest[:12]}-{uuid.uuid4().hex}.download.part"
-    return shard_dir / filename
+    root = _resolve_storage_tmp_root() / "staging"
+    run_token = (run_id or "adhoc").strip() or "adhoc"
+    run_segment = "".join(ch if ch.isalnum() else "-" for ch in run_token)
+    resolver_segment = "".join(ch if ch.isalnum() else "-" for ch in resolver_name) or "resolver"
+    staging_dir = root / run_segment / f"{resolver_segment}-{uuid.uuid4().hex}"
+    staging_dir.mkdir(parents=True, exist_ok=True)
+
+    file_name = filename or f"payload-{uuid.uuid4().hex}.part"
+    return staging_dir, staging_dir / file_name
+
+
+def _cleanup_staging_artifacts(
+    path_tmp: Optional[Path | str],
+    staging_dir: Optional[Path | str],
+) -> None:
+    """Best-effort cleanup for staging files and directories."""
+
+    if path_tmp:
+        tmp_path = Path(path_tmp)
+        try:
+            tmp_path.unlink()
+        except FileNotFoundError:
+            pass
+
+    if staging_dir:
+        dir_path = Path(staging_dir)
+        if dir_path.exists():
+            shutil.rmtree(dir_path, ignore_errors=True)
 
 
 def prepare_candidate_download(
@@ -476,9 +501,8 @@ def stream_candidate_payload(
     cl = resp.headers.get("Content-Length")
     expected_len = int(cl) if (cl and cl.isdigit()) else None
 
-    staging_dir: Optional[str] = None
-    tmp_path: Optional[str] = None
-    # Determine effective byte limit (plan override wins)
+    staging_dir: Optional[Path] = None
+    tmp_path: Optional[Path] = None
     effective_max_bytes = (
         plan.max_bytes_override
         if plan.max_bytes_override is not None
@@ -494,9 +518,6 @@ def stream_candidate_payload(
             "too-large",
             f"Content-Length {expected_len} exceeds cap {effective_max_bytes} bytes",
         )
-
-    # Write to temporary file using atomic writer
-    tmp_path = _plan_temp_path(plan)
 
     bytes_streamed = 0
 
@@ -518,37 +539,29 @@ def stream_candidate_payload(
             bytes_streamed = new_total
             yield chunk
 
+    url_path = Path(urlsplit(plan.url).path)
+    staging_name = f"{url_path.name or 'download.bin'}.part"
+
     try:
-        staging_dir, tmp_path = _prepare_staging_destination(run_id, plan.resolver_name)
+        staging_dir, tmp_path = _prepare_staging_destination(
+            run_id,
+            plan.resolver_name,
+            filename=staging_name,
+        )
         bytes_written = atomic_write_stream(
-            dest_path=tmp_path,
-            byte_iter=_iter_with_limit(
-                resp.iter_bytes(chunk_size=chunk_size)
-            ),
+            dest_path=str(tmp_path),
+            byte_iter=_iter_with_limit(resp.iter_bytes(chunk_size=chunk_size)),
             expected_len=(expected_len if verify_content_length else None),
             chunk_size=chunk_size,
         )
 
-        # Check size limit
         if effective_max_bytes is not None and bytes_written > effective_max_bytes:
-            try:
-                tmp_path.unlink()
-        if max_bytes and bytes_written > max_bytes:
             _cleanup_staging_artifacts(tmp_path, staging_dir)
-        if (
-            effective_max_bytes is not None
-            and bytes_written > effective_max_bytes
-        ):
-            try:
-                os.unlink(tmp_path)
-            except FileNotFoundError:
-                pass
             raise DownloadError(
                 "too-large",
                 f"Payload exceeded {effective_max_bytes} bytes",
             )
 
-        # Emit final success record
         _emit(
             telemetry,
             run_id=run_id,
@@ -570,7 +583,7 @@ def stream_candidate_payload(
             bytes_written=bytes_written,
             http_status=resp.status_code,
             content_type=content_type,
-            staging_path=staging_dir,
+            staging_path=str(staging_dir) if staging_dir else None,
         )
 
     except SizeMismatchError:
@@ -591,10 +604,6 @@ def stream_candidate_payload(
         raise DownloadError("size-mismatch")
     except DownloadError:
         _cleanup_staging_artifacts(tmp_path, staging_dir)
-        try:
-            os.unlink(tmp_path)
-        except FileNotFoundError:
-            pass
         raise
     except Exception as e:  # pylint: disable=broad-except
         _cleanup_staging_artifacts(tmp_path, staging_dir)
@@ -639,66 +648,54 @@ def finalize_candidate_download(
             meta={"http_status": 304},
         )
 
-    # Determine artifact root from storage configuration
-    artifact_root = storage_root
-    if artifact_root is None and storage_settings is not None:
-        artifact_root = getattr(storage_settings, "root_dir", None)
-    if artifact_root is None:
-        artifact_root = os.getcwd()
+    root_candidate = storage_root
+    if root_candidate is None and storage_settings is not None:
+        root_candidate = getattr(storage_settings, "root_dir", None)
+    if root_candidate is None:
+        root_candidate = os.getcwd()
 
-    # Determine final path (in real implementation, would use storage policy)
-    candidate_final_path = final_path
-    if candidate_final_path:
-        if not os.path.isabs(candidate_final_path):
-            candidate_final_path = os.path.join(artifact_root, candidate_final_path)
+    artifact_root = Path(root_candidate)
+    if final_path:
+        destination = Path(final_path)
+        if not destination.is_absolute():
+            destination = artifact_root / destination
     else:
-        base = plan.url.rsplit("/", 1)[-1] or "download.bin"
-        candidate_final_path = os.path.join(artifact_root, base)
+        base_name = Path(urlsplit(plan.url).path).name or "download.bin"
+        destination = artifact_root / base_name
 
-    # Validate final path safety
     try:
-        safe_final_path = validate_path_safety(candidate_final_path, artifact_root=artifact_root)
-    # Determine final path (in real implementation, would use storage policy)
-    destination = final_path
-    if not destination:
-        base = plan.url.rsplit("/", 1)[-1] or "download.bin"
-        destination = os.path.join(os.getcwd(), base)
-
-    # Validate final path safety (initial + resolved)
-    try:
-        safe_path = validate_path_safety(destination)
-        final_path = validate_path_safety(safe_path)
+        safe_final_path = validate_path_safety(str(destination), artifact_root=str(artifact_root))
     except PathPolicyError as e:
         raise SkipDownload("path-policy", f"Path policy violation: {e}")
 
-    # atomic_write_stream already moved temp → dest_path, so final_path exists
-    # Just verify and emit event
-    cleanup_dirs = False
-    same_destination = False
-    try:
-        if stream.path_tmp and not os.path.exists(safe_final_path):
-            # If atomic_write_stream didn't finalize, move it now
-            os.replace(stream.path_tmp, safe_final_path)
-        if stream.path_tmp:
-            same_destination = os.path.abspath(stream.path_tmp) == os.path.abspath(final_path)
+    final_path_obj = Path(safe_final_path)
+    tmp_path = Path(stream.path_tmp) if stream.path_tmp else None
+    staging_dir = Path(stream.staging_path) if stream.staging_path else None
 
-            if not same_destination and not os.path.exists(final_path):
-                # If atomic_write_stream didn't finalize, move it now
-                os.replace(stream.path_tmp, final_path)
-            elif not same_destination:
-                _cleanup_staging_artifacts(stream.path_tmp, None)
-        cleanup_dirs = not same_destination
-        if stream.path_tmp and not os.path.exists(dest_path):
-            # If atomic_write_stream didn't finalize, move it now
-            os.replace(stream.path_tmp, dest_path)
+    if tmp_path is None:
+        raise DownloadError("download-error", "Missing temporary payload path")
+
+    cleanup_staging = False
+    try:
+        if not tmp_path.exists():
+            raise DownloadError("download-error", "Temporary payload missing on disk")
+
+        same_destination = tmp_path.resolve() == final_path_obj.resolve()
+        if not same_destination:
+            final_path_obj.parent.mkdir(parents=True, exist_ok=True)
+            os.replace(str(tmp_path), str(final_path_obj))
+            cleanup_staging = True
+        else:
+            cleanup_staging = False
     except Exception as e:  # pylint: disable=broad-except
+        _cleanup_staging_artifacts(tmp_path, staging_dir)
         raise DownloadError(
             "download-error",
             f"Failed to finalize: {e}",
         ) from e
-    finally:
-        if cleanup_dirs and stream.staging_path:
-            _cleanup_staging_artifacts(None, stream.staging_path)
+
+    if cleanup_staging and staging_dir:
+        _cleanup_staging_artifacts(None, staging_dir)
 
     # Emit finalization event
     _emit(
@@ -712,7 +709,7 @@ def finalize_candidate_download(
         http_status=stream.http_status,
         meta={
             "bytes": stream.bytes_written,
-            "final_path": final_path,
+            "final_path": safe_final_path,
             "content_type": stream.content_type,
         },
     )
