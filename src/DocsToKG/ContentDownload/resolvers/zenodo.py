@@ -17,25 +17,19 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Iterable
+from typing import TYPE_CHECKING, Any, Iterable
 
 import httpx
 
 from DocsToKG.ContentDownload.core import normalize_doi
 
+from DocsToKG.ContentDownload.resolvers.base import (
+    ApiResolverBase,
+    ResolverEvent,
+    ResolverEventReason,
+    ResolverResult,
+)
 from .registry_v2 import register_v2
-
-class ResolverResult:
-    """Result from resolver attempt."""
-    def __init__(self, url=None, referer=None, metadata=None, 
-                 event=None, event_reason=None, **kwargs):
-        self.url = url
-        self.referer = referer
-        self.metadata = metadata or {}
-        self.event = event
-        self.event_reason = event_reason
-        for k, v in kwargs.items():
-            setattr(self, k, v)
 
 
 
@@ -47,7 +41,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 @register_v2("zenodo")
-class ZenodoResolver:
+class ZenodoResolver(ApiResolverBase):
     """Resolve Zenodo records into downloadable open-access PDF URLs."""
 
     name = "zenodo"

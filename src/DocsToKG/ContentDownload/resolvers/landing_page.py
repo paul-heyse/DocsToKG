@@ -18,15 +18,15 @@ from __future__ import annotations
 
 import logging
 import warnings
-from typing import TYPE_CHECKING, Iterable, Mapping
+from typing import TYPE_CHECKING, Any, Iterable, Mapping
 
 import httpx
 
 from DocsToKG.ContentDownload.networking import BreakerOpenError
 from DocsToKG.ContentDownload.robots import RobotsCache
 
+from DocsToKG.ContentDownload.resolvers.base import (
     BeautifulSoup,
-    RegisteredResolver,
     ResolverEvent,
     ResolverEventReason,
     ResolverResult,
@@ -37,18 +37,6 @@ from DocsToKG.ContentDownload.robots import RobotsCache
     request_with_retries,
 )
 from .registry_v2 import register_v2
-
-class ResolverResult:
-    """Result from resolver attempt."""
-    def __init__(self, url=None, referer=None, metadata=None, 
-                 event=None, event_reason=None, **kwargs):
-        self.url = url
-        self.referer = referer
-        self.metadata = metadata or {}
-        self.event = event
-        self.event_reason = event_reason
-        for k, v in kwargs.items():
-            setattr(self, k, v)
 
 
 

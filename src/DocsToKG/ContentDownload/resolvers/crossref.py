@@ -24,19 +24,14 @@ import httpx
 from DocsToKG.ContentDownload.core import normalize_doi
 from DocsToKG.ContentDownload.urls import canonical_for_index
 
-from .registry_v2 import register_v2
+from DocsToKG.ContentDownload.resolvers.base import (
+    ApiResolverBase,
+    ResolverEvent,
+    ResolverEventReason,
+    ResolverResult,
+)
 
-class ResolverResult:
-    """Result from resolver attempt."""
-    def __init__(self, url=None, referer=None, metadata=None, 
-                 event=None, event_reason=None, **kwargs):
-        self.url = url
-        self.referer = referer
-        self.metadata = metadata or {}
-        self.event = event
-        self.event_reason = event_reason
-        for k, v in kwargs.items():
-            setattr(self, k, v)
+from .registry_v2 import register_v2
 
 
 
@@ -45,7 +40,7 @@ if TYPE_CHECKING:  # pragma: no cover
     
 
 @register_v2("crossref")
-class CrossrefResolver:
+class CrossrefResolver(ApiResolverBase):
     """Resolve candidate URLs from the Crossref metadata API."""
 
     name = "crossref"

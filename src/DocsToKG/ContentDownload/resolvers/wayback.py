@@ -62,7 +62,7 @@ import httpx
 from DocsToKG.ContentDownload.networking import BreakerOpenError, request_with_retries
 from DocsToKG.ContentDownload.urls import canonical_for_index, canonical_for_request
 
-    RegisteredResolver,
+from DocsToKG.ContentDownload.resolvers.base import (
     ResolverEvent,
     ResolverEventReason,
     ResolverResult,

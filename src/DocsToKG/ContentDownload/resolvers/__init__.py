@@ -1,33 +1,61 @@
-"""
-Resolver subsystem for ContentDownload.
-
-Each resolver implements the Resolver protocol:
-  - name: str
-  - resolve(artifact, session, ctx, telemetry, run_id) -> ResolverResult
-
-Canonical types (from api module):
-  - DownloadPlan: url + resolver_name + optional hints
-  - ResolverResult: plans (Sequence) + notes (Mapping)
-
-Usage example:
-    from DocsToKG.ContentDownload.api import DownloadPlan, ResolverResult
-
-    class MyResolver:
-        name = "my_resolver"
-
-        def resolve(self, artifact, session, ctx, telemetry, run_id):
-            # Attempt to find a PDF URL
-            url = get_pdf_url(artifact, session)
-            if not url:
-                return ResolverResult(plans=[])  # Nothing to offer
-
-            # Return one or more plans
-            plan = DownloadPlan(url=url, resolver_name=self.name)
-            return ResolverResult(plans=[plan])
-"""
+"""Resolver subsystem public exports."""
 
 from __future__ import annotations
 
-from .base import Resolver
+from .arxiv import ArxivResolver
+from .base import (
+    ApiResolverBase,
+    DEFAULT_RESOLVER_TOGGLES,
+    Resolver,
+    ResolverEvent,
+    ResolverEventReason,
+    ResolverResult,
+    find_pdf_via_anchor,
+    find_pdf_via_link,
+    find_pdf_via_meta,
+)
+from .core import CoreResolver
+from .crossref import CrossrefResolver
+from .doaj import DoajResolver
+from .europe_pmc import EuropePmcResolver
+from .figshare import FigshareResolver
+from .hal import HalResolver
+from .landing_page import LandingPageResolver
+from .openaire import OpenAireResolver
+from .openalex import OpenAlexResolver
+from .osf import OsfResolver
+from .semantic_scholar import SemanticScholarResolver
+from .unpaywall import UnpaywallResolver
+from .wayback import WaybackResolver
+from .zenodo import ZenodoResolver
 
-__all__ = ["Resolver"]
+# Legacy alias maintained for compatibility with older tests
+PmcResolver = EuropePmcResolver
+
+__all__ = [
+    "ApiResolverBase",
+    "ArxivResolver",
+    "CoreResolver",
+    "CrossrefResolver",
+    "DEFAULT_RESOLVER_TOGGLES",
+    "DoajResolver",
+    "EuropePmcResolver",
+    "FigshareResolver",
+    "HalResolver",
+    "LandingPageResolver",
+    "OpenAireResolver",
+    "OpenAlexResolver",
+    "OsfResolver",
+    "PmcResolver",
+    "Resolver",
+    "ResolverEvent",
+    "ResolverEventReason",
+    "ResolverResult",
+    "SemanticScholarResolver",
+    "UnpaywallResolver",
+    "WaybackResolver",
+    "ZenodoResolver",
+    "find_pdf_via_anchor",
+    "find_pdf_via_link",
+    "find_pdf_via_meta",
+]
