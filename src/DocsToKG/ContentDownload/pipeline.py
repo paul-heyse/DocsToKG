@@ -182,6 +182,8 @@ class ResolverPipeline:
             try:
                 adj_plan = prepare_candidate_download(
                     plan,
+                    session=client,
+                    ctx=ctx,
                     telemetry=self._telemetry,
                     run_id=self._run_id,
                 )

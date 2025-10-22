@@ -19,7 +19,9 @@ import logging
 import os
 import tempfile
 import time
-from typing import Any, Optional
+from dataclasses import replace
+from typing import Any, Mapping, Optional
+from urllib.parse import urlsplit
 
 from DocsToKG.ContentDownload.api import (
     DownloadOutcome,
@@ -30,6 +32,7 @@ from DocsToKG.ContentDownload.api.exceptions import DownloadError, SkipDownload
 from DocsToKG.ContentDownload.io_utils import SizeMismatchError, atomic_write_stream
 from DocsToKG.ContentDownload.policy.path_gate import PathPolicyError, validate_path_safety
 from DocsToKG.ContentDownload.policy.url_gate import PolicyError, validate_url_security
+from DocsToKG.ContentDownload.robots import RobotsCache
 from DocsToKG.ContentDownload.telemetry import (
     ATTEMPT_REASON_NOT_MODIFIED,
     ATTEMPT_REASON_OK,
@@ -54,72 +57,133 @@ def _emit(telemetry: Any, **kw: Any) -> None:
             LOGGER.debug(f"Telemetry emission failed: {e}")
 
 
-def _sanitize_component(component: Optional[str]) -> str:
-    """Sanitize arbitrary identifiers for filesystem usage."""
+def _ctx_get(ctx: Any, name: str, default: Any = None) -> Any:
+    """Return attribute ``name`` from ``ctx`` supporting mapping and attr access."""
 
-    if not component:
-        return "default"
+    if ctx is None:
+        return default
 
-    sanitized = "".join(
-        ch if ch.isalnum() or ch in {"-", "_", "."} else "_" for ch in component
-    ).strip("_")
+    if hasattr(ctx, name):
+        return getattr(ctx, name)
 
-    if not sanitized:
-        return "id"
+    if isinstance(ctx, Mapping):
+        if name in ctx:
+            return ctx[name]
 
-    return sanitized[:64]
-
-
-def _prepare_staging_destination(
-    run_id: Optional[str], resolver_name: str
-) -> tuple[str, str]:
-    """Create a unique staging directory and destination path for this attempt."""
-
-    base_dir = os.path.join(os.getcwd(), ".download-staging")
-    run_component = _sanitize_component(run_id) if run_id else "default"
-    base_dir = os.path.join(base_dir, run_component)
-    os.makedirs(base_dir, exist_ok=True)
-
-    prefix = f"{_sanitize_component(resolver_name)}-"
-    staging_dir = tempfile.mkdtemp(prefix=prefix, dir=base_dir)
-    tmp_path = os.path.join(staging_dir, "payload.download.part")
-    return staging_dir, tmp_path
-
-
-def _cleanup_staging_artifacts(
-    path: Optional[str], staging_dir: Optional[str]
-) -> None:
-    """Best-effort cleanup of staging files/directories."""
-
-    if path:
+    getter = getattr(ctx, "get", None)
+    if callable(getter):
         try:
-            os.unlink(path)
-        except FileNotFoundError:
+            return getter(name, default)
+        except TypeError:
             pass
-        except OSError as exc:  # pragma: no cover - diagnostic only
-            LOGGER.debug(f"Failed to remove staging file {path}: {exc}")
 
-    if not staging_dir:
-        return
+    return default
 
-    try:
-        os.rmdir(staging_dir)
-    except OSError:
-        return
 
-    parent = os.path.dirname(staging_dir)
-    for candidate in (parent, os.path.dirname(parent)):
-        if not candidate or os.path.basename(candidate) == "":
-            continue
-        try:
-            os.rmdir(candidate)
-        except OSError:
-            break
+def _infer_user_agent(ctx: Any) -> str:
+    """Infer user-agent string from context or fall back to default."""
+
+    default = "DocsToKG/ContentDownload"
+
+    http_config = _ctx_get(ctx, "http_config", None)
+    if http_config and hasattr(http_config, "user_agent"):
+        return getattr(http_config, "user_agent")
+
+    candidate = _ctx_get(ctx, "user_agent", None)
+    if isinstance(candidate, str) and candidate.strip():
+        return candidate
+
+    extra = _ctx_get(ctx, "extra", None)
+    if isinstance(extra, Mapping):
+        ua = extra.get("user_agent")
+        if isinstance(ua, str) and ua.strip():
+            return ua
+
+    return default
+
+
+def _resolve_domain_policy(ctx: Any, url: str) -> Optional[Mapping[str, Any]]:
+    """Return domain-specific policy mapping for ``url`` if configured."""
+
+    rules = _ctx_get(ctx, "domain_content_rules", None)
+    if not isinstance(rules, Mapping):
+        return None
+
+    host = urlsplit(url).hostname
+    if not host:
+        return None
+
+    host_key = host.lower()
+    entry = rules.get(host_key)
+    if entry is None and host_key.startswith("www."):
+        entry = rules.get(host_key[4:])
+    if entry is None:
+        # Also try without leading www when original host lacked it
+        alt = f"www.{host_key}"
+        entry = rules.get(alt)
+    if isinstance(entry, Mapping):
+        return entry
+    return None
+
+
+def _resolve_plan_hints(ctx: Any, plan: DownloadPlan) -> Mapping[str, Any]:
+    """Return resolver-provided hints for ``plan`` if available."""
+
+    hints = _ctx_get(ctx, "resolver_hints", None)
+    if not isinstance(hints, Mapping):
+        return {}
+
+    url_hint = hints.get(plan.url)
+    if isinstance(url_hint, Mapping):
+        return url_hint
+
+    resolver_hint = hints.get(plan.resolver_name)
+    if isinstance(resolver_hint, Mapping):
+        return resolver_hint
+
+    return {}
+
+
+def _coerce_allowed_types(policy: Mapping[str, Any]) -> tuple[str, ...]:
+    """Extract a normalized tuple of allowed MIME prefixes from policy mapping."""
+
+    if not isinstance(policy, Mapping):
+        return ()
+
+    for key in ("allowed_types", "allowed_mime", "allow"):
+        value = policy.get(key)
+        if value:
+            if isinstance(value, str):
+                return (value.lower(),)
+            if isinstance(value, (list, tuple, set)):
+                return tuple(str(item).lower() for item in value if item)
+    return ()
+
+
+def _effective_max_bytes(plan: DownloadPlan, ctx: Any) -> Optional[int]:
+    """Return the effective max-bytes limit considering plan overrides and context."""
+
+    if plan.max_bytes_override is not None:
+        return plan.max_bytes_override
+
+    ctx_limit = _ctx_get(ctx, "max_bytes", None)
+    if isinstance(ctx_limit, int):
+        return ctx_limit
+
+    download_policy = _ctx_get(ctx, "download_policy", None)
+    if download_policy and hasattr(download_policy, "max_bytes"):
+        limit = getattr(download_policy, "max_bytes")
+        if isinstance(limit, int):
+            return limit
+
+    return None
 
 
 def prepare_candidate_download(
     plan: DownloadPlan,
     *,
+    session: Any = None,
+    ctx: Any = None,
     telemetry: Any = None,
     run_id: Optional[str] = None,
 ) -> DownloadPlan:
@@ -139,13 +203,53 @@ def prepare_candidate_download(
         SkipDownload: If policy or robots block this download
         DownloadError: If unrecoverable preflight error
     """
-    # Example: robots check (would call actual robots cache in real implementation)
-    # if not await_robots_check(plan.url):
-    #     raise SkipDownload("robots", f"Blocked by robots.txt: {plan.url}")
+    url = plan.url
 
-    # Example: content-type policy (would use ctx.domain_content_rules in real implementation)
-    # if plan.expected_mime and not is_allowed_mime(plan.expected_mime):
-    #     raise SkipDownload("policy-type", f"Disallowed MIME: {plan.expected_mime}")
+    # Validate URL security and normalize if necessary
+    try:
+        normalized_url = validate_url_security(url, _ctx_get(ctx, "http_config", None))
+    except PolicyError as e:
+        raise SkipDownload("policy-type", f"URL security policy violation: {e}") from e
+
+    if normalized_url != url:
+        plan = replace(plan, url=normalized_url)
+        url = normalized_url
+
+    # Apply robots guard if a session is available
+    robots_checker = _ctx_get(ctx, "robots_checker", None)
+    if robots_checker is None and session is not None:
+        robots_checker = RobotsCache()
+
+    if robots_checker is not None and session is not None:
+        user_agent = _infer_user_agent(ctx)
+        if not robots_checker.is_allowed(session, url, user_agent):
+            raise SkipDownload("robots", f"Blocked by robots.txt: {url}")
+
+    # Content policy enforcement via domain rules
+    domain_policy = _resolve_domain_policy(ctx, url)
+    allowed_types = _coerce_allowed_types(domain_policy or {})
+    expected_mime = (plan.expected_mime or "").lower()
+    if allowed_types and expected_mime:
+        if not any(expected_mime.startswith(prefix) for prefix in allowed_types):
+            raise SkipDownload("policy-type", f"Disallowed MIME: {plan.expected_mime}")
+
+    # Size policy based on context or plan overrides combined with resolver hints
+    effective_max = _effective_max_bytes(plan, ctx)
+    hints = _resolve_plan_hints(ctx, plan)
+    hinted_size = hints.get("content_length") or hints.get("size")
+    if (
+        isinstance(hinted_size, int)
+        and hinted_size >= 0
+        and isinstance(effective_max, int)
+        and hinted_size > effective_max
+    ):
+        raise SkipDownload(
+            "policy-size",
+            f"Expected size {hinted_size} exceeds limit {effective_max}",
+        )
+
+    if effective_max is not None and plan.max_bytes_override != effective_max:
+        plan = replace(plan, max_bytes_override=effective_max)
 
     return plan
 

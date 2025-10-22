@@ -17,6 +17,7 @@ import shutil
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import FrozenInstanceError
+from types import SimpleNamespace
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -37,6 +38,7 @@ from DocsToKG.ContentDownload.download_execution import (
     finalize_candidate_download,
 )
 from DocsToKG.ContentDownload.pipeline import ResolverPipeline
+from DocsToKG.ContentDownload.robots import RobotsCache
 
 
 # ============================================================================
@@ -197,10 +199,54 @@ class TestDownloadExecutionContracts:
     def test_prepare_can_raise_skip(self):
         """prepare_candidate_download can raise SkipDownload."""
         plan = DownloadPlan(url="https://example.com/file.pdf", resolver_name="test")
-        # Placeholder: would implement actual validation logic
-        # For now, just verify no exception on valid plan
-        result = prepare_candidate_download(plan)
-        assert result is not None
+        with pytest.raises(SkipDownload) as excinfo:
+            prepare_candidate_download(
+                plan,
+                session=None,
+                ctx={
+                    "resolver_hints": {plan.url: {"content_length": 10_000}},
+                    "max_bytes": 1024,
+                },
+            )
+        assert excinfo.value.reason == "policy-size"
+
+    def test_prepare_blocks_robots(self):
+        """prepare_candidate_download raises SkipDownload when robots denies."""
+
+        class DenyRobots(RobotsCache):
+            def is_allowed(self, session, url, user_agent):  # type: ignore[override]
+                return False
+
+        plan = DownloadPlan(url="https://example.com/blocked.pdf", resolver_name="test")
+        ctx = SimpleNamespace(robots_checker=DenyRobots())
+        with pytest.raises(SkipDownload) as excinfo:
+            prepare_candidate_download(plan, session=MagicMock(), ctx=ctx)
+        assert excinfo.value.reason == "robots"
+
+    def test_prepare_enforces_domain_mime_policy(self):
+        """prepare_candidate_download enforces domain MIME allow-list."""
+
+        plan = DownloadPlan(
+            url="https://example.com/file.html",
+            resolver_name="test",
+            expected_mime="text/html",
+        )
+        ctx = {
+            "domain_content_rules": {
+                "example.com": {"allowed_types": ["application/pdf"]},
+            }
+        }
+        with pytest.raises(SkipDownload) as excinfo:
+            prepare_candidate_download(plan, session=MagicMock(), ctx=ctx)
+        assert excinfo.value.reason == "policy-type"
+
+    def test_prepare_applies_context_max_bytes(self):
+        """prepare_candidate_download propagates max-bytes override from context."""
+
+        plan = DownloadPlan(url="https://example.com/file.pdf", resolver_name="test")
+        ctx = SimpleNamespace(max_bytes=2048)
+        result = prepare_candidate_download(plan, session=None, ctx=ctx)
+        assert result.max_bytes_override == 2048
 
     def test_stream_returns_stream_result(self):
         """stream_candidate_payload returns DownloadStreamResult."""
