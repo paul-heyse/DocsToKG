@@ -15,20 +15,19 @@ Design:
 
 from __future__ import annotations
 
-import hashlib
 import logging
 import os
+import shutil
 import tempfile
 import time
 import uuid
-from pathlib import Path
-from typing import Any, Optional
 from dataclasses import replace
+from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any, Mapping, Optional
 from urllib.parse import urlsplit
 
 from DocsToKG.ContentDownload.api import (
-    AttemptRecord,
     DownloadOutcome,
     DownloadPlan,
     DownloadStreamResult,
@@ -48,47 +47,59 @@ from DocsToKG.ContentDownload.telemetry import (
     ATTEMPT_STATUS_HTTP_GET,
     ATTEMPT_STATUS_HTTP_HEAD,
     ATTEMPT_STATUS_SIZE_MISMATCH,
+    SimplifiedAttemptRecord,
 )
 
 LOGGER = logging.getLogger(__name__)
 
 
-def _emit(
+def _log_io_attempt(
     telemetry: Any,
     *,
     run_id: Optional[str],
     resolver_name: str,
     url: str,
+    verb: str,
     status: str,
     http_status: Optional[int] = None,
+    reason: Optional[str] = None,
     elapsed_ms: Optional[int] = None,
-    meta: Optional[dict[str, Any]] = None,
-    **extra_meta: Any,
+    content_type: Optional[str] = None,
+    bytes_written: Optional[int] = None,
+    content_length_hdr: Optional[int] = None,
+    extra: Optional[Mapping[str, Any]] = None,
 ) -> None:
-    """Emit telemetry record if telemetry sink provided."""
-    if not telemetry or not hasattr(telemetry, "log_attempt"):
+    """Emit a :class:`SimplifiedAttemptRecord` via ``telemetry.log_io_attempt``."""
+
+    if not telemetry or not hasattr(telemetry, "log_io_attempt"):
         return
 
-    payload: dict[str, Any] = {}
-    if meta:
-        payload.update(meta)
-    if extra_meta:
-        payload.update(extra_meta)
+    extra_payload: Mapping[str, Any]
+    if extra:
+        extra_payload = dict(extra)
+    else:
+        extra_payload = {}
 
     try:
-        telemetry.log_attempt(
-            AttemptRecord(
-                run_id=str(run_id or ""),
-                resolver_name=resolver_name,
+        telemetry.log_io_attempt(
+            SimplifiedAttemptRecord(
+                ts=datetime.now(UTC),
+                run_id=run_id,
+                resolver=resolver_name,
                 url=url,
+                verb=verb,
                 status=status,
                 http_status=http_status,
+                content_type=content_type,
+                reason=reason,
                 elapsed_ms=elapsed_ms,
-                meta=payload,
+                bytes_written=bytes_written,
+                content_length_hdr=content_length_hdr,
+                extra=extra_payload,
             )
         )
-    except Exception as e:  # pylint: disable=broad-except
-        LOGGER.debug(f"Telemetry emission failed: {e}")
+    except Exception as exc:  # pylint: disable=broad-except
+        LOGGER.debug("Telemetry emission failed: %s", exc)
 
 
 def _ctx_get(ctx: Any, name: str, default: Any = None) -> Any:
@@ -229,16 +240,42 @@ def _resolve_storage_tmp_root() -> Path:
     return root
 
 
-def _plan_temp_path(plan: DownloadPlan) -> Path:
-    """Derive a collision-resistant temporary path for a download plan."""
+def _prepare_staging_destination(
+    run_id: Optional[str],
+    resolver_name: str,
+    *,
+    filename: Optional[str] = None,
+) -> tuple[Path, Path]:
+    """Allocate a dedicated staging directory for a download attempt."""
 
-    base = _resolve_storage_tmp_root()
-    digest = hashlib.sha256(plan.url.encode("utf-8")).hexdigest()
-    shard_dir = base / digest[:2]
-    shard_dir.mkdir(parents=True, exist_ok=True)
-    resolver_token = "".join(ch if ch.isalnum() else "-" for ch in plan.resolver_name) or "plan"
-    filename = f"{resolver_token}-{digest[:12]}-{uuid.uuid4().hex}.download.part"
-    return shard_dir / filename
+    root = _resolve_storage_tmp_root() / "staging"
+    run_token = (run_id or "adhoc").strip() or "adhoc"
+    run_segment = "".join(ch if ch.isalnum() else "-" for ch in run_token)
+    resolver_segment = "".join(ch if ch.isalnum() else "-" for ch in resolver_name) or "resolver"
+    staging_dir = root / run_segment / f"{resolver_segment}-{uuid.uuid4().hex}"
+    staging_dir.mkdir(parents=True, exist_ok=True)
+
+    file_name = filename or f"payload-{uuid.uuid4().hex}.part"
+    return staging_dir, staging_dir / file_name
+
+
+def _cleanup_staging_artifacts(
+    path_tmp: Optional[Path | str],
+    staging_dir: Optional[Path | str],
+) -> None:
+    """Best-effort cleanup for staging files and directories."""
+
+    if path_tmp:
+        tmp_path = Path(path_tmp)
+        try:
+            tmp_path.unlink()
+        except FileNotFoundError:
+            pass
+
+    if staging_dir:
+        dir_path = Path(staging_dir)
+        if dir_path.exists():
+            shutil.rmtree(dir_path, ignore_errors=True)
 
 
 def prepare_candidate_download(
@@ -284,7 +321,14 @@ def prepare_candidate_download(
 
     if robots_checker is not None and session is not None:
         user_agent = _infer_user_agent(ctx)
-        if not robots_checker.is_allowed(session, url, user_agent):
+        if not robots_checker.is_allowed(
+            session,
+            url,
+            user_agent,
+            telemetry=telemetry,
+            run_id=run_id,
+            resolver=getattr(plan, "resolver_name", None),
+        ):
             raise SkipDownload("robots", f"Blocked by robots.txt: {url}")
 
     # Content policy enforcement via domain rules
@@ -377,14 +421,22 @@ def stream_candidate_payload(
             head_kwargs["headers"] = dict(base_headers)
         head = session.head(url, **head_kwargs)
         elapsed_ms = (time.monotonic_ns() - t0) // 1_000_000
-        _emit(
+        head_headers = getattr(head, "headers", None)
+        head_content_type: Optional[str] = None
+        if head_headers:
+            ct_raw = head_headers.get("Content-Type")
+            if isinstance(ct_raw, str):
+                head_content_type = ct_raw.lower()
+        _log_io_attempt(
             telemetry,
             run_id=run_id,
             resolver_name=plan.resolver_name,
             url=url,
+            verb="HEAD",
             status=ATTEMPT_STATUS_HTTP_HEAD,
             http_status=head.status_code,
             elapsed_ms=elapsed_ms,
+            content_type=head_content_type,
         )
     except Exception as e:  # pylint: disable=broad-except
         # Some servers 405 on HEAD; proceed without failing
@@ -408,16 +460,17 @@ def stream_candidate_payload(
         from_cache = bool(getattr(resp, "extensions", {}).get("from_cache"))
         revalidated = bool(getattr(resp, "extensions", {}).get("revalidated"))
 
-        _emit(
+        _log_io_attempt(
             telemetry,
             run_id=run_id,
             resolver_name=plan.resolver_name,
             url=url,
+            verb="GET",
             status=ATTEMPT_STATUS_HTTP_GET,
             http_status=resp.status_code,
             elapsed_ms=elapsed_ms,
-            meta={
-                "content_type": content_type,
+            content_type=content_type,
+            extra={
                 "from_cache": from_cache,
                 "revalidated": revalidated,
             },
@@ -425,30 +478,32 @@ def stream_candidate_payload(
 
         # Emit cache-aware tokens
         if from_cache and not revalidated:
-            _emit(
+            _log_io_attempt(
                 telemetry,
                 run_id=run_id,
                 resolver_name=plan.resolver_name,
                 url=url,
+                verb="GET",
                 status=ATTEMPT_STATUS_CACHE_HIT,
                 http_status=resp.status_code,
-                meta={
-                    "content_type": content_type,
-                    "reason": "ok",
+                content_type=content_type,
+                reason=ATTEMPT_REASON_OK,
+                extra={
                     "from_cache": True,
                 },
             )
         if revalidated and resp.status_code == 304:
-            _emit(
+            _log_io_attempt(
                 telemetry,
                 run_id=run_id,
                 resolver_name=plan.resolver_name,
                 url=url,
+                verb="GET",
                 status=ATTEMPT_STATUS_HTTP_304,
                 http_status=304,
-                meta={
-                    "content_type": content_type,
-                    "reason": "not-modified",
+                content_type=content_type,
+                reason=ATTEMPT_REASON_NOT_MODIFIED,
+                extra={
                     "revalidated": True,
                     "from_cache": from_cache,
                 },
@@ -476,9 +531,8 @@ def stream_candidate_payload(
     cl = resp.headers.get("Content-Length")
     expected_len = int(cl) if (cl and cl.isdigit()) else None
 
-    staging_dir: Optional[str] = None
-    tmp_path: Optional[str] = None
-    # Determine effective byte limit (plan override wins)
+    staging_dir: Optional[Path] = None
+    tmp_path: Optional[Path] = None
     effective_max_bytes = (
         plan.max_bytes_override
         if plan.max_bytes_override is not None
@@ -494,9 +548,6 @@ def stream_candidate_payload(
             "too-large",
             f"Content-Length {expected_len} exceeds cap {effective_max_bytes} bytes",
         )
-
-    # Write to temporary file using atomic writer
-    tmp_path = _plan_temp_path(plan)
 
     bytes_streamed = 0
 
@@ -518,48 +569,43 @@ def stream_candidate_payload(
             bytes_streamed = new_total
             yield chunk
 
+    url_path = Path(urlsplit(plan.url).path)
+    staging_name = f"{url_path.name or 'download.bin'}.part"
+
     try:
-        staging_dir, tmp_path = _prepare_staging_destination(run_id, plan.resolver_name)
+        staging_dir, tmp_path = _prepare_staging_destination(
+            run_id,
+            plan.resolver_name,
+            filename=staging_name,
+        )
         bytes_written = atomic_write_stream(
-            dest_path=tmp_path,
-            byte_iter=_iter_with_limit(
-                resp.iter_bytes(chunk_size=chunk_size)
-            ),
+            dest_path=str(tmp_path),
+            byte_iter=_iter_with_limit(resp.iter_bytes(chunk_size=chunk_size)),
             expected_len=(expected_len if verify_content_length else None),
             chunk_size=chunk_size,
         )
 
-        # Check size limit
         if effective_max_bytes is not None and bytes_written > effective_max_bytes:
-            try:
-                tmp_path.unlink()
-        if max_bytes and bytes_written > max_bytes:
             _cleanup_staging_artifacts(tmp_path, staging_dir)
-        if (
-            effective_max_bytes is not None
-            and bytes_written > effective_max_bytes
-        ):
-            try:
-                os.unlink(tmp_path)
-            except FileNotFoundError:
-                pass
             raise DownloadError(
                 "too-large",
                 f"Payload exceeded {effective_max_bytes} bytes",
             )
 
         # Emit final success record
-        _emit(
+        _log_io_attempt(
             telemetry,
             run_id=run_id,
             resolver_name=plan.resolver_name,
             url=url,
+            verb="STREAM",
             status=ATTEMPT_STATUS_HTTP_200,
             http_status=resp.status_code,
-            meta={
-                "bytes": bytes_written,
-                "content_type": content_type,
-                "content_length_hdr": expected_len,
+            reason=ATTEMPT_REASON_OK,
+            content_type=content_type,
+            bytes_written=bytes_written,
+            content_length_hdr=expected_len,
+            extra={
                 "from_cache": from_cache,
                 "revalidated": revalidated,
             },
@@ -570,31 +616,27 @@ def stream_candidate_payload(
             bytes_written=bytes_written,
             http_status=resp.status_code,
             content_type=content_type,
-            staging_path=staging_dir,
+            staging_path=str(staging_dir) if staging_dir else None,
         )
 
     except SizeMismatchError:
         _cleanup_staging_artifacts(tmp_path, staging_dir)
-        _emit(
+        _log_io_attempt(
             telemetry,
             run_id=run_id,
             resolver_name=plan.resolver_name,
             url=url,
+            verb="STREAM",
             status=ATTEMPT_STATUS_SIZE_MISMATCH,
             http_status=resp.status_code,
-            meta={
-                "content_type": content_type,
-                "reason": "size-mismatch",
-                "content_length_hdr": expected_len,
-            },
+            reason=ATTEMPT_REASON_SIZE_MISMATCH,
+            content_type=content_type,
+            bytes_written=bytes_streamed,
+            content_length_hdr=expected_len,
         )
         raise DownloadError("size-mismatch")
     except DownloadError:
         _cleanup_staging_artifacts(tmp_path, staging_dir)
-        try:
-            os.unlink(tmp_path)
-        except FileNotFoundError:
-            pass
         raise
     except Exception as e:  # pylint: disable=broad-except
         _cleanup_staging_artifacts(tmp_path, staging_dir)
@@ -639,81 +681,69 @@ def finalize_candidate_download(
             meta={"http_status": 304},
         )
 
-    # Determine artifact root from storage configuration
-    artifact_root = storage_root
-    if artifact_root is None and storage_settings is not None:
-        artifact_root = getattr(storage_settings, "root_dir", None)
-    if artifact_root is None:
-        artifact_root = os.getcwd()
+    root_candidate = storage_root
+    if root_candidate is None and storage_settings is not None:
+        root_candidate = getattr(storage_settings, "root_dir", None)
+    if root_candidate is None:
+        root_candidate = os.getcwd()
 
-    # Determine final path (in real implementation, would use storage policy)
-    candidate_final_path = final_path
-    if candidate_final_path:
-        if not os.path.isabs(candidate_final_path):
-            candidate_final_path = os.path.join(artifact_root, candidate_final_path)
+    artifact_root = Path(root_candidate)
+    if final_path:
+        destination = Path(final_path)
+        if not destination.is_absolute():
+            destination = artifact_root / destination
     else:
-        base = plan.url.rsplit("/", 1)[-1] or "download.bin"
-        candidate_final_path = os.path.join(artifact_root, base)
+        base_name = Path(urlsplit(plan.url).path).name or "download.bin"
+        destination = artifact_root / base_name
 
-    # Validate final path safety
     try:
-        safe_final_path = validate_path_safety(candidate_final_path, artifact_root=artifact_root)
-    # Determine final path (in real implementation, would use storage policy)
-    destination = final_path
-    if not destination:
-        base = plan.url.rsplit("/", 1)[-1] or "download.bin"
-        destination = os.path.join(os.getcwd(), base)
-
-    # Validate final path safety (initial + resolved)
-    try:
-        safe_path = validate_path_safety(destination)
-        final_path = validate_path_safety(safe_path)
+        safe_final_path = validate_path_safety(str(destination), artifact_root=str(artifact_root))
     except PathPolicyError as e:
         raise SkipDownload("path-policy", f"Path policy violation: {e}")
 
-    # atomic_write_stream already moved temp → dest_path, so final_path exists
-    # Just verify and emit event
-    cleanup_dirs = False
-    same_destination = False
-    try:
-        if stream.path_tmp and not os.path.exists(safe_final_path):
-            # If atomic_write_stream didn't finalize, move it now
-            os.replace(stream.path_tmp, safe_final_path)
-        if stream.path_tmp:
-            same_destination = os.path.abspath(stream.path_tmp) == os.path.abspath(final_path)
+    final_path_obj = Path(safe_final_path)
+    tmp_path = Path(stream.path_tmp) if stream.path_tmp else None
+    staging_dir = Path(stream.staging_path) if stream.staging_path else None
 
-            if not same_destination and not os.path.exists(final_path):
-                # If atomic_write_stream didn't finalize, move it now
-                os.replace(stream.path_tmp, final_path)
-            elif not same_destination:
-                _cleanup_staging_artifacts(stream.path_tmp, None)
-        cleanup_dirs = not same_destination
-        if stream.path_tmp and not os.path.exists(dest_path):
-            # If atomic_write_stream didn't finalize, move it now
-            os.replace(stream.path_tmp, dest_path)
+    if tmp_path is None:
+        raise DownloadError("download-error", "Missing temporary payload path")
+
+    cleanup_staging = False
+    try:
+        if not tmp_path.exists():
+            raise DownloadError("download-error", "Temporary payload missing on disk")
+
+        same_destination = tmp_path.resolve() == final_path_obj.resolve()
+        if not same_destination:
+            final_path_obj.parent.mkdir(parents=True, exist_ok=True)
+            os.replace(str(tmp_path), str(final_path_obj))
+            cleanup_staging = True
+        else:
+            cleanup_staging = False
     except Exception as e:  # pylint: disable=broad-except
+        _cleanup_staging_artifacts(tmp_path, staging_dir)
         raise DownloadError(
             "download-error",
             f"Failed to finalize: {e}",
         ) from e
-    finally:
-        if cleanup_dirs and stream.staging_path:
-            _cleanup_staging_artifacts(None, stream.staging_path)
+
+    if cleanup_staging and staging_dir:
+        _cleanup_staging_artifacts(None, staging_dir)
 
     # Emit finalization event
-    _emit(
+    _log_io_attempt(
         telemetry,
         run_id=run_id,
         resolver_name=plan.resolver_name,
         url=plan.url,
-        status="http-200",
-        bytes_written=stream.bytes_written,
-        final_path=safe_final_path,
+        verb="FINALIZE",
+        status=ATTEMPT_STATUS_HTTP_200,
         http_status=stream.http_status,
-        meta={
-            "bytes": stream.bytes_written,
-            "final_path": final_path,
-            "content_type": stream.content_type,
+        reason=ATTEMPT_REASON_OK,
+        content_type=stream.content_type,
+        bytes_written=stream.bytes_written,
+        extra={
+            "final_path": str(final_path) if final_path else None,
         },
     )
 

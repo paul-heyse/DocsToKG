@@ -5,64 +5,96 @@ Covers:
 - is_allowed() with allowed/disallowed URLs
 - Cache expiration and refresh
 - Fail-open semantics (errors don't block requests)
-- Integration with mock HTTP sessions
+- Integration with shared networking + telemetry primitives
 """
 
 from __future__ import annotations
 
-from typing import Optional
-from unittest.mock import Mock
+from typing import Any, Dict, List, Union
+
+import pytest
 
 from DocsToKG.ContentDownload.robots import RobotsCache
+from DocsToKG.ContentDownload.telemetry import (
+    ATTEMPT_REASON_ROBOTS,
+    ATTEMPT_STATUS_ROBOTS_DISALLOWED,
+    SimplifiedAttemptRecord,
+)
 
 
 class MockResponse:
-    """Mock httpx.Response for testing."""
+    """Lightweight stand-in for :class:`httpx.Response`."""
 
     def __init__(self, status_code: int = 200, text: str = "") -> None:
         self.status_code = status_code
         self.text = text
+        self.headers: Dict[str, str] = {}
 
 
-class MockSession:
-    """Mock httpx.Client session for testing."""
+class RequestStub:
+    """Patch :func:`request_with_retries` and supply canned responses."""
 
-    def __init__(self, responses: Optional[dict] = None) -> None:
-        self.responses = responses or {}
-        self.get_called_with = []
+    def __init__(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        self._responses: Dict[str, List[Any]] = {}
+        self.calls: List[tuple[object, str, str, Dict[str, Any]]] = []
+        monkeypatch.setattr(
+            "DocsToKG.ContentDownload.robots.request_with_retries", self
+        )
 
-    def get(self, url: str, timeout: Optional[int] = None) -> MockResponse:
-        """Mock GET method that returns configured responses."""
-        self.get_called_with.append(url)
+    def set_response(self, url: str, response: Union[Any, List[Any]]) -> None:
+        if isinstance(response, list):
+            self._responses[url] = list(response)
+        else:
+            self._responses[url] = [response]
 
-        # Match URL to configured response
-        for key, response in self.responses.items():
-            if key in url or url in key:
-                if isinstance(response, tuple):
-                    status, text = response
-                    return MockResponse(status_code=status, text=text)
-                else:
-                    return response
+    def __call__(self, session: object, method: str, url: str, **kwargs: Any) -> Any:
+        self.calls.append((session, method, url, kwargs))
+        queue = self._responses.get(url)
+        if queue:
+            resp = queue.pop(0) if queue else None
+        else:
+            resp = None
 
-        # Default: return 404 (robots.txt not found)
-        return MockResponse(status_code=404, text="")
+        if resp is None:
+            resp = MockResponse(status_code=404, text="")
+
+        if isinstance(resp, Exception):
+            raise resp
+        if callable(resp):
+            resp = resp()
+
+        return resp
+
+
+@pytest.fixture
+def request_stub(monkeypatch: pytest.MonkeyPatch) -> RequestStub:
+    """Provide a request stub patched into the robots cache module."""
+
+    return RequestStub(monkeypatch)
+
+
+class FakeTelemetry:
+    """Collect `SimplifiedAttemptRecord` instances for assertions."""
+
+    def __init__(self) -> None:
+        self.records: List[SimplifiedAttemptRecord] = []
+
+    def log_io_attempt(self, record: SimplifiedAttemptRecord) -> None:
+        self.records.append(record)
 
 
 class TestRobotsCacheInitialization:
     """Tests for RobotsCache initialization."""
 
     def test_default_ttl_is_3600_seconds(self) -> None:
-        """Default TTL is 1 hour."""
         cache = RobotsCache()
         assert cache.ttl_sec == 3600
 
     def test_custom_ttl(self) -> None:
-        """Custom TTL can be set."""
         cache = RobotsCache(ttl_sec=7200)
         assert cache.ttl_sec == 7200
 
     def test_cache_starts_empty(self) -> None:
-        """Cache is empty on initialization."""
         cache = RobotsCache()
         assert len(cache._cache) == 0
 
@@ -70,244 +102,280 @@ class TestRobotsCacheInitialization:
 class TestRobotsCacheAllowed:
     """Tests for is_allowed() with allowed URLs."""
 
-    def test_allowed_url_returns_true(self) -> None:
-        """Allowed URL returns True."""
-        robots_txt = """User-agent: *
-Allow: /
-"""
-        session = MockSession({"robots.txt": (200, robots_txt)})
+    def test_allowed_url_returns_true(self, request_stub: RequestStub) -> None:
+        robots_txt = """User-agent: *\nAllow: /\n"""
+        request_stub.set_response(
+            "https://example.com/robots.txt", MockResponse(200, robots_txt)
+        )
         cache = RobotsCache()
 
-        result = cache.is_allowed(session, "https://example.com/page", "MyBot/1.0")
-        assert result is True
+        assert cache.is_allowed(object(), "https://example.com/page", "MyBot/1.0")
 
-    def test_disallowed_url_returns_false(self) -> None:
-        """Disallowed URL returns False."""
-        robots_txt = """User-agent: *
-Disallow: /
-"""
-        session = MockSession({"robots.txt": (200, robots_txt)})
+    def test_disallowed_url_returns_false(self, request_stub: RequestStub) -> None:
+        robots_txt = """User-agent: *\nDisallow: /\n"""
+        request_stub.set_response(
+            "https://example.com/robots.txt", MockResponse(200, robots_txt)
+        )
         cache = RobotsCache()
 
-        result = cache.is_allowed(session, "https://example.com/page", "MyBot/1.0")
-        assert result is False
+        assert not cache.is_allowed(object(), "https://example.com/page", "MyBot/1.0")
 
-    def test_specific_path_disallowed(self) -> None:
-        """Specific path can be disallowed."""
-        robots_txt = """User-agent: *
-Disallow: /admin/
-Allow: /
-"""
-        session = MockSession({"robots.txt": (200, robots_txt)})
+    def test_specific_path_disallowed(self, request_stub: RequestStub) -> None:
+        robots_txt = """User-agent: *\nDisallow: /admin/\nAllow: /\n"""
+        request_stub.set_response(
+            "https://example.com/robots.txt", MockResponse(200, robots_txt)
+        )
         cache = RobotsCache()
 
-        # Admin path is disallowed
-        assert cache.is_allowed(session, "https://example.com/admin/page", "MyBot/1.0") is False
+        assert not cache.is_allowed(
+            object(), "https://example.com/admin/page", "MyBot/1.0"
+        )
+        assert cache.is_allowed(object(), "https://example.com/page", "MyBot/1.0")
 
-        # Other paths are allowed
-        assert cache.is_allowed(session, "https://example.com/page", "MyBot/1.0") is True
-
-    def test_empty_robots_txt_allows_all(self) -> None:
-        """Empty robots.txt allows all URLs."""
-        session = MockSession({"robots.txt": (200, "")})
+    def test_empty_robots_txt_allows_all(self, request_stub: RequestStub) -> None:
+        request_stub.set_response("https://example.com/robots.txt", MockResponse(200, ""))
         cache = RobotsCache()
 
-        result = cache.is_allowed(session, "https://example.com/page", "MyBot/1.0")
-        assert result is True
+        assert cache.is_allowed(object(), "https://example.com/page", "MyBot/1.0")
 
 
 class TestRobotsCacheFailOpen:
     """Tests for fail-open semantics (errors don't block requests)."""
 
-    def test_missing_robots_txt_allows_all(self) -> None:
-        """Missing robots.txt (404) allows all URLs."""
-        session = MockSession({})
+    def test_missing_robots_txt_allows_all(self, request_stub: RequestStub) -> None:
         cache = RobotsCache()
 
-        result = cache.is_allowed(session, "https://example.com/page", "MyBot/1.0")
-        assert result is True
+        assert cache.is_allowed(object(), "https://example.com/page", "MyBot/1.0")
 
-    def test_exception_on_fetch_allows_url(self) -> None:
-        """Exception fetching robots.txt allows URL (fail-open)."""
-        session = Mock()
-        session.get.side_effect = Exception("Network error")
-
-        cache = RobotsCache()
-        result = cache.is_allowed(session, "https://example.com/page", "MyBot/1.0")
-        assert result is True
-
-    def test_invalid_robots_txt_allows_all(self) -> None:
-        """Invalid robots.txt format allows all URLs."""
-        session = MockSession({"robots.txt": (200, "INVALID:::CONTENT:::FORMAT")})
+    def test_exception_on_fetch_allows_url(self, request_stub: RequestStub) -> None:
+        request_stub.set_response(
+            "https://example.com/robots.txt", Exception("Network error")
+        )
         cache = RobotsCache()
 
-        # Should not crash; should allow
-        result = cache.is_allowed(session, "https://example.com/page", "MyBot/1.0")
-        assert result is True
+        assert cache.is_allowed(object(), "https://example.com/page", "MyBot/1.0")
+
+    def test_invalid_robots_txt_allows_all(self, request_stub: RequestStub) -> None:
+        request_stub.set_response(
+            "https://example.com/robots.txt",
+            MockResponse(200, "INVALID:::CONTENT:::FORMAT"),
+        )
+        cache = RobotsCache()
+
+        assert cache.is_allowed(object(), "https://example.com/page", "MyBot/1.0")
 
 
 class TestRobotsCacheCaching:
     """Tests for per-host cache behavior."""
 
-    def test_cache_stores_parsed_robots(self) -> None:
-        """Parsed robots.txt is cached per host."""
-        robots_txt = """User-agent: *
-Disallow: /admin/
-"""
-        session = MockSession({"robots.txt": (200, robots_txt)})
+    def test_cache_stores_parsed_robots(self, request_stub: RequestStub) -> None:
+        robots_txt = """User-agent: *\nDisallow: /admin/\n"""
+        request_stub.set_response(
+            "https://example.com/robots.txt", MockResponse(200, robots_txt)
+        )
         cache = RobotsCache()
 
-        # First call: fetches robots.txt
-        cache.is_allowed(session, "https://example.com/page1", "MyBot/1.0")
+        cache.is_allowed(object(), "https://example.com/page1", "MyBot/1.0")
         assert len(cache._cache) == 1
 
-        # Second call to same host: uses cache (not fetching again)
-        session.get_called_with.clear()
-        cache.is_allowed(session, "https://example.com/page2", "MyBot/1.0")
-        # Second call doesn't fetch robots.txt again (it's cached)
-        assert len(session.get_called_with) == 0
+        cache.is_allowed(object(), "https://example.com/page2", "MyBot/1.0")
+        assert len(request_stub.calls) == 1
 
-    def test_different_hosts_cached_separately(self) -> None:
-        """Different hosts have separate cache entries."""
-        robots1 = "User-agent: *\nDisallow: /\n"
-        robots2 = "User-agent: *\nAllow: /\n"
-
-        session = Mock()
-        session.get.side_effect = lambda url, timeout: (
-            MockResponse(200, robots1)
-            if "example.com" in url
-            else MockResponse(200, robots2)
-            if "other.com" in url
-            else MockResponse(404)
+    def test_different_hosts_cached_separately(self, request_stub: RequestStub) -> None:
+        request_stub.set_response(
+            "https://example.com/robots.txt",
+            MockResponse(200, "User-agent: *\nDisallow: /\n"),
+        )
+        request_stub.set_response(
+            "https://other.com/robots.txt",
+            MockResponse(200, "User-agent: *\nAllow: /\n"),
         )
 
         cache = RobotsCache()
 
-        # example.com disallows
-        result1 = cache.is_allowed(session, "https://example.com/page", "MyBot/1.0")
-        assert result1 is False
-
-        # other.com allows
-        result2 = cache.is_allowed(session, "https://other.com/page", "MyBot/1.0")
-        assert result2 is True
-
-        # Both entries cached
+        assert not cache.is_allowed(object(), "https://example.com/page", "MyBot/1.0")
+        assert cache.is_allowed(object(), "https://other.com/page", "MyBot/1.0")
         assert len(cache._cache) == 2
 
 
 class TestRobotsCacheUserAgent:
     """Tests for user-agent specific rules."""
 
-    def test_user_agent_specific_rules(self) -> None:
-        """User-agent specific rules are respected."""
-        robots_txt = """User-agent: Googlebot
-Disallow: /
-
-User-agent: *
-Allow: /
-"""
-        session = MockSession({"robots.txt": (200, robots_txt)})
+    def test_user_agent_specific_rules(self, request_stub: RequestStub) -> None:
+        robots_txt = (
+            "User-agent: Googlebot\nDisallow: /\n\nUser-agent: *\nAllow: /\n"
+        )
+        request_stub.set_response(
+            "https://example.com/robots.txt", MockResponse(200, robots_txt)
+        )
         cache = RobotsCache()
 
-        # Googlebot is disallowed
-        assert cache.is_allowed(session, "https://example.com/page", "Googlebot") is False
+        assert not cache.is_allowed(object(), "https://example.com/page", "Googlebot")
 
-        # Other bots are allowed (refresh cache for new user-agent)
         cache._cache.clear()
-        assert cache.is_allowed(session, "https://example.com/page", "MyBot/1.0") is True
+        assert cache.is_allowed(object(), "https://example.com/page", "MyBot/1.0")
 
 
 class TestRobotsCacheNetworking:
     """Tests for networking behavior."""
 
-    def test_robots_txt_fetched_from_correct_path(self) -> None:
-        """robots.txt is fetched from / path."""
-        session = MockSession({"robots.txt": (200, "User-agent: *\nDisallow: /\n")})
+    def test_robots_txt_fetched_from_correct_path(
+        self, request_stub: RequestStub
+    ) -> None:
+        request_stub.set_response(
+            "https://example.com/robots.txt",
+            MockResponse(200, "User-agent: *\nDisallow: /\n"),
+        )
         cache = RobotsCache()
+        cache.is_allowed(object(), "https://example.com/page", "MyBot/1.0")
 
-        cache.is_allowed(session, "https://example.com/page", "MyBot/1.0")
+        assert any(call[2].endswith("/robots.txt") for call in request_stub.calls)
 
-        # Check that robots.txt was fetched
-        assert any("robots.txt" in url for url in session.get_called_with)
-
-    def test_timeout_parameter_passed(self) -> None:
-        """Timeout is passed to session.get()."""
-        session = Mock()
-        session.get.return_value = MockResponse(404)
-
+    def test_timeout_parameter_passed(self, request_stub: RequestStub) -> None:
         cache = RobotsCache()
-        cache.is_allowed(session, "https://example.com/page", "MyBot/1.0")
+        cache.is_allowed(object(), "https://example.com/page", "MyBot/1.0")
 
-        # Verify timeout was passed
-        call_kwargs = session.get.call_args[1]
-        assert call_kwargs.get("timeout") == 5
+        assert request_stub.calls[0][3]["timeout"] == 5.0
 
 
 class TestRobotsCacheEdgeCases:
     """Tests for edge cases."""
 
-    def test_url_without_scheme(self) -> None:
-        """URLs without scheme are handled gracefully."""
-        session = MockSession({"robots.txt": (200, "User-agent: *\nAllow: /\n")})
+    def test_url_without_scheme(self, request_stub: RequestStub) -> None:
+        request_stub.set_response(
+            "https://example.com/robots.txt", MockResponse(200, "User-agent: *\nAllow: /\n")
+        )
+        cache = RobotsCache()
+        cache.is_allowed(object(), "example.com/page", "MyBot/1.0")
+
+    def test_url_with_port(self, request_stub: RequestStub) -> None:
+        request_stub.set_response(
+            "https://example.com:8443/robots.txt",
+            MockResponse(200, "User-agent: *\nDisallow: /admin/\n"),
+        )
         cache = RobotsCache()
 
-        # Should not crash
-        try:
-            cache.is_allowed(session, "example.com/page", "MyBot/1.0")
-        except Exception:
-            pass  # Expected - urlsplit may fail, but cache handles it
+        assert not cache.is_allowed(
+            object(), "https://example.com:8443/admin/page", "MyBot/1.0"
+        )
 
-    def test_url_with_port(self) -> None:
-        """URLs with ports are handled correctly."""
-        session = MockSession({"robots.txt": (200, "User-agent: *\nDisallow: /admin/\n")})
+    def test_multiple_disallow_rules(self, request_stub: RequestStub) -> None:
+        robots_txt = """User-agent: *\nDisallow: /admin/\nDisallow: /private/\nDisallow: /secret/\nAllow: /\n"""
+        request_stub.set_response(
+            "https://example.com/robots.txt", MockResponse(200, robots_txt)
+        )
         cache = RobotsCache()
 
-        result = cache.is_allowed(session, "https://example.com:8443/admin/page", "MyBot/1.0")
-        assert result is False
-
-    def test_multiple_disallow_rules(self) -> None:
-        """Multiple Disallow rules are all respected."""
-        robots_txt = """User-agent: *
-Disallow: /admin/
-Disallow: /private/
-Disallow: /secret/
-Allow: /
-"""
-        session = MockSession({"robots.txt": (200, robots_txt)})
-        cache = RobotsCache()
-
-        assert cache.is_allowed(session, "https://example.com/admin/page", "MyBot/1.0") is False
-        assert cache.is_allowed(session, "https://example.com/private/file", "MyBot/1.0") is False
-        assert cache.is_allowed(session, "https://example.com/secret/data", "MyBot/1.0") is False
-        assert cache.is_allowed(session, "https://example.com/public/page", "MyBot/1.0") is True
+        assert not cache.is_allowed(object(), "https://example.com/admin/page", "MyBot/1.0")
+        assert not cache.is_allowed(object(), "https://example.com/private/file", "MyBot/1.0")
+        assert not cache.is_allowed(object(), "https://example.com/secret/data", "MyBot/1.0")
+        assert cache.is_allowed(object(), "https://example.com/public/page", "MyBot/1.0")
 
 
 class TestRobotsCacheInheritance:
     """Tests for path inheritance in robots.txt rules."""
 
-    def test_disallow_root_blocks_all(self) -> None:
-        """Disallow: / blocks all paths."""
-        robots_txt = """User-agent: *
-Disallow: /
-"""
-        session = MockSession({"robots.txt": (200, robots_txt)})
+    def test_disallow_root_blocks_all(self, request_stub: RequestStub) -> None:
+        request_stub.set_response(
+            "https://example.com/robots.txt",
+            MockResponse(200, "User-agent: *\nDisallow: /\n"),
+        )
         cache = RobotsCache()
 
-        assert cache.is_allowed(session, "https://example.com/", "MyBot/1.0") is False
-        assert cache.is_allowed(session, "https://example.com/page", "MyBot/1.0") is False
-        assert cache.is_allowed(session, "https://example.com/deep/path/file", "MyBot/1.0") is False
+        assert not cache.is_allowed(object(), "https://example.com/", "MyBot/1.0")
+        assert not cache.is_allowed(object(), "https://example.com/page", "MyBot/1.0")
+        assert not cache.is_allowed(
+            object(), "https://example.com/deep/path/file", "MyBot/1.0"
+        )
 
-    def test_allow_overrides_parent_disallow(self) -> None:
-        """Allow rules can override parent Disallow rules."""
-        robots_txt = """User-agent: *
-Disallow: /
-Allow: /public/
-"""
-        session = MockSession({"robots.txt": (200, robots_txt)})
+    def test_allow_overrides_parent_disallow(self, request_stub: RequestStub) -> None:
+        robots_txt = """User-agent: *\nDisallow: /\nAllow: /public/\n"""
+        request_stub.set_response(
+            "https://example.com/robots.txt", MockResponse(200, robots_txt)
+        )
         cache = RobotsCache()
 
-        # Disallowed by default
-        assert cache.is_allowed(session, "https://example.com/private/", "MyBot/1.0") is False
+        assert not cache.is_allowed(object(), "https://example.com/private/", "MyBot/1.0")
+        assert cache.is_allowed(object(), "https://example.com/public/page", "MyBot/1.0")
 
-        # Allowed exception
-        assert cache.is_allowed(session, "https://example.com/public/page", "MyBot/1.0") is True
+
+class TestRobotsTelemetry:
+    """Telemetry emission when robots enforcement blocks a URL."""
+
+    def test_allowed_does_not_emit(self, request_stub: RequestStub) -> None:
+        request_stub.set_response(
+            "https://example.com/robots.txt", MockResponse(200, "User-agent: *\nAllow: /\n")
+        )
+        cache = RobotsCache()
+        telemetry = FakeTelemetry()
+
+        allowed = cache.is_allowed(
+            object(),
+            "https://example.com/page",
+            "MyBot/1.0",
+            telemetry=telemetry,
+            run_id="run-123",
+            resolver="landing",
+        )
+
+        assert allowed is True
+        assert telemetry.records == []
+
+    def test_blocked_emits_record(self, request_stub: RequestStub) -> None:
+        request_stub.set_response(
+            "https://example.com/robots.txt", MockResponse(200, "User-agent: *\nDisallow: /blocked\n")
+        )
+        cache = RobotsCache()
+        telemetry = FakeTelemetry()
+
+        allowed = cache.is_allowed(
+            object(),
+            "https://example.com/blocked",
+            "MyBot/1.0",
+            telemetry=telemetry,
+            run_id="run-123",
+            resolver="landing",
+        )
+
+        assert allowed is False
+        assert len(telemetry.records) == 1
+        record = telemetry.records[0]
+        assert isinstance(record, SimplifiedAttemptRecord)
+        assert record.status == ATTEMPT_STATUS_ROBOTS_DISALLOWED
+        assert record.reason == ATTEMPT_REASON_ROBOTS
+        assert record.url == "https://example.com/blocked"
+        assert record.run_id == "run-123"
+        assert record.resolver == "landing"
+        assert record.extra["robots_url"] == "https://example.com/robots.txt"
+        assert record.extra["cache"] == "miss"
+
+        # Second call hits cache and reports cache-hit in telemetry extra metadata
+        telemetry.records.clear()
+        cache.is_allowed(
+            object(),
+            "https://example.com/blocked",
+            "MyBot/1.0",
+            telemetry=telemetry,
+            run_id="run-123",
+            resolver="landing",
+        )
+        assert telemetry.records[0].extra["cache"] == "hit"
+
+    def test_fail_open_does_not_emit(self, request_stub: RequestStub) -> None:
+        request_stub.set_response(
+            "https://example.com/robots.txt", Exception("boom")
+        )
+        cache = RobotsCache()
+        telemetry = FakeTelemetry()
+
+        allowed = cache.is_allowed(
+            object(),
+            "https://example.com/page",
+            "MyBot/1.0",
+            telemetry=telemetry,
+            run_id="run-123",
+            resolver="landing",
+        )
+
+        assert allowed is True
+        assert telemetry.records == []

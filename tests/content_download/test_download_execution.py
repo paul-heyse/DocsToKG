@@ -36,10 +36,14 @@ from tests.conftest import PatchManager
 class _FakeTelemetry:
     def __init__(self) -> None:
         self.records: list[Any] = []
+        self.io_attempts: list[Any] = []
 
     def log_attempt(self, record: Any, *, timestamp: Any = None) -> None:  # pragma: no cover - signature parity
         del timestamp
         self.records.append(record)
+
+    def log_io_attempt(self, record: Any) -> None:
+        self.io_attempts.append(record)
 
 
 def test_stream_and_finalize_emit_attempt_records(
@@ -109,28 +113,28 @@ def test_stream_and_finalize_emit_attempt_records(
         run_id="run",
     )
 
-    statuses = [record.status for record in telemetry.records]
+    statuses = [record.status for record in telemetry.io_attempts]
     assert statuses == ["http-head", "http-get", "cache-hit", "http-200", "http-200"]
 
-    get_record = telemetry.records[1]
+    get_record = telemetry.io_attempts[1]
     assert get_record.http_status == 200
-    assert get_record.meta["content_type"] == "application/pdf"
-    assert get_record.meta["from_cache"] is True
-    assert get_record.meta["revalidated"] is False
+    assert get_record.content_type == "application/pdf"
+    assert get_record.extra["from_cache"] is True
+    assert get_record.extra["revalidated"] is False
 
-    cache_record = telemetry.records[2]
-    assert cache_record.meta["reason"] == "ok"
+    cache_record = telemetry.io_attempts[2]
+    assert cache_record.reason == "ok"
 
-    stream_record = telemetry.records[3]
+    stream_record = telemetry.io_attempts[3]
     assert stream_record.http_status == 200
-    assert stream_record.meta["bytes"] == len(payload)
-    assert stream_record.meta["content_length_hdr"] == len(payload)
-    assert stream_record.meta["from_cache"] is True
+    assert stream_record.bytes_written == len(payload)
+    assert stream_record.content_length_hdr == len(payload)
+    assert stream_record.extra["from_cache"] is True
 
-    finalize_record = telemetry.records[-1]
+    finalize_record = telemetry.io_attempts[-1]
     assert finalize_record.http_status == 200
-    assert finalize_record.meta["bytes"] == len(payload)
-    assert finalize_record.meta["final_path"] == str(final_path)
+    assert finalize_record.bytes_written == len(payload)
+    assert finalize_record.extra["final_path"] == str(final_path)
 
 
 class ResolverMetrics:

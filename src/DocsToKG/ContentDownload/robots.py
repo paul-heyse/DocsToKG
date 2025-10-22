@@ -73,14 +73,31 @@ This conservative approach ensures operational resilience.
 
 from __future__ import annotations
 
+import contextlib
 import logging
+import threading
 import time
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from typing import Any, Dict, Optional, Tuple
 from urllib import robotparser
 from urllib.parse import urlsplit, urlunsplit
+
+from DocsToKG.ContentDownload.networking import request_with_retries
 
 __all__ = ["RobotsCache"]
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class _CacheEntry:
+    """Cached robots.txt policy metadata."""
+
+    fetched_at: float
+    parser: robotparser.RobotFileParser
+    status_code: Optional[int]
+    elapsed_ms: Optional[int]
 
 
 class RobotsCache:
@@ -117,13 +134,19 @@ class RobotsCache:
                     set higher for stable content sources.
         """
         self.ttl_sec = ttl_sec
-        self._cache: dict[str, tuple[float, robotparser.RobotFileParser]] = {}
+        self._cache: Dict[str, _CacheEntry] = {}
+        self._cache_lock = threading.RLock()
+        self._host_locks: Dict[str, threading.Lock] = {}
 
     def is_allowed(
         self,
         session: object,  # httpx.Client or similar
         url: str,
         user_agent: str,
+        *,
+        telemetry: Optional[Any] = None,
+        run_id: Optional[str] = None,
+        resolver: Optional[str] = None,
     ) -> bool:
         """Check if the URL is allowed by the robots.txt policy.
 
@@ -176,43 +199,190 @@ class RobotsCache:
         # Build robots.txt URL for this host
         robots_url = urlunsplit((parts.scheme, netloc, "/robots.txt", "", ""))
 
-        now = time.monotonic()
-        need_fetch = True
-
-        # Check cache and TTL
-        if netloc in self._cache:
-            fetched_at, parser = self._cache[netloc]
-            if now - fetched_at <= self.ttl_sec:
-                need_fetch = False
-                parser_to_use = parser
-            else:
-                # Cache expired; fetch fresh
-                parser_to_use = None
-        else:
-            parser_to_use = None
-
-        if need_fetch or parser_to_use is None:
-            try:
-                resp = session.get(robots_url, timeout=5)
-                rp = robotparser.RobotFileParser()
-
-                if resp.status_code == 200:
-                    rp.parse(resp.text.splitlines())
-                else:
-                    # If robots.txt doesn't exist (404), create empty policy (allow all)
-                    rp.parse([])
-
-                self._cache[netloc] = (now, rp)
-                parser_to_use = rp
-            except Exception as e:
-                logger.warning(f"Failed to fetch robots.txt from {robots_url}: {e}")
-                # Fail open: assume allowed if fetch fails
-                return True
+        entry, cache_hit = self._lookup_entry(session, netloc, robots_url)
+        if entry is None:
+            return True
+        parser_to_use = entry.parser
 
         # Check if user_agent can fetch this URL
         try:
-            return parser_to_use.can_fetch(user_agent, url)
+            allowed = parser_to_use.can_fetch(user_agent, url)
         except Exception as e:
             logger.warning(f"Error checking robots policy for {url}: {e}")
             # Fail open
             return True
+
+        if not allowed:
+            self._emit_disallowed_telemetry(
+                url=url,
+                robots_url=robots_url,
+                user_agent=user_agent,
+                telemetry=telemetry,
+                run_id=run_id,
+                resolver=resolver,
+                http_status=entry.status_code,
+                elapsed_ms=entry.elapsed_ms,
+                cache_hit=cache_hit,
+            )
+
+        return allowed
+
+    def _lookup_entry(
+        self,
+        session: object,
+        netloc: str,
+        robots_url: str,
+    ) -> Tuple[Optional[_CacheEntry], bool]:
+        """Return a cached entry, fetching when expired."""
+
+        now = time.monotonic()
+        with self._cache_lock:
+            entry = self._cache.get(netloc)
+        if entry is not None and self._is_entry_fresh(entry, now):
+            return entry, True
+
+        host_lock = self._get_host_lock(netloc)
+        with host_lock:
+            refreshed_now = time.monotonic()
+            with self._cache_lock:
+                entry = self._cache.get(netloc)
+            if entry is not None and self._is_entry_fresh(entry, refreshed_now):
+                return entry, True
+
+            fetched_entry = self._fetch_entry(session, robots_url)
+            if fetched_entry is None:
+                with self._cache_lock:
+                    self._cache.pop(netloc, None)
+                return None, False
+
+            with self._cache_lock:
+                self._cache[netloc] = fetched_entry
+            return fetched_entry, False
+
+    def _is_entry_fresh(self, entry: _CacheEntry, now: float) -> bool:
+        if self.ttl_sec <= 0:
+            return False
+        return (now - entry.fetched_at) <= self.ttl_sec
+
+    def _get_host_lock(self, netloc: str) -> threading.Lock:
+        with self._cache_lock:
+            lock = self._host_locks.get(netloc)
+            if lock is None:
+                lock = threading.Lock()
+                self._host_locks[netloc] = lock
+            return lock
+
+    def _fetch_entry(
+        self,
+        session: object,
+        robots_url: str,
+    ) -> Optional[_CacheEntry]:
+        start = time.perf_counter()
+        parser = robotparser.RobotFileParser()
+        parser.set_url(robots_url)
+
+        try:
+            response_cm = request_with_retries(
+                session,
+                "GET",
+                robots_url,
+                role="metadata",
+                timeout=5.0,
+                allow_redirects=True,
+                max_retries=1,
+                max_retry_duration=5.0,
+                backoff_max=5.0,
+                retry_after_cap=5.0,
+                original_url=robots_url,
+            )
+        except Exception as exc:  # pragma: no cover - fail-open path exercised elsewhere
+            logger.warning(f"Failed to fetch robots.txt from {robots_url}: {exc}")
+            return None
+
+        if hasattr(response_cm, "__enter__") and hasattr(response_cm, "__exit__"):
+            response_ctx = response_cm  # type: ignore[assignment]
+        else:
+            response_ctx = contextlib.nullcontext(response_cm)
+
+        status_code: Optional[int] = None
+        try:
+            with response_ctx as response:
+                status_code = getattr(response, "status_code", None)
+                text = getattr(response, "text", "") or ""
+
+                if status_code == 200:
+                    lines = text.splitlines()
+                elif status_code == 404:
+                    lines = []
+                elif status_code is not None and status_code >= 400:
+                    lines = []
+                else:
+                    lines = text.splitlines()
+
+                try:
+                    parser.parse(lines)
+                except Exception as exc:
+                    logger.warning(
+                        "Failed to parse robots.txt from %s: %s", robots_url, exc
+                    )
+                    parser.parse([])
+        except Exception as exc:
+            logger.warning(f"Failed to fetch robots.txt from {robots_url}: {exc}")
+            return None
+
+        elapsed_ms = int((time.perf_counter() - start) * 1000)
+        return _CacheEntry(
+            fetched_at=time.monotonic(),
+            parser=parser,
+            status_code=status_code,
+            elapsed_ms=elapsed_ms,
+        )
+
+    def _emit_disallowed_telemetry(
+        self,
+        *,
+        url: str,
+        robots_url: str,
+        user_agent: str,
+        telemetry: Optional[Any],
+        run_id: Optional[str],
+        resolver: Optional[str],
+        http_status: Optional[int],
+        elapsed_ms: Optional[int],
+        cache_hit: bool,
+    ) -> None:
+        from DocsToKG.ContentDownload.telemetry import (
+            ATTEMPT_REASON_ROBOTS,
+            ATTEMPT_STATUS_ROBOTS_DISALLOWED,
+            SimplifiedAttemptRecord,
+        )
+
+        if telemetry is None or not hasattr(telemetry, "log_io_attempt"):
+            return
+
+        extra = {
+            "robots_url": robots_url,
+            "user_agent": user_agent,
+            "cache": "hit" if cache_hit else "miss",
+        }
+
+        record = SimplifiedAttemptRecord(
+            ts=datetime.now(timezone.utc),
+            run_id=run_id,
+            resolver=resolver,
+            url=url,
+            verb="ROBOTS",
+            status=ATTEMPT_STATUS_ROBOTS_DISALLOWED,
+            http_status=http_status,
+            content_type=None,
+            reason=ATTEMPT_REASON_ROBOTS,
+            elapsed_ms=elapsed_ms,
+            bytes_written=None,
+            content_length_hdr=None,
+            extra=extra,
+        )
+
+        try:
+            telemetry.log_io_attempt(record)
+        except Exception:  # pragma: no cover - telemetry failures shouldn't crash
+            logger.exception("Failed to emit robots telemetry for %s", url)

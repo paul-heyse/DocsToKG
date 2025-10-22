@@ -1057,6 +1057,27 @@ class JsonlSink:
             }
         )
 
+    def log_io_attempt(self, record: "SimplifiedAttemptRecord") -> None:
+        """Append a low-level HTTP/IO attempt to the JSONL log."""
+
+        payload = {
+            "record_type": "io_attempt",
+            "timestamp": record.ts.isoformat(),
+            "run_id": record.run_id,
+            "resolver": record.resolver,
+            "url": record.url,
+            "verb": record.verb,
+            "status": record.status,
+            "http_status": record.http_status,
+            "content_type": record.content_type,
+            "reason": record.reason,
+            "elapsed_ms": record.elapsed_ms,
+            "bytes_written": record.bytes_written,
+            "content_length_hdr": record.content_length_hdr,
+            "extra": dict(record.extra),
+        }
+        self._write(payload)
+
     def log_manifest(self, entry: ManifestEntry) -> None:
         """Append a manifest record representing a persisted document.
 
@@ -1287,6 +1308,11 @@ class CsvSink:
                 self._writer.writerow(row)
                 self._file.flush()
 
+    def log_io_attempt(self, record: "SimplifiedAttemptRecord") -> None:  # pragma: no cover - no-op
+        """No-op for IO attempts; CSV sink tracks resolver-level attempts only."""
+
+        return None
+
     def log_manifest(self, entry: ManifestEntry) -> None:  # pragma: no cover
         """Ignore manifest writes for CSV sinks (interface compatibility)."""
 
@@ -1339,6 +1365,12 @@ class MultiSink:
         ts = timestamp or _utc_timestamp()
         for sink in self._sinks:
             sink.log_attempt(record, timestamp=ts)
+
+    def log_io_attempt(self, record: "SimplifiedAttemptRecord") -> None:
+        """Fan out low-level IO attempts to each sink."""
+
+        for sink in self._sinks:
+            sink.log_io_attempt(record)
 
     def log_manifest(self, entry: ManifestEntry) -> None:
         """Fan out manifest records to every sink in the collection."""
@@ -1407,6 +1439,11 @@ class ManifestIndexSink:
         self, record: "AttemptRecord", *, timestamp: Optional[str] = None
     ) -> None:  # pragma: no cover - intentional no-op
         """No-op to satisfy the telemetry sink interface."""
+
+        return None
+
+    def log_io_attempt(self, record: "SimplifiedAttemptRecord") -> None:  # pragma: no cover - no-op
+        """Ignore low-level IO attempts for manifest indexing."""
 
         return None
 
@@ -1499,6 +1536,11 @@ class LastAttemptCsvSink:
         self, record: "AttemptRecord", *, timestamp: Optional[str] = None
     ) -> None:  # pragma: no cover - intentional no-op
         """No-op to satisfy the telemetry sink interface."""
+
+        return None
+
+    def log_io_attempt(self, record: "SimplifiedAttemptRecord") -> None:  # pragma: no cover - no-op
+        """Ignore IO attempts; this sink only processes manifest entries."""
 
         return None
 
@@ -1597,6 +1639,11 @@ class SummarySink:
         Returns:
             None
         """
+        return None
+
+    def log_io_attempt(self, record: "SimplifiedAttemptRecord") -> None:  # pragma: no cover - no-op
+        """Ignore IO attempts; summary sink only stores aggregated metrics."""
+
         return None
 
     def log_manifest(self, entry: ManifestEntry) -> None:  # pragma: no cover - no-op
@@ -1757,6 +1804,11 @@ class SqliteSink:
                     values,
                 )
                 self._conn.commit()
+
+    def log_io_attempt(self, record: "SimplifiedAttemptRecord") -> None:  # pragma: no cover - no-op
+        """Placeholder for IO attempts until the SQLite schema is extended."""
+
+        return None
 
     def log_manifest(self, entry: ManifestEntry) -> None:
         """Record manifest outcomes for the processed document artifact.

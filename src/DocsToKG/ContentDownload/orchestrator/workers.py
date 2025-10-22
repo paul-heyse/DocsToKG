@@ -42,7 +42,8 @@ import json
 import logging
 import random
 import threading
-from typing import TYPE_CHECKING, Any, Mapping, Optional
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Mapping, Optional, Tuple
 
 if TYPE_CHECKING:
     from DocsToKG.ContentDownload.orchestrator.limits import KeyedLimiter
@@ -50,6 +51,7 @@ if TYPE_CHECKING:
     from DocsToKG.ContentDownload.pipeline import ResolverPipeline
 
 from DocsToKG.ContentDownload.orchestrator.limits import host_key
+from DocsToKG.ContentDownload.core import DownloadContext, WorkArtifact
 
 __all__ = ["Worker"]
 
@@ -140,12 +142,23 @@ class Worker:
         try:
             logger.debug(f"Worker {self.worker_id} processing job {job_id} ({artifact_id})")
 
-            # Rehydrate artifact from JSON
             try:
-                artifact_json = job.get("artifact_json", "{}")
-                artifact = json.loads(artifact_json) if artifact_json else {}
-            except Exception as e:
-                logger.error(f"Failed to rehydrate artifact for job {job_id}: {e}")
+                artifact, ctx = self._deserialize_job(job)
+            except _ArtifactValidationError as exc:
+                logger.error(
+                    f"Failed to deserialize artifact for job {job_id}: {exc}",
+                )
+                self.queue.fail_and_retry(
+                    job_id,
+                    backoff_sec=self.retry_backoff,
+                    max_attempts=self.max_job_attempts,
+                    last_error=f"artifact_validation_failed: {str(exc)[:100]}",
+                )
+                return
+            except Exception as e:  # Defensive: unexpected validation failure
+                logger.exception(
+                    "Unexpected error while deserializing artifact for job %s", job_id
+                )
                 self.queue.fail_and_retry(
                     job_id,
                     backoff_sec=self.retry_backoff,
@@ -173,7 +186,7 @@ class Worker:
                 return
 
             try:
-                outcome = self.pipeline.process(artifact, ctx=None)
+                outcome = self.pipeline.run(artifact, ctx)
 
                 # Determine terminal state
                 if outcome.ok:
@@ -358,3 +371,97 @@ class Worker:
                     return item.strip()
 
         return None
+    def _deserialize_job(
+        self, job: Mapping[str, Any]
+    ) -> Tuple[WorkArtifact, Optional[DownloadContext]]:
+        """Return a typed artifact/context pair for the leased job."""
+
+        artifact_json = job.get("artifact_json", "{}")
+        try:
+            raw_payload = json.loads(artifact_json) if artifact_json else {}
+        except json.JSONDecodeError as exc:  # pragma: no cover - defensive guard
+            raise _ArtifactValidationError(f"invalid JSON payload: {exc}") from exc
+
+        if isinstance(raw_payload, WorkArtifact):
+            return raw_payload, None
+
+        if not isinstance(raw_payload, Mapping):
+            raise _ArtifactValidationError(
+                "expected artifact payload to be a mapping after JSON decode"
+            )
+
+        artifact_payload: Any
+        context_payload: Any = None
+
+        if "artifact" in raw_payload and isinstance(raw_payload["artifact"], Mapping):
+            artifact_payload = raw_payload["artifact"]
+        else:
+            artifact_payload = raw_payload
+
+        for key in ("context", "ctx", "download_context"):
+            if key in raw_payload:
+                context_payload = raw_payload[key]
+                break
+
+        if isinstance(artifact_payload, WorkArtifact):
+            artifact = artifact_payload
+        else:
+            artifact = self._build_work_artifact(artifact_payload)
+
+        context: Optional[DownloadContext] = None
+        if isinstance(context_payload, DownloadContext):
+            context = context_payload
+        elif context_payload:
+            if not isinstance(context_payload, Mapping):
+                raise _ArtifactValidationError("context payload must be a mapping")
+            try:
+                context = DownloadContext.from_mapping(context_payload)
+            except Exception as exc:  # pragma: no cover - validation guard
+                raise _ArtifactValidationError(f"invalid context payload: {exc}") from exc
+
+        return artifact, context
+
+    def _build_work_artifact(self, payload: Mapping[str, Any]) -> WorkArtifact:
+        """Construct a WorkArtifact from a mapping payload."""
+
+        if not isinstance(payload, Mapping):
+            raise _ArtifactValidationError("artifact payload must be a mapping")
+
+        try:
+            pdf_dir = Path(str(payload["pdf_dir"]))
+            html_dir = Path(str(payload["html_dir"]))
+            xml_dir = Path(str(payload["xml_dir"]))
+        except KeyError as exc:  # pragma: no cover - ensures deterministic failure
+            raise _ArtifactValidationError(f"missing required field: {exc.args[0]}") from exc
+
+        try:
+            artifact = WorkArtifact(
+                work_id=str(payload["work_id"]),
+                title=str(payload.get("title", "")),
+                publication_year=payload.get("publication_year"),
+                doi=payload.get("doi"),
+                pmid=payload.get("pmid"),
+                pmcid=payload.get("pmcid"),
+                arxiv_id=payload.get("arxiv_id"),
+                landing_urls=list(payload.get("landing_urls", [])),
+                pdf_urls=list(payload.get("pdf_urls", [])),
+                open_access_url=payload.get("open_access_url"),
+                source_display_names=list(payload.get("source_display_names", [])),
+                base_stem=str(payload.get("base_stem", payload.get("work_id", ""))),
+                pdf_dir=pdf_dir,
+                html_dir=html_dir,
+                xml_dir=xml_dir,
+                failed_pdf_urls=list(payload.get("failed_pdf_urls", [])),
+                metadata=dict(payload.get("metadata", {})),
+            )
+        except KeyError as exc:
+            raise _ArtifactValidationError(f"missing required field: {exc.args[0]}") from exc
+        except TypeError as exc:  # pragma: no cover - defensive guard
+            raise _ArtifactValidationError(f"invalid artifact payload: {exc}") from exc
+
+        return artifact
+
+
+class _ArtifactValidationError(RuntimeError):
+    """Raised when an artifact payload cannot be converted for the pipeline."""
+
