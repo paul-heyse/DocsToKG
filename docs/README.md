@@ -32,7 +32,7 @@ Deployment instructions, monitoring, and troubleshooting guides.
 
 ### 📚 [07. Reference](./07-reference/index.md)
 
-Glossary, Faiss integration details, and external dependencies.
+Glossary, FAISS integration details, external dependencies, and deep dives like the ContentDownload artifact catalog & storage index.
 
 ### 📂 Package Guides & Agent Playbooks
 
