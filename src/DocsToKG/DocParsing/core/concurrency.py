@@ -33,7 +33,7 @@ import logging
 import socket
 import time
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable, Iterator, Optional
 
 from filelock import FileLock, Timeout
 
@@ -44,10 +44,45 @@ __all__ = [
     "find_free_port",
     "set_spawn_or_warn",
     "safe_write",
+    "_acquire_lock",
 ]
 
 
 LOGGER = get_logger(__name__, base_fields={"stage": "core"})
+
+
+def _lock_path_for(path: Path) -> Path:
+    """Return the canonical lock path for a given payload file."""
+
+    return path.with_suffix(path.suffix + ".lock")
+
+
+@contextlib.contextmanager
+def _acquire_lock(path: Path, *, timeout: float = 60.0) -> Iterator[bool]:
+    """Acquire a process-safe lock for ``path``.
+
+    This context manager exists for backwards compatibility with legacy code
+    that previously relied on ``_acquire_lock``. It delegates locking to the
+    same FileLock-based implementation used by :func:`safe_write` and yields a
+    simple boolean placeholder to preserve historical semantics.
+    """
+
+    lock_path = _lock_path_for(path)
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    file_lock = FileLock(str(lock_path))
+
+    try:
+        file_lock.acquire(timeout=timeout)
+    except Timeout as exc:
+        raise TimeoutError(f"Could not acquire lock on {path} after {timeout}s") from exc
+
+    try:
+        yield True
+    finally:
+        with contextlib.suppress(RuntimeError):
+            file_lock.release()
+        with contextlib.suppress(OSError):
+            lock_path.unlink()
 
 
 def safe_write(
@@ -59,8 +94,9 @@ def safe_write(
 ) -> bool:
     """Atomically write a file with process-safe locking.
 
-    Acquires a FileLock, then executes write_fn. Returns True if write occurred,
-    False if file already exists and skip_if_exists=True.
+    Acquires a FileLock via :func:`_acquire_lock`, then executes ``write_fn``.
+    Returns ``True`` if a write occurred and ``False`` when ``skip_if_exists``
+    short-circuits due to a pre-existing file.
 
     Args:
         path: File path to write
@@ -74,25 +110,12 @@ def safe_write(
     Raises:
         TimeoutError: If lock cannot be acquired within timeout
     """
-    lock_path = path.with_suffix(path.suffix + ".lock")
-    lock_path.parent.mkdir(parents=True, exist_ok=True)
-    file_lock = FileLock(str(lock_path))
 
-    try:
-        file_lock.acquire(timeout=timeout)
-    except Timeout as exc:
-        raise TimeoutError(f"Could not acquire lock on {path} after {timeout}s") from exc
-
-    try:
+    with _acquire_lock(path, timeout=timeout):
         if skip_if_exists and path.exists():
             return False
         write_fn()
         return True
-    finally:
-        with contextlib.suppress(RuntimeError):
-            file_lock.release()
-        with contextlib.suppress(OSError):
-            lock_path.unlink()
 
 
 def set_spawn_or_warn(logger: Optional[logging.Logger] = None) -> None:
