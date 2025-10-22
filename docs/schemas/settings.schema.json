@@ -338,10 +338,17 @@
     "LoggingSettings": {
       "description": "Logging configuration.",
       "properties": {
+        "emit_json_logs": {
+          "default": true,
+          "description": "Emit JSON-formatted logs (legacy configs may use 'json')",
+          "title": "Emit Json Logs",
+          "type": "boolean"
+        },
         "json": {
           "default": true,
-          "description": "Output JSON-formatted logs",
-          "title": "Json",
+          "deprecated": true,
+          "description": "Deprecated alias for emit_json_logs",
+          "title": "Json (deprecated)",
           "type": "boolean"
         },
         "level": {
