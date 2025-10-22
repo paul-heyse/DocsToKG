@@ -13,15 +13,16 @@ Tests cover:
 from __future__ import annotations
 
 import json
-import threading
-from typing import Any, Mapping
-from unittest.mock import MagicMock, Mock, patch
+from pathlib import Path
+from typing import Any, Dict, Mapping, Optional, Tuple
+from unittest.mock import Mock
 
 import pytest
 
 from DocsToKG.ContentDownload.api.types import DownloadOutcome
-from DocsToKG.ContentDownload.core import ReasonCode
+from DocsToKG.ContentDownload.core import DownloadContext, ReasonCode, WorkArtifact
 from DocsToKG.ContentDownload.orchestrator.models import JobState
+from DocsToKG.ContentDownload.orchestrator.queue import WorkQueue
 from DocsToKG.ContentDownload.orchestrator.workers import Worker
 
 
@@ -45,13 +46,13 @@ class MockPipeline:
     """Mock ResolverPipeline for testing."""
 
     def __init__(self) -> None:
-        self.processed_artifacts: list[Any] = []
+        self.run_calls: list[Tuple[Any, Optional[Any]]] = []
         self.outcome_to_return = DownloadOutcome(
             ok=True, classification="success", path="/tmp/file.pdf"
         )
 
-    def process(self, artifact: Any, ctx: Any = None) -> DownloadOutcome:
-        self.processed_artifacts.append(artifact)
+    def run(self, artifact: Any, ctx: Any = None) -> DownloadOutcome:  # noqa: D401
+        self.run_calls.append((artifact, ctx))
         return self.outcome_to_return
 
 
@@ -63,6 +64,46 @@ class MockLimiter:
 
     def release(self, key: str) -> None:
         pass
+
+
+def _artifact_payload(
+    tmp_path: Path,
+    *,
+    artifact_overrides: Optional[Dict[str, Any]] = None,
+    context_overrides: Optional[Dict[str, Any]] = None,
+) -> dict[str, Any]:
+    base_dirs = {
+        "pdf_dir": str(tmp_path / "pdf"),
+        "html_dir": str(tmp_path / "html"),
+        "xml_dir": str(tmp_path / "xml"),
+    }
+    artifact: Dict[str, Any] = {
+        "work_id": "W-123",
+        "title": "Example Work",
+        "publication_year": 2024,
+        "doi": "10.1234/example",
+        "pmid": None,
+        "pmcid": None,
+        "arxiv_id": None,
+        "landing_urls": ["https://example.org/landing"],
+        "pdf_urls": ["https://example.org/file.pdf"],
+        "open_access_url": None,
+        "source_display_names": ["Example"],
+        "base_stem": "2024__example-work__W-123",
+        "failed_pdf_urls": [],
+        "metadata": {"openalex_id": "https://openalex.org/W-123"},
+        **base_dirs,
+    }
+    context: Dict[str, Any] = {
+        "resolver_order": ["resolver-a"],
+        "dry_run": False,
+        "extra": {"user_agent": "DocsToKG/Tests"},
+    }
+    if artifact_overrides:
+        artifact.update(artifact_overrides)
+    if context_overrides:
+        context.update(context_overrides)
+    return {"artifact": artifact, "context": context}
 
 
 def test_worker_initialization() -> None:
@@ -91,7 +132,7 @@ def test_worker_initialization() -> None:
     assert worker.jitter == 15
 
 
-def test_worker_run_successful_job() -> None:
+def test_worker_run_successful_job(tmp_path: Path) -> None:
     """Test worker successfully executes and acks a job."""
     queue = MockWorkQueue()
     pipeline = MockPipeline()
@@ -110,18 +151,21 @@ def test_worker_run_successful_job() -> None:
         jitter=15,
     )
 
-    artifact_data = {"doi": "10.1234/example"}
+    payload = _artifact_payload(tmp_path)
     job = {
         "id": 123,
         "artifact_id": "doi:10.1234/example",
-        "artifact_json": json.dumps(artifact_data),
+        "artifact_json": json.dumps(payload),
     }
 
     worker.run_one(job)
 
     # Verify job was processed
-    assert len(pipeline.processed_artifacts) == 1
-    assert pipeline.processed_artifacts[0] == artifact_data
+    assert len(pipeline.run_calls) == 1
+    artifact, ctx = pipeline.run_calls[0]
+    assert isinstance(artifact, WorkArtifact)
+    assert isinstance(ctx, DownloadContext)
+    assert artifact.work_id == "W-123"
 
     # Verify job was acked with success
     assert len(queue.acked_jobs) == 1
@@ -131,7 +175,7 @@ def test_worker_run_successful_job() -> None:
     assert error is None
 
 
-def test_worker_run_skipped_job() -> None:
+def test_worker_run_skipped_job(tmp_path: Path) -> None:
     """Test worker acks skipped job."""
     queue = MockWorkQueue()
     pipeline = MockPipeline()
@@ -155,10 +199,11 @@ def test_worker_run_skipped_job() -> None:
         jitter=15,
     )
 
+    payload = _artifact_payload(tmp_path)
     job = {
         "id": 456,
         "artifact_id": "doi:10.5678/test",
-        "artifact_json": "{}",
+        "artifact_json": json.dumps(payload),
     }
 
     worker.run_one(job)
@@ -199,7 +244,7 @@ def test_worker_artifact_rehydration_error() -> None:
     worker.run_one(job)
 
     # Verify job was not processed
-    assert len(pipeline.processed_artifacts) == 0
+    assert len(pipeline.run_calls) == 0
 
     # Verify job was marked for retry
     assert len(queue.failed_jobs) == 1
@@ -209,11 +254,11 @@ def test_worker_artifact_rehydration_error() -> None:
     assert max_attempts == 3
 
 
-def test_worker_pipeline_error_retry() -> None:
+def test_worker_pipeline_error_retry(tmp_path: Path) -> None:
     """Test worker retries on pipeline error."""
     queue = MockWorkQueue()
     pipeline = MockPipeline()
-    pipeline.process = Mock(side_effect=RuntimeError("Pipeline failed"))
+    pipeline.run = Mock(side_effect=RuntimeError("Pipeline failed"))
     resolver_limiter = MockLimiter()
     host_limiter = MockLimiter()
 
@@ -229,10 +274,11 @@ def test_worker_pipeline_error_retry() -> None:
         jitter=15,
     )
 
+    payload = _artifact_payload(tmp_path)
     job = {
         "id": 1000,
         "artifact_id": "doi:10.1111/error",
-        "artifact_json": "{}",
+        "artifact_json": json.dumps(payload),
     }
 
     worker.run_one(job)
@@ -243,7 +289,7 @@ def test_worker_pipeline_error_retry() -> None:
     assert job_id == 1000
 
 
-def test_worker_stop_signal() -> None:
+def test_worker_stop_signal(tmp_path: Path) -> None:
     """Test worker respects stop signal."""
     queue = MockWorkQueue()
     pipeline = MockPipeline()
@@ -265,21 +311,22 @@ def test_worker_stop_signal() -> None:
     # Signal stop
     worker.stop()
 
+    payload = _artifact_payload(tmp_path)
     job = {
         "id": 1111,
         "artifact_id": "doi:10.2222/stop",
-        "artifact_json": "{}",
+        "artifact_json": json.dumps(payload),
     }
 
     worker.run_one(job)
 
     # Verify job was not processed
-    assert len(pipeline.processed_artifacts) == 0
+    assert len(pipeline.run_calls) == 0
     assert len(queue.acked_jobs) == 0
     assert len(queue.failed_jobs) == 0
 
 
-def test_worker_concurrent_job_tracking() -> None:
+def test_worker_concurrent_job_tracking(tmp_path: Path) -> None:
     """Test worker tracks concurrent jobs."""
     queue = MockWorkQueue()
     pipeline = MockPipeline()
@@ -298,16 +345,19 @@ def test_worker_concurrent_job_tracking() -> None:
         jitter=15,
     )
 
+    payload1 = _artifact_payload(tmp_path, artifact_overrides={"work_id": "W-1"})
+    payload2 = _artifact_payload(tmp_path, artifact_overrides={"work_id": "W-2"})
+
     job1 = {
         "id": 2000,
         "artifact_id": "doi:10.3333/job1",
-        "artifact_json": "{}",
+        "artifact_json": json.dumps(payload1),
     }
 
     job2 = {
         "id": 2001,
         "artifact_id": "doi:10.3333/job2",
-        "artifact_json": "{}",
+        "artifact_json": json.dumps(payload2),
     }
 
     # Run jobs sequentially
@@ -315,7 +365,7 @@ def test_worker_concurrent_job_tracking() -> None:
     worker.run_one(job2)
 
     # Both should be processed
-    assert len(pipeline.processed_artifacts) == 2
+    assert len(pipeline.run_calls) == 2
     assert len(queue.acked_jobs) == 2
 
 
@@ -346,8 +396,8 @@ def test_worker_compute_backoff_with_jitter() -> None:
     assert len(set(backoffs)) > 1  # Should have variation from jitter
 
 
-def test_worker_empty_artifact_json() -> None:
-    """Test worker handles empty artifact JSON."""
+def test_worker_empty_artifact_json_triggers_retry() -> None:
+    """Empty artifact JSON results in validation retry."""
     queue = MockWorkQueue()
     pipeline = MockPipeline()
     resolver_limiter = MockLimiter()
@@ -373,7 +423,46 @@ def test_worker_empty_artifact_json() -> None:
 
     worker.run_one(job)
 
-    # Should handle gracefully and pass empty dict to pipeline
-    assert len(pipeline.processed_artifacts) == 1
-    assert pipeline.processed_artifacts[0] == {}
-    assert len(queue.acked_jobs) == 1
+    # Should retry due to validation failure
+    assert len(pipeline.run_calls) == 0
+    assert len(queue.failed_jobs) == 1
+
+
+def test_worker_processes_leased_job(tmp_path: Path) -> None:
+    """End-to-end regression: leased job runs through pipeline without errors."""
+
+    queue_path = tmp_path / "queue.sqlite"
+    queue = WorkQueue(str(queue_path))
+    pipeline = MockPipeline()
+    resolver_limiter = MockLimiter()
+    host_limiter = MockLimiter()
+
+    worker = Worker(
+        worker_id="worker-lease",
+        queue=queue,
+        pipeline=pipeline,
+        resolver_limiter=resolver_limiter,
+        host_limiter=host_limiter,
+        heartbeat_sec=30,
+        max_job_attempts=3,
+        retry_backoff=60,
+        jitter=15,
+    )
+
+    payload = _artifact_payload(tmp_path, artifact_overrides={"work_id": "W-lease"})
+    queue.enqueue("doi:lease", payload)
+    leased_jobs = queue.lease("worker-lease", 1, lease_ttl_sec=60)
+    assert len(leased_jobs) == 1
+
+    worker.run_one(leased_jobs[0])
+
+    assert len(pipeline.run_calls) == 1
+    artifact, ctx = pipeline.run_calls[0]
+    assert isinstance(artifact, WorkArtifact)
+    assert artifact.work_id == "W-lease"
+    assert isinstance(ctx, DownloadContext)
+
+    stats = queue.stats()
+    assert stats[JobState.DONE.value] == 1
+
+    queue.close_connection()
