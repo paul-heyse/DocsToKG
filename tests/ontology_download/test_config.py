@@ -46,6 +46,7 @@ from DocsToKG.OntologyDownload.settings import (
     DefaultsConfig,
     DownloadConfiguration,
     LoggingConfiguration,
+    LoggingSettings,
     ResolvedConfig,
     ValidationConfig,
     build_resolved_config,
@@ -117,6 +118,20 @@ def test_logging_config_validates_positive_values() -> None:
         LoggingConfiguration(max_log_size_mb=0)
     with pytest.raises(ValidationError):
         LoggingConfiguration(max_log_size_mb=-5)
+
+
+def test_resolved_config_serializes_logging_settings(recwarn) -> None:
+    """ResolvedConfig should respect emit_json_logs and serialize without warnings."""
+
+    resolved = ResolvedConfig(defaults=DefaultsConfig(), specs=[])
+    runtime_logging = LoggingSettings(json=False)
+
+    assert runtime_logging.emit_json_logs is False
+
+    payload = resolved.model_dump_json()
+    assert isinstance(payload, str)
+    assert payload
+    assert len(recwarn) == 0
 
 
 def test_validation_config_timeout_bounds() -> None:

@@ -65,7 +65,7 @@ except ModuleNotFoundError as exc:  # pragma: no cover - explicit guidance for u
         "instead of installing packages directly."
     ) from exc
 
-from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, field_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, PrivateAttr, field_validator
 from pydantic import ValidationError as PydanticValidationError
 from pydantic_core import ValidationError as CoreValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -1851,7 +1851,11 @@ class LoggingSettings(BaseModel):
         default="INFO",
         description="Logging level (DEBUG, INFO, WARNING, ERROR)",
     )
-    json: bool = Field(default=True, description="Output JSON-formatted logs")
+    emit_json_logs: bool = Field(
+        default=True,
+        description="Emit JSON-formatted logs (legacy configs may use 'json')",
+        validation_alias=AliasChoices("emit_json_logs", "json"),
+    )
 
     @field_validator("level", mode="before")
     @classmethod

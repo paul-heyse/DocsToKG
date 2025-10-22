@@ -196,7 +196,7 @@ class TestLoggingSettingsDefaults:
 
         s = LoggingSettings()
         assert s.level == "INFO"
-        assert s.json is True
+        assert s.emit_json_logs is True
 
     # @pytest.mark.skip(reason="LoggingSettings not yet implemented")
     def test_level_int_conversion(self):
@@ -247,6 +247,13 @@ class TestLoggingSettingsValidation:
         for level in ["DEBUG", "INFO", "WARNING", "ERROR"]:
             s = LoggingSettings(level=level)
             assert s.level == level
+
+    def test_legacy_json_alias(self):
+        """Legacy 'json' field name should map to emit_json_logs."""
+        from DocsToKG.OntologyDownload.settings import LoggingSettings
+
+        settings = LoggingSettings(json=False)
+        assert settings.emit_json_logs is False
 
 
 class TestTelemetrySettingsDefaults:
