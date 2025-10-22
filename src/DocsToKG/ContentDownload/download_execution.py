@@ -295,16 +295,18 @@ def finalize_candidate_download(
             meta={"http_status": 304},
         )
 
-    # Validate final path safety
+    # Determine final path (in real implementation, would use storage policy)
+    destination = final_path
+    if not destination:
+        base = plan.url.rsplit("/", 1)[-1] or "download.bin"
+        destination = os.path.join(os.getcwd(), base)
+
+    # Validate final path safety (initial + resolved)
     try:
-        validate_path_safety(final_path)
+        safe_path = validate_path_safety(destination)
+        final_path = validate_path_safety(safe_path)
     except PathPolicyError as e:
         raise SkipDownload("path-policy", f"Path policy violation: {e}")
-
-    # Determine final path (in real implementation, would use storage policy)
-    if not final_path:
-        base = plan.url.rsplit("/", 1)[-1] or "download.bin"
-        final_path = os.path.join(os.getcwd(), base)
 
     # atomic_write_stream already moved temp → dest_path, so final_path exists
     # Just verify and emit event

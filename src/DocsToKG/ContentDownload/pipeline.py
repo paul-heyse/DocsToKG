@@ -244,6 +244,15 @@ class ResolverPipeline:
                     f"artifact {artifact.work_id} (path: {outcome.path})"
                 )
                 return outcome
+            except SkipDownload as e:
+                LOGGER.debug(f"Skipped finalize (url={plan.url}, reason={e.reason}): {e}")
+                return DownloadOutcome(
+                    ok=False,
+                    classification="skip",
+                    path=None,
+                    reason=e.reason,
+                    meta={"error": str(e)},
+                )
             except DownloadError as e:
                 LOGGER.debug(f"Finalization error (url={plan.url}, reason={e.reason}): {e}")
                 return DownloadOutcome(
