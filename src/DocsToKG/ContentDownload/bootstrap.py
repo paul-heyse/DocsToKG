@@ -216,7 +216,7 @@ def run_from_config(
             telemetry=telemetry,
             run_id=run_id,
             client_map=client_map,
-            **policy_knobs,
+            policy_knobs=policy_knobs,
         )
         LOGGER.info(
             f"Pipeline ready: {len(resolver_registry)} resolvers, {len(client_map)} clients"

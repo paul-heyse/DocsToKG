@@ -663,6 +663,23 @@ class TestResolverPipeline:
         pipeline = ResolverPipeline(resolvers, session)
         assert pipeline._resolvers == resolvers
 
+    def test_pipeline_init_with_policy_mappings(self):
+        """Pipeline accepts policy mappings for knobs and overrides."""
+
+        session = MagicMock()
+        knobs = {"timeout_s": 30, "verify_content_length": True}
+        overrides = {"download_policy": MagicMock(name="download_policy")}
+
+        pipeline = ResolverPipeline(
+            [],
+            session,
+            policy_knobs=knobs,
+            policy_overrides=overrides,
+        )
+
+        assert pipeline._policy_knobs == knobs
+        assert pipeline._policy_overrides == overrides
+
     def test_pipeline_run_no_resolvers(self):
         """Pipeline with no resolvers returns error outcome."""
         pipeline = ResolverPipeline([], MagicMock())

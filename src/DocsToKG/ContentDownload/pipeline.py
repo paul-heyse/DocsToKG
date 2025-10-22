@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import logging
 from types import SimpleNamespace
-from typing import Any, Optional, Sequence
+from typing import Any, Mapping, Optional, Sequence
 
 from DocsToKG.ContentDownload.api import (
     DownloadOutcome,
@@ -55,8 +55,8 @@ class ResolverPipeline:
         telemetry: Optional[Any] = None,
         run_id: Optional[str] = None,
         client_map: Optional[dict[str, Any]] = None,
-        **policy_knobs: Any,
-        **policy_overrides: Any,
+        policy_knobs: Optional[Mapping[str, Any]] = None,
+        policy_overrides: Optional[Mapping[str, Any]] = None,
     ):
         """
         Initialize pipeline.
@@ -67,15 +67,16 @@ class ResolverPipeline:
             telemetry: Optional telemetry sink
             run_id: Optional run ID for correlation
             client_map: Optional dict mapping resolver_name → per-resolver HTTP client
-            **policy_overrides: Additional policy knobs (download, robots, etc.)
+            policy_knobs: Optional mapping of contextual knobs for pipeline execution
+            policy_overrides: Optional mapping of override policies (download, robots, etc.)
         """
         self._resolvers = list(resolvers)
         self._session = session
         self._telemetry = telemetry
         self._run_id = run_id
         self._client_map = client_map or {}
-        self._policy_knobs = policy_knobs
-        self._policy_overrides = policy_overrides
+        self._policy_knobs = dict(policy_knobs or {})
+        self._policy_overrides = dict(policy_overrides or {})
 
     def run(self, artifact: Any, ctx: Any) -> DownloadOutcome:
         """
