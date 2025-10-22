@@ -34,26 +34,34 @@ Coordinates the full pipeline:
 from __future__ import annotations
 
 import logging
+import importlib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterator, Mapping, Optional
 from uuid import uuid4
 
+from DocsToKG.ContentDownload.config import ContentDownloadConfig
 from DocsToKG.ContentDownload.http_session import HttpConfig, get_http_session
 from DocsToKG.ContentDownload.pipeline import ResolverPipeline
 from DocsToKG.ContentDownload.resolver_http_client import (
     PerResolverHttpClient,
     RetryConfig,
 )
+from DocsToKG.ContentDownload.resolvers.registry_v2 import build_resolvers
 from DocsToKG.ContentDownload.telemetry import (
     AttemptSink,
     CsvSink,
+    JsonlSink,
     LastAttemptCsvSink,
     ManifestIndexSink,
     MultiSink,
     RunTelemetry,
     SqliteSink,
     SummarySink,
+)
+from DocsToKG.ContentDownload.httpx_transport import (
+    configure_http_client,
+    get_http_client,
 )
 
 # Feature flags support
@@ -113,6 +121,7 @@ class BootstrapConfig:
     resolver_registry: Optional[dict[str, Any]] = None
     resolver_retry_configs: Optional[dict[str, RetryConfig]] = None
     policy_knobs: Optional[dict[str, Any]] = None
+    run_id: Optional[str] = None
 
 
 @dataclass
@@ -123,6 +132,27 @@ class RunResult:
     success_count: int = 0
     skip_count: int = 0
     error_count: int = 0
+
+
+def build_bootstrap_config(config: ContentDownloadConfig) -> BootstrapConfig:
+    """Map :class:`ContentDownloadConfig` into :class:`BootstrapConfig`."""
+
+    http_cfg = _translate_http_config(config)
+    telemetry_paths = _translate_telemetry_paths(config)
+    resolver_registry = _build_resolver_registry(config)
+    resolver_retry_configs = _build_retry_configs(config, resolver_registry)
+    policy_knobs = {
+        "download_policy": config.download,
+        "robots_policy": config.robots,
+    }
+
+    return BootstrapConfig(
+        http=http_cfg,
+        telemetry_paths=telemetry_paths,
+        resolver_registry=resolver_registry,
+        resolver_retry_configs=resolver_retry_configs,
+        policy_knobs=policy_knobs,
+    )
 
 
 def run_from_config(
@@ -149,16 +179,21 @@ def run_from_config(
         RunResult with counts and run_id
     """
     # Step 1: Generate or validate run_id
-    run_id = str(uuid4())
+    run_id = config.run_id or str(uuid4())
     LOGGER.info(f"Starting run {run_id}")
 
     # Step 2: Build telemetry sinks
     telemetry = _build_telemetry(config.telemetry_paths, run_id)
 
     try:
-        # Step 3: Get shared HTTP session
-        http_session = get_http_session(config.http)
-        LOGGER.debug("Shared HTTP session acquired")
+        # Step 3: Get shared HTTP session (httpx + hishel transport)
+        configure_http_client()
+        http_session = get_http_client()
+        _apply_http_config(http_session, config.http)
+        LOGGER.debug(
+            "Shared HTTP session acquired (httpx_transport)",
+            extra={"user_agent": http_session.headers.get("User-Agent")},
+        )
 
         # Step 4: Materialize resolvers in order
         resolver_registry = config.resolver_registry or {}
@@ -218,6 +253,7 @@ def _build_telemetry(paths: Optional[Mapping[str, Path]], run_id: str) -> RunTel
     - Manifest index sink (key: 'manifest_index')
     - Last attempt CSV sink (key: 'last_attempt')
     - Summary sink (key: 'summary')
+    - JSONL manifest sink (key: 'jsonl')
 
     At least one path must be provided. Calling without paths will raise an error
     to ensure telemetry configuration is explicit.
@@ -259,7 +295,7 @@ def _build_telemetry(paths: Optional[Mapping[str, Path]], run_id: str) -> RunTel
         raise ValueError(
             "telemetry_paths must be provided to _build_telemetry(). "
             "Provide at least one of: 'csv', 'sqlite', 'manifest_index', "
-            "'last_attempt', 'summary'"
+            "'last_attempt', 'summary', 'jsonl'"
         )
 
     sinks: list[AttemptSink] = []
@@ -275,11 +311,13 @@ def _build_telemetry(paths: Optional[Mapping[str, Path]], run_id: str) -> RunTel
         sinks.append(LastAttemptCsvSink(paths["last_attempt"]))
     if "summary" in paths:
         sinks.append(SummarySink(paths["summary"]))
+    if "jsonl" in paths:
+        sinks.append(JsonlSink(paths["jsonl"]))
 
     if not sinks:
         raise ValueError(
             "No recognized telemetry paths provided. "
-            "Expected one of: 'csv', 'sqlite', 'manifest_index', 'last_attempt', 'summary'"
+            "Expected one of: 'csv', 'sqlite', 'manifest_index', 'last_attempt', 'summary', 'jsonl'"
         )
 
     # Composite sink handles all outputs
@@ -321,6 +359,118 @@ def _build_client_map(
     return client_map
 
 
+def _translate_http_config(config: ContentDownloadConfig) -> HttpConfig:
+    """Translate HTTP client settings from the Pydantic config."""
+
+    http_cfg = config.http
+
+    return HttpConfig(
+        user_agent=http_cfg.user_agent,
+        mailto=http_cfg.mailto,
+        timeout_connect_s=http_cfg.timeout_connect_s,
+        timeout_read_s=http_cfg.timeout_read_s,
+        pool_connections=http_cfg.max_keepalive_connections,
+        pool_maxsize=http_cfg.max_connections,
+        verify_tls=http_cfg.verify_tls,
+        proxies=http_cfg.proxies or None,
+    )
+
+
+def _translate_telemetry_paths(config: ContentDownloadConfig) -> dict[str, Path]:
+    """Resolve telemetry sink paths into ``Path`` objects."""
+
+    paths: dict[str, Path] = {}
+    telemetry_cfg = config.telemetry
+
+    if "csv" in telemetry_cfg.sinks:
+        csv_path = Path(telemetry_cfg.csv_path).expanduser()
+        paths["csv"] = csv_path
+        paths["last_attempt"] = csv_path.with_name("last.csv")
+
+    if "jsonl" in telemetry_cfg.sinks:
+        manifest_path = Path(telemetry_cfg.manifest_path).expanduser()
+        paths["jsonl"] = manifest_path
+        paths["manifest_index"] = manifest_path.with_name("index.json")
+        paths["summary"] = manifest_path.with_name("summary.json")
+        paths["sqlite"] = manifest_path.with_name("manifest.sqlite")
+
+    return paths
+
+
+def _build_resolver_registry(config: ContentDownloadConfig) -> dict[str, Any]:
+    """Instantiate resolvers declared in the configuration."""
+
+    for resolver_name in config.resolvers.order:
+        resolver_cfg = getattr(config.resolvers, resolver_name, None)
+        if resolver_cfg is None or not resolver_cfg.enabled:
+            continue
+        try:
+            importlib.import_module(
+                f"DocsToKG.ContentDownload.resolvers.{resolver_name}"
+            )
+        except ModuleNotFoundError:
+            LOGGER.debug(f"Resolver module not found: {resolver_name}")
+
+    instances = build_resolvers(config)
+    registry: dict[str, Any] = {}
+
+    for resolver in instances:
+        name = getattr(
+            resolver,
+            "_registry_name",
+            getattr(resolver, "name", resolver.__class__.__name__),
+        )
+        registry[name] = resolver
+
+    return registry
+
+
+def _build_retry_configs(
+    config: ContentDownloadConfig, resolver_registry: Mapping[str, Any]
+) -> dict[str, RetryConfig]:
+    """Derive retry + rate policies for instantiated resolvers."""
+
+    retry_configs: dict[str, RetryConfig] = {}
+
+    for resolver_name in resolver_registry:
+        resolver_cfg = getattr(config.resolvers, resolver_name, None)
+        if resolver_cfg is None:
+            continue
+
+        retry_policy = resolver_cfg.retry
+        rate_policy = resolver_cfg.rate_limit
+
+        retry_configs[resolver_name] = RetryConfig(
+            max_attempts=retry_policy.max_attempts,
+            retry_statuses=tuple(retry_policy.retry_statuses),
+            base_delay_ms=retry_policy.base_delay_ms,
+            max_delay_ms=retry_policy.max_delay_ms,
+            jitter_ms=retry_policy.jitter_ms,
+            rate_capacity=float(rate_policy.capacity),
+            rate_refill_per_sec=float(rate_policy.refill_per_sec),
+            rate_burst=float(rate_policy.burst),
+        )
+
+    return retry_configs
+def _apply_http_config(session: Any, http_config: HttpConfig) -> None:
+    """Apply HttpConfig headers to the shared httpx client."""
+
+    if not http_config:
+        return
+
+    user_agent = http_config.user_agent
+    if http_config.mailto and "+mailto:" not in user_agent:
+        user_agent = f"{user_agent} (+mailto:{http_config.mailto})"
+
+    # Copy headers to avoid mutating httpx frozen mapping in-place unexpectedly
+    try:
+        session.headers = session.headers.copy()
+    except AttributeError:
+        pass  # Fallback when headers not accessible
+
+    session.headers["User-Agent"] = user_agent
+
+
 def _process_artifacts(
     pipeline: ResolverPipeline,
     artifacts: Optional[Iterator[Any]],
@@ -357,5 +507,6 @@ def _process_artifacts(
 __all__ = [
     "BootstrapConfig",
     "RunResult",
+    "build_bootstrap_config",
     "run_from_config",
 ]

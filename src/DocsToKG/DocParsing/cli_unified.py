@@ -44,6 +44,14 @@ app = typer.Typer(
 config_app = typer.Typer(no_args_is_help=True, rich_markup_mode="rich")
 app.add_typer(config_app, name="config", help="Introspect and manage configuration")
 
+inspect_app = typer.Typer(
+    no_args_is_help=True,
+    invoke_without_command=True,
+    rich_markup_mode="rich",
+    help="Inspect generated datasets (chunks and vector stores).",
+)
+app.add_typer(inspect_app, name="inspect", help="Inspect datasets (chunks|vectors-*)")
+
 
 # ============================================================================
 # Root Callback (Global Options)
@@ -686,28 +694,12 @@ def all(
         raise typer.Exit(code=1)
 
 
-@app.command()
-def inspect(
+def _inspect_dataset(
     ctx: typer.Context,
-    dataset: Annotated[
-        str,
-        typer.Option(
-            "--dataset",
-            help="Dataset to inspect (chunks|vectors-dense|vectors-sparse|vectors-lexical)",
-        ),
-    ] = "chunks",
-    root: Annotated[Optional[Path], typer.Option("--root", help="Dataset base directory")] = None,
-    limit: Annotated[int, typer.Option("--limit", help="Max rows to show (0=all)")] = 0,
+    dataset: str,
+    root: Optional[Path],
+    limit: int,
 ) -> None:
-    """
-    Quickly inspect dataset schema and statistics.
-
-    Shows row counts, file counts, total bytes, and sample records
-    without loading entire datasets.
-
-    [bold yellow]Example:[/bold yellow]
-    [cyan]docparse inspect --dataset chunks --limit 10[/cyan]
-    """
     from DocsToKG.DocParsing.storage.dataset_view import open_chunks, open_vectors, summarize
 
     app_ctx: AppContext = ctx.obj
@@ -760,6 +752,47 @@ def inspect(
     except Exception as e:
         typer.secho(f"[red]✗ Error inspecting dataset: {e}[/red]", err=True)
         raise typer.Exit(code=1)
+
+
+@inspect_app.callback()
+def inspect_root(
+    ctx: typer.Context,
+    dataset: Annotated[
+        str,
+        typer.Option(
+            "--dataset",
+            help="Dataset to inspect (chunks|vectors-dense|vectors-sparse|vectors-lexical)",
+        ),
+    ] = "chunks",
+    root: Annotated[Optional[Path], typer.Option("--root", help="Dataset base directory")] = None,
+    limit: Annotated[int, typer.Option("--limit", help="Max rows to show (0=all)")] = 0,
+) -> None:
+    """
+    Inspect datasets produced by DocParsing stages.
+
+    Supports both `[cyan]docparse inspect --dataset chunks[/cyan]` and
+    `[cyan]docparse inspect dataset --dataset chunks[/cyan]`.
+    """
+    if ctx.invoked_subcommand:
+        return
+    _inspect_dataset(ctx, dataset, root, limit)
+
+
+@inspect_app.command("dataset")
+def inspect_dataset(
+    ctx: typer.Context,
+    dataset: Annotated[
+        str,
+        typer.Option(
+            "--dataset",
+            help="Dataset to inspect (chunks|vectors-dense|vectors-sparse|vectors-lexical)",
+        ),
+    ] = "chunks",
+    root: Annotated[Optional[Path], typer.Option("--root", help="Dataset base directory")] = None,
+    limit: Annotated[int, typer.Option("--limit", help="Max rows to show (0=all)")] = 0,
+) -> None:
+    """Inspect dataset schema and statistics."""
+    _inspect_dataset(ctx, dataset, root, limit)
 
 
 # ============================================================================
