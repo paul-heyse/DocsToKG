@@ -56,6 +56,7 @@ class ResolverPipeline:
         run_id: Optional[str] = None,
         client_map: Optional[dict[str, Any]] = None,
         **policy_knobs: Any,
+        **policy_overrides: Any,
     ):
         """
         Initialize pipeline.
@@ -66,6 +67,7 @@ class ResolverPipeline:
             telemetry: Optional telemetry sink
             run_id: Optional run ID for correlation
             client_map: Optional dict mapping resolver_name → per-resolver HTTP client
+            **policy_overrides: Additional policy knobs (download, robots, etc.)
         """
         self._resolvers = list(resolvers)
         self._session = session
@@ -73,6 +75,7 @@ class ResolverPipeline:
         self._run_id = run_id
         self._client_map = client_map or {}
         self._policy_knobs = policy_knobs
+        self._policy_overrides = policy_overrides
 
     def run(self, artifact: Any, ctx: Any) -> DownloadOutcome:
         """
@@ -185,6 +188,8 @@ class ResolverPipeline:
             try:
                 adj_plan = prepare_candidate_download(
                     plan,
+                    session=client,
+                    ctx=ctx,
                     telemetry=self._telemetry,
                     run_id=self._run_id,
                 )

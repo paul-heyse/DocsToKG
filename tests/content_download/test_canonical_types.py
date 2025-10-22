@@ -12,9 +12,16 @@ Tests for:
 
 from __future__ import annotations
 
-import pytest
+import os
+import shutil
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import FrozenInstanceError
+from types import SimpleNamespace
+from pathlib import Path
 from unittest.mock import MagicMock
+
+import pytest
 
 from DocsToKG.ContentDownload.api import (
     DownloadPlan,
@@ -24,12 +31,14 @@ from DocsToKG.ContentDownload.api import (
     AttemptRecord,
 )
 from DocsToKG.ContentDownload.api.exceptions import SkipDownload, DownloadError
+import DocsToKG.ContentDownload.download_execution as download_exec
 from DocsToKG.ContentDownload.download_execution import (
     prepare_candidate_download,
     stream_candidate_payload,
     finalize_candidate_download,
 )
 from DocsToKG.ContentDownload.pipeline import ResolverPipeline
+from DocsToKG.ContentDownload.robots import RobotsCache
 
 
 # ============================================================================
@@ -190,10 +199,54 @@ class TestDownloadExecutionContracts:
     def test_prepare_can_raise_skip(self):
         """prepare_candidate_download can raise SkipDownload."""
         plan = DownloadPlan(url="https://example.com/file.pdf", resolver_name="test")
-        # Placeholder: would implement actual validation logic
-        # For now, just verify no exception on valid plan
-        result = prepare_candidate_download(plan)
-        assert result is not None
+        with pytest.raises(SkipDownload) as excinfo:
+            prepare_candidate_download(
+                plan,
+                session=None,
+                ctx={
+                    "resolver_hints": {plan.url: {"content_length": 10_000}},
+                    "max_bytes": 1024,
+                },
+            )
+        assert excinfo.value.reason == "policy-size"
+
+    def test_prepare_blocks_robots(self):
+        """prepare_candidate_download raises SkipDownload when robots denies."""
+
+        class DenyRobots(RobotsCache):
+            def is_allowed(self, session, url, user_agent):  # type: ignore[override]
+                return False
+
+        plan = DownloadPlan(url="https://example.com/blocked.pdf", resolver_name="test")
+        ctx = SimpleNamespace(robots_checker=DenyRobots())
+        with pytest.raises(SkipDownload) as excinfo:
+            prepare_candidate_download(plan, session=MagicMock(), ctx=ctx)
+        assert excinfo.value.reason == "robots"
+
+    def test_prepare_enforces_domain_mime_policy(self):
+        """prepare_candidate_download enforces domain MIME allow-list."""
+
+        plan = DownloadPlan(
+            url="https://example.com/file.html",
+            resolver_name="test",
+            expected_mime="text/html",
+        )
+        ctx = {
+            "domain_content_rules": {
+                "example.com": {"allowed_types": ["application/pdf"]},
+            }
+        }
+        with pytest.raises(SkipDownload) as excinfo:
+            prepare_candidate_download(plan, session=MagicMock(), ctx=ctx)
+        assert excinfo.value.reason == "policy-type"
+
+    def test_prepare_applies_context_max_bytes(self):
+        """prepare_candidate_download propagates max-bytes override from context."""
+
+        plan = DownloadPlan(url="https://example.com/file.pdf", resolver_name="test")
+        ctx = SimpleNamespace(max_bytes=2048)
+        result = prepare_candidate_download(plan, session=None, ctx=ctx)
+        assert result.max_bytes_override == 2048
 
     def test_stream_returns_stream_result(self):
         """stream_candidate_payload returns DownloadStreamResult."""
@@ -210,6 +263,56 @@ class TestDownloadExecutionContracts:
         result = stream_candidate_payload(plan, session=session)
         assert isinstance(result, DownloadStreamResult)
         assert result.http_status == 200
+
+    def test_stream_enforces_max_bytes_limit(
+        self, tmp_path, monkeypatch
+    ) -> None:
+        """stream_candidate_payload aborts once the size cap is exceeded."""
+
+        class StubResponse:
+            def __init__(self, *, status_code, headers, chunks=None):
+                self.status_code = status_code
+                self.headers = headers
+                self.extensions = {}
+                self._chunks = list(chunks or [])
+
+            def iter_bytes(self, chunk_size=None):
+                for chunk in self._chunks:
+                    yield chunk
+
+        plan = DownloadPlan(url="https://example.com/file.pdf", resolver_name="test")
+        session = MagicMock()
+        chunk_a = b"a" * 512
+        chunk_b = b"b" * 512
+        limit = len(chunk_a) + 100
+
+        head_response = StubResponse(
+            status_code=200,
+            headers={"Content-Type": "application/pdf"},
+        )
+        get_response = StubResponse(
+            status_code=200,
+            headers={
+                "Content-Type": "application/pdf",
+                "Content-Length": str(len(chunk_a) + len(chunk_b)),
+            },
+            chunks=[chunk_a, chunk_b],
+        )
+        session.head.return_value = head_response
+        session.get.return_value = get_response
+
+        monkeypatch.chdir(tmp_path)
+
+        with pytest.raises(DownloadError) as excinfo:
+            stream_candidate_payload(
+                plan,
+                session=session,
+                max_bytes=limit,
+                chunk_size=256,
+            )
+
+        assert excinfo.value.reason == "too-large"
+        assert list(tmp_path.iterdir()) == []
 
     def test_finalize_returns_outcome(self):
         """finalize_candidate_download returns DownloadOutcome."""
@@ -234,6 +337,138 @@ class TestDownloadExecutionContracts:
             assert outcome.classification == "success"
         finally:
             os.replace = original_replace
+
+    def test_parallel_streams_use_isolated_temp_files(self):
+        """Parallel streams should land in distinct staging files and directories."""
+
+        barrier = threading.Barrier(2)
+
+        class FakeResponse:
+            def __init__(self, payload: bytes, sync: bool) -> None:
+                self.status_code = 200
+                self.headers = {
+                    "Content-Type": "application/pdf",
+                    "Content-Length": str(len(payload)),
+                }
+                self.extensions: dict[str, object] = {}
+                self._payload = payload
+                self._sync = sync
+
+            def iter_bytes(self):  # type: ignore[override]
+                if self._sync:
+                    barrier.wait()
+                yield self._payload
+
+        class FakeSession:
+            def __init__(self) -> None:
+                self._counter = 0
+                self._lock = threading.Lock()
+
+            def head(self, url, allow_redirects=True, timeout=None):  # noqa: D401
+                return FakeResponse(b"", sync=False)
+
+            def get(self, url, stream=True, allow_redirects=True, timeout=None):  # noqa: D401
+                with self._lock:
+                    self._counter += 1
+                    idx = self._counter
+                payload = f"payload-{idx}".encode()
+                return FakeResponse(payload, sync=True)
+
+        session = FakeSession()
+        plan = DownloadPlan(url="https://example.com/file.pdf", resolver_name="resolver")
+
+        def _download(_: int):
+            return stream_candidate_payload(
+                plan,
+                session=session,
+                run_id="parallel-run",
+            )
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            futures = [executor.submit(_download, idx) for idx in range(2)]
+            results = [future.result() for future in futures]
+
+        assert results[0].path_tmp != results[1].path_tmp
+        assert results[0].staging_path != results[1].staging_path
+
+        for result in results:
+            assert result.staging_path is not None
+            assert os.path.exists(result.path_tmp)
+            assert os.path.dirname(result.path_tmp) == result.staging_path
+
+        final_root = Path(os.getcwd()) / "tmp-downloads-test"
+        final_root.mkdir(parents=True, exist_ok=True)
+        final_paths: list[Path] = []
+
+        try:
+            for idx, result in enumerate(results):
+                final_path = final_root / f"final-{idx}.bin"
+                final_paths.append(final_path)
+                outcome = finalize_candidate_download(
+                    plan,
+                    result,
+                    final_path=str(final_path),
+                )
+                assert outcome.ok is True
+                assert final_path.exists()
+
+            for result in results:
+                if result.staging_path:
+                    assert not os.path.exists(result.staging_path)
+
+            staging_run_root = Path(os.getcwd()) / ".download-staging" / "parallel-run"
+            assert not staging_run_root.exists()
+        finally:
+            for final_path in final_paths:
+                if final_path.exists():
+                    final_path.unlink()
+            if final_root.exists():
+                shutil.rmtree(final_root)
+
+    def test_finalize_invokes_path_gate_with_resolved_path(self, monkeypatch):
+        """Path gate receives the derived destination path (not None)."""
+        plan = DownloadPlan(url="https://example.com/subdir/file.pdf", resolver_name="test")
+        stream = DownloadStreamResult(
+            path_tmp="/tmp/file.part",
+            bytes_written=128,
+            http_status=200,
+            content_type="application/pdf",
+        )
+
+        observed = {}
+
+        def fake_validate(path: str, artifact_root=None) -> str:
+            observed["path"] = path
+            return path
+
+        monkeypatch.setattr(download_exec, "validate_path_safety", fake_validate)
+        monkeypatch.setattr(download_exec.os, "replace", MagicMock())
+
+        outcome = finalize_candidate_download(plan, stream)
+
+        assert isinstance(outcome, DownloadOutcome)
+        assert observed["path"].endswith("file.pdf")
+
+    def test_finalize_rejects_unsafe_final_path(self, monkeypatch):
+        """Unsafe final paths trigger SkipDownload via the path gate."""
+        plan = DownloadPlan(url="https://example.com/file.pdf", resolver_name="test")
+        stream = DownloadStreamResult(
+            path_tmp="/tmp/file.part",
+            bytes_written=64,
+            http_status=200,
+            content_type="application/pdf",
+        )
+
+        def fake_validate(path: str, artifact_root=None) -> str:
+            raise download_exec.PathPolicyError("escapes artifact root")
+
+        monkeypatch.setattr(download_exec, "validate_path_safety", fake_validate)
+        monkeypatch.setattr(download_exec.os, "replace", MagicMock())
+
+        with pytest.raises(SkipDownload) as exc_info:
+            finalize_candidate_download(plan, stream, final_path="/etc/passwd")
+
+        assert exc_info.value.reason == "path-policy"
 
 
 # ============================================================================

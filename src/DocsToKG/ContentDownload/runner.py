@@ -37,6 +37,7 @@ from typing import Any, Iterable, Optional
 
 from DocsToKG.ContentDownload.bootstrap import (
     BootstrapConfig,
+    build_bootstrap_config,
     run_from_config,
 )
 from DocsToKG.ContentDownload.bootstrap import (
@@ -83,6 +84,7 @@ class DownloadRun:
         self.config = config
         self.pipeline: Optional[ResolverPipeline] = None
         self._result: Optional[BootstrapRunResult] = None
+        self._bootstrap_config: Optional[BootstrapConfig] = None
 
     def __enter__(self) -> DownloadRun:
         """Set up the pipeline and telemetry on context entry."""
@@ -94,6 +96,7 @@ class DownloadRun:
                 "resolvers": self.config.resolvers.order,
             },
         )
+        self._bootstrap_config = build_bootstrap_config(self.config)
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
@@ -132,11 +135,15 @@ class DownloadRun:
         bootstrap_config = self._build_bootstrap_config()
 
         # Delegate to canonical bootstrap orchestrator
+        if self._bootstrap_config is None:
+            self._bootstrap_config = build_bootstrap_config(self.config)
+
         bootstrap_result = run_from_config(
-            config=bootstrap_config,
+            config=self._bootstrap_config,
             artifacts=iter(artifacts),
             dry_run=False,
         )
+        self._result = bootstrap_result
 
         return RunResult(
             run_id=bootstrap_result.run_id,
