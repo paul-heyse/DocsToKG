@@ -56,6 +56,8 @@ class ConfigurationAdapter:
 
         cfg = DoctagsCfg()
 
+        doctags_settings = app_ctx.settings.doctags
+
         # Apply app-level settings
         if app_ctx.settings.app.data_root:
             cfg.data_root = app_ctx.settings.app.data_root
@@ -63,12 +65,16 @@ class ConfigurationAdapter:
             cfg.log_level = app_ctx.settings.app.log_level
 
         # Apply doctags-specific settings
-        if app_ctx.settings.doctags.input_dir:
-            cfg.input = Path(app_ctx.settings.doctags.input_dir)
-        if app_ctx.settings.doctags.output_dir:
-            cfg.output = Path(app_ctx.settings.doctags.output_dir)
-        if app_ctx.settings.doctags.model_id:
-            cfg.model = app_ctx.settings.doctags.model_id
+        if doctags_settings.input_dir:
+            cfg.input = Path(doctags_settings.input_dir)
+        if doctags_settings.output_dir:
+            cfg.output = Path(doctags_settings.output_dir)
+        if doctags_settings.model_id:
+            cfg.model = doctags_settings.model_id
+
+        cfg.resume = bool(doctags_settings.resume)
+        cfg.force = bool(doctags_settings.force)
+        cfg.vllm_wait_timeout = int(doctags_settings.vllm_wait_timeout_s)
 
         # Apply runner settings (workers override)
         if app_ctx.settings.runner.workers:
@@ -98,6 +104,8 @@ class ConfigurationAdapter:
 
         cfg = ChunkerCfg()
 
+        chunk_settings = app_ctx.settings.chunk
+
         # Apply app-level settings
         if app_ctx.settings.app.data_root:
             cfg.data_root = app_ctx.settings.app.data_root
@@ -105,13 +113,20 @@ class ConfigurationAdapter:
             cfg.log_level = app_ctx.settings.app.log_level
 
         # Apply chunk-specific settings
-        if app_ctx.settings.chunk.input_dir:
-            cfg.in_dir = Path(app_ctx.settings.chunk.input_dir)
-        if app_ctx.settings.chunk.output_dir:
-            cfg.out_dir = Path(app_ctx.settings.chunk.output_dir)
+        if chunk_settings.input_dir:
+            cfg.in_dir = Path(chunk_settings.input_dir)
+        if chunk_settings.output_dir:
+            cfg.out_dir = Path(chunk_settings.output_dir)
 
-        cfg.min_tokens = app_ctx.settings.chunk.min_tokens or cfg.min_tokens
-        cfg.max_tokens = app_ctx.settings.chunk.max_tokens or cfg.max_tokens
+        cfg.min_tokens = chunk_settings.min_tokens
+        cfg.max_tokens = chunk_settings.max_tokens
+        if chunk_settings.tokenizer_model:
+            cfg.tokenizer_model = chunk_settings.tokenizer_model
+        cfg.shard_count = chunk_settings.shard_count
+        cfg.shard_index = chunk_settings.shard_index
+        cfg.format = chunk_settings.format.value
+        cfg.resume = bool(chunk_settings.resume)
+        cfg.force = bool(chunk_settings.force)
 
         # Apply runner settings (workers override)
         if app_ctx.settings.runner.workers:
@@ -138,6 +153,8 @@ class ConfigurationAdapter:
 
         cfg = EmbedCfg()
 
+        embed_settings = app_ctx.settings.embed
+
         # Apply app-level settings
         if app_ctx.settings.app.data_root:
             cfg.data_root = app_ctx.settings.app.data_root
@@ -145,10 +162,14 @@ class ConfigurationAdapter:
             cfg.log_level = app_ctx.settings.app.log_level
 
         # Apply embed-specific settings
-        if app_ctx.settings.embed.input_chunks_dir:
-            cfg.chunks_dir = Path(app_ctx.settings.embed.input_chunks_dir)
-        if app_ctx.settings.embed.output_vectors_dir:
-            cfg.out_dir = Path(app_ctx.settings.embed.output_vectors_dir)
+        if embed_settings.input_chunks_dir:
+            cfg.chunks_dir = Path(embed_settings.input_chunks_dir)
+        if embed_settings.output_vectors_dir:
+            cfg.out_dir = Path(embed_settings.output_vectors_dir)
+
+        cfg.vector_format = embed_settings.vectors.format.value
+        cfg.resume = bool(embed_settings.resume)
+        cfg.force = bool(embed_settings.force)
 
         # Apply runner settings (workers override)
         if app_ctx.settings.runner.workers:
