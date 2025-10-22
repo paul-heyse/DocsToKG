@@ -22,12 +22,12 @@ import tempfile
 import time
 import uuid
 from dataclasses import replace
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Mapping, Optional
 from urllib.parse import urlsplit
 
 from DocsToKG.ContentDownload.api import (
-    AttemptRecord,
     DownloadOutcome,
     DownloadPlan,
     DownloadStreamResult,
@@ -47,47 +47,59 @@ from DocsToKG.ContentDownload.telemetry import (
     ATTEMPT_STATUS_HTTP_GET,
     ATTEMPT_STATUS_HTTP_HEAD,
     ATTEMPT_STATUS_SIZE_MISMATCH,
+    SimplifiedAttemptRecord,
 )
 
 LOGGER = logging.getLogger(__name__)
 
 
-def _emit(
+def _log_io_attempt(
     telemetry: Any,
     *,
     run_id: Optional[str],
     resolver_name: str,
     url: str,
+    verb: str,
     status: str,
     http_status: Optional[int] = None,
+    reason: Optional[str] = None,
     elapsed_ms: Optional[int] = None,
-    meta: Optional[dict[str, Any]] = None,
-    **extra_meta: Any,
+    content_type: Optional[str] = None,
+    bytes_written: Optional[int] = None,
+    content_length_hdr: Optional[int] = None,
+    extra: Optional[Mapping[str, Any]] = None,
 ) -> None:
-    """Emit telemetry record if telemetry sink provided."""
-    if not telemetry or not hasattr(telemetry, "log_attempt"):
+    """Emit a :class:`SimplifiedAttemptRecord` via ``telemetry.log_io_attempt``."""
+
+    if not telemetry or not hasattr(telemetry, "log_io_attempt"):
         return
 
-    payload: dict[str, Any] = {}
-    if meta:
-        payload.update(meta)
-    if extra_meta:
-        payload.update(extra_meta)
+    extra_payload: Mapping[str, Any]
+    if extra:
+        extra_payload = dict(extra)
+    else:
+        extra_payload = {}
 
     try:
-        telemetry.log_attempt(
-            AttemptRecord(
-                run_id=str(run_id or ""),
-                resolver_name=resolver_name,
+        telemetry.log_io_attempt(
+            SimplifiedAttemptRecord(
+                ts=datetime.now(UTC),
+                run_id=run_id,
+                resolver=resolver_name,
                 url=url,
+                verb=verb,
                 status=status,
                 http_status=http_status,
+                content_type=content_type,
+                reason=reason,
                 elapsed_ms=elapsed_ms,
-                meta=payload,
+                bytes_written=bytes_written,
+                content_length_hdr=content_length_hdr,
+                extra=extra_payload,
             )
         )
-    except Exception as e:  # pylint: disable=broad-except
-        LOGGER.debug(f"Telemetry emission failed: {e}")
+    except Exception as exc:  # pylint: disable=broad-except
+        LOGGER.debug("Telemetry emission failed: %s", exc)
 
 
 def _ctx_get(ctx: Any, name: str, default: Any = None) -> Any:
@@ -402,14 +414,22 @@ def stream_candidate_payload(
             head_kwargs["headers"] = dict(base_headers)
         head = session.head(url, **head_kwargs)
         elapsed_ms = (time.monotonic_ns() - t0) // 1_000_000
-        _emit(
+        head_headers = getattr(head, "headers", None)
+        head_content_type: Optional[str] = None
+        if head_headers:
+            ct_raw = head_headers.get("Content-Type")
+            if isinstance(ct_raw, str):
+                head_content_type = ct_raw.lower()
+        _log_io_attempt(
             telemetry,
             run_id=run_id,
             resolver_name=plan.resolver_name,
             url=url,
+            verb="HEAD",
             status=ATTEMPT_STATUS_HTTP_HEAD,
             http_status=head.status_code,
             elapsed_ms=elapsed_ms,
+            content_type=head_content_type,
         )
     except Exception as e:  # pylint: disable=broad-except
         # Some servers 405 on HEAD; proceed without failing
@@ -433,16 +453,17 @@ def stream_candidate_payload(
         from_cache = bool(getattr(resp, "extensions", {}).get("from_cache"))
         revalidated = bool(getattr(resp, "extensions", {}).get("revalidated"))
 
-        _emit(
+        _log_io_attempt(
             telemetry,
             run_id=run_id,
             resolver_name=plan.resolver_name,
             url=url,
+            verb="GET",
             status=ATTEMPT_STATUS_HTTP_GET,
             http_status=resp.status_code,
             elapsed_ms=elapsed_ms,
-            meta={
-                "content_type": content_type,
+            content_type=content_type,
+            extra={
                 "from_cache": from_cache,
                 "revalidated": revalidated,
             },
@@ -450,30 +471,32 @@ def stream_candidate_payload(
 
         # Emit cache-aware tokens
         if from_cache and not revalidated:
-            _emit(
+            _log_io_attempt(
                 telemetry,
                 run_id=run_id,
                 resolver_name=plan.resolver_name,
                 url=url,
+                verb="GET",
                 status=ATTEMPT_STATUS_CACHE_HIT,
                 http_status=resp.status_code,
-                meta={
-                    "content_type": content_type,
-                    "reason": "ok",
+                content_type=content_type,
+                reason=ATTEMPT_REASON_OK,
+                extra={
                     "from_cache": True,
                 },
             )
         if revalidated and resp.status_code == 304:
-            _emit(
+            _log_io_attempt(
                 telemetry,
                 run_id=run_id,
                 resolver_name=plan.resolver_name,
                 url=url,
+                verb="GET",
                 status=ATTEMPT_STATUS_HTTP_304,
                 http_status=304,
-                meta={
-                    "content_type": content_type,
-                    "reason": "not-modified",
+                content_type=content_type,
+                reason=ATTEMPT_REASON_NOT_MODIFIED,
+                extra={
                     "revalidated": True,
                     "from_cache": from_cache,
                 },
@@ -562,17 +585,20 @@ def stream_candidate_payload(
                 f"Payload exceeded {effective_max_bytes} bytes",
             )
 
-        _emit(
+        # Emit final success record
+        _log_io_attempt(
             telemetry,
             run_id=run_id,
             resolver_name=plan.resolver_name,
             url=url,
+            verb="STREAM",
             status=ATTEMPT_STATUS_HTTP_200,
             http_status=resp.status_code,
-            meta={
-                "bytes": bytes_written,
-                "content_type": content_type,
-                "content_length_hdr": expected_len,
+            reason=ATTEMPT_REASON_OK,
+            content_type=content_type,
+            bytes_written=bytes_written,
+            content_length_hdr=expected_len,
+            extra={
                 "from_cache": from_cache,
                 "revalidated": revalidated,
             },
@@ -588,18 +614,18 @@ def stream_candidate_payload(
 
     except SizeMismatchError:
         _cleanup_staging_artifacts(tmp_path, staging_dir)
-        _emit(
+        _log_io_attempt(
             telemetry,
             run_id=run_id,
             resolver_name=plan.resolver_name,
             url=url,
+            verb="STREAM",
             status=ATTEMPT_STATUS_SIZE_MISMATCH,
             http_status=resp.status_code,
-            meta={
-                "content_type": content_type,
-                "reason": "size-mismatch",
-                "content_length_hdr": expected_len,
-            },
+            reason=ATTEMPT_REASON_SIZE_MISMATCH,
+            content_type=content_type,
+            bytes_written=bytes_streamed,
+            content_length_hdr=expected_len,
         )
         raise DownloadError("size-mismatch")
     except DownloadError:
@@ -698,19 +724,19 @@ def finalize_candidate_download(
         _cleanup_staging_artifacts(None, staging_dir)
 
     # Emit finalization event
-    _emit(
+    _log_io_attempt(
         telemetry,
         run_id=run_id,
         resolver_name=plan.resolver_name,
         url=plan.url,
-        status="http-200",
-        bytes_written=stream.bytes_written,
-        final_path=safe_final_path,
+        verb="FINALIZE",
+        status=ATTEMPT_STATUS_HTTP_200,
         http_status=stream.http_status,
-        meta={
-            "bytes": stream.bytes_written,
-            "final_path": safe_final_path,
-            "content_type": stream.content_type,
+        reason=ATTEMPT_REASON_OK,
+        content_type=stream.content_type,
+        bytes_written=stream.bytes_written,
+        extra={
+            "final_path": str(final_path) if final_path else None,
         },
     )
 

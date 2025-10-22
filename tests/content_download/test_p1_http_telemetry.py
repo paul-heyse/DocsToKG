@@ -23,6 +23,8 @@ from DocsToKG.ContentDownload.telemetry import (
     ATTEMPT_STATUS_HTTP_304,
     ATTEMPT_STATUS_HTTP_HEAD,
     ATTEMPT_STATUS_RETRY,
+    MultiSink,
+    RunTelemetry,
     SimplifiedAttemptRecord,
 )
 
@@ -149,6 +151,29 @@ class TestListAttemptSink:
         assert len(sink.io_attempts) == 2
         assert sink.io_attempts[0].verb == "HEAD"
         assert sink.io_attempts[1].verb == "GET"
+
+
+def test_run_telemetry_log_io_attempt_fans_out() -> None:
+    """RunTelemetry delegates IO attempts to all underlying sinks."""
+
+    sink_a = ListAttemptSink()
+    sink_b = ListAttemptSink()
+    telemetry = RunTelemetry(MultiSink([sink_a, sink_b]))
+    now = datetime.now(UTC)
+    record = SimplifiedAttemptRecord(
+        ts=now,
+        run_id="run-1",
+        resolver="resolver",
+        url="https://example.org/pdf",
+        verb="GET",
+        status=ATTEMPT_STATUS_HTTP_200,
+        http_status=200,
+    )
+
+    telemetry.log_io_attempt(record)
+
+    assert sink_a.io_attempts == [record]
+    assert sink_b.io_attempts == [record]
 
 
 class TestHTTPHeadEmission:
