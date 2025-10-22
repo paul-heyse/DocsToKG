@@ -24,6 +24,7 @@ from typing import Any, Mapping, Optional
 from urllib.parse import urlsplit
 
 from DocsToKG.ContentDownload.api import (
+    AttemptRecord,
     DownloadOutcome,
     DownloadPlan,
     DownloadStreamResult,
@@ -48,13 +49,42 @@ from DocsToKG.ContentDownload.telemetry import (
 LOGGER = logging.getLogger(__name__)
 
 
-def _emit(telemetry: Any, **kw: Any) -> None:
+def _emit(
+    telemetry: Any,
+    *,
+    run_id: Optional[str],
+    resolver_name: str,
+    url: str,
+    status: str,
+    http_status: Optional[int] = None,
+    elapsed_ms: Optional[int] = None,
+    meta: Optional[dict[str, Any]] = None,
+    **extra_meta: Any,
+) -> None:
     """Emit telemetry record if telemetry sink provided."""
-    if telemetry and hasattr(telemetry, "log_attempt"):
-        try:
-            telemetry.log_attempt(**kw)
-        except Exception as e:  # pylint: disable=broad-except
-            LOGGER.debug(f"Telemetry emission failed: {e}")
+    if not telemetry or not hasattr(telemetry, "log_attempt"):
+        return
+
+    payload: dict[str, Any] = {}
+    if meta:
+        payload.update(meta)
+    if extra_meta:
+        payload.update(extra_meta)
+
+    try:
+        telemetry.log_attempt(
+            AttemptRecord(
+                run_id=str(run_id or ""),
+                resolver_name=resolver_name,
+                url=url,
+                status=status,
+                http_status=http_status,
+                elapsed_ms=elapsed_ms,
+                meta=payload,
+            )
+        )
+    except Exception as e:  # pylint: disable=broad-except
+        LOGGER.debug(f"Telemetry emission failed: {e}")
 
 
 def _ctx_get(ctx: Any, name: str, default: Any = None) -> Any:
@@ -329,8 +359,12 @@ def stream_candidate_payload(
             url=url,
             status=ATTEMPT_STATUS_HTTP_GET,
             http_status=resp.status_code,
-            content_type=content_type,
             elapsed_ms=elapsed_ms,
+            meta={
+                "content_type": content_type,
+                "from_cache": from_cache,
+                "revalidated": revalidated,
+            },
         )
 
         # Emit cache-aware tokens
@@ -342,8 +376,11 @@ def stream_candidate_payload(
                 url=url,
                 status=ATTEMPT_STATUS_CACHE_HIT,
                 http_status=resp.status_code,
-                content_type=content_type,
-                reason=ATTEMPT_REASON_OK,
+                meta={
+                    "content_type": content_type,
+                    "reason": "ok",
+                    "from_cache": True,
+                },
             )
         if revalidated and resp.status_code == 304:
             _emit(
@@ -353,8 +390,12 @@ def stream_candidate_payload(
                 url=url,
                 status=ATTEMPT_STATUS_HTTP_304,
                 http_status=304,
-                content_type=content_type,
-                reason=ATTEMPT_REASON_NOT_MODIFIED,
+                meta={
+                    "content_type": content_type,
+                    "reason": "not-modified",
+                    "revalidated": True,
+                    "from_cache": from_cache,
+                },
             )
             return DownloadStreamResult(
                 path_tmp="",
@@ -448,9 +489,13 @@ def stream_candidate_payload(
             url=url,
             status=ATTEMPT_STATUS_HTTP_200,
             http_status=resp.status_code,
-            bytes_written=bytes_written,
-            content_type=content_type,
-            content_length_hdr=expected_len,
+            meta={
+                "bytes": bytes_written,
+                "content_type": content_type,
+                "content_length_hdr": expected_len,
+                "from_cache": from_cache,
+                "revalidated": revalidated,
+            },
         )
 
         return DownloadStreamResult(
@@ -470,9 +515,11 @@ def stream_candidate_payload(
             url=url,
             status=ATTEMPT_STATUS_SIZE_MISMATCH,
             http_status=resp.status_code,
-            content_type=content_type,
-            reason=ATTEMPT_REASON_SIZE_MISMATCH,
-            content_length_hdr=expected_len,
+            meta={
+                "content_type": content_type,
+                "reason": "size-mismatch",
+                "content_length_hdr": expected_len,
+            },
         )
         raise DownloadError("size-mismatch")
     except DownloadError:
@@ -567,9 +614,14 @@ def finalize_candidate_download(
         telemetry,
         run_id=run_id,
         resolver_name=plan.resolver_name,
-        status=ATTEMPT_STATUS_HTTP_200,
-        bytes_written=stream.bytes_written,
-        final_path=dest_path,
+        url=plan.url,
+        status="http-200",
+        http_status=stream.http_status,
+        meta={
+            "bytes": stream.bytes_written,
+            "final_path": final_path,
+            "content_type": stream.content_type,
+        },
     )
 
     return DownloadOutcome(
