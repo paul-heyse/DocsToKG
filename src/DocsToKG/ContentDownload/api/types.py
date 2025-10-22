@@ -136,6 +136,9 @@ class DownloadStreamResult:
     content_type: Optional[str] = None
     """HTTP Content-Type header value from the response."""
 
+    staging_path: Optional[str] = None
+    """Directory containing the temporary payload artifacts for this attempt."""
+
 
 @dataclass(frozen=True, slots=True)
 class DownloadOutcome:
