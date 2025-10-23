@@ -24,6 +24,7 @@ import logging
 import math
 import re
 import threading
+import time
 from dataclasses import dataclass
 from fractions import Fraction
 from pathlib import Path
@@ -51,6 +52,7 @@ _UNIT_TO_MILLISECONDS = {
 }
 _BLOCKING_MAX_DELAY_MS = int(Duration.DAY) * 365  # wait up to ~one year before giving up
 _BUFFER_MS = 0
+_RETRY_SLEEP_SECONDS = 0.1
 
 
 class RateLimiterHandle(Protocol):
@@ -109,14 +111,42 @@ class _LimiterAdapter(RateLimiterHandle):
 
     def consume(self, tokens: float = 1.0) -> None:
         weight = max(1, math.ceil(tokens))
-        result = self._limiter.try_acquire(self._name, weight=weight)
-        if isinstance(result, bool):
+        wait_started_at: float | None = None
+
+        while True:
+            result = self._limiter.try_acquire(self._name, weight=weight)
+
+            if not isinstance(result, bool):
+                raise RuntimeError(
+                    "Limiter produced an asynchronous result in a synchronous context"
+                )
+
             if result:
+                if wait_started_at is not None:
+                    elapsed = time.monotonic() - wait_started_at
+                    logger.debug(
+                        "rate limiter admitted request after waiting",
+                        extra={
+                            "stage": "rate-limit",
+                            "key": self._name,
+                            "weight": weight,
+                            "wait_s": round(elapsed, 6),
+                        },
+                    )
                 return
-            raise RuntimeError(
-                "Limiter returned without blocking; verify rate limiter configuration"
-            )
-        raise RuntimeError("Limiter produced an asynchronous result in a synchronous context")
+
+            if wait_started_at is None:
+                wait_started_at = time.monotonic()
+                logger.debug(
+                    "rate limiter throttled request; waiting for available tokens",
+                    extra={
+                        "stage": "rate-limit",
+                        "key": self._name,
+                        "weight": weight,
+                    },
+                )
+
+            time.sleep(_RETRY_SLEEP_SECONDS)
 
     def dispose(self, bucket: InMemoryBucket | SQLiteBucket) -> None:
         """Release any background leakers and close bucket resources."""
