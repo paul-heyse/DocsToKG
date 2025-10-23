@@ -191,7 +191,7 @@ class WaybackResolver:
                     yield ResolverResult(
                         url=None,
                         event=ResolverEvent.SKIPPED,
-                        event_reason=ResolverEventReason.NO_WAYBACK_SNAPSHOT,
+                        event_reason=ResolverEventReason.NO_OPENACCESS_PDF,
                         metadata={
                             "source": "wayback",
                             "original": original_url,

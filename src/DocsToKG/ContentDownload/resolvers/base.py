@@ -91,7 +91,6 @@ class ResolverEventReason(str):
     NO_OPENACCESS_PDF = "no-openaccess-pdf"
     NO_OPENALEX_URLS = "no-openalex-urls"
     NO_PMCID = "no-pmcid"
-    NO_WAYBACK_SNAPSHOT = "no-wayback-snapshot"
     RATE_LIMIT = "rate-limit"
     REQUEST_ERROR = "request-error"
     RESOLVER_EXCEPTION = "resolver-exception"
