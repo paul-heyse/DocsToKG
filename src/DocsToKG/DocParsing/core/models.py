@@ -114,3 +114,7 @@ class ChunkResult:
     sanitizer_profile: Optional[str] = None
     anchors_injected: bool = False
     error: Optional[str] = None
+    artifact_paths: Tuple[Path, ...] = ()
+    parquet_bytes: Optional[int] = None
+    row_group_count: Optional[int] = None
+    rows_written: Optional[int] = None

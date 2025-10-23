@@ -660,11 +660,16 @@ def _process_chunk_task(task: ChunkTask) -> ChunkResult:
             caption_markers=caption_markers,
         )
 
-        output_path = task.output_path
-        output_path.parent.mkdir(parents=True, exist_ok=True)
+        planned_output_path = task.output_path
+        planned_output_path.parent.mkdir(parents=True, exist_ok=True)
 
         chunk_count = len(merged)
         total_tokens = sum(rec.n_tok for rec in merged)
+
+        artifact_paths: List[Path] = []
+        parquet_bytes: Optional[int] = None
+        row_group_count: Optional[int] = None
+        rows_written: Optional[int] = None
 
         # Collect chunk rows (shared for both formats)
         chunk_rows = []
@@ -713,31 +718,45 @@ def _process_chunk_task(task: ChunkTask) -> ChunkResult:
                 from DocsToKG.DocParsing.storage.chunks_writer import ParquetChunksWriter
 
                 writer = ParquetChunksWriter()
-                rel_id = storage_paths.normalize_rel_id(output_path.stem)
+                rel_id = storage_paths.normalize_rel_id(planned_output_path.stem)
                 # Compute cfg_hash for this worker config
                 cfg_hash = _compute_worker_cfg_hash(cfg)
-                writer.write(
+                write_result = writer.write(
                     chunk_rows,
                     data_root=cfg.data_root,
                     rel_id=rel_id,
                     cfg_hash=cfg_hash,
                     created_by="DocsToKG-DocParsing",
                 )
+                artifact_paths = list(write_result.paths)
+                if write_result.paths:
+                    primary_path = write_result.paths[0]
+                else:
+                    primary_path = planned_output_path
+                parquet_bytes = write_result.parquet_bytes
+                row_group_count = write_result.row_group_count
+                rows_written = write_result.rows_written
             except Exception as exc:
                 # Fallback to JSONL on Parquet write failure
                 _LOGGER.warning(
                     f"Parquet write failed for {task.doc_id}, falling back to JSONL: {exc}"
                 )
-                with atomic_write(output_path) as handle:
+                primary_path = planned_output_path
+                with atomic_write(primary_path) as handle:
                     for row in chunk_rows:
                         handle.write(json.dumps(row, ensure_ascii=False))
                         handle.write("\n")
+                artifact_paths = [primary_path]
+                rows_written = len(chunk_rows)
         else:
             # Legacy JSONL format
-            with atomic_write(output_path) as handle:
+            primary_path = planned_output_path
+            with atomic_write(primary_path) as handle:
                 for row in chunk_rows:
                     handle.write(json.dumps(row, ensure_ascii=False))
                     handle.write("\n")
+            artifact_paths = [primary_path]
+            rows_written = len(chunk_rows)
 
         duration = time.perf_counter() - start_time
         return ChunkResult(
@@ -746,13 +765,17 @@ def _process_chunk_task(task: ChunkTask) -> ChunkResult:
             status="success",
             duration_s=duration,
             input_path=task.doc_path,
-            output_path=task.output_path,
+            output_path=primary_path,
             input_hash=input_hash,
             chunk_count=chunk_count,
             total_tokens=total_tokens,
             parse_engine=task.parse_engine,
             sanitizer_profile=task.sanitizer_profile,
             anchors_injected=cfg.inject_anchors,
+            artifact_paths=tuple(artifact_paths),
+            parquet_bytes=parquet_bytes,
+            row_group_count=row_group_count,
+            rows_written=rows_written,
         )
     except Exception as exc:  # pragma: no cover - exercised in failure paths
         duration = time.perf_counter() - start_time
@@ -763,7 +786,7 @@ def _process_chunk_task(task: ChunkTask) -> ChunkResult:
             status="error",
             duration_s=duration,
             input_path=task.doc_path,
-            output_path=task.output_path,
+            output_path=planned_output_path,
             input_hash=input_hash,
             chunk_count=0,
             total_tokens=0,
@@ -962,17 +985,21 @@ def _compute_worker_cfg_hash(config: ChunkWorkerConfig) -> str:
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
 
-def _write_fingerprint(path: Path, *, input_sha256: str, cfg_hash: str) -> None:
-    """Persist the resume fingerprint alongside the chunk output."""
+def _write_fingerprint_for_output(
+    output_path: Path, *, input_sha256: str, cfg_hash: str
+) -> Path:
+    """Persist the resume fingerprint alongside ``output_path`` and return its location."""
 
-    path.parent.mkdir(parents=True, exist_ok=True)
+    fingerprint_path = output_path.with_name(f"{output_path.name}.fp.json")
+    fingerprint_path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "input_sha256": input_sha256,
         "cfg_hash": cfg_hash,
     }
-    with atomic_write(path) as handle:
+    with atomic_write(fingerprint_path) as handle:
         json.dump(payload, handle, sort_keys=True)
         handle.write("\n")
+    return fingerprint_path
 
 
 def _ensure_worker_initialised(config: ChunkWorkerConfig, cfg_hash: str) -> None:
@@ -1002,25 +1029,32 @@ def _build_chunk_plan(
 
     plan_items: List[WorkItem] = []
     for doc_path in files:
-        doc_id, output_path = derive_doc_id_and_chunks_path(doc_path, in_dir, out_dir)
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        fingerprint_path = output_path.with_suffix(output_path.suffix + ".fp.json")
+        doc_id, planned_output_path = derive_doc_id_and_chunks_path(doc_path, in_dir, out_dir)
+        planned_output_path.parent.mkdir(parents=True, exist_ok=True)
         input_hash = compute_content_hash(doc_path, algorithm=hash_alg)
         entry = manifest_lookup.get(doc_id, {})
         parse_engine = parse_engine_lookup.get(doc_id, entry.get("parse_engine", "docling-html"))
         sanitizer_profile = entry.get("sanitizer_profile")
+        manifest_output_path_str = entry.get("output_path") if isinstance(entry, Mapping) else None
+        manifest_output_path = (
+            Path(str(manifest_output_path_str))
+            if manifest_output_path_str
+            else planned_output_path
+        )
+        fingerprint_path = manifest_output_path.with_name(f"{manifest_output_path.name}.fp.json")
         metadata: Dict[str, Any] = {
             "doc_id": doc_id,
             "input_path": str(doc_path),
-            "output_path": str(output_path),
+            "output_path": str(planned_output_path),
+            "resume_output_path": str(manifest_output_path),
             "input_hash": input_hash,
             "hash_alg": hash_alg,
-            "fingerprint_path": str(fingerprint_path),
             "parse_engine": parse_engine,
             "sanitizer_profile": sanitizer_profile,
             "worker_config": worker_config,
             "input_relpath": relative_path(doc_path, resolved_root),
-            "output_relpath": relative_path(output_path, resolved_root),
+            "output_relpath": relative_path(manifest_output_path, resolved_root),
+            "planned_output_relpath": relative_path(planned_output_path, resolved_root),
         }
         try:
             size = doc_path.stat().st_size
@@ -1030,7 +1064,7 @@ def _build_chunk_plan(
             WorkItem(
                 item_id=doc_id,
                 inputs={"doctags": doc_path},
-                outputs={"chunks": output_path},
+                outputs={"chunks": manifest_output_path},
                 cfg_hash=cfg_hash,
                 cost_hint=max(float(size), 1.0),
                 metadata=metadata,
@@ -1053,16 +1087,16 @@ def _chunk_stage_worker(item: WorkItem) -> ItemOutcome:
     _ensure_worker_initialised(config, cfg_hash)
 
     input_path = Path(metadata["input_path"])
-    output_path = Path(metadata["output_path"])
+    planned_output_path = Path(metadata["output_path"])
+    resume_output_path = Path(metadata.get("resume_output_path", metadata["output_path"]))
     parse_engine = metadata.get("parse_engine", "docling-html")
     sanitizer_profile = metadata.get("sanitizer_profile")
     input_hash = metadata["input_hash"]
     hash_alg = metadata["hash_alg"]
-    fingerprint_path = Path(metadata["fingerprint_path"])
 
     task = ChunkTask(
         doc_path=input_path,
-        output_path=output_path,
+        output_path=planned_output_path,
         doc_id=metadata["doc_id"],
         doc_stem=input_path.stem,
         input_hash=input_hash,
@@ -1085,7 +1119,7 @@ def _chunk_stage_worker(item: WorkItem) -> ItemOutcome:
             "input_path": str(input_path),
             "input_hash": input_hash,
             "hash_alg": hash_alg,
-            "output_path": str(output_path),
+            "output_path": str(resume_output_path),
             "schema_version": CHUNK_SCHEMA_VERSION,
             "error": err.message,
             "parse_engine": parse_engine,
@@ -1121,7 +1155,14 @@ def _chunk_stage_worker(item: WorkItem) -> ItemOutcome:
             status="failure", duration_s=result.duration_s, manifest=manifest, result={}, error=err
         )
 
-    _write_fingerprint(fingerprint_path, input_sha256=input_hash, cfg_hash=cfg_hash)
+    fingerprint_path = _write_fingerprint_for_output(
+        result.output_path, input_sha256=input_hash, cfg_hash=cfg_hash
+    )
+    metadata["resume_output_path"] = str(result.output_path)
+    metadata["output_path"] = str(result.output_path)
+    metadata["fingerprint_path"] = str(fingerprint_path)
+    if config.data_root is not None:
+        metadata["output_relpath"] = relative_path(result.output_path, config.data_root)
 
     manifest = {
         "input_path": str(result.input_path),
@@ -1136,11 +1177,25 @@ def _chunk_stage_worker(item: WorkItem) -> ItemOutcome:
         "sanitizer_profile": result.sanitizer_profile,
         "chunks_format": config.format,
     }
+    if result.parquet_bytes is not None:
+        manifest["parquet_bytes"] = result.parquet_bytes
+    if result.row_group_count is not None:
+        manifest["row_group_count"] = result.row_group_count
+    if result.rows_written is not None:
+        manifest["rows_written"] = result.rows_written
+    if result.artifact_paths:
+        manifest["output_paths"] = [str(path) for path in result.artifact_paths]
     result_payload = {
         "chunk_count": result.chunk_count,
         "total_tokens": result.total_tokens,
         "anchors_injected": result.anchors_injected,
     }
+    if result.parquet_bytes is not None:
+        result_payload["parquet_bytes"] = result.parquet_bytes
+    if result.row_group_count is not None:
+        result_payload["row_group_count"] = result.row_group_count
+    if result.artifact_paths:
+        result_payload["output_paths"] = [str(path) for path in result.artifact_paths]
     return ItemOutcome(
         status="success",
         duration_s=result.duration_s,
@@ -1181,7 +1236,7 @@ def _make_chunk_stage_hooks(
         metadata = item.metadata
         doc_id = metadata["doc_id"]
         input_path = Path(metadata["input_path"])
-        output_path = Path(metadata["output_path"])
+        output_path = Path(metadata.get("resume_output_path", metadata["output_path"]))
         input_hash = metadata["input_hash"]
         hash_alg = metadata["hash_alg"]
         parse_engine = metadata.get("parse_engine", "docling-html")
@@ -1189,7 +1244,10 @@ def _make_chunk_stage_hooks(
             "stage": MANIFEST_STAGE,
             "doc_id": doc_id,
             "input_relpath": metadata.get("input_relpath", relative_path(input_path, root)),
-            "output_relpath": metadata.get("output_relpath", relative_path(output_path, root)),
+            "output_relpath": metadata.get(
+                "output_relpath",
+                metadata.get("planned_output_relpath", relative_path(output_path, root)),
+            ),
         }
 
         if isinstance(outcome_or_error, ItemOutcome):
