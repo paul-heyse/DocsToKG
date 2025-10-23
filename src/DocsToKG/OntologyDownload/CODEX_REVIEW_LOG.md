@@ -81,6 +81,14 @@ No eligible files after excludes.
 <!-- 2025-10-23 05:59:29Z UTC -->
 ## Pass 3 — find and fix real bugs
 
+<!-- 2025-10-23 07:12:00Z UTC -->
+## Pass 3 — find and fix real bugs
+
+### Batch 0 (Pass 3)
+- Broken: domain summaries in `MetricsCollector.get_summary()` subtracted the global reject count from each domain, so rejections elsewhere dragged unrelated pass rates toward zero.
+- Fix: accumulate per-domain pass totals and derive pass_rate from each domain’s own invocations so telemetry reflects local performance.
+- TODO: add a metrics collector test that covers multiple domains with different rejection counts.
+
 <!-- 2025-10-23 05:59:42Z UTC -->
 ## Pass 4 — find and fix real bugs
 
@@ -89,3 +97,6 @@ No eligible files after excludes.
 
 <!-- 2025-10-23 06:57:32Z UTC -->
 ## Pass 2 — find and fix real bugs
+
+<!-- 2025-10-23 07:02:09Z UTC -->
+## Pass 3 — find and fix real bugs

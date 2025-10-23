@@ -198,22 +198,24 @@ class MetricsCollector:
         total_rejects = sum(s.rejects for s in snapshots.values())
 
         # Group by domain
-        by_domain = {}
+        by_domain: Dict[str, Dict[str, Any]] = {}
         for snapshot in snapshots.values():
-            if snapshot.domain not in by_domain:
-                by_domain[snapshot.domain] = {
+            domain_stats = by_domain.setdefault(
+                snapshot.domain,
+                {
                     "gates": 0,
                     "invocations": 0,
-                    "pass_rate": 0.0,
-                }
-            by_domain[snapshot.domain]["gates"] += 1
-            by_domain[snapshot.domain]["invocations"] += snapshot.invocations
-            by_domain[snapshot.domain]["pass_rate"] = (
-                (by_domain[snapshot.domain]["invocations"] - total_rejects)
-                / by_domain[snapshot.domain]["invocations"]
-                if by_domain[snapshot.domain]["invocations"] > 0
-                else 0.0
+                    "_passes": 0,
+                },
             )
+            domain_stats["gates"] += 1
+            domain_stats["invocations"] += snapshot.invocations
+            domain_stats["_passes"] += snapshot.passes
+
+        for stats in by_domain.values():
+            invocations = stats["invocations"]
+            passes = stats.pop("_passes")
+            stats["pass_rate"] = passes / invocations if invocations > 0 else 0.0
 
         return {
             "total_gates": len(snapshots),
