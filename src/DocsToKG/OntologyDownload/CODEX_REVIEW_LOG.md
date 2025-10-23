@@ -53,3 +53,11 @@ No eligible files after excludes.
 - Broken: `retry_http_request` retried every `HTTPStatusError`, so 4xx responses were needlessly reissued and non-idempotent calls could run multiple times.
 - Fix: limit the decorator's stop condition with `stop_after_attempt` and reuse the existing predicate so only connection faults and 5xx responses trigger retries.
 - TODO: add decorator-focused tests that emulate 4xx and 5xx responses to confirm retry boundaries.
+
+<!-- 2025-10-23 04:48:24Z UTC -->
+## Pass 2 — find and fix real bugs
+
+### Batch 0 (Pass 2)
+- Broken: `PoliteHttpClient.close()` never released the shared HTTPX client, leaking open connection pools despite callers invoking `close_polite_http_client()`.
+- Fix: delegate client shutdown to `close_http_client()` so connection pools are torn down and the singleton can rebuild cleanly on the next request.
+- TODO: add a shutdown test that asserts `get_http_client()` returns a fresh instance after closing the polite client.

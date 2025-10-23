@@ -33,9 +33,7 @@ from urllib.parse import urlparse
 import httpx
 
 from DocsToKG.OntologyDownload.errors import PolicyError
-from DocsToKG.OntologyDownload.network import (
-    get_http_client,
-)
+from DocsToKG.OntologyDownload.network import close_http_client, get_http_client
 from DocsToKG.OntologyDownload.ratelimit import (
     emit_acquire_event,
     emit_blocked_event,
@@ -310,6 +308,13 @@ class PoliteHttpClient:
         Call at application shutdown.
         """
         logger.debug("PoliteHttpClient closing")
+        try:
+            close_http_client()
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logger.error(
+                "Failed to close underlying HTTP client",
+                extra={"error": str(exc)},
+            )
 
 
 # ============================================================================
