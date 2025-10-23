@@ -82,3 +82,13 @@ No eligible files after excludes.
 
 <!-- 2025-10-23 06:45:11Z UTC -->
 ## Pass 2 — find and fix real bugs
+
+<!-- 2025-10-23 06:52:53Z UTC -->
+## Pass 1 — find and fix real bugs
+
+### Batch 0 (Pass 1)
+- Broken: `FaissRouter.restore_all` always forwarded snapshot metadata to adapter restores, raising `TypeError` for stores that omit a `meta` parameter and blocking namespace recovery.
+- Fix:
+  - Normalise legacy snapshot payloads with the existing helper before restore attempts.
+  - Reuse the reflective `restore_store` wrapper to only pass metadata when the adapter supports it.
+- TODO: None.

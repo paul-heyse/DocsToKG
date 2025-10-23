@@ -30,7 +30,7 @@ import inspect
 import logging
 import time
 from threading import RLock
-from typing import Callable, Dict, Mapping, Optional, Sequence, Tuple, Union, cast
+from typing import Callable, Dict, Mapping, Optional, Sequence, Tuple
 
 from .interfaces import DenseVectorStore
 
@@ -321,28 +321,17 @@ class FaissRouter:
                     self._stores[namespace] = store
                 elif self._resolver:
                     store.set_id_resolver(self._resolver)
-                payload, meta = self._extract_payload_and_meta(packed)
+                payload, meta = coerce_entry(packed)
+                if payload is None:
+                    raise ValueError("Serialized namespace payload is missing 'payload' bytes")
                 restored = False
                 try:
-                    store.restore(payload, meta=meta)
+                    restore_store(store, payload, meta)
                     restored = True
                 finally:
                     self._last_used[namespace] = time.time()
                     if restored:
                         self._snapshots.pop(namespace, None)
-
-    @staticmethod
-    def _extract_payload_and_meta(
-        packed: Union[bytes, Mapping[str, object]],
-    ) -> Tuple[bytes, Optional[Mapping[str, object]]]:
-        if isinstance(packed, (bytes, bytearray, memoryview)):
-            return (bytes(packed), None)
-        payload_obj = cast(Optional[bytes], packed.get("payload"))
-        if payload_obj is None:
-            raise ValueError("Serialized namespace payload is missing 'payload' bytes")
-        meta_obj = packed.get("meta")
-        meta = cast(Optional[Mapping[str, object]], meta_obj)
-        return payload_obj, meta
 
     def rebuild_if_needed(self) -> bool:
         """Attempt to rebuild all managed stores; returns True if any rebuild occurs."""
