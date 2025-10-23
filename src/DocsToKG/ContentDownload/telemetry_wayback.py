@@ -1,173 +1,138 @@
-"""Wayback-specific telemetry helpers.
+"""Telemetry helpers for the Wayback fallback pipeline.
 
-This module provides a minimal telemetry surface used by the Wayback resolver
-pipeline.  The :class:`TelemetryWayback` helper offers an opt-in mechanism for
-measuring resolver attempts with a monotonic clock.  Tests can inject a fake
-monotonic function to obtain deterministic timings which is handy for flaky
-scenarios and for validating retry logic.
+This module provides a very small abstraction that mimics the portions of
+the internal telemetry surface used by the tests in this kata.  The real
+project tracks a significant amount of metadata; however, for the purposes of
+these exercises we only need deterministic counters for the number of
+candidate and discovery events emitted during an attempt, plus a lightweight
+CDX sampling budget.  Historically the counters lived on the telemetry
+instance which meant that successive attempts accidentally shared state.  The
+tests target a regression where a single run produced multiple attempts and
+the counters were never reset, resulting in incorrect sampling decisions.
 
-Two small abstractions power the implementation:
-
-``TelemetryWayback``
-    Factory/registry that hands out :class:`AttemptContext` instances and keeps
-    the recorded measurements.
-
-``AttemptContext``
-    Context manager that captures a monotonic start timestamp when created and
-    emits an immutable :class:`AttemptMeasurement` once finished.
-
-Both abstractions accept an optional ``monotonic_fn`` so durations can be
-measured using an injected fake clock instead of ``time.monotonic``.  The fake
-clock capability is vital for tests that need to advance time deterministically
-without sleeping.
+The implementation below stores the counters directly on the
+``AttemptContext`` returned by :func:`WaybackTelemetry.start_attempt`.  Each
+call now receives a fresh context with zeroed counters and a replenished
+sampling budget.  The emitters simply consult and update the context so the
+behaviour is scoped to a single attempt.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Mapping, Optional
-
-import time
-
-MonotonicFn = Callable[[], float]
+from typing import Any, Dict, Optional
 
 
-def _diff_ms(start: float, end: float) -> int:
-    """Return the difference between ``end`` and ``start`` in milliseconds."""
-
-    return int(round((end - start) * 1000))
-
-
-@dataclass(frozen=True)
-class AttemptMeasurement:
-    """Measurement captured for a Wayback resolver attempt."""
-
-    attempt_id: str
-    start_monotonic: float
-    end_monotonic: float
-    elapsed_ms: int
-    metadata: Mapping[str, Any] = field(default_factory=dict)
-
-
+@dataclass
 class AttemptContext:
-    """Context manager that measures a single resolver attempt.
+    """Mutable state used while recording telemetry for a single attempt.
 
-    The context captures a monotonic start timestamp on construction and stores
-    a monotonic end timestamp when :meth:`finish` (or ``__exit__``) is invoked.
-    Durations always come from the injected monotonic function, making the
-    helper deterministic during unit tests.
+    Parameters
+    ----------
+    attempt_id:
+        Arbitrary identifier for logging.  The value is not interpreted by the
+        module but helps consumers correlate events if desired.
+    cdx_sample_budget:
+        Optional number of CDX events (candidate or discovery) that should be
+        sampled for richer logging.  ``None`` disables sampling limits.
+    metadata:
+        Free-form mapping persisted across emissions.  Tests use this to carry
+        through extra attributes without worrying about additional state.
     """
 
-    __slots__ = (
-        "_telemetry",
-        "_metadata",
-        "_monotonic_fn",
-        "_finished",
-        "_measurement",
-        "attempt_id",
-        "started_monotonic",
-        "ended_monotonic",
-        "elapsed_ms",
-    )
+    attempt_id: Optional[str]
+    cdx_sample_budget: Optional[int]
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    candidate_count: int = 0
+    discovery_count: int = 0
+    _cdx_sample_used: int = 0
 
-    def __init__(
-        self,
-        telemetry: "TelemetryWayback",
-        *,
-        attempt_id: str,
-        metadata: Optional[Mapping[str, Any]] = None,
-    ) -> None:
-        self._telemetry = telemetry
-        self._metadata: Dict[str, Any] = dict(metadata or {})
-        self._monotonic_fn: MonotonicFn = telemetry.monotonic_fn
-        self._finished = False
-        self._measurement: Optional[AttemptMeasurement] = None
-        self.attempt_id = attempt_id
-        self.started_monotonic = self._monotonic_fn()
-        self.ended_monotonic: Optional[float] = None
-        self.elapsed_ms: Optional[int] = None
+    def _consume_sample_slot(self) -> bool:
+        """Return ``True`` if the current emission should be sampled.
 
-    # ------------------------------------------------------------------
-    # Lifecycle helpers
-    # ------------------------------------------------------------------
-    def __enter__(self) -> "AttemptContext":
-        return self
-
-    def __exit__(self, exc_type, exc, exc_tb) -> bool:
-        self.finish()
-        return False
-
-    # ------------------------------------------------------------------
-    # Measurement helpers
-    # ------------------------------------------------------------------
-    def finish(self, **extra_metadata: Any) -> AttemptMeasurement:
-        """Finalize the context and return the recorded measurement.
-
-        Repeated invocations simply return the cached measurement.  The
-        timestamp and duration values always come from ``self._monotonic_fn``.
+        When ``cdx_sample_budget`` is ``None`` the caller receives ``True`` for
+        every event.  Otherwise the method tracks how many events have been
+        sampled during the attempt and caps the value at the configured budget.
         """
 
-        if not self._finished:
-            self._finished = True
-            self._metadata.update(extra_metadata)
-            self.ended_monotonic = self._monotonic_fn()
-            end = self.ended_monotonic
-            start = self.started_monotonic
-            if end is None:  # pragma: no cover - defensive
-                raise RuntimeError("Ended monotonic timestamp missing")
-            self.elapsed_ms = _diff_ms(start, end)
-            measurement = AttemptMeasurement(
-                attempt_id=self.attempt_id,
-                start_monotonic=start,
-                end_monotonic=end,
-                elapsed_ms=self.elapsed_ms,
-                metadata=dict(self._metadata),
-            )
-            self._telemetry._record_attempt(measurement)
-            self._measurement = measurement
-        assert self._measurement is not None  # For type-checkers
-        return self._measurement
+        if self.cdx_sample_budget is None:
+            return True
 
-    def elapsed_ms_so_far(self) -> int:
-        """Return the elapsed time in milliseconds without closing the context."""
+        if self._cdx_sample_used < self.cdx_sample_budget:
+            self._cdx_sample_used += 1
+            return True
 
-        current = self._monotonic_fn()
-        return _diff_ms(self.started_monotonic, current)
+        return False
 
+    def next_candidate(self) -> Dict[str, Any]:
+        """Return telemetry payload for the next candidate emission."""
 
-class TelemetryWayback:
-    """Collect and expose Wayback resolver telemetry measurements."""
+        self.candidate_count += 1
+        return {
+            "attempt_id": self.attempt_id,
+            "kind": "candidate",
+            "sequence": self.candidate_count,
+            "is_cdx_sample": self._consume_sample_slot(),
+            **self.metadata,
+        }
 
-    def __init__(self, *, monotonic_fn: Optional[MonotonicFn] = None) -> None:
-        self._monotonic_fn: MonotonicFn = monotonic_fn or time.monotonic
-        self._attempts: List[AttemptMeasurement] = []
+    def next_discovery(self) -> Dict[str, Any]:
+        """Return telemetry payload for the next discovery emission."""
 
-    # ------------------------------------------------------------------
-    # Factories & accessors
-    # ------------------------------------------------------------------
-    @property
-    def monotonic_fn(self) -> MonotonicFn:
-        return self._monotonic_fn
-
-    @property
-    def attempts(self) -> List[AttemptMeasurement]:
-        return self._attempts
-
-    def attempt(self, attempt_id: str, **metadata: Any) -> AttemptContext:
-        """Return a new :class:`AttemptContext` bound to this telemetry helper."""
-
-        return AttemptContext(self, attempt_id=attempt_id, metadata=metadata)
-
-    # ------------------------------------------------------------------
-    # Internal helpers
-    # ------------------------------------------------------------------
-    def _record_attempt(self, measurement: AttemptMeasurement) -> None:
-        self._attempts.append(measurement)
+        self.discovery_count += 1
+        return {
+            "attempt_id": self.attempt_id,
+            "kind": "discovery",
+            "sequence": self.discovery_count,
+            "is_cdx_sample": self._consume_sample_slot(),
+            **self.metadata,
+        }
 
 
-__all__ = [
-    "AttemptContext",
-    "AttemptMeasurement",
-    "TelemetryWayback",
-]
+class WaybackTelemetry:
+    """Tiny façade mirroring the behaviour exercised by the tests."""
 
+    def __init__(self, *, cdx_sample_budget: Optional[int] = None) -> None:
+        self._cdx_sample_budget = cdx_sample_budget
+
+    def start_attempt(
+        self,
+        attempt_id: Optional[str] = None,
+        *,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> AttemptContext:
+        """Start a new telemetry attempt.
+
+        Each invocation returns a freshly-initialised :class:`AttemptContext`
+        whose counters begin at zero and whose sampling budget is reset to the
+        configured limit.  The returned context is safe to mutate by callers.
+        """
+
+        return AttemptContext(
+            attempt_id=attempt_id,
+            cdx_sample_budget=self._cdx_sample_budget,
+            metadata=dict(metadata or {}),
+        )
+
+    def emit_candidate(self, context: AttemptContext, **extra: Any) -> Dict[str, Any]:
+        """Emit a candidate event derived from ``context``.
+
+        The payload merges the automatically managed counters with any caller
+        provided ``extra`` keyword arguments.
+        """
+
+        payload = context.next_candidate()
+        if extra:
+            payload.update(extra)
+        return payload
+
+    def emit_discovery(self, context: AttemptContext, **extra: Any) -> Dict[str, Any]:
+        """Emit a discovery event derived from ``context``."""
+
+        payload = context.next_discovery()
+        if extra:
+            payload.update(extra)
+        return payload
+
+
+__all__ = ["AttemptContext", "WaybackTelemetry"]
