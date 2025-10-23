@@ -229,7 +229,7 @@ import os
 import shutil
 import threading
 import time
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Collection, Iterable, Mapping
 from dataclasses import dataclass, field
 from enum import Enum
 from functools import lru_cache
@@ -321,6 +321,19 @@ __all__ = [
     "download_candidate",
     "process_one_work",
 ]
+
+
+class DownloadOptions(Protocol):
+    """Protocol capturing the consumer-facing download option interface."""
+
+    dry_run: bool
+    list_only: bool
+    resume_completed: Collection[str]
+    run_id: str | None
+    previous_lookup: Mapping[str, Any]
+
+    def to_context(self, overrides: Mapping[str, Any]) -> DownloadContext:
+        """Materialise a :class:`DownloadContext` with the provided overrides."""
 
 LOGGER = logging.getLogger("DocsToKG.ContentDownload")
 

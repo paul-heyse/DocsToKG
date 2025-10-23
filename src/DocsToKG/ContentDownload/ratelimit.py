@@ -102,11 +102,40 @@ from dataclasses import dataclass, field
 from typing import Literal, Protocol
 
 import httpx
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:  # pragma: no cover - type checking only
+    from pyrate_limiter import Limiter as _Limiter, Rate as _Rate
+
+_MISSING_PYRATE_MESSAGE = (
+    "pyrate-limiter is required for rate limiting; install the optional dependency with "
+    "`pip install DocsToKG[pyrate]`"
+)
 
 try:
     from pyrate_limiter import Limiter, Rate
-except ImportError as e:
-    raise RuntimeError("pyrate-limiter is required for rate limiting") from e
+
+    PYRATE_LIMITER_AVAILABLE = True
+    PYRATE_LIMITER_IMPORT_ERROR: ModuleNotFoundError | None = None
+except ModuleNotFoundError as exc:  # pragma: no cover - exercised in tests via monkeypatch
+    PYRATE_LIMITER_AVAILABLE = False
+    PYRATE_LIMITER_IMPORT_ERROR = exc
+
+    class Rate:  # type: ignore[no-redef]
+        """Lightweight stand-in exposed when pyrate-limiter is unavailable."""
+
+        def __init__(self, limit: int, interval: int) -> None:
+            self.limit = limit
+            self.interval = interval
+
+    class Limiter:  # type: ignore[no-redef]
+        """Limiter stub that surfaces a helpful dependency error."""
+
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            raise RuntimeError(_MISSING_PYRATE_MESSAGE) from PYRATE_LIMITER_IMPORT_ERROR
+
+        def try_acquire(self, *args: object, **kwargs: object) -> bool:  # pragma: no cover - stub
+            raise RuntimeError(_MISSING_PYRATE_MESSAGE) from PYRATE_LIMITER_IMPORT_ERROR
 
 LOGGER = logging.getLogger(__name__)
 
