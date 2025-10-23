@@ -220,40 +220,48 @@ def obs_tail(
     """
     con = None
     try:
-        con = _get_duckdb_connection()
+        with closing(_get_duckdb_connection()) as con:
+            # Build query
+            query = "SELECT ts, type, level, service, run_id FROM events"
+            conditions: list[str] = []
+            params: list[Any] = []
 
-        # Build query
-        query = "SELECT ts, type, level, service, run_id FROM events"
-        conditions: list[str] = []
-        params: list[Any] = []
+            if level:
+                conditions.append("level = ?")
+                params.append(level)
+            if event_type:
+                conditions.append("type LIKE ?")
+                params.append(f"{event_type}%")
+            if service:
+                conditions.append("service = ?")
+                params.append(service)
 
-        if level:
-            conditions.append("level = ?")
-            params.append(level)
-        if event_type:
-            conditions.append("type LIKE ?")
-            params.append(f"{event_type}%")
-        if service:
-            conditions.append("service = ?")
-            params.append(service)
+            if conditions:
+                query += " WHERE " + " AND ".join(conditions)
 
-        if conditions:
-            query += " WHERE " + " AND ".join(conditions)
+            query += " ORDER BY ts DESC LIMIT ?"
+            params.append(count)
 
-        query += " ORDER BY ts DESC LIMIT ?"
-        params.append(count)
+            cursor = con.execute(query, params)
+            rows = cursor.fetchall()
+            description = cursor.description or []
+            headers = [col[0] for col in description] or [
+                "ts",
+                "type",
+                "level",
+                "service",
+                "run_id",
+            ]
 
-        cursor = con.execute(query, params)
-        rows = cursor.fetchall()
-        headers = ["ts", "type", "level", "service", "run_id"]
+            if json_output:
+                df = _rows_to_dataframe(rows, headers)
+                typer.echo(df.to_json(orient="records", date_format="iso"))
+            else:
+                table = _format_table(rows, headers)
+                typer.echo(table)
 
-        if json_output:
-            df = _rows_to_dataframe(rows, headers)
-            typer.echo(df.to_json(orient="records", date_format="iso"))
-        else:
-            table = _format_table(rows, headers)
-            typer.echo(table)
-
+    except typer.Exit:
+        raise
     except Exception as e:
         typer.echo(f"❌ Error: {e}", err=True)
         raise typer.Exit(code=1)
@@ -321,17 +329,19 @@ def obs_stats(
 
         with closing(_get_duckdb_connection()) as con:
             cursor = con.execute(query)
-            columns = cursor.description or []
+            rows = cursor.fetchall()
+            description = cursor.description or []
+            headers = [col[0] for col in description]
 
             if json_output:
-                df = cursor.df()
+                df = _rows_to_dataframe(rows, headers)
                 typer.echo(df.to_json(orient="records"))
             else:
-                result = cursor.fetchall()
-                headers = [col[0] for col in columns]
-                table = _format_table(result, headers)
+                table = _format_table(rows, headers)
                 typer.echo(table)
 
+    except typer.Exit:
+        raise
     except Exception as e:
         typer.echo(f"❌ Error: {e}", err=True)
         raise typer.Exit(code=1)
@@ -416,29 +426,12 @@ def obs_export(
             params.append(limit)
 
         # Export
-        con = _get_duckdb_connection()
-        cursor = con.execute(query, params)
-        description = cursor.description or []
-        headers = [col[0] for col in description]
-        rows = cursor.fetchall()
-        df = _rows_to_dataframe(rows, headers)
-
-        if format_type == ".json":
-            df.to_json(output_path, orient="records", date_format="iso")
-        elif format_type == ".jsonl":
-            df.to_json(output_path, orient="records", lines=True)
-        elif format_type == ".parquet":
-            df.to_parquet(output_path)
-        elif format_type == ".csv":
-            df.to_csv(output_path, index=False)
-
-        row_count = len(df)
-        typer.echo(
-            f"✅ Exported {row_count} events to {output_path}",
-        )
-
         with closing(_get_duckdb_connection()) as con:
-            df = con.execute(query).df()
+            cursor = con.execute(query, params)
+            description = cursor.description or []
+            headers = [col[0] for col in description]
+            rows = cursor.fetchall()
+            df = _rows_to_dataframe(rows, headers)
 
             if format_type == ".json":
                 df.to_json(output_path, orient="records", date_format="iso")
@@ -454,12 +447,28 @@ def obs_export(
                 f"✅ Exported {row_count} events to {output_path}",
             )
 
+    except typer.Exit:
+        raise
     except Exception as e:
         typer.echo(f"❌ Error: {e}", err=True)
         raise typer.Exit(code=1)
     finally:
         if con is not None:
             con.close()
+
+
+def _rows_to_dataframe(rows: Sequence[Sequence[Any]], headers: list[str]):
+    """Return a pandas DataFrame for the given rows and headers."""
+    try:
+        import pandas as pd
+    except ImportError as exc:  # pragma: no cover - aligns with existing behaviour
+        typer.echo(
+            "❌ pandas is required for JSON and export formatting. Install with: pip install pandas",
+            err=True,
+        )
+        raise typer.Exit(code=1) from exc
+
+    return pd.DataFrame(rows, columns=headers)
 
 
 def _rows_to_dataframe(rows: Sequence[Sequence[Any]], headers: list[str]):

@@ -45,6 +45,7 @@ if "typer" not in sys.modules:
     typer_stub.echo = _echo
     typer_stub.secho = _secho
     typer_stub.Exit = _Exit
+    typer_stub._DOCSTOKG_TEST_STUB = True
     sys.modules["typer"] = typer_stub
 
 if "duckdb" not in sys.modules:
@@ -54,6 +55,7 @@ if "duckdb" not in sys.modules:
         raise RuntimeError("duckdb stub should not be used directly")
 
     duckdb_stub.connect = _connect
+    duckdb_stub._DOCSTOKG_TEST_STUB = True
     sys.modules["duckdb"] = duckdb_stub
 
 SRC_PATH = Path(__file__).resolve().parents[2] / "src"
