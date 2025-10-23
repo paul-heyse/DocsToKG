@@ -37,7 +37,6 @@ from typing import Any, Iterable, Optional
 
 from DocsToKG.ContentDownload.bootstrap import (
     BootstrapConfig,
-    build_bootstrap_config,
     run_from_config,
 )
 from DocsToKG.ContentDownload.bootstrap import (
@@ -85,6 +84,7 @@ class DownloadRun:
         self.pipeline: Optional[ResolverPipeline] = None
         self._result: Optional[BootstrapRunResult] = None
         self._bootstrap_config: Optional[BootstrapConfig] = None
+        self._bootstrap_config_signature: Optional[str] = None
 
     def __enter__(self) -> DownloadRun:
         """Set up the pipeline and telemetry on context entry."""
@@ -96,7 +96,7 @@ class DownloadRun:
                 "resolvers": self.config.resolvers.order,
             },
         )
-        self._bootstrap_config = build_bootstrap_config(self.config)
+        self._refresh_bootstrap_config()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
@@ -132,11 +132,8 @@ class DownloadRun:
         Returns:
             Summary of the run
         """
-        bootstrap_config = self._build_bootstrap_config()
-
         # Delegate to canonical bootstrap orchestrator
-        if self._bootstrap_config is None:
-            self._bootstrap_config = build_bootstrap_config(self.config)
+        self._refresh_bootstrap_config()
 
         bootstrap_result = run_from_config(
             config=self._bootstrap_config,
@@ -154,6 +151,18 @@ class DownloadRun:
             failed=bootstrap_result.error_count,
             skipped=bootstrap_result.skip_count,
         )
+
+    def _refresh_bootstrap_config(self) -> None:
+        """Ensure cached bootstrap config matches the current run configuration."""
+
+        signature = self._compute_config_signature()
+
+        if (
+            self._bootstrap_config is None
+            or self._bootstrap_config_signature != signature
+        ):
+            self._bootstrap_config = self._build_bootstrap_config()
+            self._bootstrap_config_signature = signature
 
     def _build_bootstrap_config(self) -> BootstrapConfig:
         """Translate ContentDownloadConfig into BootstrapConfig."""
@@ -182,6 +191,16 @@ class DownloadRun:
             policy_knobs=policy_knobs,
             run_id=self.config.run_id,
         )
+
+    def _compute_config_signature(self) -> str:
+        """Return a deterministic signature for the current configuration."""
+
+        config = self.config
+
+        if hasattr(config, "config_hash") and callable(config.config_hash):
+            return config.config_hash()
+
+        return repr(config)
 
     def _build_telemetry_paths(self) -> dict[str, Path]:
         telemetry_cfg = self.config.telemetry
