@@ -122,8 +122,16 @@ class CacheConfig:
 
     def __post_init__(self) -> None:
         """Validate configuration invariants."""
-        if self.controller.default == CacheDefault.DO_NOT_CACHE and not self.hosts:
-            raise ValueError("If default=DO_NOT_CACHE, must specify at least one host")
+        if not self.hosts:
+            if self.controller.default == CacheDefault.DO_NOT_CACHE:
+                LOGGER.debug(
+                    "Cache configuration defaulting to DO_NOT_CACHE with no host policies; all hosts will bypass cache."
+                )
+            else:
+                LOGGER.warning(
+                    "Cache configuration default is CACHE but no host policies are defined; "
+                    "all hosts will use controller defaults."
+                )
 
 
 def _normalize_host_key(host: str) -> str:
