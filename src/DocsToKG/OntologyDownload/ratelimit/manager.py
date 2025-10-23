@@ -32,7 +32,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 import platformdirs
-from pyrate_limiter import BucketFullException, Limiter, Rate
+from pyrate_limiter import BucketFullException, Duration, Limiter, Rate
 
 from DocsToKG.OntologyDownload.ratelimit.config import RateSpec
 
@@ -46,6 +46,9 @@ _rate_limiter: Optional["RateLimitManager"] = None
 _rate_limiter_lock = threading.Lock()
 _rate_limiter_config_hash: Optional[str] = None
 _rate_limiter_pid: Optional[int] = None
+
+# Allow the limiter to block for a very long time (≈ 1 year) before giving up.
+_BLOCKING_MAX_DELAY_MS = int(Duration.DAY) * 365
 
 
 # ============================================================================
@@ -150,10 +153,22 @@ class RateLimitManager:
         try:
             # Acquire slot(s) using pyrate-limiter API
             # try_acquire(name, weight=1) returns bool or raises BucketFullException
-            result = limiter.try_acquire(name=key, weight=weight)
+            acquired = bool(limiter.try_acquire(name=key, weight=weight))
 
-            logger.debug(
-                "Rate limit acquired",
+            if acquired:
+                logger.debug(
+                    "Rate limit acquired",
+                    extra={
+                        "service": service,
+                        "host": host,
+                        "weight": weight,
+                        "mode": self._mode,
+                    },
+                )
+                return True
+
+            logger.warning(
+                "Rate limit acquisition returned without success",
                 extra={
                     "service": service,
                     "host": host,
@@ -161,7 +176,7 @@ class RateLimitManager:
                     "mode": self._mode,
                 },
             )
-            return result
+            return False
 
         except BucketFullException as e:
             logger.warning(
@@ -203,8 +218,10 @@ class RateLimitManager:
         # Create Limiter with rates as a list
         # raise_when_fail: True raises BucketFullException, False returns bool
         limiter = Limiter(
-            *rates,
+            rates,
             raise_when_fail=(self._mode == "fail-fast"),
+            max_delay=_BLOCKING_MAX_DELAY_MS if self._mode == "block" else None,
+            retry_until_max_delay=(self._mode == "block"),
         )
 
         logger.debug(

@@ -30,3 +30,10 @@ No eligible files after excludes.
 
 <!-- 2025-10-23 04:06:56Z UTC -->
 ## Pass 2 — find and fix real bugs
+
+<!-- 2025-10-23 04:24:41Z UTC -->
+## Pass 1 — find and fix real bugs
+### Batch 0 (Pass 1)
+- Broken: rate limiter was configured without blocking semantics so polite client proceeded with HTTP calls even after slot acquisition failed.
+- Fix: enable pyrate limiter blocking (max_delay + retry) and raise `PolicyError` when acquisition returns False to stop the HTTP request.
+- TODO: add integration coverage that exercises fail-fast mode and verifies blocked requests never reach the transport.

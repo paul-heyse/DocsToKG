@@ -32,6 +32,7 @@ from urllib.parse import urlparse
 
 import httpx
 
+from DocsToKG.OntologyDownload.errors import PolicyError
 from DocsToKG.OntologyDownload.network import (
     get_http_client,
 )
@@ -237,6 +238,9 @@ class PoliteHttpClient:
                     host=host,
                     weight=weight,
                     reason="rate_limit_exceeded",
+                )
+                raise PolicyError(
+                    f"Rate limit denied for service '{service}' (host='{host or 'default'}')"
                 )
 
         except Exception as e:
