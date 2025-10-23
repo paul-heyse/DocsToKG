@@ -21,17 +21,83 @@
 
 Files: `telemetry.py`, `logging.py`
 
-- Items: <!-- add items here -->
-- Tests: <!-- add items here -->
-- Docs: <!-- add items here -->
+- Items:
+  - Instrumentation
+    - [ ] Structured logging: ensure JSON logs with stable fields (stage, doc_id, status, duration, attempt, error_code).
+    - [ ] Metrics: define counters/gauges for attempts (success/skip/failure), queue/exec latency (p50/p95/p99), throughput.
+    - [ ] Tracing: add OpenTelemetry spans for stage/item; attributes: stage, doc_id, status, durations, error flags.
+  - Tooling
+    - [ ] Exporters: optional OTel stdout/OTLP exporters; Prometheus metrics endpoint (guarded by flag); Jaeger config recipe.
+    - [ ] Log routing: support file JSONL + stdout concurrently; rotation guidance for JSONL files.
+  - Implementation
+    - [ ] Auto-instrument select libs (httpx) where relevant; correlate HTTP retries with item spans.
+    - [ ] Central log setup in `logging.py` with mask/scrub of PII and paths when `DOCSTOKG_SCRUB_LOGS=1`.
+    - [ ] Add `run_id` propagation to all telemetry calls in `StageTelemetry` and loggers.
+    - [ ] Emit stage start/finish summary events with counts and wall time.
+  - Best practices
+    - [ ] Sampling: configurable trace sampling rates; disable high-cardinality labels by default.
+    - [ ] Context: include correlation IDs, host, pid, policy, workers; avoid sensitive values.
+  - Security & Compliance
+    - [ ] Redaction policy: hash/omit doc paths; explicit allowlist for extras keys; GDPR notes for logs.
+    - [ ] Transport security: recommend OTLP over TLS; document token/env handling.
+  - Performance
+    - [ ] Async/non-blocking handlers for logs/metrics; bounded queues with backpressure.
+    - [ ] Measure telemetry overhead in profiling; target <3% CPU time.
+  - Integration & Deployment
+    - [ ] CI smoke: validate logs parse as JSON; metrics endpoint exposes expected series; traces exported in staging.
+    - [ ] Dashboards: create suggested Prometheus/Grafana panels (success rate, p95 exec, backlog, error codes).
+
+- Tests:
+  - [ ] JSON logging: schema presence for base fields; no PII when scrubbing enabled.
+  - [ ] Metrics: counters monotonic; latency histograms bucket correctly; throughput derived accurately.
+  - [ ] Tracing: spans and attributes present; error spans on failures; sampling honored.
+  - [ ] Run correlation: run_id present across attempts, manifests, provider events.
+  - [ ] Overhead: telemetry on/off comparison within budget; async handlers do not block.
+
+- Docs:
+  - [ ] Telemetry guide: logging fields, metric names/units, trace attributes; exporter setup (OTLP, Prometheus, Jaeger).
+  - [ ] Examples: code snippets for emitting events via `StageTelemetry`; HTTP client correlation.
+  - [ ] Operations: dashboard cookbook; alert examples (error budget burn, skip spikes, p95 latency).
 
 ### Performance & Profiling
 
 Files: `core/batching.py`, `core/concurrency.py`, `core/runner.py`
 
-- Items: <!-- add items here -->
-- Benchmarks: <!-- add items here -->
-- Docs: <!-- add items here -->
+- Items:
+  - Profiling tools
+    - [ ] cProfile integration: add `--profile-cpu` CLI flag per stage; capture `.prof` output per run.
+    - [ ] pstats rendering: helper to print top-N cumulative/self time; export TSV for CI artifacts.
+    - [ ] line_profiler: optional dependency; annotate hotspots (runner dispatch, planning walkers) with `@profile` guards.
+    - [ ] memory_profiler: optional `--profile-mem` sampling around `run_stage`; record peak RSS; guard overhead.
+    - [ ] py-spy: recipe + script to record sampling profiles; generate SVG flamegraphs for long runs.
+    - [ ] pyinstrument: provide one-shot profiler helper and CLI recipe; emit HTML report.
+  - Visualization
+    - [ ] SnakeViz: verify `.prof` compatibility and document `snakeviz` usage for interactive analysis.
+    - [ ] Flame graphs: support `py-spy record --flame` and `gprof2dot` pipelines; store under `Data/Profiles/`.
+  - Optimization strategies
+    - [ ] Batching: ensure streaming generator path in `Batcher` for no-policy mode (no materialization); add fast path asserts.
+    - [ ] Discovery: minimize `stat()` calls and directory sorting where not required; cache symlink resolutions.
+    - [ ] Runner: reduce lock contention; minimize per-item logging; precompute hook lookups; cheap time sources.
+    - [ ] IO: adopt buffered writes and atomic rename path; coalesce small writes.
+    - [ ] Concurrency: evaluate thread vs process policies per stage; document guidance.
+  - Best practices
+    - [ ] Realistic workloads: fixture generator mirroring `Data/` scale tiers (S, M, L) for local benchmarking.
+    - [ ] Hotspot focus: 80/20 rule checklist; only optimize top offenders from profiles.
+    - [ ] Continuous monitoring: optional nightly profiling job storing artifacts; compare to baselines.
+    - [ ] Regression budget: define acceptable deltas per stage; fail builds over threshold.
+
+- Benchmarks:
+  - [ ] Micro-benchmarks: `timeit` harness for tight loops (marker parsing, hashing, batching order).
+  - [ ] pytest-benchmark: integrate for `runner`, `planning`, `discovery`; emit JSON and compare in CI.
+  - [ ] Scenario runs: scripted timings for `doctags|chunk|embed` on S/M datasets; capture wall, p50/p95 exec, CPU, RSS.
+  - [ ] Baseline matrix: track across Python versions (3.12/3.13), policies (io/cpu), worker counts, vector formats.
+  - [ ] CI gating: warn on >10% regression, fail on >20%; store artifacts for inspection.
+
+- Docs:
+  - [ ] Profiling guide: cProfile + SnakeViz; py-spy flamegraphs; pyinstrument HTML.
+  - [ ] Benchmarking guide: pytest-benchmark usage, baseline storage, interpreting regressions.
+  - [ ] Optimization playbook: common hotspots and recommended fixes per module.
+  - [ ] Performance ledger: changelog of major improvements with before/after metrics.
 
 ### Security & Policy Gates
 

@@ -105,9 +105,9 @@ class ChunkingConfig:
     and indexing, balancing between context preservation and search
     granularity.
 
-    Attributes:
-        max_tokens: Maximum number of tokens per chunk (800 default)
-        overlap: Number of tokens to overlap between chunks (150 default)
+    Key fields:
+    - ``max_tokens``: Maximum number of tokens per chunk (800 default).
+    - ``overlap``: Number of tokens to overlap between chunks (150 default).
 
     Examples:
         >>> config = ChunkingConfig(max_tokens=1000, overlap=200)
@@ -125,41 +125,12 @@ class DenseIndexConfig:
     Controls the behavior of vector similarity search using FAISS,
     including index type selection and performance parameters.
 
-    Attributes:
-        index_type: Type of FAISS index ("flat", "ivf_flat", "ivf_pq")
-        nlist: Number of Voronoi cells for IVF indexes (1024 default)
-        nprobe: Number of cells to search for IVF indexes (8 default)
-        pq_m: Number of sub-quantizers for PQ indexes (16 default)
-        pq_bits: Bits per sub-quantizer for PQ indexes (8 default)
-        oversample: Oversampling factor for IVF training samples (2 default)
-        device: GPU device ordinal for FAISS operations (0 default)
-        ivfpq_use_precomputed: Use precomputed IVFPQ lookup tables (True default)
-        ivfpq_float16_lut: Use float16 IVFPQ lookup tables when available (True default)
-        multi_gpu_mode: Replica strategy for multi-GPU hosts ("single" default)
-        replication_gpu_ids: Explicit GPU ids to target when multi-GPU replication is enabled
-        gpu_temp_memory_bytes: Optional temporary memory pool size for FAISS GPU ops
-        gpu_pinned_memory_bytes: Optional pinned memory pool size for faster H2D/D2H transfers
-        gpu_indices_32_bit: When True, store FAISS indices in 32-bit format to save VRAM
-        expected_ntotal: Hint for anticipated index size; used to pre-reserve GPU memory
-        rebuild_delete_threshold: Pending delete count before forcing full rebuild
-        force_64bit_ids: Force FAISS to use 64-bit IDs even when 32-bit would suffice
-        interleaved_layout: Enable GPU interleaved layout optimisations when supported
-        flat_use_fp16: Use float16 compute for flat indexes when available
-        enable_replication: Allow replication to additional GPUs when configured
-        enable_reserve_memory: Enable GPU memory reservation based on expected_ntotal
-        use_pinned_memory: Use pinned host buffers for large add/search batches
-        gpu_use_default_null_stream: Use FAISS APIs to bind CUDA's default null stream
-            for the configured device when available (False default)
-        gpu_use_default_null_stream_all_devices: Use FAISS APIs to bind the default
-            CUDA null stream across every visible GPU (False default)
-        use_cuvs: Optional override to force-enable or disable cuVS acceleration
-            for FAISS GPU distance kernels. ``None`` defers to FAISS heuristics
-            (``faiss.should_use_cuvs``).
-        ingest_dedupe_threshold: Skip ingest when cosine similarity exceeds this value (0 disables)
-        persist_mode: Persistence policy ("cpu_bytes" default, disable for GPU-only runtime)
-        snapshot_refresh_interval_seconds: Minimum seconds between CPU snapshot refreshes (0 disables interval throttle)
-        snapshot_refresh_writes: Minimum write operations between CPU snapshot refreshes (0 disables write throttle)
-        ivf_train_factor: Controls IVF training sample size per nlist shard
+    Key tunables include:
+    - Index topology: ``index_type``, ``nlist``, ``nprobe``, ``pq_m``, ``pq_bits``, and ``oversample``.
+    - GPU deployment knobs such as ``device``, replication controls, memory pool sizing, and 32-bit index toggles.
+    - Precision/layout options (``ivfpq_use_precomputed``, ``ivfpq_float16_lut``, ``interleaved_layout``, ``flat_use_fp16``).
+    - Persistence and snapshot settings (``persist_mode``, snapshot refresh intervals, ``ivf_train_factor``).
+    - Optional accelerators and safety valves (cuVS toggles, dedupe thresholds, forced 64-bit IDs).
 
     Examples:
         >>> config = DenseIndexConfig(
@@ -214,12 +185,11 @@ class FusionConfig:
     Controls how results from different retrieval methods (BM25, SPLADE,
     dense vectors) are combined and ranked for optimal relevance.
 
-    Attributes:
-        k0: RRF (Reciprocal Rank Fusion) parameter (60.0 default)
-        mmr_lambda: MMR diversification parameter (0.6 default)
-        enable_mmr: Whether to apply MMR diversification (True default)
-        cosine_dedupe_threshold: Cosine similarity threshold for deduplication (0.98 default)
-        max_chunks_per_doc: Maximum chunks to return per document (3 default)
+    Key fields:
+    - ``k0``: RRF (Reciprocal Rank Fusion) parameter (60.0 default).
+    - ``mmr_lambda`` / ``enable_mmr``: MMR diversification controls.
+    - ``cosine_dedupe_threshold``: Cosine similarity threshold for deduplication (0.98 default).
+    - ``max_chunks_per_doc``: Maximum chunks to return per document (3 default).
 
     Examples:
         >>> config = FusionConfig(
@@ -252,18 +222,12 @@ class RetrievalConfig:
     Controls the behavior of each retrieval method (BM25, SPLADE, dense)
     including how many candidates each method should return.
 
-    Attributes:
-        bm25_top_k: Number of BM25 candidates to retrieve (50 default)
-        splade_top_k: Number of SPLADE candidates to retrieve (50 default)
-        dense_top_k: Number of dense vector candidates to retrieve (50 default)
-        dense_overfetch_factor: Multiplier applied to oversampled dense requests (1.5 default)
-        dense_oversample: Query-time oversample multiplier for dense retrieval (2.0 default)
-        dense_score_floor: Minimum similarity score required for dense results before fusion (0.0 default)
-        dense_calibration_batch_size: Optional batch size for validator dense calibration sweeps
-        bm25_scoring: \"compat\" for legacy dot-product, \"true\" for Okapi BM25
-        bm25_k1: Okapi BM25 k1 parameter (used when bm25_scoring == \"true\")
-        bm25_b: Okapi BM25 b parameter (used when bm25_scoring == \"true\")
-        executor_max_workers: Optional override for the service thread pool size
+    Key fields:
+    - ``bm25_top_k`` / ``splade_top_k`` / ``dense_top_k``: Candidate counts per retrieval modality.
+    - ``dense_overfetch_factor`` / ``dense_oversample``: Dense oversampling controls.
+    - ``dense_score_floor`` / ``dense_calibration_batch_size``: Dense filtering and calibration knobs.
+    - ``bm25_scoring`` / ``bm25_k1`` / ``bm25_b``: BM25 scoring configuration.
+    - ``executor_max_workers``: Optional override for service thread pool size.
 
     Examples:
         >>> config = RetrievalConfig(

@@ -57,18 +57,6 @@ Key Functions:
 - `open_chunks`: Open Chunks dataset as Arrow Dataset.
 - `open_vectors`: Open Vectors dataset (by family) as Arrow Dataset.
 - `summarize`: Compute fast summary statistics.
-
-=== NAVMAP v1 ===
-{
-  "module": "DocsToKG.DocParsing.storage.dataset_view",
-  "purpose": "Lazy inspection and summarization of Parquet datasets",
-  "sections": [
-    {"id": "types", "name": "Types", "anchor": "types", "kind": "section"},
-    {"id": "dataset-summary", "name": "DatasetSummary", "anchor": "class-dataset-summary", "kind": "class"},
-    {"id": "readers", "name": "Reader Functions", "anchor": "readers", "kind": "section"}
-  ]
-}
-=== END NAVMAP ===
 """
 
 from __future__ import annotations
