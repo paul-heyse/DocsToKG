@@ -171,7 +171,6 @@ autoapi_options = [
     "show-inheritance",
     "show-module-summary",
     "special-members",
-    "imported-members",
 ]
 autoapi_include = ["DocsToKG.*"]
 autoapi_ignore = [
@@ -183,6 +182,8 @@ autoapi_ignore = [
     "*/DocsToKG/OntologyDownload/cli/db_cmd.py",
     "*/DocsToKG/OntologyDownload/cli/obs_cmd.py",
     "*/DocsToKG/OntologyDownload/monitoring_cli.py",
+    "*/DocsToKG/OntologyDownload/cli/__main__.py",
+    "*/DocsToKG/OntologyDownload/cli/__init__.py",
 ]
 autoapi_member_order = "bysource"
 autoapi_python_class_content = "both"

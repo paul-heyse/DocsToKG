@@ -108,6 +108,15 @@ Files: `planning.py`, `discovery.py`, `runner.py`, `manifest.py`, `manifest_sink
   - [ ] HTTP: `Retry-After` seconds and date parsing; per-request overrides; base headers cloning.
   - [ ] Batching: fixed-size mode streams lazily; length policy ordering stable; buckets follow power-of-two.
   - [ ] Concurrency: `safe_write` atomic temp+rename survives crash simulation; lock contention metrics recorded.
+  - [ ] Scheduler: cost-aware strategy executes short items first; no starvation under mixed lengths.
+  - [ ] Dynamic concurrency: tuning reacts to latency/queue depth; respects min/max worker bounds.
+  - [ ] OTel: spans emitted for stage/item with expected attributes; nested spans close on errors.
+  - [ ] Security: redaction removes PII/paths; sandbox prevents writing outside data root; traversal attempts rejected.
+  - [ ] Signals: `SIGTERM` triggers graceful cancellation with correct manifest entries and counts.
+  - [ ] Pause/Resume: sentinel files pause progress and resume without dropping state; abort halts with `cancelled=True`.
+  - [ ] Watcher: continuous plan detects new/removed inputs; debounces bursts; JSON output schema stable.
+  - [ ] Lineage: manifest extras include expected parent/child pointers; downstream queries can reconstruct flows.
+  - [ ] Windows/macOS: file locking and atomic rename behave as expected (skipped if platform not available in CI).
 
 - Docs:
   - [ ] Define orchestrator invariants: idempotency, resume/force rules, manifest fields, fingerprint contract.
@@ -115,6 +124,11 @@ Files: `planning.py`, `discovery.py`, `runner.py`, `manifest.py`, `manifest_sink
   - [ ] Planner CLI reference: flags, JSON schema, environment variables (preview limit, vector format default).
   - [ ] Manifest sink field dictionary, including common `extras` keys per stage (e.g., `vector_format`, `qwen_dim`).
   - [ ] Concurrency FAQ: locking, atomic writes, spawn semantics, free port reservations.
+  - [ ] Plugin architecture: how to implement a custom `SchedulerStrategy`/`RetryPolicy`; stability guarantees.
+  - [ ] Observability guide: OpenTelemetry spans + metrics; recommended exporters; field dictionary.
+  - [ ] Security posture: redaction policy, sandboxing constraints, path normalization rules.
+  - [ ] Operations: pause/resume/abort workflow using sentinels; continuous plan watcher usage and limitations.
+  - [ ] Versioning: manifest schema versioning, migration utilities, backward-compat policies.
 
 ### DocTags Stage (`doctags.py`)
 
