@@ -2,6 +2,7 @@
 ## Environment Setup
 
 ## Table of Contents
+
 - [Environment Setup](#environment-setup)
 - [Code Style & Architecture References](#code-style-architecture-references)
 - [1) Verify the environment exists (no install)](#1-verify-the-environment-exists-no-install)
@@ -26,6 +27,7 @@
 - [Coding Standards & Module Organization](#coding-standards-module-organization)
 
 Use the uv bootstrap to stand up the project environment:
+
 1. Optionally run `direnv allow` once per machine to trust `.envrc`.
 2. For CPU-only work, run `./scripts/bootstrap_env.sh`.
 3. For GPU work (requires wheels in `.wheelhouse/`), run `./scripts/bootstrap_env.sh --gpu`.
@@ -38,7 +40,6 @@ The script installs uv if it is missing, respects `UV_PROJECT_ENVIRONMENT`, and 
 - Consult [docs/Formats%20and%20Standards/CODESTYLE.md](<../../../../docs/Formats%20and%20Standards/CODESTYLE.md>) for the Python 3.12+ baseline, uv-powered tooling, and required Google-style docstrings/NAVMAP metadata.
 - Architecture primers: [HybridSearch overview](<../../../../docs/architecture/130-hybrid-search.cuvs.updated.md>) and [Level 2 CUDA/FAISS details](<../../../../docs/architecture/130-hybrid-search.level2.cuvs.updated.md>).
 - **Required library primers:** review [faiss-gpu-wheel-reference](<../../../../src/DocsToKG/HybridSearch/faiss-gpu-wheel-reference.md>), [cuvs-reference](<../../../../src/DocsToKG/HybridSearch/cuvs-reference.md>), and [libcuvs-reference](<../../../../src/DocsToKG/HybridSearch/libcuvs-reference.md>) before touching GPU search internals.
-
 
 ## 1) Verify the environment exists (no install)
 
@@ -137,7 +138,9 @@ If any import fails: **do not install**. Go to Troubleshooting.
 ./.venv/bin/black --check .
 
 # Type check
-./.venv/bin/mypy src
+./.venv/bin/mypy srsrc/DocsToKG/HybridSearch/faiss-gpu-wheel-reference.md
+src/DocsToKG/HybridSearch/cuvs-reference.md
+src/DocsToKG/HybridSearch/libcuvs-reference.mdc
 ```
 
 > Always prefer `python -m <module>` and `.venv/bin/<tool>` — these guarantee resolution from the project environment.

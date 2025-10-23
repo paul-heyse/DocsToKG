@@ -33,6 +33,7 @@ copyright = f"{date.today():%Y}, {author}"
 html_title = f"{project} {release}"
 
 # --- extensions -------------------------------------------------------------
+# Enabled Sphinx extensions (optional ones documented in pyproject.toml)
 extensions = [
     "myst_parser",
     "sphinx.ext.autodoc",
@@ -43,10 +44,21 @@ extensions = [
     "sphinx.ext.linkcode",
     "sphinx.ext.autosectionlabel",
     "sphinx.ext.githubpages",
+    "sphinx.ext.todo",
+    "sphinx.ext.coverage",
     "sphinx_sitemap",
     "sphinx_copybutton",
     "sphinx_design",
     "autoapi.extension",
+    "sphinxext.opengraph",
+    "notfound.extension",
+    "sphinxext.rediraffe",
+    "sphinx_codeautolink",
+    "sphinxcontrib.autodoc_pydantic",
+    "sphinxcontrib.mermaid",
+    "sphinx_external_toc",
+    "sphinx_issues",
+    "sphinxcontrib.spelling",
 ]
 
 autosummary_generate = True
@@ -88,6 +100,22 @@ html_theme_options = {
 html_baseurl = "https://paul-heyse.github.io/DocsToKG/"
 sitemap_url_scheme = "{link}"
 
+# --- OpenGraph -------------------------------------------------------------
+ogp_site_url = html_baseurl
+ogp_site_name = project
+ogp_description_length = 200
+ogp_image = None
+ogp_use_first_image = True
+
+# --- Not Found / redirects -------------------------------------------------
+notfound_urls_prefix = "/"
+rediraffe_redirects = {}
+rediraffe_redirects_external = {}
+
+# --- Code auto-linking -----------------------------------------------------
+codeautolink_autodoc_inject = True
+codeautolink_concat_default = True
+
 # --- intersphinx mappings --------------------------------------------------
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3/", None),
@@ -107,6 +135,12 @@ autodoc_mock_imports = [
     "raft",
     "cuvs",
     "pyarrow",
+    "pydantic",
+    "pydantic_settings",
+    "docling_core",
+    "docling",
+    "bs4",
+    "regex",
 ]
 
 # --- AutoAPI ---------------------------------------------------------------
@@ -124,9 +158,36 @@ autoapi_options = [
     "show-module-summary",
 ]
 autoapi_include = ["DocsToKG.*"]
-autoapi_ignore = ["*/tests/*", "*/__pycache__/*", "*/DocParsing/embedding/backends/dense/qwen_vllm.py"]
+autoapi_ignore = [
+    "*/tests/*",
+    "*/__pycache__/*",
+    "*/DocParsing/embedding/backends/dense/qwen_vllm.py",
+]
 autoapi_member_order = "bysource"
 autoapi_python_class_content = "both"
+
+# --- autodoc-pydantic ------------------------------------------------------
+autodoc_pydantic_model_show_json = True
+autodoc_pydantic_model_show_config_summary = True
+autodoc_pydantic_model_member_order = "bysource"
+
+# --- External ToC ----------------------------------------------------------
+external_toc_path = "../_toc.yml"
+external_toc_exclude_missing = True
+
+# --- GitHub issues links ---------------------------------------------------
+issues_github_path = "paul-heyse/DocsToKG"
+
+# --- Spelling --------------------------------------------------------------
+spelling_lang = "en_US"
+spelling_show_suggestions = True
+spelling_word_list_filename = "spelling-wordlist.txt"
+
+# --- TODOs -----------------------------------------------------------------
+todo_include_todos = True
+
+# --- Mermaid ---------------------------------------------------------------
+mermaid_version = "10.9.0"
 
 
 # --- linkcode resolver -----------------------------------------------------
