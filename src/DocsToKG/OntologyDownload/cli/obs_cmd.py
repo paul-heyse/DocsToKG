@@ -39,6 +39,10 @@
 
 """Observability CLI commands: tail, stats, export.
 
+Commands query the shared DuckDB catalog configured by the ontology
+downloader so analytics operate on the same event store as event
+emitters.
+
 Provides:
 - obs tail - Stream recent events in real-time
 - obs stats - Show aggregated statistics
@@ -52,6 +56,9 @@ from typing import Any, Sequence
 
 import typer
 
+from DocsToKG.OntologyDownload.database import DatabaseConfiguration
+from DocsToKG.OntologyDownload.settings import get_default_config
+
 from DocsToKG.OntologyDownload.observability.queries import (
     get_query,
     list_queries,
@@ -62,7 +69,7 @@ logger = logging.getLogger(__name__)
 
 app = typer.Typer(
     name="obs",
-    help="Observability commands: view and analyze events",
+    help="Observability commands backed by the shared DuckDB event catalog",
     short_help="View events and stats",
 )
 
@@ -73,20 +80,65 @@ app = typer.Typer(
 
 
 def _get_duckdb_connection():
-    """Get DuckDB connection (stub for now).
+    """Connect to the configured DuckDB catalog used by event emitters."""
 
-    In production, this would connect to the configured DuckDB instance.
-    """
     try:
         import duckdb
-
-        return duckdb.connect()
-    except ImportError:
+    except ImportError:  # pragma: no cover - dependency guard
         typer.echo(
             "❌ DuckDB not installed. Install with: pip install duckdb",
             err=True,
         )
         raise typer.Exit(code=1)
+
+    config = get_default_config(copy=True)
+    db_settings = config.defaults.db
+
+    db_config = DatabaseConfiguration(
+        db_path=db_settings.path,
+        readonly=True,
+        enable_locks=db_settings.writer_lock,
+        threads=db_settings.threads,
+    )
+
+    db_path = db_config.db_path
+    if db_path is None:
+        typer.echo("❌ DuckDB catalog path is not configured", err=True)
+        raise typer.Exit(code=1)
+
+    if not db_path.exists():
+        typer.echo(
+            f"❌ DuckDB catalog not found at {db_path}. Emit events before querying.",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    connect_config: dict[str, object] = {}
+    if db_config.threads is not None:
+        connect_config["threads"] = db_config.threads
+    if db_config.memory_limit is not None:
+        connect_config["memory_limit"] = db_config.memory_limit
+
+    try:
+        connection = duckdb.connect(
+            str(db_path),
+            read_only=True,
+            config=connect_config or None,
+        )
+    except Exception as exc:  # pragma: no cover - duckdb provides rich errors
+        typer.echo(
+            f"❌ Failed to open DuckDB catalog at {db_path}: {exc}",
+            err=True,
+        )
+        raise typer.Exit(code=1) from exc
+
+    if db_config.enable_object_cache:
+        try:
+            connection.execute("PRAGMA enable_object_cache;")
+        except Exception:  # pragma: no cover - best effort
+            logger.debug("Failed to enable DuckDB object cache", exc_info=True)
+
+    return connection
 
 
 def _format_table(query_result: Sequence[Sequence[Any]], headers: list[str]) -> str:
@@ -166,6 +218,7 @@ def obs_tail(
 
     Shows the N most recent events with optional filtering.
     """
+    con = None
     try:
         with closing(_get_duckdb_connection()) as con:
             # Build query
@@ -212,6 +265,9 @@ def obs_tail(
     except Exception as e:
         typer.echo(f"❌ Error: {e}", err=True)
         raise typer.Exit(code=1)
+    finally:
+        if con is not None:
+            con.close()
 
 
 # ============================================================================
@@ -329,6 +385,7 @@ def obs_export(
 
     Supports JSON, JSONL, Parquet, and CSV formats (inferred from extension).
     """
+    con = None
     try:
         # Validate output path
         if not output_path.suffix:
@@ -395,6 +452,23 @@ def obs_export(
     except Exception as e:
         typer.echo(f"❌ Error: {e}", err=True)
         raise typer.Exit(code=1)
+    finally:
+        if con is not None:
+            con.close()
+
+
+def _rows_to_dataframe(rows: Sequence[Sequence[Any]], headers: list[str]):
+    """Return a pandas DataFrame for the given rows and headers."""
+    try:
+        import pandas as pd
+    except ImportError as exc:  # pragma: no cover - aligns with existing behaviour
+        typer.echo(
+            "❌ pandas is required for JSON and export formatting. Install with: pip install pandas",
+            err=True,
+        )
+        raise typer.Exit(code=1) from exc
+
+    return pd.DataFrame(rows, columns=headers)
 
 
 def _rows_to_dataframe(rows: Sequence[Sequence[Any]], headers: list[str]):
