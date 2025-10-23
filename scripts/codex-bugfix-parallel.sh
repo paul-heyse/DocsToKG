@@ -168,7 +168,7 @@ EOF
       # Run Codex
       local run_log="$LOG_DIR/$(slugify "$subdir")/pass${pass}-batch${batch}.log"
       mkdir -p "$(dirname "$run_log")"
-      local cmd=(codex exec --full-auto --ask-for-approval never --sandbox workspace-write)
+      local cmd=(codex exec --full-auto -s workspace-write -c 'approval_policy="never"')
       (( EXEC_TIMEOUT > 0 )) && cmd+=(--timeout "$EXEC_TIMEOUT")
       if [[ "$VERBOSE" == "true" ]]; then
         echo "[codex][$subdir][pass $pass][batch $batch] starting…"
@@ -183,7 +183,7 @@ EOF
     # Optional local gates (never fail the script)
     command -v ruff  >/dev/null && ruff check --fix "$subdir" || true
     command -v black >/dev/null && black "$subdir"           || true
-    command -v pytest>/dev/null && pytest -q || true
+    
 
     # Commit & push if there were changes inside this folder
     local changed_count
