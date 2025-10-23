@@ -16,10 +16,8 @@ Design:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Mapping, Optional
 from datetime import datetime
-
-from DocsToKG.ContentDownload.api.types import AttemptStatus, ReasonCode
+from typing import Any, Mapping, Optional
 
 # ============================================================================
 # EXTENDED ATTEMPT RECORD - Telemetry Internal Type

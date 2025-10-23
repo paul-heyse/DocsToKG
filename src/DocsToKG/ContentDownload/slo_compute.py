@@ -31,7 +31,7 @@ from __future__ import annotations
 
 import sqlite3
 import time
-from typing import Dict, List, Optional, Tuple
+from typing import Dict
 
 from DocsToKG.ContentDownload import slo_schema
 

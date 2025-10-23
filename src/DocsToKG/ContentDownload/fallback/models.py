@@ -11,11 +11,10 @@ Provides validated, typed data models for:
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Literal
 from enum import Enum
+from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, Field, ConfigDict, field_validator, model_validator
-
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 # ============================================================================
 # Enums for Type Safety
@@ -24,6 +23,7 @@ from pydantic import BaseModel, Field, ConfigDict, field_validator, model_valida
 
 class AttemptStatus(str, Enum):
     """Status of a resolution attempt."""
+
     SUCCESS = "success"
     ERROR = "error"
     TIMEOUT = "timeout"
@@ -33,6 +33,7 @@ class AttemptStatus(str, Enum):
 
 class TierName(str, Enum):
     """Fallback tier names."""
+
     TIER_1 = "tier_1"
     TIER_2 = "tier_2"
     TIER_3 = "tier_3"
@@ -40,6 +41,7 @@ class TierName(str, Enum):
 
 class MetricType(str, Enum):
     """Type of metric."""
+
     COUNTER = "counter"
     GAUGE = "gauge"
     HISTOGRAM = "histogram"
@@ -64,7 +66,9 @@ class TelemetryAttemptRecord(BaseModel):
     # Core identification
     run_id: str = Field(..., description="Unique run identifier")
     attempt_id: str = Field(..., description="Unique attempt identifier")
-    timestamp: datetime = Field(default_factory=datetime.utcnow, description="When attempt occurred")
+    timestamp: datetime = Field(
+        default_factory=datetime.utcnow, description="When attempt occurred"
+    )
 
     # Resolution context
     tier: TierName = Field(..., description="Which tier this attempt was in")
@@ -133,17 +137,10 @@ class StorageConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     storage_type: Literal["sqlite", "jsonl", "hybrid"] = Field(
-        default="sqlite",
-        description="Storage backend type"
+        default="sqlite", description="Storage backend type"
     )
-    path: str = Field(
-        default="Data/Manifests/manifest.sqlite3",
-        description="Storage file path"
-    )
-    backup_path: Optional[str] = Field(
-        None,
-        description="Backup file path"
-    )
+    path: str = Field(default="Data/Manifests/manifest.sqlite3", description="Storage file path")
+    backup_path: Optional[str] = Field(None, description="Backup file path")
     auto_backup: bool = Field(default=True, description="Automatic backups enabled")
     batch_size: int = Field(default=100, ge=1, le=10000, description="Batch size for operations")
 
@@ -163,20 +160,13 @@ class DashboardConfig(BaseModel):
 
     enabled: bool = Field(default=True, description="Dashboard enabled")
     export_formats: List[Literal["grafana", "prometheus", "json"]] = Field(
-        default=["json"],
-        description="Export formats"
+        default=["json"], description="Export formats"
     )
     update_interval_s: int = Field(
-        default=60,
-        ge=5,
-        le=3600,
-        description="Update interval in seconds"
+        default=60, ge=5, le=3600, description="Update interval in seconds"
     )
     retention_days: int = Field(
-        default=30,
-        ge=1,
-        le=365,
-        description="Data retention period in days"
+        default=30, ge=1, le=365, description="Data retention period in days"
     )
 
     @field_validator("export_formats")
@@ -195,26 +185,16 @@ class MetricsThreshold(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     success_rate_min: float = Field(
-        default=0.75,
-        ge=0.0,
-        le=1.0,
-        description="Minimum acceptable success rate"
+        default=0.75, ge=0.0, le=1.0, description="Minimum acceptable success rate"
     )
     latency_p95_max_ms: int = Field(
-        default=5000,
-        ge=100,
-        description="Maximum acceptable P95 latency"
+        default=5000, ge=100, description="Maximum acceptable P95 latency"
     )
     latency_p99_max_ms: int = Field(
-        default=10000,
-        ge=100,
-        description="Maximum acceptable P99 latency"
+        default=10000, ge=100, description="Maximum acceptable P99 latency"
     )
     error_rate_max: float = Field(
-        default=0.1,
-        ge=0.0,
-        le=1.0,
-        description="Maximum acceptable error rate"
+        default=0.1, ge=0.0, le=1.0, description="Maximum acceptable error rate"
     )
 
 
@@ -228,8 +208,7 @@ class TelemetryConfig(BaseModel):
     dashboard: DashboardConfig = Field(default_factory=DashboardConfig)
     thresholds: MetricsThreshold = Field(default_factory=MetricsThreshold)
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = Field(
-        default="INFO",
-        description="Logging level"
+        default="INFO", description="Logging level"
     )
 
 

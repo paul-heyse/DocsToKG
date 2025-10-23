@@ -17,7 +17,7 @@ import os
 from pathlib import Path
 from typing import Any, Dict, Literal, Optional
 
-from .config import CatalogConfig, load_catalog_config
+from .config import load_catalog_config
 from .connector import CatalogConnector
 
 logger = logging.getLogger(__name__)

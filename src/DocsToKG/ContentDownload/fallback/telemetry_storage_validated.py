@@ -10,19 +10,17 @@ Extends TelemetryStorage with:
 
 from __future__ import annotations
 
-import json
 import logging
 from typing import Any, Dict, List, Optional
 
-from DocsToKG.ContentDownload.fallback.telemetry_storage import TelemetryStorage
 from DocsToKG.ContentDownload.fallback.models import (
+    AttemptStatus,
     TelemetryAttemptRecord,
     TelemetryBatchRecord,
     TelemetryConfig,
-    StorageConfig,
-    AttemptStatus,
     TierName,
 )
+from DocsToKG.ContentDownload.fallback.telemetry_storage import TelemetryStorage
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +34,7 @@ class ValidatedTelemetryStorage:
         config: Optional[TelemetryConfig] = None,
     ):
         """Initialize with optional Pydantic configuration.
-        
+
         Args:
             storage_path: Path to storage file
             config: TelemetryConfig (Pydantic model)
@@ -59,9 +57,9 @@ class ValidatedTelemetryStorage:
         **kwargs,
     ) -> TelemetryAttemptRecord:
         """Write a validated telemetry record.
-        
+
         All parameters are validated via Pydantic models.
-        
+
         Args:
             run_id: Run identifier
             attempt_id: Attempt identifier
@@ -73,10 +71,10 @@ class ValidatedTelemetryStorage:
             http_status: HTTP status code
             reason: Failure reason
             **kwargs: Additional metadata
-            
+
         Returns:
             Validated TelemetryAttemptRecord
-            
+
         Raises:
             ValueError: If validation fails
         """
@@ -94,11 +92,11 @@ class ValidatedTelemetryStorage:
                 reason=reason,
                 metadata=kwargs,
             )
-            
+
             # Write to storage
             self.storage.write_record(record.model_dump(), format="sqlite")
             logger.info(f"Wrote validated record: {attempt_id}")
-            
+
             return record
         except ValueError as e:
             logger.error(f"Validation error: {e}")
@@ -110,14 +108,14 @@ class ValidatedTelemetryStorage:
         records: List[Dict[str, Any]],
     ) -> TelemetryBatchRecord:
         """Write a validated batch of records.
-        
+
         Args:
             batch_id: Batch identifier
             records: List of record dictionaries
-            
+
         Returns:
             Validated TelemetryBatchRecord
-            
+
         Raises:
             ValueError: If validation fails
         """
@@ -127,18 +125,18 @@ class ValidatedTelemetryStorage:
             for record_dict in records:
                 record = TelemetryAttemptRecord(**record_dict)
                 validated_records.append(record)
-            
+
             # Create batch
             batch = TelemetryBatchRecord(
                 batch_id=batch_id,
                 records=validated_records,
                 count=len(validated_records),
             )
-            
+
             # Write all records
             for record in validated_records:
                 self.storage.write_record(record.model_dump(), format="sqlite")
-            
+
             logger.info(f"Wrote batch {batch_id}: {len(validated_records)} records")
             return batch
         except ValueError as e:
@@ -152,12 +150,12 @@ class ValidatedTelemetryStorage:
         source_filter: Optional[str] = None,
     ) -> List[TelemetryAttemptRecord]:
         """Load and validate records from storage.
-        
+
         Args:
             period: Time period filter
             tier_filter: Tier filter
             source_filter: Source/host filter
-            
+
         Returns:
             List of validated TelemetryAttemptRecord objects
         """
@@ -167,7 +165,7 @@ class ValidatedTelemetryStorage:
             tier_filter=tier_filter.value if tier_filter else None,
             source_filter=source_filter,
         )
-        
+
         # Validate each record
         validated = []
         for raw in raw_records:
@@ -177,12 +175,12 @@ class ValidatedTelemetryStorage:
             except ValueError as e:
                 logger.warning(f"Skipping invalid record: {e}")
                 continue
-        
+
         return validated
 
     def get_config(self) -> TelemetryConfig:
         """Get current configuration.
-        
+
         Returns:
             TelemetryConfig (Pydantic model)
         """
@@ -190,7 +188,7 @@ class ValidatedTelemetryStorage:
 
     def update_config(self, config: TelemetryConfig) -> None:
         """Update configuration with validation.
-        
+
         Args:
             config: New TelemetryConfig
         """

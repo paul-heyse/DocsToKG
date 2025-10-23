@@ -50,8 +50,8 @@ if TYPE_CHECKING:
     from DocsToKG.ContentDownload.orchestrator.queue import WorkQueue
     from DocsToKG.ContentDownload.pipeline import ResolverPipeline
 
-from DocsToKG.ContentDownload.orchestrator.limits import host_key
 from DocsToKG.ContentDownload.core import DownloadContext, WorkArtifact
+from DocsToKG.ContentDownload.orchestrator.limits import host_key
 
 __all__ = ["Worker"]
 
@@ -156,9 +156,7 @@ class Worker:
                 )
                 return
             except Exception as e:  # Defensive: unexpected validation failure
-                logger.exception(
-                    "Unexpected error while deserializing artifact for job %s", job_id
-                )
+                logger.exception("Unexpected error while deserializing artifact for job %s", job_id)
                 self.queue.fail_and_retry(
                     job_id,
                     backoff_sec=self.retry_backoff,
@@ -267,9 +265,7 @@ class Worker:
 
         return tokens
 
-    def _release_limiter_slots(
-        self, tokens: list[tuple["KeyedLimiter", str]]
-    ) -> None:
+    def _release_limiter_slots(self, tokens: list[tuple["KeyedLimiter", str]]) -> None:
         """Release limiter slots acquired for this job."""
 
         while tokens:
@@ -289,9 +285,7 @@ class Worker:
                     exc,
                 )
 
-    def _extract_resolver_key(
-        self, job: Mapping[str, Any], artifact: Any
-    ) -> Optional[str]:
+    def _extract_resolver_key(self, job: Mapping[str, Any], artifact: Any) -> Optional[str]:
         """Determine resolver limiter key for the job if available."""
 
         candidates: list[Mapping[str, Any]] = [job]
@@ -308,9 +302,7 @@ class Worker:
 
         return None
 
-    def _extract_host_key(
-        self, job: Mapping[str, Any], artifact: Any
-    ) -> Optional[str]:
+    def _extract_host_key(self, job: Mapping[str, Any], artifact: Any) -> Optional[str]:
         """Determine host limiter key for the job if available."""
 
         for mapping in (job, artifact if isinstance(artifact, Mapping) else None):
@@ -371,6 +363,7 @@ class Worker:
                     return item.strip()
 
         return None
+
     def _deserialize_job(
         self, job: Mapping[str, Any]
     ) -> Tuple[WorkArtifact, Optional[DownloadContext]]:
@@ -464,4 +457,3 @@ class Worker:
 
 class _ArtifactValidationError(RuntimeError):
     """Raised when an artifact payload cannot be converted for the pipeline."""
-

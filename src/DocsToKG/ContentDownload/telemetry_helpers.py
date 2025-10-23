@@ -73,7 +73,7 @@ This ensures telemetry is **non-breaking** and **optional** throughout the pipel
 from __future__ import annotations
 
 import time
-from typing import Any, Mapping, Optional
+from typing import Any, Optional
 
 
 def emit_http_event(

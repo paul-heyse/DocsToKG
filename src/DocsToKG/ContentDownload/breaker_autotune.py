@@ -180,27 +180,33 @@ class BreakerAutoTuner:
                 if adv.suggest_fail_max is not None:
                     self._br.update_host_policy(
                         host,
-                        fail_max=self._clamp(adv.suggest_fail_max, 2, 10)
-                        if self._clamp
-                        else adv.suggest_fail_max,
+                        fail_max=(
+                            self._clamp(adv.suggest_fail_max, 2, 10)
+                            if self._clamp
+                            else adv.suggest_fail_max
+                        ),
                     )
                     changes.append(f"fail_max → {adv.suggest_fail_max}")
 
                 if adv.suggest_reset_timeout_s is not None:
                     self._br.update_host_policy(
                         host,
-                        reset_timeout_s=self._clamp(adv.suggest_reset_timeout_s, 15, 600)
-                        if self._clamp
-                        else adv.suggest_reset_timeout_s,
+                        reset_timeout_s=(
+                            self._clamp(adv.suggest_reset_timeout_s, 15, 600)
+                            if self._clamp
+                            else adv.suggest_reset_timeout_s
+                        ),
                     )
                     changes.append(f"reset_timeout_s → {adv.suggest_reset_timeout_s}")
 
                 if adv.suggest_success_threshold is not None:
                     self._br.update_host_policy(
                         host,
-                        success_threshold=self._clamp(adv.suggest_success_threshold, 1, 3)
-                        if self._clamp
-                        else adv.suggest_success_threshold,
+                        success_threshold=(
+                            self._clamp(adv.suggest_success_threshold, 1, 3)
+                            if self._clamp
+                            else adv.suggest_success_threshold
+                        ),
                     )
                     changes.append(f"success_threshold → {adv.suggest_success_threshold}")
 

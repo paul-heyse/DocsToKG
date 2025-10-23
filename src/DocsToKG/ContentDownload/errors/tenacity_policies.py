@@ -41,7 +41,7 @@ from __future__ import annotations
 
 import logging
 from enum import Enum, auto
-from typing import Any, Callable, Optional
+from typing import Any, Callable
 
 import httpx
 from tenacity import (
@@ -51,7 +51,6 @@ from tenacity import (
     retry_if_exception_type,
     retry_if_result,
     stop_after_delay,
-    wait_random_exponential,
 )
 
 logger = logging.getLogger(__name__)
@@ -93,7 +92,7 @@ def _should_retry_on_429(operation: OperationType) -> Callable[[Any], bool]:
         if operation == OperationType.DOWNLOAD:
             # Downloads: always retry (critical path)
             # Rate limiting is enforced at limiter level, not here
-            logger.debug(f"429 on DOWNLOAD: retrying (critical path)")
+            logger.debug("429 on DOWNLOAD: retrying (critical path)")
             return True
         elif operation in (OperationType.VALIDATE, OperationType.MANIFEST_FETCH):
             # Non-critical: return False to signal deferral to caller
@@ -131,20 +130,20 @@ def _should_retry_on_timeout(operation: OperationType) -> Callable[[Any], bool]:
         # Operation-specific timeout strategy
         if operation == OperationType.DOWNLOAD:
             # Downloads: always retry (critical path)
-            logger.debug(f"Timeout on DOWNLOAD: retrying (critical path)")
+            logger.debug("Timeout on DOWNLOAD: retrying (critical path)")
             return True
         elif operation == OperationType.VALIDATE:
             # Validation: defer (non-critical)
-            logger.debug(f"Timeout on VALIDATE: signaling deferral (non-critical)")
+            logger.debug("Timeout on VALIDATE: signaling deferral (non-critical)")
             return False
         elif operation == OperationType.RESOLVE:
             # Resolve: retry up to 3 times, then failover (handled by caller)
             # This predicate always returns True; caller counts attempts
-            logger.debug(f"Timeout on RESOLVE: retrying (failover handled by caller)")
+            logger.debug("Timeout on RESOLVE: retrying (failover handled by caller)")
             return True
         elif operation == OperationType.EXTRACT:
             # Extract: always retry (retryable operation)
-            logger.debug(f"Timeout on EXTRACT: retrying (retryable)")
+            logger.debug("Timeout on EXTRACT: retrying (retryable)")
             return True
         else:
             # Default: retry (safe fallback)

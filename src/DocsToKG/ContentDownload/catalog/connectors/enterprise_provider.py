@@ -53,17 +53,14 @@ class EnterpriseProvider:
 
             try:
                 if not self.connection_url:
-                    raise ProviderConfigError(
-                        "connection_url is required for enterprise provider"
-                    )
+                    raise ProviderConfigError("connection_url is required for enterprise provider")
 
                 # Import SQLAlchemy here to avoid hard dependency
                 try:
-                    from sqlalchemy import create_engine, pool as sqlalchemy_pool
+                    from sqlalchemy import create_engine
+                    from sqlalchemy import pool as sqlalchemy_pool
                 except ImportError as e:
-                    raise ProviderConnectionError(
-                        f"SQLAlchemy not installed: {e}"
-                    ) from e
+                    raise ProviderConnectionError(f"SQLAlchemy not installed: {e}") from e
 
                 # Create engine with connection pooling
                 self.engine = create_engine(
@@ -79,17 +76,13 @@ class EnterpriseProvider:
                 self._initialize_schema()
 
                 self._initialized = True
-                logger.info(
-                    f"Enterprise provider initialized with pool_size={self.pool_size}"
-                )
+                logger.info(f"Enterprise provider initialized with pool_size={self.pool_size}")
 
             except Exception as e:
                 if self.engine:
                     self.engine.dispose()
                     self.engine = None
-                raise ProviderConnectionError(
-                    f"Failed to initialize Postgres: {e}"
-                ) from e
+                raise ProviderConnectionError(f"Failed to initialize Postgres: {e}") from e
 
     def close(self) -> None:
         """Cleanup and dispose connection pool."""
@@ -141,21 +134,13 @@ class EnterpriseProvider:
             )
 
             # Create lookup indexes
-            conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_documents_sha ON documents(sha256)"
-            )
-            conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_documents_ct ON documents(content_type)"
-            )
-            conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_documents_run ON documents(run_id)"
-            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_documents_sha ON documents(sha256)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_documents_ct ON documents(content_type)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_documents_run ON documents(run_id)")
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_documents_artifact ON documents(artifact_id)"
             )
-            conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_documents_resolver ON documents(resolver)"
-            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_documents_resolver ON documents(resolver)")
 
             # Create variants table
             conn.execute(
@@ -180,9 +165,7 @@ class EnterpriseProvider:
                 ON variants(document_id, variant)
                 """
             )
-            conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_variants_sha ON variants(sha256)"
-            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_variants_sha ON variants(sha256)")
 
     def register_or_get(
         self,
@@ -258,7 +241,7 @@ class EnterpriseProvider:
                         row = result.fetchone()
                         if row:
                             return self._row_to_record(row)
-                
+
                 raise ProviderOperationError(f"Register or get failed: {e}") from e
 
     def get_by_artifact(self, artifact_id: str) -> List[DocumentRecord]:
@@ -355,6 +338,7 @@ class EnterpriseProvider:
                     # In cloud provider, this would verify S3 object
                     if storage_uri.startswith("file://"):
                         from pathlib import Path
+
                         path = Path(storage_uri.replace("file://", ""))
                         return path.exists()
 
@@ -375,9 +359,7 @@ class EnterpriseProvider:
                     result = conn.execute("SELECT COUNT(*) FROM documents")
                     total_records = result.scalar() or 0
 
-                    result = conn.execute(
-                        "SELECT SUM(bytes) FROM documents WHERE bytes > 0"
-                    )
+                    result = conn.execute("SELECT SUM(bytes) FROM documents WHERE bytes > 0")
                     total_bytes = result.scalar() or 0
 
                     result = conn.execute(
@@ -387,9 +369,7 @@ class EnterpriseProvider:
 
                     duplicates = len(self.find_duplicates())
 
-                    result = conn.execute(
-                        "SELECT DISTINCT resolver FROM documents"
-                    )
+                    result = conn.execute("SELECT DISTINCT resolver FROM documents")
                     resolvers = [row[0] for row in result.fetchall()]
 
                     result = conn.execute(

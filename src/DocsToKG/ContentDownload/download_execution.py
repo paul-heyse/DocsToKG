@@ -409,9 +409,7 @@ def stream_candidate_payload(
         base_headers["If-Modified-Since"] = plan.last_modified
 
     effective_max_bytes = (
-        plan.max_bytes_override
-        if plan.max_bytes_override is not None
-        else max_bytes
+        plan.max_bytes_override if plan.max_bytes_override is not None else max_bytes
     )
 
     t0 = time.monotonic_ns()
@@ -542,9 +540,7 @@ def stream_candidate_payload(
                 expected_len = int(cl) if (cl and cl.isdigit()) else None
 
                 effective_max_bytes = (
-                    plan.max_bytes_override
-                    if plan.max_bytes_override is not None
-                    else max_bytes
+                    plan.max_bytes_override if plan.max_bytes_override is not None else max_bytes
                 )
 
                 if (
@@ -564,10 +560,7 @@ def stream_candidate_payload(
                             yield chunk
                             continue
                         new_total = bytes_streamed + len(chunk)
-                        if (
-                            effective_max_bytes is not None
-                            and new_total > effective_max_bytes
-                        ):
+                        if effective_max_bytes is not None and new_total > effective_max_bytes:
                             raise DownloadError(
                                 "too-large",
                                 f"Payload exceeded {effective_max_bytes} bytes",

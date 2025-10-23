@@ -54,7 +54,6 @@ import csv
 import io
 import json
 import logging
-import os
 import shutil
 import sqlite3
 import tempfile
@@ -1035,9 +1034,7 @@ class JsonlSink:
                 "reason": (
                     record.reason.value
                     if isinstance(record.reason, ReasonCode)
-                    else record.reason
-                    if record.reason is not None
-                    else None
+                    else record.reason if record.reason is not None else None
                 ),
                 "reason_detail": getattr(record, "reason_detail", None),
                 "metadata": record.metadata,
@@ -1287,9 +1284,7 @@ class CsvSink:
             "reason": (
                 record.reason.value
                 if isinstance(record.reason, ReasonCode)
-                else record.reason
-                if record.reason is not None
-                else None
+                else record.reason if record.reason is not None else None
             ),
             "reason_detail": getattr(record, "reason_detail", None) or "",
             "sha256": record.sha256,
@@ -1783,9 +1778,7 @@ class SqliteSink:
                     (
                         record.reason.value
                         if isinstance(record.reason, ReasonCode)
-                        else record.reason
-                        if record.reason is not None
-                        else None
+                        else record.reason if record.reason is not None else None
                     ),
                     getattr(record, "reason_detail", None),
                     metadata_json,
@@ -2723,9 +2716,7 @@ def iter_previous_manifest_entries(
                         qualifier = (
                             "newer"
                             if schema_version > MANIFEST_SCHEMA_VERSION
-                            else "older"
-                            if schema_version < MANIFEST_SCHEMA_VERSION
-                            else "unknown"
+                            else "older" if schema_version < MANIFEST_SCHEMA_VERSION else "unknown"
                         )
                         raise ValueError(
                             "Unsupported manifest schema_version {observed} ({qualifier}); expected version {expected}. "

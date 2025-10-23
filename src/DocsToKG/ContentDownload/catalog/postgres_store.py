@@ -10,21 +10,20 @@ Provides enterprise-grade database backend with:
 
 from __future__ import annotations
 
-import json
 import logging
 from datetime import datetime
 from threading import RLock
-from typing import Any, Optional
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
 
 class PostgresCatalogStore:
     """PostgreSQL implementation of catalog store.
-    
+
     Thread-safe catalog operations using PostgreSQL.
     """
-    
+
     def __init__(
         self,
         connection_string: str,
@@ -32,7 +31,7 @@ class PostgresCatalogStore:
         timeout: int = 30,
     ):
         """Initialize PostgreSQL catalog store.
-        
+
         Args:
             connection_string: PostgreSQL connection URL
               Format: postgresql://user:password@host:port/database
@@ -45,9 +44,9 @@ class PostgresCatalogStore:
         self._lock = RLock()
         self.conn = None
         self.pool = None
-        
+
         self._init_connection()
-    
+
     def _init_connection(self):
         """Initialize database connection and pool."""
         try:
@@ -55,13 +54,14 @@ class PostgresCatalogStore:
             from psycopg_pool import ConnectionPool
         except ImportError:
             raise ImportError(
-                "psycopg[pool] not installed. "
-                "Install with: pip install psycopg[pool]"
+                "psycopg[pool] not installed. " "Install with: pip install psycopg[pool]"
             )
-        
+
         try:
-            logger.info(f"Connecting to PostgreSQL: {self.connection_string.split('@')[1] if '@' in self.connection_string else '...'}")
-            
+            logger.info(
+                f"Connecting to PostgreSQL: {self.connection_string.split('@')[1] if '@' in self.connection_string else '...'}"
+            )
+
             # Create connection pool
             self.pool = ConnectionPool(
                 self.connection_string,
@@ -69,15 +69,15 @@ class PostgresCatalogStore:
                 max_size=self.pool_size,
                 timeout=self.timeout,
             )
-            
+
             # Initialize schema
             self._init_schema()
             logger.info("PostgreSQL catalog store initialized")
-        
+
         except Exception as e:
             logger.error(f"Failed to initialize PostgreSQL: {e}")
             raise
-    
+
     def _init_schema(self):
         """Initialize database schema."""
         schema_sql = """
@@ -117,7 +117,7 @@ class PostgresCatalogStore:
         CREATE UNIQUE INDEX IF NOT EXISTS idx_variants_unique
             ON variants(document_id, variant);
         """
-        
+
         try:
             with self.pool.connection() as conn:
                 with conn.cursor() as cur:
@@ -127,7 +127,7 @@ class PostgresCatalogStore:
         except Exception as e:
             logger.error(f"Failed to initialize schema: {e}")
             raise
-    
+
     def register_or_get(
         self,
         artifact_id: str,
@@ -140,7 +140,7 @@ class PostgresCatalogStore:
         run_id: Optional[str],
     ):
         """Register or fetch document record.
-        
+
         Args:
             artifact_id: Artifact identifier
             source_url: Source URL
@@ -150,18 +150,18 @@ class PostgresCatalogStore:
             sha256: SHA-256 hash
             storage_uri: Storage location
             run_id: Run identifier
-            
+
         Returns:
             DocumentRecord
         """
         from DocsToKG.ContentDownload.catalog.models import DocumentRecord
-        
+
         with self._lock:
             try:
                 with self.pool.connection() as conn:
                     with conn.cursor() as cur:
                         now = datetime.utcnow().isoformat()
-                        
+
                         # Try insert (idempotent)
                         cur.execute(
                             """
@@ -169,10 +169,21 @@ class PostgresCatalogStore:
                             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                             ON CONFLICT (artifact_id, source_url, resolver) DO NOTHING
                             """,
-                            (artifact_id, source_url, resolver, content_type, bytes, sha256, storage_uri, now, now, run_id)
+                            (
+                                artifact_id,
+                                source_url,
+                                resolver,
+                                content_type,
+                                bytes,
+                                sha256,
+                                storage_uri,
+                                now,
+                                now,
+                                run_id,
+                            ),
                         )
                         conn.commit()
-                        
+
                         # Fetch record
                         cur.execute(
                             """
@@ -180,13 +191,13 @@ class PostgresCatalogStore:
                             FROM documents
                             WHERE artifact_id = %s AND source_url = %s AND resolver = %s
                             """,
-                            (artifact_id, source_url, resolver)
+                            (artifact_id, source_url, resolver),
                         )
                         row = cur.fetchone()
-                        
+
                         if not row:
                             raise RuntimeError("Record not found after insert")
-                        
+
                         return DocumentRecord(
                             id=row[0],
                             artifact_id=row[1],
@@ -203,11 +214,11 @@ class PostgresCatalogStore:
             except Exception as e:
                 logger.error(f"Failed to register record: {e}")
                 raise
-    
+
     def get_by_artifact(self, artifact_id: str) -> list:
         """Get all records for an artifact."""
         from DocsToKG.ContentDownload.catalog.models import DocumentRecord
-        
+
         with self._lock:
             try:
                 with self.pool.connection() as conn:
@@ -219,7 +230,7 @@ class PostgresCatalogStore:
                             WHERE artifact_id = %s
                             ORDER BY created_at DESC
                             """,
-                            (artifact_id,)
+                            (artifact_id,),
                         )
                         return [
                             DocumentRecord(
@@ -240,11 +251,11 @@ class PostgresCatalogStore:
             except Exception as e:
                 logger.error(f"Failed to get artifact records: {e}")
                 raise
-    
+
     def get_by_sha256(self, sha256: str) -> list:
         """Get all records with matching SHA-256."""
         from DocsToKG.ContentDownload.catalog.models import DocumentRecord
-        
+
         with self._lock:
             try:
                 with self.pool.connection() as conn:
@@ -256,7 +267,7 @@ class PostgresCatalogStore:
                             WHERE sha256 = %s
                             ORDER BY created_at DESC
                             """,
-                            (sha256,)
+                            (sha256,),
                         )
                         return [
                             DocumentRecord(
@@ -277,7 +288,7 @@ class PostgresCatalogStore:
             except Exception as e:
                 logger.error(f"Failed to get records by SHA-256: {e}")
                 raise
-    
+
     def find_duplicates(self) -> list[tuple[str, int]]:
         """Find all duplicate groups (sha256, count)."""
         with self._lock:
@@ -298,11 +309,11 @@ class PostgresCatalogStore:
             except Exception as e:
                 logger.error(f"Failed to find duplicates: {e}")
                 raise
-    
+
     def get_all_records(self) -> list:
         """Get all records in catalog."""
         from DocsToKG.ContentDownload.catalog.models import DocumentRecord
-        
+
         with self._lock:
             try:
                 with self.pool.connection() as conn:
@@ -333,7 +344,7 @@ class PostgresCatalogStore:
             except Exception as e:
                 logger.error(f"Failed to get all records: {e}")
                 raise
-    
+
     def stats(self) -> dict:
         """Get catalog statistics."""
         with self._lock:
@@ -342,13 +353,15 @@ class PostgresCatalogStore:
                     with conn.cursor() as cur:
                         cur.execute("SELECT COUNT(*) FROM documents")
                         total_records = cur.fetchone()[0]
-                        
+
                         cur.execute("SELECT SUM(bytes) FROM documents")
                         total_bytes = cur.fetchone()[0] or 0
-                        
-                        cur.execute("SELECT COUNT(DISTINCT sha256) FROM documents WHERE sha256 IS NOT NULL")
+
+                        cur.execute(
+                            "SELECT COUNT(DISTINCT sha256) FROM documents WHERE sha256 IS NOT NULL"
+                        )
                         unique_hashes = cur.fetchone()[0]
-                        
+
                         return {
                             "total_records": total_records,
                             "total_bytes": total_bytes,
@@ -358,7 +371,7 @@ class PostgresCatalogStore:
             except Exception as e:
                 logger.error(f"Failed to get stats: {e}")
                 raise
-    
+
     def close(self):
         """Close database connection pool."""
         try:

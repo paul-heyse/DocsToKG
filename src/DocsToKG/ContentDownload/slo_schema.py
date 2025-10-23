@@ -68,9 +68,11 @@ SLO_WINDOW_30DAY_SECONDS = 2592000
 
 # === SLO DATACLASSES ===
 
+
 @dataclass
 class SLOThreshold:
     """Single SLO threshold definition."""
+
     name: str
     metric: str
     target: float
@@ -82,6 +84,7 @@ class SLOThreshold:
 @dataclass
 class SLOMetric:
     """Computed SLO metric result."""
+
     name: str
     actual_value: float
     target_value: float
@@ -91,6 +94,7 @@ class SLOMetric:
 
 
 # === SLO DEFINITIONS ===
+
 
 def get_slo_definitions() -> List[SLOThreshold]:
     """Get all active SLO definitions."""
@@ -148,6 +152,7 @@ def get_slo_definitions() -> List[SLOThreshold]:
 
 # === SLO EVALUATION HELPERS ===
 
+
 def evaluate_slo_status(actual: float, target: float, error_budget: float) -> str:
     """Determine SLO status: pass, warning, or fail.
 
@@ -203,6 +208,7 @@ def calculate_error_budget_remaining(
 
 
 # === SLO MONITORING ALERTS ===
+
 
 def should_alert(status: str, error_budget_remaining: float) -> bool:
     """Determine if alert should be triggered.

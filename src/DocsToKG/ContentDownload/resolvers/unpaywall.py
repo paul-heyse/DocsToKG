@@ -22,21 +22,19 @@ from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Tuple
 import httpx
 
 from DocsToKG.ContentDownload.core import dedupe, normalize_doi
-from DocsToKG.ContentDownload.urls import canonical_for_index
-
 from DocsToKG.ContentDownload.resolvers.base import (
     ResolverEvent,
     ResolverEventReason,
     ResolverResult,
     _fetch_unpaywall_data,
 )
+from DocsToKG.ContentDownload.urls import canonical_for_index
+
 from .registry_v2 import register_v2
-
-
 
 if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.core import WorkArtifact
-    
+
 
 LOGGER = logging.getLogger(__name__)
 

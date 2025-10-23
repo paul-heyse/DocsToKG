@@ -60,9 +60,6 @@ from typing import TYPE_CHECKING, Any, Dict, Iterable, Iterator, List, Mapping, 
 import httpx
 
 from DocsToKG.ContentDownload.networking import BreakerOpenError, request_with_retries
-from DocsToKG.ContentDownload.telemetry_wayback import TelemetryWayback
-from DocsToKG.ContentDownload.urls import canonical_for_index, canonical_for_request
-
 from DocsToKG.ContentDownload.resolvers.base import (
     ResolverEvent,
     ResolverEventReason,
@@ -71,6 +68,9 @@ from DocsToKG.ContentDownload.resolvers.base import (
     find_pdf_via_link,
     find_pdf_via_meta,
 )
+from DocsToKG.ContentDownload.telemetry_wayback import TelemetryWayback
+from DocsToKG.ContentDownload.urls import canonical_for_index, canonical_for_request
+
 from .registry_v2 import register_v2
 
 try:  # pragma: no cover - optional dependency
@@ -82,10 +82,13 @@ except ImportError:  # pragma: no cover - handled gracefully at runtime
     ArchiveNotInAvailabilityAPIResponse = None  # type: ignore[assignment]
     WaybackError = Exception  # type: ignore[assignment]
 
+
 class ResolverResult:
     """Result from resolver attempt."""
-    def __init__(self, url=None, referer=None, metadata=None, 
-                 event=None, event_reason=None, **kwargs):
+
+    def __init__(
+        self, url=None, referer=None, metadata=None, event=None, event_reason=None, **kwargs
+    ):
         self.url = url
         self.referer = referer
         self.metadata = metadata or {}
@@ -95,10 +98,9 @@ class ResolverResult:
             setattr(self, k, v)
 
 
-
 if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.core import WorkArtifact
-    
+
 
 LOGGER = logging.getLogger(__name__)
 

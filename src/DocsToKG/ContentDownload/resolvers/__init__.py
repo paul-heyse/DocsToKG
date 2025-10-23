@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from .arxiv import ArxivResolver
 from .base import (
-    ApiResolverBase,
     DEFAULT_RESOLVER_TOGGLES,
+    ApiResolverBase,
     Resolver,
     ResolverEvent,
     ResolverEventReason,

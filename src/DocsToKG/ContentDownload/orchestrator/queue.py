@@ -134,22 +134,16 @@ class WorkQueue:
     def _run_schema_migrations(self, conn: sqlite3.Connection) -> None:
         """Apply lightweight schema migrations for existing queue databases."""
 
-        columns = {
-            row["name"]
-            for row in conn.execute("PRAGMA table_info(jobs)").fetchall()
-        }
+        columns = {row["name"] for row in conn.execute("PRAGMA table_info(jobs)").fetchall()}
 
         if "available_at" not in columns:
             conn.execute("ALTER TABLE jobs ADD COLUMN available_at TEXT")
             # Existing jobs should be immediately available for leasing.
-            conn.execute(
-                "UPDATE jobs SET available_at = created_at WHERE available_at IS NULL"
-            )
+            conn.execute("UPDATE jobs SET available_at = created_at WHERE available_at IS NULL")
 
         # Ensure supporting indexes exist even if table predates this version.
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_jobs_state_available"
-            " ON jobs(state, available_at)"
+            "CREATE INDEX IF NOT EXISTS idx_jobs_state_available" " ON jobs(state, available_at)"
         )
 
     def _get_connection(self) -> sqlite3.Connection:

@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import argparse
 import sqlite3
-import threading
 import time
 from typing import Any, Dict, Optional
 
@@ -86,8 +85,9 @@ def _compute_run_summary(cx: sqlite3.Connection, run_id: str) -> Dict[str, float
     out["yield_pct"] = 100.0 * ok / max(1, tot)
 
     # TTFP p50/p95 from fallback_attempts
-    row = cx.execute(
-        """
+    row = (
+        cx.execute(
+            """
         WITH s AS (
           SELECT artifact_id, MIN(ts) ts_s FROM fallback_attempts
           WHERE run_id=? AND outcome='success' GROUP BY artifact_id
@@ -103,8 +103,10 @@ def _compute_run_summary(cx: sqlite3.Connection, run_id: str) -> Dict[str, float
           (SELECT ms FROM d ORDER BY ms LIMIT 1 OFFSET (SELECT CAST(COUNT(*)*0.50 AS INT) FROM d)) AS p50,
           (SELECT ms FROM d ORDER BY ms LIMIT 1 OFFSET (SELECT CAST(COUNT(*)*0.95 AS INT) FROM d)) AS p95
         """,
-        (run_id, run_id),
-    ).fetchone() or (0, 0)
+            (run_id, run_id),
+        ).fetchone()
+        or (0, 0)
+    )
     out["ttfp_p50_ms"] = int(row[0] or 0)
     out["ttfp_p95_ms"] = int(row[1] or 0)
 

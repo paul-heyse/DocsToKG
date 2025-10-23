@@ -25,7 +25,7 @@ import threading
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Any, Dict, Mapping, Optional, List, Tuple
+from typing import Any, Dict, List, Mapping, Optional
 
 from DocsToKG.ContentDownload.core import ReasonCode
 

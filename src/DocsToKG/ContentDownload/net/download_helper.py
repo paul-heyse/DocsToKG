@@ -20,7 +20,7 @@ from typing import Any, Optional
 
 import httpx
 
-from .client import get_http_client, request_with_redirect_audit, _normalize_host_for_telemetry
+from .client import _normalize_host_for_telemetry, get_http_client, request_with_redirect_audit
 from .instrumentation import (
     CacheStatus,
     NetRequestEventBuilder,

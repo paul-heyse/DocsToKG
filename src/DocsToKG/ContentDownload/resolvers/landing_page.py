@@ -23,8 +23,6 @@ from typing import TYPE_CHECKING, Any, Iterable, Mapping
 import httpx
 
 from DocsToKG.ContentDownload.networking import BreakerOpenError
-from DocsToKG.ContentDownload.robots import RobotsCache
-
 from DocsToKG.ContentDownload.resolvers.base import (
     BeautifulSoup,
     ResolverEvent,
@@ -36,13 +34,13 @@ from DocsToKG.ContentDownload.resolvers.base import (
     find_pdf_via_meta,
     request_with_retries,
 )
+from DocsToKG.ContentDownload.robots import RobotsCache
+
 from .registry_v2 import register_v2
-
-
 
 if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.core import WorkArtifact
-    
+
 
 LOGGER = logging.getLogger(__name__)
 

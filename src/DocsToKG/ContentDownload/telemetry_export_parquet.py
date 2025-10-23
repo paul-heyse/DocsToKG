@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import argparse
 import pathlib
-from typing import List
 
 try:
     import duckdb

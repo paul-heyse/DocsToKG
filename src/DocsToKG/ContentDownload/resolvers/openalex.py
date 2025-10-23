@@ -21,20 +21,18 @@ from typing import TYPE_CHECKING, Any, Iterable
 import httpx
 
 from DocsToKG.ContentDownload.core import dedupe
-from DocsToKG.ContentDownload.urls import canonical_for_index
-
 from DocsToKG.ContentDownload.resolvers.base import (
     ResolverEvent,
     ResolverEventReason,
     ResolverResult,
 )
+from DocsToKG.ContentDownload.urls import canonical_for_index
+
 from .registry_v2 import register_v2
-
-
 
 if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.core import WorkArtifact
-    
+
 
 @register_v2("openalex")
 class OpenAlexResolver:

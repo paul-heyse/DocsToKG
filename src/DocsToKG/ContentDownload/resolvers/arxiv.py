@@ -19,21 +19,19 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Iterable
 
 from DocsToKG.ContentDownload.core import strip_prefix
-
 from DocsToKG.ContentDownload.resolvers.base import (
     ResolverEvent,
     ResolverEventReason,
     ResolverResult,
 )
+
 from .registry_v2 import register_v2
-
-
 
 if TYPE_CHECKING:  # pragma: no cover
     import httpx
 
     from DocsToKG.ContentDownload.core import WorkArtifact
-    
+
 
 @register_v2("arxiv")
 class ArxivResolver:

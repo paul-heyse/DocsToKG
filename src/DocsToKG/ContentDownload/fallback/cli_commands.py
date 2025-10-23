@@ -12,12 +12,12 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any, Dict, List, Optional
 from collections import defaultdict
+from typing import Any, Dict, List
 
 from DocsToKG.ContentDownload.fallback.loader import load_fallback_plan
-from DocsToKG.ContentDownload.fallback.types import FallbackPlan
 from DocsToKG.ContentDownload.fallback.telemetry_storage import get_telemetry_storage
+from DocsToKG.ContentDownload.fallback.types import FallbackPlan
 
 logger = logging.getLogger(__name__)
 
@@ -51,9 +51,19 @@ class TelemetryAnalyzer:
             "success_count": success_count,
             "success_rate": round(success_rate, 3),
             "avg_elapsed_ms": round(avg_elapsed, 1),
-            "p50_elapsed_ms": round(sorted(elapsed_times)[len(elapsed_times)//2], 1) if elapsed_times else 0,
-            "p95_elapsed_ms": round(sorted(elapsed_times)[int(len(elapsed_times)*0.95)], 1) if elapsed_times else 0,
-            "p99_elapsed_ms": round(sorted(elapsed_times)[int(len(elapsed_times)*0.99)], 1) if elapsed_times else 0,
+            "p50_elapsed_ms": (
+                round(sorted(elapsed_times)[len(elapsed_times) // 2], 1) if elapsed_times else 0
+            ),
+            "p95_elapsed_ms": (
+                round(sorted(elapsed_times)[int(len(elapsed_times) * 0.95)], 1)
+                if elapsed_times
+                else 0
+            ),
+            "p99_elapsed_ms": (
+                round(sorted(elapsed_times)[int(len(elapsed_times) * 0.99)], 1)
+                if elapsed_times
+                else 0
+            ),
         }
 
     def get_tier_stats(self) -> Dict[str, Dict[str, Any]]:
@@ -72,7 +82,11 @@ class TelemetryAnalyzer:
         result = {}
         for tier, data in tier_data.items():
             success_rate = data["successes"] / data["attempts"] if data["attempts"] > 0 else 0
-            avg_elapsed = sum(data["elapsed_times"]) / len(data["elapsed_times"]) if data["elapsed_times"] else 0
+            avg_elapsed = (
+                sum(data["elapsed_times"]) / len(data["elapsed_times"])
+                if data["elapsed_times"]
+                else 0
+            )
             result[tier] = {
                 "attempts": data["attempts"],
                 "success_rate": round(success_rate, 3),
@@ -84,7 +98,9 @@ class TelemetryAnalyzer:
 
     def get_source_stats(self) -> Dict[str, Dict[str, Any]]:
         """Get statistics per source."""
-        source_data = defaultdict(lambda: {"attempts": 0, "successes": 0, "errors": 0, "timeouts": 0})
+        source_data = defaultdict(
+            lambda: {"attempts": 0, "successes": 0, "errors": 0, "timeouts": 0}
+        )
 
         for record in self.records:
             source = record.get("host", "unknown")
@@ -100,9 +116,15 @@ class TelemetryAnalyzer:
         for source, data in source_data.items():
             result[source] = {
                 "attempts": data["attempts"],
-                "success_rate": round(data["successes"] / data["attempts"] if data["attempts"] > 0 else 0, 3),
-                "error_rate": round(data["errors"] / data["attempts"] if data["attempts"] > 0 else 0, 3),
-                "timeout_rate": round(data["timeouts"] / data["attempts"] if data["attempts"] > 0 else 0, 3),
+                "success_rate": round(
+                    data["successes"] / data["attempts"] if data["attempts"] > 0 else 0, 3
+                ),
+                "error_rate": round(
+                    data["errors"] / data["attempts"] if data["attempts"] > 0 else 0, 3
+                ),
+                "timeout_rate": round(
+                    data["timeouts"] / data["attempts"] if data["attempts"] > 0 else 0, 3
+                ),
                 "success_count": data["successes"],
             }
 
@@ -212,12 +234,14 @@ class ConfigurationTuner:
         tier_stats = self.analyzer.get_tier_stats()
         for tier_name, stats in tier_stats.items():
             if stats["success_rate"] < 0.2:  # Less than 20% success
-                recommendations.append({
-                    "type": "low_success_tier",
-                    "tier": tier_name,
-                    "message": f"{tier_name} has low success rate ({stats['success_rate'] * 100:.1f}%)",
-                    "impact": "Consider moving to separate tier or disabling",
-                })
+                recommendations.append(
+                    {
+                        "type": "low_success_tier",
+                        "tier": tier_name,
+                        "message": f"{tier_name} has low success rate ({stats['success_rate'] * 100:.1f}%)",
+                        "impact": "Consider moving to separate tier or disabling",
+                    }
+                )
 
         return recommendations
 
@@ -301,15 +325,17 @@ class StrategyExplainer:
             for source in tier.sources:
                 lines.append(f"    └─ {source}")
 
-        lines.extend([
-            "",
-            "BUDGETS (Global):",
-            f"  - Total Timeout: {self.plan.budgets.get('total_timeout_ms', 0)} ms",
-            f"  - Total Attempts: {self.plan.budgets.get('total_attempts', 0)}",
-            f"  - Max Concurrent: {self.plan.budgets.get('max_concurrent', 0)} threads",
-            "",
-            "═" * 73,
-        ])
+        lines.extend(
+            [
+                "",
+                "BUDGETS (Global):",
+                f"  - Total Timeout: {self.plan.budgets.get('total_timeout_ms', 0)} ms",
+                f"  - Total Attempts: {self.plan.budgets.get('total_attempts', 0)}",
+                f"  - Max Concurrent: {self.plan.budgets.get('max_concurrent', 0)} threads",
+                "",
+                "═" * 73,
+            ]
+        )
 
         return "\n".join(lines)
 
@@ -362,7 +388,7 @@ def cmd_fallback_config(args: Any) -> None:
         for tier in plan.tiers:
             print(f"    - name: {tier.name}")
             print(f"      parallel: {tier.parallel}")
-            print(f"      sources:")
+            print("      sources:")
             for source in tier.sources:
                 print(f"        - {source}")
         print("  policies:")

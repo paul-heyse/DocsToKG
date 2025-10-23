@@ -85,8 +85,9 @@ def load_config_with_audit(
         >>> print(f"Loaded from {audit._sources_used()}")
         >>> print(f"Config hash: {audit.config_hash}")
     """
-    from DocsToKG.ContentDownload.config.loader import load_config
     import os
+
+    from DocsToKG.ContentDownload.config.loader import load_config
 
     # Initialize audit log
     audit = ConfigAuditLog(

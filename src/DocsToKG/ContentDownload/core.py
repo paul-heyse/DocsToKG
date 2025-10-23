@@ -32,8 +32,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Mapping, Optional, Set, Union
 from urllib.parse import unquote, urlsplit
 
-from DocsToKG.ContentDownload.urls import canonical_for_index
-
 __all__ = (
     "Classification",
     "PDF_LIKE",

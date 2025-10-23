@@ -21,20 +21,18 @@ from typing import TYPE_CHECKING, Any, Iterable, List
 import httpx
 
 from DocsToKG.ContentDownload.core import dedupe, normalize_doi
-
 from DocsToKG.ContentDownload.resolvers.base import (
     ApiResolverBase,
     ResolverEvent,
     ResolverEventReason,
     ResolverResult,
 )
+
 from .registry_v2 import register_v2
-
-
 
 if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.core import WorkArtifact
-    
+
 
 @register_v2("europe_pmc")
 class EuropePmcResolver(ApiResolverBase):

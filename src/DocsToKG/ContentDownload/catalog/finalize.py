@@ -23,14 +23,14 @@ logger = logging.getLogger(__name__)
 
 def compute_sha256_file(file_path: str, chunk_size: int = 65536) -> str:
     """Compute SHA-256 of a file.
-    
+
     Args:
         file_path: Path to file
         chunk_size: Read chunk size (default 64KB)
-        
+
     Returns:
         SHA-256 hash in lowercase hex
-        
+
     Raises:
         IOError: If file cannot be read
     """
@@ -60,14 +60,14 @@ def finalize_artifact(
     run_id: Optional[str] = None,
 ) -> dict:
     """Finalize a downloaded artifact: compute hash, choose path, register.
-    
+
     This is the integration point between download and catalog. It:
     1. Optionally computes SHA-256
     2. Chooses final path (CAS or policy)
     3. Performs atomic move/hardlink
     4. Registers to catalog
     5. Returns metadata
-    
+
     Args:
         temp_path: Temporary file path from download
         artifact_id: Artifact identifier
@@ -81,7 +81,7 @@ def finalize_artifact(
         compute_sha256: Whether to compute SHA-256
         verify_on_register: Verify SHA-256 after finalize
         run_id: Run ID for provenance
-        
+
     Returns:
         Dict with keys:
             - 'status': 'success' or 'error'
@@ -93,24 +93,24 @@ def finalize_artifact(
             - 'error': Error message (if status='error')
     """
     temp = Path(temp_path)
-    
+
     if not temp.exists():
         return {
             "status": "error",
             "error": f"Temporary file not found: {temp_path}",
         }
-    
+
     try:
         # Get file size
         file_size = temp.stat().st_size
-        
+
         # Compute SHA-256 if requested
         sha256_hex = None
         if compute_sha256:
             logger.debug(f"Computing SHA-256 for {temp_path}")
             sha256_hex = compute_sha256_file(temp_path)
             logger.debug(f"SHA-256: {sha256_hex}")
-        
+
         # Choose final path
         basename = extract_basename_from_url(source_url)
         try:
@@ -126,7 +126,7 @@ def finalize_artifact(
                 "status": "error",
                 "error": f"Failed to choose final path: {e}",
             }
-        
+
         # Perform hardlink dedup or move
         is_dedup = False
         try:
@@ -141,7 +141,7 @@ def finalize_artifact(
                 "status": "error",
                 "error": f"Failed to finalize file: {e}",
             }
-        
+
         # Verify after finalize if requested
         if verify_on_register and sha256_hex:
             if not Path(final_path).exists():
@@ -149,14 +149,14 @@ def finalize_artifact(
                     "status": "error",
                     "error": f"File not found after finalize: {final_path}",
                 }
-            
+
             computed_sha = compute_sha256_file(final_path)
             if computed_sha != sha256_hex:
                 return {
                     "status": "error",
                     "error": f"SHA-256 mismatch after finalize: {computed_sha} != {sha256_hex}",
                 }
-        
+
         # Register to catalog
         if catalog is not None:
             storage_uri = f"file://{final_path}"
@@ -175,7 +175,7 @@ def finalize_artifact(
             except Exception as e:
                 logger.error(f"Failed to register to catalog: {e}")
                 # Continue anyway - file is finalized even if registration failed
-        
+
         # Build response
         return {
             "status": "success",
@@ -185,7 +185,7 @@ def finalize_artifact(
             "sha256": sha256_hex,
             "is_dedup": is_dedup,
         }
-    
+
     except Exception as e:
         logger.error(f"Unexpected error during finalization: {e}", exc_info=True)
         return {

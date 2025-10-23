@@ -207,9 +207,7 @@ class RoleAwareCacheTransport(httpx.BaseTransport):
             new_validator = parse_entity_validator(response.headers)
             if should_revalidate(validator, response.headers):
                 # Update validator with response data
-                self.validator_cache[canonical_url] = merge_validators(
-                    validator, new_validator
-                )
+                self.validator_cache[canonical_url] = merge_validators(validator, new_validator)
                 # 304 means return the cached response body
                 # (Hishel should handle this internally)
 

@@ -322,9 +322,7 @@ class RobotsCache:
                 try:
                     parser.parse(lines)
                 except Exception as exc:
-                    logger.warning(
-                        "Failed to parse robots.txt from %s: %s", robots_url, exc
-                    )
+                    logger.warning("Failed to parse robots.txt from %s: %s", robots_url, exc)
                     parser.parse([])
         except Exception as exc:
             logger.warning(f"Failed to fetch robots.txt from {robots_url}: {exc}")

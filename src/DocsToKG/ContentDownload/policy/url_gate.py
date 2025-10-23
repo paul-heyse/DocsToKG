@@ -15,9 +15,9 @@ This is the SINGLE SOURCE OF TRUTH for URL validation across ContentDownload.
 from __future__ import annotations
 
 import logging
+import os
 from typing import Optional
 from urllib.parse import urlparse, urlunparse
-import os
 
 logger = logging.getLogger(__name__)
 

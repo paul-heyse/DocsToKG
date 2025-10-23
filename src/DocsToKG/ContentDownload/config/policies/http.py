@@ -30,7 +30,9 @@ class HttpClientConfig(BaseModel):
 
     # Pool settings
     max_connections: int = Field(default=64, ge=1, description="Max connections")
-    max_keepalive_connections: int = Field(default=20, ge=1, description="Max keepalive connections")
+    max_keepalive_connections: int = Field(
+        default=20, ge=1, description="Max keepalive connections"
+    )
     keepalive_expiry_s: float = Field(default=30.0, ge=0, description="Keepalive expiry (seconds)")
 
     # Cache settings (Hishel)

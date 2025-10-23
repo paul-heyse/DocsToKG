@@ -33,15 +33,19 @@ Coordinates the full pipeline:
 
 from __future__ import annotations
 
-import logging
 import importlib
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterator, Mapping, Optional
 from uuid import uuid4
 
 from DocsToKG.ContentDownload.config import ContentDownloadConfig
-from DocsToKG.ContentDownload.http_session import HttpConfig, get_http_session
+from DocsToKG.ContentDownload.http_session import HttpConfig
+from DocsToKG.ContentDownload.httpx_transport import (
+    configure_http_client,
+    get_http_client,
+)
 from DocsToKG.ContentDownload.pipeline import ResolverPipeline
 from DocsToKG.ContentDownload.resolver_http_client import (
     PerResolverHttpClient,
@@ -59,16 +63,12 @@ from DocsToKG.ContentDownload.telemetry import (
     SqliteSink,
     SummarySink,
 )
-from DocsToKG.ContentDownload.httpx_transport import (
-    configure_http_client,
-    get_http_client,
-)
 
 # Feature flags support
 try:
     from DocsToKG.ContentDownload.config.feature_flags import (
-        get_feature_flags,
         FeatureFlag,
+        get_feature_flags,
     )
 
     FEATURE_FLAGS_AVAILABLE = True
@@ -275,10 +275,10 @@ def _build_telemetry(paths: Optional[Mapping[str, Path]], run_id: str) -> RunTel
             LOGGER.debug("Using unified bootstrap for telemetry (feature enabled)")
             # Try to import and use Pydantic v2 config
             try:
+                from DocsToKG.ContentDownload.config.loader import load_config
                 from DocsToKG.ContentDownload.config.models import (
                     ContentDownloadConfig,
                 )
-                from DocsToKG.ContentDownload.config.loader import load_config
 
                 # Load config and use new telemetry builder
                 cfg = load_config()
@@ -405,9 +405,7 @@ def _build_resolver_registry(config: ContentDownloadConfig) -> dict[str, Any]:
         if resolver_cfg is None or not resolver_cfg.enabled:
             continue
         try:
-            importlib.import_module(
-                f"DocsToKG.ContentDownload.resolvers.{resolver_name}"
-            )
+            importlib.import_module(f"DocsToKG.ContentDownload.resolvers.{resolver_name}")
         except ModuleNotFoundError:
             LOGGER.debug(f"Resolver module not found: {resolver_name}")
 
@@ -453,6 +451,8 @@ def _build_retry_configs(
         )
 
     return retry_configs
+
+
 def _apply_http_config(session: Any, http_config: HttpConfig) -> None:
     """Apply HttpConfig headers to the shared httpx client."""
 

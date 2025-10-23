@@ -186,6 +186,7 @@ class _TelemetryAttemptCtx:
             self._attempt.complete("error")
         self._attempt.ensure_completed()
 
+
 """Telemetry helpers for the Wayback fallback pipeline.
 
 This module provides a very small abstraction that mimics the portions of
@@ -208,7 +209,7 @@ behaviour is scoped to a single attempt.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from typing import Dict
 
 
 @dataclass

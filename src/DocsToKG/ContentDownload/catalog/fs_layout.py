@@ -3,7 +3,7 @@
 Provides two storage layout options:
   1. Policy path: human-friendly paths derived from artifact metadata
   2. CAS (Content-Addressable Storage): paths based on SHA-256 hash
-  
+
 Also handles deduplication via hardlinks or copies.
 """
 
@@ -20,26 +20,26 @@ logger = logging.getLogger(__name__)
 
 def cas_path(root_dir: str, sha256_hex: str) -> str:
     """Generate CAS path from SHA-256 hash.
-    
+
     Uses two-level directory fan-out to avoid hot directories.
-    
+
     Example:
-        cas_path("/data", "e3b0c44298fc1c14...") 
+        cas_path("/data", "e3b0c44298fc1c14...")
         -> "/data/cas/sha256/e3/b0c44298fc1c14..."
-    
+
     Args:
         root_dir: Base root directory
         sha256_hex: SHA-256 hash in lowercase hex format
-        
+
     Returns:
         Full path to CAS file location
-        
+
     Raises:
         ValueError: If sha256_hex is invalid
     """
     if not sha256_hex or len(sha256_hex) < 4:
         raise ValueError(f"Invalid SHA-256: {sha256_hex}")
-    
+
     path = Path(root_dir) / "cas" / "sha256" / sha256_hex[:2] / sha256_hex[2:]
     path.parent.mkdir(parents=True, exist_ok=True)
     return str(path)
@@ -47,18 +47,18 @@ def cas_path(root_dir: str, sha256_hex: str) -> str:
 
 def policy_path(root_dir: str, *, artifact_id: str, url_basename: str) -> str:
     """Generate human-friendly policy path from artifact metadata.
-    
+
     Creates predictable, browsable paths based on artifact metadata.
-    
+
     Example:
         policy_path("/data", artifact_id="doi:10.1234/abc", url_basename="paper.pdf")
         -> "/data/paper.pdf"
-    
+
     Args:
         root_dir: Base root directory
         artifact_id: Artifact identifier (unused in basic implementation)
         url_basename: Basename from URL (e.g., filename)
-        
+
     Returns:
         Full path to policy file location
     """
@@ -74,36 +74,36 @@ def dedup_hardlink_or_copy(
     verify_inode: bool = False,
 ) -> bool:
     """Deduplicate via hardlink or copy.
-    
+
     Attempts hardlink if dst_final exists and hardlink=True. On success,
     removes src_tmp and returns True. Falls back to move/copy on error.
-    
+
     Args:
         src_tmp: Source temporary file path
         dst_final: Destination final file path
         hardlink: If True, attempt hardlink for dedup
         verify_inode: If True, verify inode equality after hardlink
-        
+
     Returns:
         True if dedup was successful (hardlink hit or copy)
         False if file didn't exist (new file)
-        
+
     Raises:
         OSError: If final operations fail
     """
     src = Path(src_tmp)
     dst = Path(dst_final)
-    
+
     # If destination doesn't exist, this is a new file (no dedup)
     if not dst.exists():
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.move(src_tmp, dst_final)
         logger.debug(f"New file: {dst_final}")
         return False
-    
+
     # Destination exists - this is a dedup hit
     logger.info(f"Dedup hit detected: {dst_final}")
-    
+
     if hardlink:
         try:
             # Try hardlink if destination exists
@@ -111,21 +111,23 @@ def dedup_hardlink_or_copy(
             # Now replace destination with the linked version
             os.remove(dst_final)
             os.replace(src_tmp, dst_final)
-            
+
             if verify_inode:
                 src_stat = os.stat(src_tmp)
                 dst_stat = os.stat(dst_final)
                 if src_stat.st_ino == dst_stat.st_ino:
                     logger.debug(f"Hardlink verified: inode {src_stat.st_ino}")
                 else:
-                    logger.warning(f"Hardlink inode mismatch: {src_stat.st_ino} vs {dst_stat.st_ino}")
-            
+                    logger.warning(
+                        f"Hardlink inode mismatch: {src_stat.st_ino} vs {dst_stat.st_ino}"
+                    )
+
             logger.info(f"Hardlink dedup successful: {dst_final}")
             return True
         except OSError as e:
             logger.debug(f"Hardlink failed: {e}, falling back to copy")
             # Fall through to copy
-    
+
     # Fallback: copy to destination (may be same filesystem or cross-filesystem)
     try:
         if dst.exists():
@@ -147,17 +149,17 @@ def choose_final_path(
     url_basename: str,
 ) -> str:
     """Choose final path based on layout strategy and availability.
-    
+
     Args:
         root_dir: Root storage directory
         layout: Layout strategy ('policy_path' or 'cas')
         sha256_hex: SHA-256 hash (required for CAS layout)
         artifact_id: Artifact identifier
         url_basename: URL basename
-        
+
     Returns:
         Final path to use for storage
-        
+
     Raises:
         ValueError: If CAS layout requested but sha256 unavailable
     """
@@ -173,23 +175,25 @@ def choose_final_path(
 
 def extract_basename_from_url(url: str) -> str:
     """Extract filename from URL, with fallback.
-    
+
     Args:
         url: Source URL
-        
+
     Returns:
         Filename or fallback identifier
     """
     try:
         from urllib.parse import urlparse
+
         parsed = urlparse(url)
         basename = Path(parsed.path).name
         if basename:
             return basename
     except Exception:
         pass
-    
+
     # Fallback: use last part of domain + hash
     import hashlib
+
     url_hash = hashlib.md5(url.encode()).hexdigest()[:8]
     return f"artifact_{url_hash}.bin"

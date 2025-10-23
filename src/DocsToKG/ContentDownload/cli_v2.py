@@ -17,17 +17,17 @@ from DocsToKG.ContentDownload.config import (
     load_config,
     validate_config_file,
 )
+from DocsToKG.ContentDownload.http_session import HttpConfig
 from DocsToKG.ContentDownload.resolvers.registry_v2 import (
     build_resolvers,
     get_registry,
 )
-from DocsToKG.ContentDownload.http_session import HttpConfig
 
 # Feature flags support
 try:
     from DocsToKG.ContentDownload.config.feature_flags import (
-        get_feature_flags,
         FeatureFlag,
+        get_feature_flags,
     )
 
     FEATURE_FLAGS_AVAILABLE = True

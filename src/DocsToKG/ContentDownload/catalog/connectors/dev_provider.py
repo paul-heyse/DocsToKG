@@ -23,7 +23,6 @@ from .base import (
     DocumentRecord,
     HealthCheck,
     HealthStatus,
-    ProviderConfigError,
     ProviderConnectionError,
     ProviderOperationError,
 )
@@ -101,7 +100,8 @@ class DevelopmentProvider:
             raise RuntimeError("Connection not initialized")
 
         # Create documents table
-        self.conn.execute("""
+        self.conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS documents (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 artifact_id TEXT NOT NULL,
@@ -115,13 +115,16 @@ class DevelopmentProvider:
                 updated_at TEXT NOT NULL,
                 run_id TEXT
             )
-        """)
+        """
+        )
 
         # Create unique constraint
-        self.conn.execute("""
+        self.conn.execute(
+            """
             CREATE UNIQUE INDEX IF NOT EXISTS idx_documents_unique
             ON documents(artifact_id, source_url, resolver)
-        """)
+        """
+        )
 
         # Create lookup indexes
         self.conn.execute("CREATE INDEX IF NOT EXISTS idx_documents_sha ON documents(sha256)")
@@ -135,7 +138,8 @@ class DevelopmentProvider:
         )
 
         # Create variants table (optional)
-        self.conn.execute("""
+        self.conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS variants (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 document_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
@@ -146,13 +150,16 @@ class DevelopmentProvider:
                 sha256 TEXT,
                 created_at TEXT NOT NULL
             )
-        """)
+        """
+        )
 
         # Create variants indexes
-        self.conn.execute("""
+        self.conn.execute(
+            """
             CREATE UNIQUE INDEX IF NOT EXISTS idx_variants_unique
             ON variants(document_id, variant)
-        """)
+        """
+        )
         self.conn.execute("CREATE INDEX IF NOT EXISTS idx_variants_sha ON variants(sha256)")
 
         self.conn.commit()

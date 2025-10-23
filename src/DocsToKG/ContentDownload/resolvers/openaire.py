@@ -24,7 +24,6 @@ import httpx
 
 from DocsToKG.ContentDownload.core import dedupe, normalize_doi
 from DocsToKG.ContentDownload.networking import BreakerOpenError
-
 from DocsToKG.ContentDownload.resolvers.base import (
     ResolverEvent,
     ResolverEventReason,
@@ -32,13 +31,12 @@ from DocsToKG.ContentDownload.resolvers.base import (
     _collect_candidate_urls,
     request_with_retries,
 )
+
 from .registry_v2 import register_v2
-
-
 
 if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.core import WorkArtifact
-    
+
 
 LOGGER = logging.getLogger(__name__)
 

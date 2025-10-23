@@ -16,7 +16,6 @@ import sys
 import time
 from typing import Optional
 
-
 # SLO targets (tune to your environment)
 SLO = {
     "yield_pct_min": 85.0,
@@ -66,8 +65,9 @@ def summarize(db_path: str, run_id: str) -> int:
     yield_pct = 100.0 * (y["ok"] or 0) / max(1, (y["tot"] or 1))
 
     # TTFP p50/p95 (ms)
-    ttfp = cx.execute(
-        """
+    ttfp = (
+        cx.execute(
+            """
         WITH s AS (
           SELECT artifact_id, MIN(ts) ts_s FROM fallback_attempts
           WHERE run_id=? AND outcome='success' GROUP BY artifact_id
@@ -83,8 +83,10 @@ def summarize(db_path: str, run_id: str) -> int:
           (SELECT ms FROM d ORDER BY ms LIMIT 1 OFFSET (SELECT CAST(COUNT(*)*0.50 AS INT) FROM d)) p50,
           (SELECT ms FROM d ORDER BY ms LIMIT 1 OFFSET (SELECT CAST(COUNT(*)*0.95 AS INT) FROM d)) p95
         """,
-        (run_id, run_id),
-    ).fetchone() or {"p50": None, "p95": None}
+            (run_id, run_id),
+        ).fetchone()
+        or {"p50": None, "p95": None}
+    )
 
     # Cache hit (metadata)
     cache_hit_pct = (

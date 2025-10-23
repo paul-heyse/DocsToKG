@@ -15,9 +15,9 @@ role, which means the schema must persist the role information explicitly.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import math
 import sqlite3
+from dataclasses import dataclass
 from typing import Optional, Sequence
 
 
@@ -54,7 +54,9 @@ WAYBACK_SCHEMA = WaybackTelemetrySchema(
 )
 
 
-def ensure_schema(conn: sqlite3.Connection, schema: WaybackTelemetrySchema = WAYBACK_SCHEMA) -> None:
+def ensure_schema(
+    conn: sqlite3.Connection, schema: WaybackTelemetrySchema = WAYBACK_SCHEMA
+) -> None:
     """Ensure the minimal Wayback telemetry schema exists for ``conn``.
 
     Parameters
@@ -114,4 +116,3 @@ def rate_smoothing_p95(
     )
     delays = [int(row[0]) for row in cursor.fetchall()]
     return _percentile(delays, 0.95)
-

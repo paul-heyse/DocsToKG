@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from types import MappingProxyType
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Protocol, Sequence
+from typing import Any, Dict, List, Mapping, Optional, Protocol, Sequence
 from urllib.parse import urljoin
 
 import httpx
@@ -160,8 +160,7 @@ class Resolver(Protocol):
         ctx: Any,
         telemetry: Optional[Any],
         run_id: Optional[str],
-    ) -> Any:
-        ...
+    ) -> Any: ...
 
 
 # ---------------------------------------------------------------------------
@@ -214,10 +213,8 @@ def find_pdf_via_meta(soup: Any, base_url: str) -> Optional[str]:
 def find_pdf_via_link(soup: Any, base_url: str) -> Optional[str]:
     if soup is None:
         return None
-    for tag in getattr(soup, "find_all", lambda *args, **kwargs: [])(
-        "link"
-    ):
-        rel = (tag.get("rel") or [])
+    for tag in getattr(soup, "find_all", lambda *args, **kwargs: [])("link"):
+        rel = tag.get("rel") or []
         rel_tokens = {token.lower() for token in rel} if isinstance(rel, Sequence) else set()
         link_type = (tag.get("type") or "").lower()
         href = tag.get("href")
