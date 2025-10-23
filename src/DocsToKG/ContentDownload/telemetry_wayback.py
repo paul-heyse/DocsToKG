@@ -1,3 +1,4 @@
+# === NAVMAP v1 ===
 # {
 #   "module": "DocsToKG.ContentDownload.telemetry_wayback",
 #   "purpose": "Wayback resolver telemetry helpers.",
@@ -39,6 +40,8 @@ from collections.abc import Mapping
 from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import Any
+
+__all__ = ["TelemetryWayback", "TelemetryWaybackAttempt"]
 
 
 def _ensure_event_buffer(ctx: Any) -> list[dict[str, Any]] | None:
@@ -218,6 +221,3 @@ class _TelemetryAttemptCtx:
             )
             self._attempt.complete("error")
         self._attempt.ensure_completed()
-
-
-__all__ = ["TelemetryWayback", "TelemetryWaybackAttempt"]
