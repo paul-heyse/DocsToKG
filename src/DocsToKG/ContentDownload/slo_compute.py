@@ -181,10 +181,27 @@ def compute_lease_acquisition_latency(
     """
     rows = conn.execute(
         """
+        WITH first_ops AS (
+            SELECT job_id, MIN(started_at) AS first_started_at
+            FROM artifact_ops
+            GROUP BY job_id
+        )
         SELECT
-            (CASE WHEN lease_until IS NOT NULL THEN created_at + 120 - created_at ELSE 0 END) * 1000 as latency_ms
+            CASE
+                WHEN first_ops.first_started_at IS NOT NULL THEN
+                    CASE
+                        WHEN first_ops.first_started_at > artifact_jobs.created_at
+                            THEN (first_ops.first_started_at - artifact_jobs.created_at) * 1000.0
+                        ELSE 0.0
+                    END
+                WHEN artifact_jobs.lease_owner IS NOT NULL
+                     AND artifact_jobs.updated_at > artifact_jobs.created_at THEN
+                    (artifact_jobs.updated_at - artifact_jobs.created_at) * 1000.0
+                ELSE 0.0
+            END AS latency_ms
         FROM artifact_jobs
-        WHERE state IN ('LEASED', 'HEAD_DONE', 'STREAMING', 'FINALIZED')
+        LEFT JOIN first_ops ON first_ops.job_id = artifact_jobs.job_id
+        WHERE artifact_jobs.state IN ('LEASED', 'HEAD_DONE', 'STREAMING', 'FINALIZED')
         ORDER BY latency_ms DESC
         LIMIT ?
         """,
@@ -194,7 +211,11 @@ def compute_lease_acquisition_latency(
     if not rows:
         return {"p50": 0.0, "p99": 0.0}
 
-    latencies = [row["latency_ms"] for row in rows if row["latency_ms"] > 0]
+    latencies = [
+        float(row["latency_ms"])
+        for row in rows
+        if row["latency_ms"] is not None and row["latency_ms"] > 0
+    ]
     if not latencies:
         return {"p50": 0.0, "p99": 0.0}
 

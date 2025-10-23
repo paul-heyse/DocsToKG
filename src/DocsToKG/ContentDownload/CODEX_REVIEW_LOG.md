@@ -119,6 +119,12 @@ No eligible files after excludes.
 <!-- 2025-10-23 06:45:10Z UTC -->
 ## Pass 2 — find and fix real bugs
 
+### Batch 0 (Pass 7)
+- Broken: `compute_lease_acquisition_latency` hard-coded every lease to 120 s because it subtracted `created_at` from itself, so the p50/p99 SLOs always read 120 000 ms regardless of real data.
+- Fix:
+  - Rebuilt the query to derive latency from the first recorded operation (fallback to the lease row when still active) and discard non-positive samples.
+- TODO: Persist an explicit `first_leased_at` timestamp so the SLO no longer needs to infer from operation ledgers.
+
 <!-- 2025-10-23 06:52:53Z UTC -->
 ## Pass 1 — find and fix real bugs
 
@@ -154,3 +160,6 @@ No eligible files after excludes.
   - Replace `mkstemp` usage with a `NamedTemporaryFile` context so the descriptor closes on all control-flow paths.
   - Close streaming `httpx` responses on early failures to avoid connection pool leaks during retries.
 - TODO: Add a regression test that simulates repeated pre-stream failures and asserts file descriptor counts stay stable.
+
+<!-- 2025-10-23 07:10:59Z UTC -->
+## Pass 7 — find and fix real bugs
