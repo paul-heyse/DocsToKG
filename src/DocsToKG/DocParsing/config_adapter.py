@@ -13,8 +13,9 @@ directly building stage config objects from Pydantic settings, enabling:
 
 from __future__ import annotations
 
+from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from .app_context import AppContext
@@ -39,7 +40,24 @@ class ConfigurationAdapter:
     """
 
     @staticmethod
-    def to_doctags(app_ctx: AppContext, mode: str = "pdf") -> DoctagsCfg:
+    def _normalize_mode(mode: Any) -> Optional[str]:
+        """Normalize ``mode`` values from CLI overrides or settings."""
+
+        if mode is None:
+            return None
+        if isinstance(mode, Enum):
+            mode_value: Any = mode.value
+        else:
+            mode_value = mode
+        if mode_value is None:
+            return None
+        normalized = str(mode_value).strip()
+        if not normalized:
+            return None
+        return normalized.lower()
+
+    @staticmethod
+    def to_doctags(app_ctx: AppContext, mode: Any = None) -> DoctagsCfg:
         """Build DoctagsCfg from AppContext settings.
 
         Args:
@@ -80,8 +98,13 @@ class ConfigurationAdapter:
         if app_ctx.settings.runner.workers:
             cfg.workers = app_ctx.settings.runner.workers
 
-        # Set mode explicitly (overrides any existing mode)
-        cfg.mode = mode
+        override_mode = ConfigurationAdapter._normalize_mode(mode)
+        configured_mode = ConfigurationAdapter._normalize_mode(doctags_settings.mode)
+
+        if override_mode is not None:
+            cfg.mode = override_mode
+        elif configured_mode is not None:
+            cfg.mode = configured_mode
 
         # Finalize normalizes paths and validates
         cfg.finalize()

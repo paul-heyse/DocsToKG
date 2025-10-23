@@ -28,6 +28,7 @@ from DocsToKG.DocParsing.app_context import (
 )
 from DocsToKG.DocParsing.chunking import runtime as chunking_runtime
 from DocsToKG.DocParsing.config_adapter import ConfigurationAdapter
+from DocsToKG.DocParsing.core import detect_mode
 from DocsToKG.DocParsing.embedding import runtime as embedding_runtime
 
 # ============================================================================
@@ -361,19 +362,41 @@ def doctags(
         effective_mode = mode or (
             app_ctx.settings.doctags.mode if app_ctx.settings.doctags.mode else "auto"
         )
+        normalized_mode = ConfigurationAdapter._normalize_mode(effective_mode) or "auto"
 
         typer.echo(
             f"[dim]📋 Profile: {app_ctx.profile or 'none'} | Hash: {app_ctx.cfg_hashes['doctags'][:8]}...[/dim]"
         )
-        typer.echo(f"[dim]🔧 Mode: {effective_mode}[/dim]")
+        typer.echo(f"[dim]🔧 Mode: {normalized_mode}[/dim]")
 
         # Create adapted config and call stage with it (NEW PATTERN)
-        if effective_mode.lower() == "html":
+        if normalized_mode == "html":
             cfg = ConfigurationAdapter.to_doctags(app_ctx, mode="html")
             exit_code = doctags_module.html_main(config_adapter=cfg)
-        else:  # pdf or auto
-            cfg = ConfigurationAdapter.to_doctags(app_ctx, mode="pdf")
-            exit_code = doctags_module.pdf_main(config_adapter=cfg)
+        else:
+            cfg = ConfigurationAdapter.to_doctags(app_ctx, mode=normalized_mode)
+
+            if normalized_mode == "auto":
+                try:
+                    detected_mode = detect_mode(Path(cfg.input))
+                except ValueError as detection_error:
+                    typer.secho(
+                        f"[red]✗ Failed to auto-detect mode:[/red] {detection_error}",
+                        err=True,
+                    )
+                    raise typer.Exit(code=1)
+
+                typer.echo(f"[dim]🔍 Auto-detected mode: {detected_mode}[/dim]")
+                target_mode = detected_mode
+                cfg.mode = target_mode
+                cfg.finalize()
+
+                if target_mode == "html":
+                    exit_code = doctags_module.html_main(config_adapter=cfg)
+                else:
+                    exit_code = doctags_module.pdf_main(config_adapter=cfg)
+            else:
+                exit_code = doctags_module.pdf_main(config_adapter=cfg)
 
         if exit_code != 0:
             typer.secho(f"[red]✗ DocTags stage failed with exit code {exit_code}[/red]", err=True)
