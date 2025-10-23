@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 try:
     import tomllib  # Python 3.11+
@@ -137,6 +137,62 @@ def apply_dot_path_override(
     return config
 
 
+def _env_var_to_dot_path(
+    env_name: str,
+    *,
+    prefix: str,
+    root_keys: Set[str],
+) -> Optional[str]:
+    """
+    Convert an environment variable name into a dot-path understood by SettingsBuilder.
+
+    Supports both legacy single-underscore stage prefixes (e.g. ``DOCSTOKG_CHUNK_MIN_TOKENS``)
+    and nested ``__`` segments used by Pydantic BaseSettings (e.g.
+    ``DOCSTOKG_EMBED__DENSE__BACKEND``). Field names retain their underscores so multi-word
+    attributes map correctly.
+    """
+
+    if not env_name.startswith(prefix):
+        return None
+
+    suffix = env_name[len(prefix) :].strip("_")
+    if not suffix:
+        return None
+
+    raw_segments = [segment for segment in suffix.split("__") if segment]
+    if not raw_segments:
+        return None
+
+    # Normalise to lowercase while preserving embedded underscores for field names.
+    segments: List[str] = [segment.lower() for segment in raw_segments]
+    path_parts: List[str] = []
+
+    # Split legacy single-underscore prefixes like "chunk_min_tokens".
+    first = segments[0]
+    remainder: List[str] = segments[1:]
+    if "_" in first:
+        candidate_root, candidate_tail = first.split("_", 1)
+        candidate_root = candidate_root.strip("_")
+        if candidate_root in root_keys:
+            path_parts.append(candidate_root)
+            candidate_tail = candidate_tail.strip("_")
+            if candidate_tail:
+                remainder.insert(0, candidate_tail)
+    if not path_parts:
+        if first in root_keys:
+            path_parts.append(first)
+        else:
+            fallback_root = "app" if "app" in root_keys else None
+            if fallback_root is not None:
+                path_parts.append(fallback_root)
+                remainder.insert(0, first)
+            else:
+                path_parts.append(first)
+
+    path_parts.extend(remainder)
+    return ".".join(part for part in path_parts if part)
+
+
 class SettingsBuilder:
     """
     Builder for layering configuration from multiple sources.
@@ -210,25 +266,27 @@ class SettingsBuilder:
             Self for chaining
         """
         self.env_overrides = {}
+        root_keys: Set[str] = {key.lower() for key in self.defaults.keys()}
+        if not root_keys:
+            root_keys = {"app", "runner", "doctags", "chunk", "embed"}
         for key, value in os.environ.items():
-            if key.startswith(env_prefix):
-                # Convert DOCSTOKG_CHUNK_MIN_TOKENS → chunk.min_tokens
-                suffix = key[len(env_prefix) :].lower()
-                parts = suffix.split("_")
-                # Try to coerce value to appropriate type
-                try:
-                    if value.lower() in {"true", "false"}:
-                        val = value.lower() == "true"
-                    elif value.isdigit():
-                        val = int(value)
-                    else:
-                        try:
-                            val = float(value)
-                        except ValueError:
-                            val = value
-                except Exception:
-                    val = value
-                apply_dot_path_override(self.env_overrides, ".".join(parts), val)
+            dot_path = _env_var_to_dot_path(key, prefix=env_prefix, root_keys=root_keys)
+            if dot_path is None:
+                continue
+            # Try to coerce value to appropriate type
+            try:
+                if value.lower() in {"true", "false"}:
+                    val = value.lower() == "true"
+                elif value.isdigit():
+                    val = int(value)
+                else:
+                    try:
+                        val = float(value)
+                    except ValueError:
+                        val = value
+            except Exception:
+                val = value
+            apply_dot_path_override(self.env_overrides, dot_path, val)
         return self
 
     def add_cli_overrides(self, overrides: Dict[str, Any]) -> SettingsBuilder:

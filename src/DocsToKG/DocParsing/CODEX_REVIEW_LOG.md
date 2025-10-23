@@ -26,6 +26,11 @@ No eligible files after excludes.
 ## Pass 1 — find and fix real bugs
 
 ### Batch 0 (Pass 1)
+- Broken: `SettingsBuilder.add_env_overrides` split every underscore into nested keys, so overrides like `DOCSTOKG_APP_LOG_LEVEL` or `DOCSTOKG_EMBED_VECTOR_FORMAT` were ignored because they landed under non-existent paths (`app.log.level`, etc.).
+- Fixed: normalise env names with a helper that honours `__` nesting, preserves snake_case field names, and falls back to known root sections before applying overrides.
+- TODO: backfill coverage that exercises snake_case and double-underscore environment overrides for the unified settings builder.
+
+### Batch 0 (Pass 1)
 - Broken: `core.http.normalize_http_timeout` treated mapping inputs as iterables of keys, triggering `ValueError` when callers passed httpx-style timeout dicts so `get_http_session(timeout={...})` crashed.
 - Fixed:
   - detect `httpx.Timeout` instances and coerce their connect/read timeouts safely
@@ -84,3 +89,6 @@ No eligible files after excludes.
 
 <!-- 2025-10-23 06:45:11Z UTC -->
 ## Pass 2 — find and fix real bugs
+
+<!-- 2025-10-23 06:52:53Z UTC -->
+## Pass 1 — find and fix real bugs
