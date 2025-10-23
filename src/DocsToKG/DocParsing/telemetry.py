@@ -63,28 +63,30 @@ to DEFAULT_JSONL_WRITER), enabling both production use and test injection of cus
 writers without modifying telemetry logic.
 
 Example:
-    from DocsToKG.DocParsing.telemetry import TelemetrySink, StageTelemetry
-    from pathlib import Path
+    .. code-block:: python
 
-    # Create a telemetry sink for a pipeline run
-    sink = TelemetrySink(
-        attempts_path=Path("attempts.jsonl"),
-        manifest_path=Path("manifest.jsonl")
-    )
+        from DocsToKG.DocParsing.telemetry import StageTelemetry, TelemetrySink
+        from pathlib import Path
 
-    # Bind to a specific stage and run
-    stage_telemetry = StageTelemetry(
-        sink=sink,
-        run_id="run-2025-10-21",
-        stage="embedding"
-    )
+        # Create a telemetry sink for a pipeline run
+        sink = TelemetrySink(
+            attempts_path=Path("attempts.jsonl"),
+            manifest_path=Path("manifest.jsonl"),
+        )
 
-    # Log attempt completion (uses lock-aware writer internally)
-    stage_telemetry.log_attempt_success(
-        file_id="doc1",
-        duration_s=1.23,
-        output_path="vectors.npy"
-    )
+        # Bind to a specific stage and run
+        stage_telemetry = StageTelemetry(
+            sink=sink,
+            run_id="run-2025-10-21",
+            stage="embedding",
+        )
+
+        # Log attempt completion (uses lock-aware writer internally)
+        stage_telemetry.log_attempt_success(
+            file_id="doc1",
+            duration_s=1.23,
+            output_path="vectors.npy",
+        )
 """
 
 from __future__ import annotations

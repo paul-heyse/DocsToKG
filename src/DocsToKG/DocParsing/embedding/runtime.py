@@ -978,10 +978,10 @@ def tokens(text: str) -> list[str]:
 class BM25StatsAccumulator:
     """Streaming accumulator for BM25 corpus statistics.
 
-    Attributes:
-        N: Number of documents processed so far.
-        total_tokens: Total token count across processed documents.
-        df: Document frequency map collected to date.
+    Maintains the following counters:
+    - ``N``: Number of documents processed so far.
+    - ``total_tokens``: Total token count across processed documents.
+    - ``df``: Document frequency map collected to date.
 
     Examples:
         >>> acc = BM25StatsAccumulator()
@@ -1090,10 +1090,10 @@ def bm25_vector(
 class SPLADEValidator:
     """Track SPLADE sparsity metrics across the corpus.
 
-    Attributes:
-        total_chunks: Total number of chunks inspected.
-        zero_nnz_chunks: UUIDs whose SPLADE vector has zero active terms.
-        nnz_counts: Non-zero counts per processed chunk.
+    The validator records:
+    - ``total_chunks``: Total number of chunks inspected.
+    - ``zero_nnz_chunks``: UUIDs whose SPLADE vector has zero active terms.
+    - ``nnz_counts``: Non-zero counts per processed chunk.
 
     Examples:
         >>> validator = SPLADEValidator()

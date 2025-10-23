@@ -69,7 +69,7 @@ nitpicky = True
 primary_domain = "py"
 default_role = None
 templates_path = ["_templates"]
-exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
+exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "04-api/generated/*"]
 nitpick_ignore_regex = [
     (r"py:.*", r"tenacity\..*"),
     (r"py:.*", r"httpx\..*"),

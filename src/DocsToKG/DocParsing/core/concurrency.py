@@ -65,16 +65,18 @@ dependencies. The safe_write() function is the recommended way to atomically
 write files when multiple processes may access them concurrently.
 
 Example:
-    from DocsToKG.DocParsing.core import safe_write
-    from pathlib import Path
+    .. code-block:: python
 
-    # Atomically write a file with process-safe locking
-    wrote = safe_write(
-        Path("output.json"),
-        lambda: save_json_to_output(),
-        timeout=60.0,
-        skip_if_exists=True
-    )
+        from DocsToKG.DocParsing.core import safe_write
+        from pathlib import Path
+
+        # Atomically write a file with process-safe locking
+        wrote = safe_write(
+            Path("output.json"),
+            lambda: save_json_to_output(),
+            timeout=60.0,
+            skip_if_exists=True,
+        )
 """
 
 from __future__ import annotations
