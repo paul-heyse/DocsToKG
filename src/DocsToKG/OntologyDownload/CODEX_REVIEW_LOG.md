@@ -25,6 +25,11 @@ No eligible files after excludes.
 <!-- 2025-10-23 04:04:17Z UTC -->
 ## Pass 1 — find and fix real bugs
 
+### Batch 0 (Pass 1)
+- Broken: `DocsToKG.OntologyDownload.ratelimit` failed to import because the instrumentation module no longer exposed the expected telemetry functions/signatures, breaking polite HTTP client telemetry at runtime.
+- Fix: restored the missing exports in `ratelimit.instrumentation`, added backward-compatible helpers that accept the modern `service`/`host` calling convention, and guarded emission so telemetry never raises.
+- TODO: add a telemetry smoke test that imports the package and exercises `emit_acquire_event`/`emit_blocked_event` with both legacy and keyword arguments.
+
 <!-- 2025-10-23 04:06:49Z UTC -->
 ## Pass 1 — find and fix real bugs
 
@@ -73,3 +78,6 @@ No eligible files after excludes.
 
 <!-- 2025-10-23 05:59:42Z UTC -->
 ## Pass 4 — find and fix real bugs
+
+<!-- 2025-10-23 06:52:53Z UTC -->
+## Pass 1 — find and fix real bugs

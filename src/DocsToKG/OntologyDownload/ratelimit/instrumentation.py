@@ -1,100 +1,234 @@
-"""Rate limiter instrumentation and telemetry.
+"""Rate limiter instrumentation and telemetry helpers.
 
-Emits ratelimit.acquire, ratelimit.cooldown, and ratelimit.block events
-for observability into rate limiting behavior and pressure.
+The public API mirrors `network.polite_client` and the re-exports from
+`ratelimit.__init__`. A previous refactor left stale signatures behind, which
+prevented the package from importing. These helpers accept the modern
+``service``/``host`` calling convention while staying defensive so older
+positional usage continues to work.
 """
+
+from __future__ import annotations
+
+import logging
+from typing import Any, Dict, Optional, Tuple
 
 from DocsToKG.OntologyDownload.observability.events import emit_event
 
+logger = logging.getLogger(__name__)
+
+
+def _normalise_service_host(
+    service: Optional[str],
+    host: Optional[str],
+    *,
+    fallback_key: Optional[str] = None,
+) -> Tuple[str, str, str]:
+    """Return normalised ``(service, host, key)`` tuple for event payloads."""
+    if fallback_key and not service:
+        parts = fallback_key.split(":", 1)
+        if len(parts) == 2:
+            service, host = parts
+        else:
+            service = parts[0]
+    service_norm = (service or "default").strip().lower() or "default"
+    host_norm = (host or "default").strip().lower() or "default"
+    key = f"{service_norm}:{host_norm}" if host_norm != "default" else service_norm
+    return service_norm, host_norm, key[:80]
+
+
+def _emit_safe(
+    type: str,
+    *,
+    level: str,
+    payload: Dict[str, Any],
+    service: Optional[str],
+) -> None:
+    """Emit the event, swallowing telemetry errors."""
+    try:
+        emit_event(type=type, level=level, payload=payload, service=service)
+    except Exception:  # pragma: no cover - telemetry must not raise
+        logger.debug("rate limit telemetry emission failed", exc_info=True)
+
 
 def emit_acquire_event(
-    key: str,
-    allowed: bool,
-    blocked_ms: float = 0,
-    tokens_requested: int = 1,
-    tokens_available: int = 0,
+    key: Optional[str] = None,
+    allowed: Optional[bool] = None,
+    blocked_ms: Optional[float] = None,
+    tokens_requested: Optional[int] = None,
+    tokens_available: Optional[int] = None,
+    *,
+    service: Optional[str] = None,
+    host: Optional[str] = None,
+    weight: int = 1,
+    elapsed_ms: Optional[int] = None,
 ) -> None:
-    """Emit event when rate limiter acquire() is called.
+    """Emit event when the rate limiter grants tokens."""
+    service_norm, host_norm, key_norm = _normalise_service_host(service, host, fallback_key=key)
+    allowed_flag = True if allowed is None else bool(allowed)
+    payload: Dict[str, Any] = {
+        "key": key_norm,
+        "service": service_norm,
+        "host": host_norm,
+        "weight": max(1, int(weight)),
+        "allowed": allowed_flag,
+        "outcome": "allowed" if allowed_flag else "blocked",
+    }
+    if elapsed_ms is not None:
+        payload["elapsed_ms"] = int(elapsed_ms)
+    if blocked_ms is not None:
+        payload["blocked_ms"] = float(blocked_ms)
+    if tokens_requested is not None:
+        payload["tokens_requested"] = int(tokens_requested)
+    if tokens_available is not None:
+        payload["tokens_available"] = int(tokens_available)
 
-    Args:
-        key: Rate limit key (service or host)
-        allowed: Whether the request was allowed
-        blocked_ms: Milliseconds blocked if delayed
-        tokens_requested: Tokens requested
-        tokens_available: Tokens available after acquire
-    """
-    try:
-        emit_event(
-            type="ratelimit.acquire",
-            level="INFO",
-            payload={
-                "key": key[:40],  # Truncate for safety
-                "allowed": allowed,
-                "blocked_ms": blocked_ms,
-                "tokens_requested": tokens_requested,
-                "tokens_available": tokens_available,
-                "outcome": "allowed" if allowed else "blocked",
-            },
-        )
-    except Exception:
-        # Never fail telemetry
-        pass
+    _emit_safe(
+        "ratelimit.acquire",
+        level="INFO" if allowed_flag else "WARN",
+        payload=payload,
+        service=service_norm,
+    )
+
+
+def emit_blocked_event(
+    *,
+    service: Optional[str],
+    host: Optional[str],
+    weight: int,
+    reason: str,
+    retry_after_seconds: Optional[float] = None,
+) -> None:
+    """Emit event when acquisition fails due to rate limiting."""
+    service_norm, host_norm, key_norm = _normalise_service_host(service, host)
+    payload: Dict[str, Any] = {
+        "key": key_norm,
+        "service": service_norm,
+        "host": host_norm,
+        "weight": max(1, int(weight)),
+        "reason": reason,
+    }
+    if retry_after_seconds is not None:
+        payload["retry_after_sec"] = float(retry_after_seconds)
+        payload["retry_after_ms"] = int(retry_after_seconds * 1000)
+
+    _emit_safe(
+        "ratelimit.block",
+        level="WARN",
+        payload=payload,
+        service=service_norm,
+    )
 
 
 def emit_cooldown_event(
-    key: str,
-    status_code: int,
-    cooldown_sec: float,
+    key: Optional[str] = None,
+    status_code: Optional[int] = None,
+    cooldown_sec: float = 0,
+    *,
+    service: Optional[str] = None,
+    host: Optional[str] = None,
 ) -> None:
-    """Emit event when rate limiter enters cooldown (e.g., on 429).
-
-    Args:
-        key: Rate limit key
-        status_code: HTTP status code that triggered cooldown
-        cooldown_sec: Seconds to wait before retrying
-    """
-    try:
-        emit_event(
-            type="ratelimit.cooldown",
-            level="WARN",
-            payload={
-                "key": key[:40],
-                "status_code": status_code,
-                "cooldown_sec": cooldown_sec,
-                "cooldown_ms": int(cooldown_sec * 1000),
-            },
-        )
-    except Exception:
-        # Never fail telemetry
-        pass
+    """Emit event when a cooldown (Retry-After) window activates."""
+    service_norm, host_norm, key_norm = _normalise_service_host(service, host, fallback_key=key)
+    payload = {
+        "key": key_norm,
+        "service": service_norm,
+        "host": host_norm,
+        "status_code": status_code,
+        "cooldown_sec": float(max(0.0, cooldown_sec)),
+        "cooldown_ms": int(max(0.0, cooldown_sec) * 1000),
+    }
+    _emit_safe(
+        "ratelimit.cooldown",
+        level="WARN",
+        payload=payload,
+        service=service_norm,
+    )
 
 
 def emit_head_skip_event(
-    key: str,
-    reason: str,
+    key: Optional[str] = None,
+    reason: str = "unknown",
+    *,
+    service: Optional[str] = None,
+    host: Optional[str] = None,
 ) -> None:
-    """Emit event when rate limiter skips a request.
+    """Emit event when a request is skipped before acquisition."""
+    service_norm, host_norm, key_norm = _normalise_service_host(service, host, fallback_key=key)
+    payload = {
+        "key": key_norm,
+        "service": service_norm,
+        "host": host_norm,
+        "reason": reason,
+    }
+    _emit_safe(
+        "ratelimit.skip",
+        level="INFO",
+        payload=payload,
+        service=service_norm,
+    )
 
-    Args:
-        key: Rate limit key
-        reason: Reason for skip (e.g., 'cooldown_active', 'no_tokens')
-    """
+
+def emit_rate_limit_event(
+    *,
+    service: Optional[str],
+    host: Optional[str],
+    event: str,
+    details: Optional[Dict[str, Any]] = None,
+) -> None:
+    """Emit a generic rate-limit lifecycle event."""
+    service_norm, host_norm, key_norm = _normalise_service_host(service, host)
+    payload = {
+        "key": key_norm,
+        "service": service_norm,
+        "host": host_norm,
+        "event": event,
+    }
+    if details:
+        payload.update(details)
+    _emit_safe(
+        "ratelimit.event",
+        level="INFO",
+        payload=payload,
+        service=service_norm,
+    )
+
+
+def emit_rate_info_event(
+    *,
+    service: Optional[str],
+    host: Optional[str],
+    limits: Dict[str, Any],
+) -> None:
+    """Emit static information about the configured rate limits."""
+    service_norm, host_norm, key_norm = _normalise_service_host(service, host)
+    payload = {
+        "key": key_norm,
+        "service": service_norm,
+        "host": host_norm,
+        "limits": limits,
+    }
+    _emit_safe(
+        "ratelimit.info",
+        level="INFO",
+        payload=payload,
+        service=service_norm,
+    )
+
+
+def log_rate_limit_stats(stats: Dict[str, Any]) -> None:
+    """Log the latest rate limiter stats (debug-level helper)."""
     try:
-        emit_event(
-            type="ratelimit.skip",
-            level="INFO",
-            payload={
-                "key": key[:40],
-                "reason": reason,
-            },
-        )
-    except Exception:
-        # Never fail telemetry
+        logger.debug("rate limiter stats", extra={"stats": stats})
+    except Exception:  # pragma: no cover - logging shouldn't raise
         pass
 
 
 __all__ = [
     "emit_acquire_event",
+    "emit_blocked_event",
     "emit_cooldown_event",
     "emit_head_skip_event",
+    "emit_rate_limit_event",
+    "emit_rate_info_event",
+    "log_rate_limit_stats",
 ]
