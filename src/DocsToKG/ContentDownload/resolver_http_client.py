@@ -96,10 +96,12 @@ class TokenBucket:
             refill_per_sec: Tokens added per second
             burst: Burst allowance (temporary overage)
         """
-        self.capacity = capacity
-        self.refill_per_sec = refill_per_sec
-        self.burst = burst
-        self.tokens = capacity
+        # Track maximum tokens separately so burst capacity is honored.
+        self.capacity = max(0.0, capacity)
+        self.refill_per_sec = max(0.0, refill_per_sec)
+        self.burst = max(0.0, burst)
+        self._max_tokens = self.capacity + self.burst
+        self.tokens = self._max_tokens
         self.last_refill = time.monotonic()
         self._lock = __import__("threading").Lock()
 
@@ -107,7 +109,10 @@ class TokenBucket:
         """Add tokens based on elapsed time."""
         now = time.monotonic()
         elapsed = now - self.last_refill
-        self.tokens = min(self.capacity, self.tokens + elapsed * self.refill_per_sec)
+        self.tokens = min(
+            self._max_tokens,
+            self.tokens + elapsed * self.refill_per_sec,
+        )
         self.last_refill = now
 
     def acquire(self, tokens: float = 1.0, timeout_s: float = 60.0) -> float:
@@ -159,7 +164,7 @@ class TokenBucket:
         """Refund tokens to the bucket."""
         with self._lock:
             self._refill()  # Ensure tokens are up-to-date before refunding
-            self.tokens = min(self.capacity, self.tokens + tokens)
+            self.tokens = min(self._max_tokens, self.tokens + tokens)
             LOGGER.debug(f"Refunded {tokens} tokens to bucket. Current tokens: {self.tokens}")
 
 

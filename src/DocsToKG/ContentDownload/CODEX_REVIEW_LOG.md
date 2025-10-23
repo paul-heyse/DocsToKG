@@ -25,6 +25,12 @@ No eligible files after excludes.
 <!-- 2025-10-23 04:04:17Z UTC -->
 ## Pass 1 — find and fix real bugs
 
+### Batch 0 (Pass 1)
+- Broken: Token bucket ignored the configured burst allowance, so rate limiting was stricter than configured and could starve bursty resolvers.
+- Fix:
+  - Track `capacity + burst` as the effective ceiling and honor it during refill/refund.
+- TODO: Add a focused unit test covering burst replenishment in the resolver HTTP client token bucket.
+
 <!-- 2025-10-23 04:06:49Z UTC -->
 ## Pass 1 — find and fix real bugs
 
@@ -100,3 +106,6 @@ No eligible files after excludes.
 
 <!-- 2025-10-23 06:45:10Z UTC -->
 ## Pass 2 — find and fix real bugs
+
+<!-- 2025-10-23 06:52:53Z UTC -->
+## Pass 1 — find and fix real bugs
