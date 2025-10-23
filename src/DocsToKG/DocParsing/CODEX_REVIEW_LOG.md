@@ -111,3 +111,12 @@ No eligible files after excludes.
   - clamp the accumulated average doc length to a positive floor during finalisation.
   - reuse the guarded average length inside `bm25_vector` to keep per-chunk weighting safe.
 - TODO: Add coverage for empty-token chunk inputs to ensure BM25 stays stable.
+
+<!-- 2025-10-23 07:17:58Z UTC -->
+## Pass 4 — find and fix real bugs
+
+### Batch 0 (Pass 4)
+- Broken: `embedding/backends/lexical/local_bm25.py` tokenised inputs using the class `[\\w]`, so every document collapsed to runs of the letter `w`, producing meaningless BM25 stats and vectors.
+- Fixed:
+  - correct the regex to `\w+` so `_tokenize` returns real word tokens under both `regex` and `re`.
+- TODO: add a regression test that exercises LocalBM25Provider tokenisation end-to-end.

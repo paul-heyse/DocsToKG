@@ -17,7 +17,7 @@ try:  # pragma: no cover - regex compilation is deterministic
 except Exception:  # pragma: no cover - fallback when regex unavailable
     import re
 
-TOKEN_RE = re.compile(r"[\\w]+", re.UNICODE)
+TOKEN_RE = re.compile(r"\w+", re.UNICODE)
 
 
 def _tokenize(text: str) -> Sequence[str]:
