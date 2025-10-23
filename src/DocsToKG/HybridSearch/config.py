@@ -347,8 +347,20 @@ class HybridSearchConfig:
                 "HybridSearchConfig.from_dict expected a mapping payload, "
                 f"received {type(payload).__name__}"
             )
-        chunking = ChunkingConfig(**payload.get("chunking", {}))
-        dense_payload = dict(payload.get("dense", {}))
+
+        def coerce_section(name: str) -> Dict[str, Any]:
+            section = payload.get(name)
+            if section is None:
+                return {}
+            if not isinstance(section, Mapping):
+                raise ValueError(
+                    f"HybridSearchConfig.{name} must be a mapping or null, "
+                    f"received {type(section).__name__}"
+                )
+            return dict(section)
+
+        chunking = ChunkingConfig(**coerce_section("chunking"))
+        dense_payload = coerce_section("dense")
         alias_pairs = (
             ("gpu_default_null_stream", "gpu_use_default_null_stream"),
             (
@@ -363,8 +375,8 @@ class HybridSearchConfig:
             if legacy_key in dense_payload:
                 dense_payload[canonical_key] = dense_payload.pop(legacy_key)
         dense = DenseIndexConfig(**dense_payload)
-        fusion = FusionConfig(**payload.get("fusion", {}))
-        retrieval = RetrievalConfig(**payload.get("retrieval", {}))
+        fusion = FusionConfig(**coerce_section("fusion"))
+        retrieval = RetrievalConfig(**coerce_section("retrieval"))
         return HybridSearchConfig(
             chunking=chunking, dense=dense, fusion=fusion, retrieval=retrieval
         )

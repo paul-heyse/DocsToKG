@@ -92,3 +92,12 @@ No eligible files after excludes.
   - Normalise legacy snapshot payloads with the existing helper before restore attempts.
   - Reuse the reflective `restore_store` wrapper to only pass metadata when the adapter supports it.
 - TODO: None.
+
+<!-- 2025-10-23 06:57:19Z UTC -->
+## Pass 2 — find and fix real bugs
+### Batch 0 (Pass 2)
+- Broken: `HybridSearchConfig.from_dict` crashed when configs set sections to `null`, raising `TypeError` during reload and blocking defaults from applying.
+- Fix:
+  - Coerce per-section payloads so `None` maps to an empty dict while non-mapping inputs raise a clear `ValueError`.
+  - Reuse the coercion for all config blocks to keep alias translation working with validated data.
+- TODO: None.
