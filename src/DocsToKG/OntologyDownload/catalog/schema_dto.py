@@ -1,3 +1,36 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.catalog.schema_dto",
+#   "purpose": "Data Transfer Objects for schema introspection.",
+#   "sections": [
+#     {
+#       "id": "columninfo",
+#       "name": "ColumnInfo",
+#       "anchor": "class-columninfo",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "indexinfo",
+#       "name": "IndexInfo",
+#       "anchor": "class-indexinfo",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "tableschema",
+#       "name": "TableSchema",
+#       "anchor": "class-tableschema",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "schemainfo",
+#       "name": "SchemaInfo",
+#       "anchor": "class-schemainfo",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Data Transfer Objects for schema introspection.
 
 Represents database schema information, tables, columns, and indexes
@@ -13,7 +46,6 @@ NAVMAP:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass(frozen=True)
@@ -31,7 +63,7 @@ class ColumnInfo:
     name: str
     data_type: str
     nullable: bool = True
-    default_value: Optional[str] = None
+    default_value: str | None = None
     constraints: list[str] = None  # type: ignore
 
     def __post_init__(self):

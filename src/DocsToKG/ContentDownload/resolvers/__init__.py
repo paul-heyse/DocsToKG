@@ -1,3 +1,11 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.resolvers.__init__",
+#   "purpose": "Resolver subsystem public exports.",
+#   "sections": []
+# }
+# === /NAVMAP ===
+
 """Resolver subsystem public exports."""
 
 from __future__ import annotations

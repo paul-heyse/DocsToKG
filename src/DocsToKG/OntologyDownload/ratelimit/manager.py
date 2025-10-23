@@ -1,3 +1,36 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.ratelimit.manager",
+#   "purpose": "RateLimitManager: Facade for pyrate-limiter with per-service rate enforcement.",
+#   "sections": [
+#     {
+#       "id": "ratelimitmanager",
+#       "name": "RateLimitManager",
+#       "anchor": "class-ratelimitmanager",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "get-rate-limiter",
+#       "name": "get_rate_limiter",
+#       "anchor": "function-get-rate-limiter",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "close-rate-limiter",
+#       "name": "close_rate_limiter",
+#       "anchor": "function-close-rate-limiter",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "reset-rate-limiter",
+#       "name": "reset_rate_limiter",
+#       "anchor": "function-reset-rate-limiter",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """RateLimitManager: Facade for pyrate-limiter with per-service rate enforcement.
 
 Provides a unified rate-limiting interface for the OntologyDownload subsystem:
@@ -29,7 +62,7 @@ import logging
 import os
 import threading
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Optional
 
 import platformdirs
 from pyrate_limiter import BucketFullException, Duration, Limiter, Rate
@@ -44,8 +77,8 @@ logger = logging.getLogger(__name__)
 
 _rate_limiter: Optional["RateLimitManager"] = None
 _rate_limiter_lock = threading.Lock()
-_rate_limiter_config_hash: Optional[str] = None
-_rate_limiter_pid: Optional[int] = None
+_rate_limiter_config_hash: str | None = None
+_rate_limiter_pid: int | None = None
 
 # Allow the limiter to block for a very long time (≈ 1 year) before giving up.
 _BLOCKING_MAX_DELAY_MS = int(Duration.DAY) * 365
@@ -71,8 +104,8 @@ class RateLimitManager:
 
     def __init__(
         self,
-        rate_specs: Dict[str, List[RateSpec]],
-        bucket_dir: Optional[Path] = None,
+        rate_specs: dict[str, list[RateSpec]],
+        bucket_dir: Path | None = None,
         mode: str = "block",
     ):
         """Initialize RateLimitManager.
@@ -97,8 +130,8 @@ class RateLimitManager:
         # Initialize limiter
         # For now, use a simple in-memory approach; can be upgraded to SQLiteBucket
         # if cross-process coordination is needed
-        self._limiter: Optional[Limiter] = None
-        self._service_limiters: Dict[str, Limiter] = {}
+        self._limiter: Limiter | None = None
+        self._service_limiters: dict[str, Limiter] = {}
 
         logger.debug(
             "RateLimitManager initialized",
@@ -112,9 +145,9 @@ class RateLimitManager:
     def acquire(
         self,
         service: str,
-        host: Optional[str] = None,
+        host: str | None = None,
         weight: int = 1,
-        timeout_ms: Optional[int] = None,
+        timeout_ms: int | None = None,
     ) -> bool:
         """Acquire rate limit slot(s) for a service/host.
 
@@ -235,7 +268,7 @@ class RateLimitManager:
 
         return limiter
 
-    def get_stats(self, service: Optional[str] = None) -> Dict[str, any]:
+    def get_stats(self, service: str | None = None) -> dict[str, any]:
         """Get rate-limiting statistics.
 
         Args:

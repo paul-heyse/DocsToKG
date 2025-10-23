@@ -1,3 +1,36 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.embedding.backends.lexical.local_bm25",
+#   "purpose": "Local BM25 lexical embedding provider.",
+#   "sections": [
+#     {
+#       "id": "tokenize",
+#       "name": "_tokenize",
+#       "anchor": "function-tokenize",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "bm25accumulator",
+#       "name": "BM25Accumulator",
+#       "anchor": "class-bm25accumulator",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "localbm25config",
+#       "name": "LocalBM25Config",
+#       "anchor": "class-localbm25config",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "localbm25provider",
+#       "name": "LocalBM25Provider",
+#       "anchor": "class-localbm25provider",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Local BM25 lexical embedding provider."""
 
 from __future__ import annotations
@@ -5,8 +38,8 @@ from __future__ import annotations
 import math
 import unicodedata
 from collections import Counter
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Sequence, Tuple
 
 from DocsToKG.DocParsing.core.models import BM25Stats
 
@@ -80,7 +113,7 @@ class LocalBM25Provider(LexicalEmbeddingBackend):
             )
         return stats
 
-    def vector(self, text: str, stats: object) -> Tuple[Sequence[str], Sequence[float]]:
+    def vector(self, text: str, stats: object) -> tuple[Sequence[str], Sequence[float]]:
         if not isinstance(stats, BM25Stats):
             raise ProviderError(
                 provider=self.identity.name,

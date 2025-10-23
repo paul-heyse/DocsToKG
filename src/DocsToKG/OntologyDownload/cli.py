@@ -3,12 +3,246 @@
 #   "module": "DocsToKG.OntologyDownload.cli",
 #   "purpose": "Expose the ontofetch CLI for planning, pulling, validating, and maintaining ontologies",
 #   "sections": [
-#     {"id": "parser", "name": "Parser Construction", "anchor": "PAR", "kind": "api"},
-#     {"id": "constants", "name": "CLI Constants", "anchor": "CON", "kind": "constants"},
-#     {"id": "arg-helpers", "name": "Argument Helpers", "anchor": "ARG", "kind": "helpers"},
-#     {"id": "dispatch", "name": "Subcommand Dispatch", "anchor": "DSP", "kind": "api"},
-#     {"id": "handlers", "name": "Command Handlers", "anchor": "HND", "kind": "api"},
-#     {"id": "entrypoint", "name": "CLI Entrypoint", "anchor": "ENT", "kind": "api"}
+#     {
+#       "id": "build-parser",
+#       "name": "_build_parser",
+#       "anchor": "function-build-parser",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-target-formats",
+#       "name": "_parse_target_formats",
+#       "anchor": "function-parse-target-formats",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-positive-int",
+#       "name": "_parse_positive_int",
+#       "anchor": "function-parse-positive-int",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-allowed-hosts",
+#       "name": "_parse_allowed_hosts",
+#       "anchor": "function-parse-allowed-hosts",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "normalize-plan-args",
+#       "name": "_normalize_plan_args",
+#       "anchor": "function-normalize-plan-args",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-since-arg",
+#       "name": "_parse_since_arg",
+#       "anchor": "function-parse-since-arg",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-since",
+#       "name": "_parse_since",
+#       "anchor": "function-parse-since",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "apply-cli-overrides",
+#       "name": "_apply_cli_overrides",
+#       "anchor": "function-apply-cli-overrides",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolve-specs-from-args",
+#       "name": "_resolve_specs_from_args",
+#       "anchor": "function-resolve-specs-from-args",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "handle-pull",
+#       "name": "_handle_pull",
+#       "anchor": "function-handle-pull",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "handle-plan",
+#       "name": "_handle_plan",
+#       "anchor": "function-handle-plan",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "handle-plan-diff",
+#       "name": "_handle_plan_diff",
+#       "anchor": "function-handle-plan-diff",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "handle-plugins",
+#       "name": "_handle_plugins",
+#       "anchor": "function-handle-plugins",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "scan-filesystem-for-orphans",
+#       "name": "_scan_filesystem_for_orphans",
+#       "anchor": "function-scan-filesystem-for-orphans",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "handle-prune",
+#       "name": "_handle_prune",
+#       "anchor": "function-handle-prune",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "read-api-key-status",
+#       "name": "_read_api_key_status",
+#       "anchor": "function-read-api-key-status",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "database-health-check",
+#       "name": "_database_health_check",
+#       "anchor": "function-database-health-check",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "doctor-report",
+#       "name": "_doctor_report",
+#       "anchor": "function-doctor-report",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "ensure-owner-only-permissions",
+#       "name": "_ensure_owner_only_permissions",
+#       "anchor": "function-ensure-owner-only-permissions",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "apply-doctor-fixes",
+#       "name": "_apply_doctor_fixes",
+#       "anchor": "function-apply-doctor-fixes",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "print-doctor-report",
+#       "name": "_print_doctor_report",
+#       "anchor": "function-print-doctor-report",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "handle-show",
+#       "name": "_handle_show",
+#       "anchor": "function-handle-show",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "selected-validators",
+#       "name": "_selected_validators",
+#       "anchor": "function-selected-validators",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "handle-validate",
+#       "name": "_handle_validate",
+#       "anchor": "function-handle-validate",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "handle-init",
+#       "name": "_handle_init",
+#       "anchor": "function-handle-init",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "handle-config-validate",
+#       "name": "_handle_config_validate",
+#       "anchor": "function-handle-config-validate",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "serialize-fetch-spec",
+#       "name": "_serialize_fetch_spec",
+#       "anchor": "function-serialize-fetch-spec",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "json-default-serializer",
+#       "name": "_json_default_serializer",
+#       "anchor": "function-json-default-serializer",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolved-config-to-dict",
+#       "name": "_resolved_config_to_dict",
+#       "anchor": "function-resolved-config-to-dict",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "redact-sensitive-values",
+#       "name": "_redact_sensitive_values",
+#       "anchor": "function-redact-sensitive-values",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "handle-config-show",
+#       "name": "_handle_config_show",
+#       "anchor": "function-handle-config-show",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "print-config-report",
+#       "name": "_print_config_report",
+#       "anchor": "function-print-config-report",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-batch-failure",
+#       "name": "_emit_batch_failure",
+#       "anchor": "function-emit-batch-failure",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "handle-db-latest",
+#       "name": "_handle_db_latest",
+#       "anchor": "function-handle-db-latest",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "handle-db-versions",
+#       "name": "_handle_db_versions",
+#       "anchor": "function-handle-db-versions",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "handle-db-stats",
+#       "name": "_handle_db_stats",
+#       "anchor": "function-handle-db-stats",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "handle-db-files",
+#       "name": "_handle_db_files",
+#       "anchor": "function-handle-db-files",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "handle-db-validations",
+#       "name": "_handle_db_validations",
+#       "anchor": "function-handle-db-validations",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "print-db-result",
+#       "name": "_print_db_result",
+#       "anchor": "function-print-db-result",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "cli-main",
+#       "name": "cli_main",
+#       "anchor": "function-cli-main",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===
@@ -41,9 +275,9 @@ import shutil
 import stat
 import subprocess
 import sys
-from datetime import datetime, timezone
+from collections.abc import Sequence
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence, Tuple, Union
 
 import httpx
 import yaml
@@ -525,7 +759,7 @@ ontologies:
 """
 
 
-def _parse_target_formats(value: Optional[str]) -> List[str]:
+def _parse_target_formats(value: str | None) -> list[str]:
     """Normalize comma-separated target format strings.
 
     Args:
@@ -561,7 +795,7 @@ def _parse_positive_int(value: str) -> int:
     return parsed
 
 
-def _parse_allowed_hosts(value: Optional[str]) -> List[str]:
+def _parse_allowed_hosts(value: str | None) -> list[str]:
     """Split comma-delimited host allowlist argument into unique entries.
 
     Args:
@@ -573,7 +807,7 @@ def _parse_allowed_hosts(value: Optional[str]) -> List[str]:
 
     if not value:
         return []
-    entries: List[str] = []
+    entries: list[str] = []
     for host in value.split(","):
         candidate = host.strip()
         if candidate and candidate not in entries:
@@ -597,7 +831,7 @@ _KNOWN_SUBCOMMANDS = {
 _GLOBAL_OPTIONS_WITH_VALUES = {"--log-level"}
 
 
-def _normalize_plan_args(args: Sequence[str]) -> List[str]:
+def _normalize_plan_args(args: Sequence[str]) -> list[str]:
     """Inject the default subcommand when callers omit it.
 
     Args:
@@ -658,7 +892,7 @@ def _parse_since_arg(value: str) -> datetime:
     return parsed
 
 
-def _parse_since(value: Optional[Union[str, datetime]]) -> Optional[datetime]:
+def _parse_since(value: str | datetime | None) -> datetime | None:
     """Parse optional date input into timezone-aware datetimes.
 
     Args:
@@ -672,8 +906,8 @@ def _parse_since(value: Optional[Union[str, datetime]]) -> Optional[datetime]:
         return None
     if isinstance(value, datetime):
         if value.tzinfo is None:
-            return value.replace(tzinfo=timezone.utc)
-        return value.astimezone(timezone.utc)
+            return value.replace(tzinfo=UTC)
+        return value.astimezone(UTC)
     text = value.strip()
     if not text:
         return None
@@ -711,25 +945,25 @@ def _apply_cli_overrides(config: ResolvedConfig, args) -> None:
 
 def _resolve_specs_from_args(
     args,
-    base_config: Optional[ResolvedConfig],
+    base_config: ResolvedConfig | None,
     *,
     allow_empty: bool = False,
-) -> tuple[ResolvedConfig, List[FetchSpec]]:
+) -> tuple[ResolvedConfig, list[FetchSpec]]:
     """Return configuration and fetch specifications derived from CLI arguments."""
 
     target_formats = _parse_target_formats(getattr(args, "target_formats", None))
-    config_path: Optional[Path] = getattr(args, "spec", None)
-    ids: List[str] = list(getattr(args, "ids", []))
+    config_path: Path | None = getattr(args, "spec", None)
+    ids: list[str] = list(getattr(args, "ids", []))
     resolver_override_arg = getattr(args, "resolver", None)
     if resolver_override_arg is None:
-        resolver_override: Optional[str] = None
+        resolver_override: str | None = None
     else:
         candidate = str(resolver_override_arg).strip()
         resolver_override = candidate or None
     if resolver_override and resolver_override not in RESOLVERS:
         raise ConfigError("Unknown resolver(s) specified: " + resolver_override)
 
-    def apply_target_override(specs: Sequence[FetchSpec]) -> List[FetchSpec]:
+    def apply_target_override(specs: Sequence[FetchSpec]) -> list[FetchSpec]:
         """Replace ``target_formats`` when CLI overrides are provided."""
 
         if not target_formats:
@@ -744,7 +978,7 @@ def _resolve_specs_from_args(
             for spec in specs
         ]
 
-    def apply_resolver_override(specs: Sequence[FetchSpec]) -> List[FetchSpec]:
+    def apply_resolver_override(specs: Sequence[FetchSpec]) -> list[FetchSpec]:
         """Force all ``specs`` to use the resolver override when one is provided.
 
         Args:
@@ -779,7 +1013,7 @@ def _resolve_specs_from_args(
     config.defaults.logging.level = getattr(args, "log_level", config.defaults.logging.level)
     _apply_cli_overrides(config, args)
 
-    lock_path: Optional[Path] = getattr(args, "lock", None)
+    lock_path: Path | None = getattr(args, "lock", None)
     if lock_path is not None:
         lock_payload = load_lockfile_payload(lock_path)
         specs = specs_from_lock_payload(
@@ -813,7 +1047,7 @@ def _resolve_specs_from_args(
         )
 
         specs_by_id = {spec.id: spec for spec in config.specs or []}
-        resolved_specs: List[FetchSpec] = []
+        resolved_specs: list[FetchSpec] = []
         for oid in ids:
             existing = specs_by_id.get(oid)
             if existing is not None:
@@ -855,10 +1089,10 @@ def _resolve_specs_from_args(
 
 def _handle_pull(
     args,
-    base_config: Optional[ResolvedConfig],
+    base_config: ResolvedConfig | None,
     *,
     dry_run: bool = False,
-    logger: Optional[logging.Logger] = None,
+    logger: logging.Logger | None = None,
 ):
     """Execute the ``pull`` subcommand workflow."""
 
@@ -875,10 +1109,10 @@ def _handle_pull(
 
 def _handle_plan(
     args,
-    base_config: Optional[ResolvedConfig],
+    base_config: ResolvedConfig | None,
     *,
-    logger: Optional[logging.Logger] = None,
-) -> List[PlannedFetch]:
+    logger: logging.Logger | None = None,
+) -> list[PlannedFetch]:
     """Resolve plans without executing downloads."""
 
     since = _parse_since(getattr(args, "since", None))
@@ -890,13 +1124,13 @@ def _handle_plan(
     return plans
 
 
-def _handle_plan_diff(args, base_config: Optional[ResolvedConfig]) -> Dict[str, object]:
+def _handle_plan_diff(args, base_config: ResolvedConfig | None) -> dict[str, object]:
     """Compare current plan output against a baseline plan file."""
 
     use_manifest = bool(getattr(args, "use_manifest", False))
     update_baseline = bool(getattr(args, "update_baseline", False))
     if use_manifest:
-        baseline_payload: List[dict] = []
+        baseline_payload: list[dict] = []
         baseline_path = None
     else:
         baseline_path = getattr(args, "baseline", DEFAULT_PLAN_BASELINE).expanduser()
@@ -917,7 +1151,7 @@ def _handle_plan_diff(args, base_config: Optional[ResolvedConfig]) -> Dict[str, 
     config, specs = _resolve_specs_from_args(args, base_config, allow_empty=True)
     plans = plan_all(specs, config=config, since=since)
     current_payload = [plan_to_dict(plan) for plan in plans]
-    lock_written: Optional[str] = None
+    lock_written: str | None = None
     if not getattr(args, "no_lock", False):
         lock_path = getattr(args, "lock_output", DEFAULT_LOCKFILE_PATH)
         lock_written = str(write_lockfile(plans, lock_path))
@@ -959,7 +1193,7 @@ def _handle_plan_diff(args, base_config: Optional[ResolvedConfig]) -> Dict[str, 
     return diff
 
 
-def _handle_plugins(args) -> Dict[str, Dict[str, Dict[str, str]]]:
+def _handle_plugins(args) -> dict[str, dict[str, dict[str, str]]]:
     """Return plugin inventory for the requested kind."""
 
     if args.kind == "all":
@@ -970,7 +1204,7 @@ def _handle_plugins(args) -> Dict[str, Dict[str, Dict[str, str]]]:
     return {args.kind: dict(_collect_plugin_details(args.kind))}
 
 
-def _scan_filesystem_for_orphans(root_dir: Path) -> List[Tuple[str, int]]:
+def _scan_filesystem_for_orphans(root_dir: Path) -> list[tuple[str, int]]:
     """Scan filesystem to find orphaned files not referenced in database.
 
     Args:
@@ -981,7 +1215,7 @@ def _scan_filesystem_for_orphans(root_dir: Path) -> List[Tuple[str, int]]:
     """
     from pathlib import PurePath
 
-    entries: List[Tuple[str, int]] = []
+    entries: list[tuple[str, int]] = []
 
     if not root_dir.exists():
         return entries
@@ -1001,7 +1235,7 @@ def _scan_filesystem_for_orphans(root_dir: Path) -> List[Tuple[str, int]]:
     return entries
 
 
-def _handle_prune(args, logger) -> Dict[str, object]:
+def _handle_prune(args, logger) -> dict[str, object]:
     """Delete surplus ontology versions based on ``--keep`` and age filters."""
 
     keep = args.keep
@@ -1010,7 +1244,7 @@ def _handle_prune(args, logger) -> Dict[str, object]:
 
     threshold = getattr(args, "older_than", None)
     if threshold is not None and threshold.tzinfo is None:
-        threshold = threshold.replace(tzinfo=timezone.utc)
+        threshold = threshold.replace(tzinfo=UTC)
 
     requested_ids: Sequence[str]
     if args.ids is not None:
@@ -1020,7 +1254,7 @@ def _handle_prune(args, logger) -> Dict[str, object]:
 
     seen: set[str] = set()
     duplicates: set[str] = set()
-    target_ids: List[str] = []
+    target_ids: list[str] = []
     for ontology_id in requested_ids:
         if ontology_id in seen:
             duplicates.add(ontology_id)
@@ -1028,10 +1262,10 @@ def _handle_prune(args, logger) -> Dict[str, object]:
         seen.add(ontology_id)
         target_ids.append(ontology_id)
 
-    summary: List[Dict[str, object]] = []
+    summary: list[dict[str, object]] = []
     total_reclaimed = 0
     total_deleted = 0
-    messages: List[str] = []
+    messages: list[str] = []
     if args.dry_run and args.ids is not None:
         if target_ids:
             ordered = ", ".join(target_ids)
@@ -1048,7 +1282,7 @@ def _handle_prune(args, logger) -> Dict[str, object]:
         raw_metadata = collect_version_metadata(ontology_id)
         metadata = sorted(
             raw_metadata,
-            key=lambda item: item.get("timestamp") or datetime.min.replace(tzinfo=timezone.utc),
+            key=lambda item: item.get("timestamp") or datetime.min.replace(tzinfo=UTC),
             reverse=True,
         )
         if not metadata:
@@ -1062,7 +1296,7 @@ def _handle_prune(args, logger) -> Dict[str, object]:
                     removal_set.add(entry["version"])
 
         required = min(keep, len(metadata))
-        retained_versions: List[str] = []
+        retained_versions: list[str] = []
         for entry in metadata:
             version = entry["version"]
             if version in removal_set:
@@ -1089,7 +1323,7 @@ def _handle_prune(args, logger) -> Dict[str, object]:
         retained_entries = [entry for entry in metadata if entry["version"] in retained_versions]
 
         reclaimed = 0
-        deleted_versions: List[str] = []
+        deleted_versions: list[str] = []
         if args.dry_run:
             for entry in to_remove:
                 reclaimed += int(entry.get("size") or 0)
@@ -1136,7 +1370,7 @@ def _handle_prune(args, logger) -> Dict[str, object]:
             )
 
     # Phase 3: Orphan Detection
-    orphans_section: Dict[str, object] = {
+    orphans_section: dict[str, object] = {
         "orphans_found": 0,
         "orphans_bytes": 0,
         "details": [],
@@ -1227,7 +1461,7 @@ def _handle_prune(args, logger) -> Dict[str, object]:
     }
 
 
-def _read_api_key_status(path: Path) -> Dict[str, object]:
+def _read_api_key_status(path: Path) -> dict[str, object]:
     """Return diagnostic metadata for an API key file.
 
     Args:
@@ -1238,7 +1472,7 @@ def _read_api_key_status(path: Path) -> Dict[str, object]:
         any error encountered while reading the contents.
     """
 
-    info: Dict[str, object] = {"path": str(path), "exists": path.exists(), "configured": False}
+    info: dict[str, object] = {"path": str(path), "exists": path.exists(), "configured": False}
     if not info["exists"]:
         return info
 
@@ -1250,7 +1484,7 @@ def _read_api_key_status(path: Path) -> Dict[str, object]:
     return info
 
 
-def _database_health_check() -> Dict[str, object]:
+def _database_health_check() -> dict[str, object]:
     """Check DuckDB catalog health and return diagnostic information."""
 
     from .database import DatabaseConfiguration
@@ -1260,7 +1494,7 @@ def _database_health_check() -> Dict[str, object]:
         Path.home() / ".data" / "ontology-fetcher" / ".catalog" / "ontofetch.duckdb"
     )
 
-    report: Dict[str, object] = {"db_path": str(db_path)}
+    report: dict[str, object] = {"db_path": str(db_path)}
 
     if not db_path.exists():
         report.update(
@@ -1337,7 +1571,7 @@ def _database_health_check() -> Dict[str, object]:
     return report
 
 
-def _doctor_report() -> Dict[str, object]:
+def _doctor_report() -> dict[str, object]:
     """Collect diagnostic information for the ``doctor`` command.
 
     Returns:
@@ -1391,7 +1625,7 @@ def _doctor_report() -> Dict[str, object]:
         else:
             probe_path = Path("/")
 
-    disk_report: Dict[str, object] = {"path": str(probe_path)}
+    disk_report: dict[str, object] = {"path": str(probe_path)}
     try:
         disk_usage = shutil.disk_usage(probe_path)
     except OSError as exc:
@@ -1425,7 +1659,7 @@ def _doctor_report() -> Dict[str, object]:
     }
 
     robot_path = shutil.which("robot")
-    robot_info: Dict[str, object] = {"available": bool(robot_path), "path": robot_path}
+    robot_info: dict[str, object] = {"available": bool(robot_path), "path": robot_path}
     if robot_path:
         try:
             completed = subprocess.run(
@@ -1452,10 +1686,10 @@ def _doctor_report() -> Dict[str, object]:
         "bioportal": "https://data.bioontology.org",
         "bioregistry": "https://bioregistry.io",
     }
-    network: Dict[str, Dict[str, object]] = {}
+    network: dict[str, dict[str, object]] = {}
     http_client = net.get_http_client()
     for name, url in network_targets.items():
-        result: Dict[str, object] = {"url": url}
+        result: dict[str, object] = {"url": url}
         try:
             response = http_client.head(url, timeout=3.0, follow_redirects=True)
             status = response.status_code
@@ -1473,8 +1707,8 @@ def _doctor_report() -> Dict[str, object]:
             result.update({"ok": False, "detail": str(exc)})
         network[name] = result
 
-    rate_limits: Dict[str, object] = {}
-    rate_limit_errors: List[str] = []
+    rate_limits: dict[str, object] = {}
+    rate_limit_errors: list[str] = []
     try:
         defaults = ResolvedConfig.from_defaults()
     except (PydanticValidationError, ValueError) as exc:
@@ -1497,8 +1731,8 @@ def _doctor_report() -> Dict[str, object]:
                 rate_limits["configured_mode"] = str(configured_mode).strip()
             configured = http_section.get("rate_limits") if isinstance(http_section, dict) else None
             if isinstance(configured, dict):
-                valid: Dict[str, Dict[str, object]] = {}
-                invalid: Dict[str, str] = {}
+                valid: dict[str, dict[str, object]] = {}
+                invalid: dict[str, str] = {}
                 for service, limit in configured.items():
                     text_value = str(limit)
                     rps = parse_rate_limit_to_rps(text_value)
@@ -1520,7 +1754,7 @@ def _doctor_report() -> Dict[str, object]:
         if len(rate_limit_errors) > 1:
             rate_limits["errors"] = rate_limit_errors
 
-    schema_report: Dict[str, object] = {"version": MANIFEST_SCHEMA_VERSION}
+    schema_report: dict[str, object] = {"version": MANIFEST_SCHEMA_VERSION}
     try:
         Draft202012Validator.check_schema(get_manifest_schema())
         schema_report["schema_valid"] = True
@@ -1528,7 +1762,7 @@ def _doctor_report() -> Dict[str, object]:
         schema_report["schema_valid"] = False
         schema_report["error"] = str(exc)
 
-    sample_manifest: Optional[Path] = None
+    sample_manifest: Path | None = None
     if LOCAL_ONTOLOGY_DIR.exists():
         for candidate in LOCAL_ONTOLOGY_DIR.rglob("manifest.json"):
             sample_manifest = candidate
@@ -1567,7 +1801,7 @@ def _doctor_report() -> Dict[str, object]:
     }
 
     # Safely collect database diagnostic without breaking doctor command
-    db_diagnostic: Dict[str, object] = {}
+    db_diagnostic: dict[str, object] = {}
     try:
         db_diagnostic = _database_health_check()
     except Exception as exc:  # pylint: disable=broad-except
@@ -1576,7 +1810,7 @@ def _doctor_report() -> Dict[str, object]:
             "error": f"Failed to get database diagnostics: {exc}",
         }
 
-    report: Dict[str, object] = {
+    report: dict[str, object] = {
         "directories": directories,
         "disk": disk_report,
         "dependencies": dependencies,
@@ -1591,7 +1825,7 @@ def _doctor_report() -> Dict[str, object]:
     return report
 
 
-def _ensure_owner_only_permissions(path: Path, actions: List[str]) -> None:
+def _ensure_owner_only_permissions(path: Path, actions: list[str]) -> None:
     """Restrict placeholder files to owner read/write when supported."""
 
     desired_mode = stat.S_IRUSR | stat.S_IWUSR
@@ -1615,10 +1849,10 @@ def _ensure_owner_only_permissions(path: Path, actions: List[str]) -> None:
         actions.append(f"Failed to update permissions for {path}: {exc}")
 
 
-def _apply_doctor_fixes(report: Dict[str, object]) -> List[str]:
+def _apply_doctor_fixes(report: dict[str, object]) -> list[str]:
     """Attempt to remediate common doctor issues and return action notes."""
 
-    actions: List[str] = []
+    actions: list[str] = []
 
     for info in report.get("directories", {}).values():
         path = Path(info.get("path", ""))
@@ -1671,7 +1905,7 @@ def _apply_doctor_fixes(report: Dict[str, object]) -> List[str]:
     return actions
 
 
-def _print_doctor_report(report: Dict[str, object]) -> None:
+def _print_doctor_report(report: dict[str, object]) -> None:
     """Render human-readable diagnostics from :func:`_doctor_report`.
 
     Args:
@@ -1682,7 +1916,7 @@ def _print_doctor_report(report: Dict[str, object]) -> None:
     for name, info in report["directories"].items():
         status = ["exists" if info.get("exists") else "missing"]
 
-        permission_labels: List[str] = []
+        permission_labels: list[str] = []
         if info.get("writable"):
             permission_labels.append("writable")
         else:
@@ -1944,7 +2178,7 @@ def _handle_config_validate(path: Path) -> dict:
     }
 
 
-def _serialize_fetch_spec(spec: FetchSpec) -> Dict[str, object]:
+def _serialize_fetch_spec(spec: FetchSpec) -> dict[str, object]:
     """Return a JSON-serialisable representation of a :class:`FetchSpec`."""
 
     return {
@@ -1969,7 +2203,7 @@ def _json_default_serializer(value):
     raise TypeError(f"Object of type {type(value).__name__} is not JSON serialisable")
 
 
-def _resolved_config_to_dict(config: ResolvedConfig) -> Dict[str, object]:
+def _resolved_config_to_dict(config: ResolvedConfig) -> dict[str, object]:
     """Convert a resolved configuration into JSON-friendly primitives."""
 
     if hasattr(config, "model_dump"):
@@ -1984,7 +2218,7 @@ def _redact_sensitive_values(payload):
     """Recursively redact values whose keys appear credential-like."""
 
     if isinstance(payload, dict):
-        redacted: Dict[str, object] = {}
+        redacted: dict[str, object] = {}
         for key, value in payload.items():
             if _SENSITIVE_KEY_PATTERN.search(str(key)):
                 redacted[key] = "***"
@@ -1997,13 +2231,13 @@ def _redact_sensitive_values(payload):
 
 
 def _handle_config_show(
-    spec_path: Optional[Path], *, defaults_only: bool, redact: bool
-) -> Dict[str, object]:
+    spec_path: Path | None, *, defaults_only: bool, redact: bool
+) -> dict[str, object]:
     """Produce a structured report describing the effective configuration."""
 
     if defaults_only:
         config = get_default_config(copy=True)
-        resolved_path: Optional[Path] = None
+        resolved_path: Path | None = None
         source = "defaults"
     else:
         if spec_path is None:
@@ -2029,7 +2263,7 @@ def _handle_config_show(
     }
 
 
-def _print_config_report(report: Dict[str, object]) -> None:
+def _print_config_report(report: dict[str, object]) -> None:
     """Render a human-readable configuration report to stdout."""
 
     path = report.get("path") or "<defaults>"
@@ -2058,7 +2292,7 @@ def _print_config_report(report: Dict[str, object]) -> None:
 # --- Error handling helpers ---
 
 
-def _emit_batch_failure(exc: Union[BatchPlanningError, BatchFetchError], args) -> None:
+def _emit_batch_failure(exc: BatchPlanningError | BatchFetchError, args) -> None:
     """Print a concise error message and optionally serialize partial results."""
 
     message = exc.args[0] if exc.args else str(exc)
@@ -2066,7 +2300,7 @@ def _emit_batch_failure(exc: Union[BatchPlanningError, BatchFetchError], args) -
     if not getattr(args, "json", False):
         return
 
-    payload: List[dict]
+    payload: list[dict]
     if isinstance(exc, BatchPlanningError):
         payload = [plan_to_dict(plan) for plan in getattr(exc, "completed", [])]
     else:
@@ -2079,7 +2313,7 @@ def _emit_batch_failure(exc: Union[BatchPlanningError, BatchFetchError], args) -
 # --- Database Query Handlers ---
 
 
-def _handle_db_latest(args) -> Dict[str, object]:
+def _handle_db_latest(args) -> dict[str, object]:
     """Show the latest ontology version from the catalog."""
 
     db = get_database()
@@ -2099,7 +2333,7 @@ def _handle_db_latest(args) -> Dict[str, object]:
         close_database()
 
 
-def _handle_db_versions(args) -> Dict[str, object]:
+def _handle_db_versions(args) -> dict[str, object]:
     """List ontology versions from the catalog."""
 
     db = get_database()
@@ -2121,7 +2355,7 @@ def _handle_db_versions(args) -> Dict[str, object]:
         close_database()
 
 
-def _handle_db_stats(args) -> Dict[str, object]:
+def _handle_db_stats(args) -> dict[str, object]:
     """Get statistics for a specific version."""
 
     db = get_database()
@@ -2146,7 +2380,7 @@ def _handle_db_stats(args) -> Dict[str, object]:
         close_database()
 
 
-def _handle_db_files(args) -> Dict[str, object]:
+def _handle_db_files(args) -> dict[str, object]:
     """List extracted files for a version."""
 
     db = get_database()
@@ -2171,7 +2405,7 @@ def _handle_db_files(args) -> Dict[str, object]:
         close_database()
 
 
-def _handle_db_validations(args) -> Dict[str, object]:
+def _handle_db_validations(args) -> dict[str, object]:
     """Show validation failures for a version."""
 
     db = get_database()
@@ -2195,7 +2429,7 @@ def _handle_db_validations(args) -> Dict[str, object]:
         close_database()
 
 
-def _print_db_result(result: Dict[str, object], args) -> None:
+def _print_db_result(result: dict[str, object], args) -> None:
     """Print database query result as JSON or table."""
 
     if args.json:
@@ -2283,7 +2517,7 @@ def _print_db_result(result: Dict[str, object], args) -> None:
 # --- Module Entry Points ---
 
 
-def cli_main(argv: Optional[Sequence[str]] = None) -> int:
+def cli_main(argv: Sequence[str] | None = None) -> int:
     """Entry point for the ontology downloader CLI.
 
     Args:
@@ -2471,7 +2705,7 @@ def cli_main(argv: Optional[Sequence[str]] = None) -> int:
                     )
             elif args.command == "doctor":
                 report = _doctor_report()
-                fixes: List[str] = []
+                fixes: list[str] = []
                 if getattr(args, "fix", False):
                     fixes = _apply_doctor_fixes(report)
                     if fixes:

@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.embedding.backends.dense.fallback",
+#   "purpose": "Placeholder dense fallback provider.",
+#   "sections": [
+#     {
+#       "id": "densefallbackprovider",
+#       "name": "DenseFallbackProvider",
+#       "anchor": "class-densefallbackprovider",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Placeholder dense fallback provider.
 
 The implementation simply raises a :class:`ProviderError` explaining that the

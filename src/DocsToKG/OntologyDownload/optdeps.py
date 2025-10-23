@@ -10,7 +10,8 @@ loader behaviour.
 from __future__ import annotations
 
 import sys
-from typing import Any, Callable, Optional
+from collections.abc import Callable
+from typing import Any
 
 from . import settings as _settings
 
@@ -37,7 +38,7 @@ def _import_module(name: str) -> Any:
     return _BASE_IMPORT(name)
 
 
-def _call_with_override(callback: Callable[[], Any], cache_key: Optional[str]) -> Any:
+def _call_with_override(callback: Callable[[], Any], cache_key: str | None) -> Any:
     original_import = _settings._import_module
     current_import = globals()["_import_module"]
 
@@ -48,8 +49,8 @@ def _call_with_override(callback: Callable[[], Any], cache_key: Optional[str]) -
             raise ModuleNotFoundError(str(exc)) from exc
 
     cache_tuple = _CACHE_ATTRS.get(cache_key or "")
-    cache_name: Optional[str]
-    module_name: Optional[str]
+    cache_name: str | None
+    module_name: str | None
     if cache_tuple:
         cache_name, module_name = cache_tuple
     else:
@@ -129,9 +130,48 @@ def get_owlready2() -> Any:
 #   "module": "DocsToKG.OntologyDownload.optdeps",
 #   "purpose": "Guard optional dependency imports used by resolvers and validators",
 #   "sections": [
-#     {"id": "import", "name": "Import Utilities", "anchor": "IMP", "kind": "helpers"},
-#     {"id": "wrappers", "name": "Override Helpers", "anchor": "WRP", "kind": "helpers"},
-#     {"id": "accessors", "name": "Cached Accessors", "anchor": "ACC", "kind": "api"}
+#     {
+#       "id": "import-module",
+#       "name": "_import_module",
+#       "anchor": "function-import-module",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "call-with-override",
+#       "name": "_call_with_override",
+#       "anchor": "function-call-with-override",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-pystow",
+#       "name": "get_pystow",
+#       "anchor": "function-get-pystow",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-rdflib",
+#       "name": "get_rdflib",
+#       "anchor": "function-get-rdflib",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "graph-factory",
+#       "name": "graph_factory",
+#       "anchor": "function-graph-factory",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-pronto",
+#       "name": "get_pronto",
+#       "anchor": "function-get-pronto",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-owlready2",
+#       "name": "get_owlready2",
+#       "anchor": "function-get-owlready2",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===

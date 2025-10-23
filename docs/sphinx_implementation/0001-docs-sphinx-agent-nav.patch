@@ -1,0 +1,358 @@
+diff --git a/.github/workflows/docs.yml b/.github/workflows/docs.yml
+new file mode 100644
+index 0000000..c222222
+--- /dev/null
++++ b/.github/workflows/docs.yml
+@@ -0,0 +1,70 @@
++name: docs
++on:
++  push:
++    branches: [ main ]
++  workflow_dispatch:
++
++permissions:
++  contents: read
++  pages: write
++  id-token: write
++
++jobs:
++  build:
++    runs-on: ubuntu-latest
++    steps:
++      - uses: actions/checkout@v4
++      - uses: astral-sh/setup-uv@v3
++      - name: Install docs deps
++        run: |
++          uv pip install -U sphinx myst-parser pydata-sphinx-theme sphinx-sitemap sphinx-copybutton sphinx-design sphinx-autoapi
++      - name: Build docs (dirhtml + json + text + linkcheck)
++        run: |
++          make -C docs dirhtml json text
++          make -C docs linkcheck || true   # non-blocking linkcheck
++      - name: Upload Pages artifact
++        uses: actions/upload-pages-artifact@v3
++        with:
++          path: docs/build/dirhtml
++  deploy:
++    needs: build
++    runs-on: ubuntu-latest
++    environment:
++      name: github-pages
++      url: ${{ steps.deployment.outputs.page_url }}
++    steps:
++      - id: deployment
++        uses: actions/deploy-pages@v4
+diff --git a/docs/.gitignore b/docs/.gitignore
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/docs/.gitignore
+@@ -0,0 +1,2 @@
++# Keep Sphinx build outputs out of git
++/build/
+diff --git a/docs/Makefile b/docs/Makefile
+new file mode 100644
+index 0000000..3333333
+--- /dev/null
++++ b/docs/Makefile
+@@ -0,0 +1,35 @@
++SPHINXOPTS=-n -W --keep-going
++SOURCEDIR=source
++BUILDDIR=build
++
++.PHONY: html dirhtml json text linkcheck all clean
++
++html:
++	@sphinx-build $(SPHINXOPTS) -b html $(SOURCEDIR) $(BUILDDIR)/html
++
++dirhtml:
++	@sphinx-build $(SPHINXOPTS) -b dirhtml $(SOURCEDIR) $(BUILDDIR)/dirhtml
++
++json:
++	@sphinx-build $(SPHINXOPTS) -b json $(SOURCEDIR) $(BUILDDIR)/json
++
++text:
++	@sphinx-build $(SPHINXOPTS) -b text $(SOURCEDIR) $(BUILDDIR)/text
++
++linkcheck:
++	@sphinx-build -b linkcheck $(SOURCEDIR) $(BUILDDIR)/linkcheck
++
++all: dirhtml json text
++
++clean:
++	rm -rf $(BUILDDIR)
+diff --git a/docs/README.md b/docs/README.md
+new file mode 100644
+index 0000000..4444444
+--- /dev/null
++++ b/docs/README.md
+@@ -0,0 +1,53 @@
++# DocsToKG Documentation
++
++This folder contains the Sphinx configuration for **agent-friendly** docs:
++
++- Human-friendly HTML with pretty permalinks (`dirhtml`)
++- Machine-friendly exports (`json`, `text`)
++- Sitemap + canonical base URL for crawlability
++- AutoAPI (parses source without importing) for complete API coverage
++
++## Local build
++
++```bash
++uv pip install -U sphinx myst-parser pydata-sphinx-theme sphinx-sitemap sphinx-copybutton sphinx-design sphinx-autoapi
++make -C docs all
++# Serve locally (optional)
++python -m http.server -d docs/build/dirhtml 8000
++```
++
++Artifacts:
++
++- HTML (dirhtml): `docs/build/dirhtml/`
++- JSON: `docs/build/json/`
++- Text: `docs/build/text/`
++
++## GitHub Pages
++
++The workflow at `.github/workflows/docs.yml` builds and publishes to Pages on every push to `main`.
++Published site (default): `https://paul-heyse.github.io/DocsToKG/`
++
++## Structure
++
++- `docs/source/index.md` – site index
++- `docs/source/00-map/` – mirrors the repo so agents can navigate by package
++- `autoapi` – generated API (root set to `04-api` for predictable URLs)
++
++## Notes
++
++- Heavy/optional imports are mocked in `conf.py` (`autodoc_mock_imports`) even though AutoAPI parses statically.
++- If you later add a custom domain, set `html_baseurl` accordingly in `conf.py`.
+diff --git a/docs/source/00-map/ContentDownload/index.md b/docs/source/00-map/ContentDownload/index.md
+new file mode 100644
+index 0000000..5555555
+--- /dev/null
++++ b/docs/source/00-map/ContentDownload/index.md
+@@ -0,0 +1,17 @@
++# ContentDownload
++
++- Code root: `src/DocsToKG/ContentDownload`
++- Purpose: Source acquisition (OpenAlex/DOAJ/CORE/etc.), resolvers, and download orchestration.
++- Contract: Produces raw artifacts (PDF/HTML/metadata) for downstream parsing.
++
++```{toctree}
++:maxdepth: 2
++:glob:
++
++*
++```
+diff --git a/docs/source/00-map/DocParsing/index.md b/docs/source/00-map/DocParsing/index.md
+new file mode 100644
+index 0000000..6666666
+--- /dev/null
++++ b/docs/source/00-map/DocParsing/index.md
+@@ -0,0 +1,18 @@
++# DocParsing
++
++- Code root: `src/DocsToKG/DocParsing`
++- Purpose: DocTags → chunks; hybrid chunking; storage schemas; ingestion quality gates.
++- Contract: Emits structured chunks fit for hybrid search & ontology mapping.
++
++```{toctree}
++:maxdepth: 2
++:glob:
++
++*
++```
+diff --git a/docs/source/00-map/HybridSearch/index.md b/docs/source/00-map/HybridSearch/index.md
+new file mode 100644
+index 0000000..7777777
+--- /dev/null
++++ b/docs/source/00-map/HybridSearch/index.md
+@@ -0,0 +1,18 @@
++# HybridSearch
++
++- Code root: `src/DocsToKG/HybridSearch`
++- Purpose: Sparse (BM25/SPLADE) + dense (Qwen3…) index build, cuVS/FAISS GPU accelerated search.
++- Contract: Exposes retrieval APIs and evaluation utilities.
++
++```{toctree}
++:maxdepth: 2
++:glob:
++
++*
++```
+diff --git a/docs/source/00-map/OntologyDownload/index.md b/docs/source/00-map/OntologyDownload/index.md
+new file mode 100644
+index 0000000..8888888
+--- /dev/null
++++ b/docs/source/00-map/OntologyDownload/index.md
+@@ -0,0 +1,18 @@
++# OntologyDownload
++
++- Code root: `src/DocsToKG/OntologyDownload`
++- Purpose: Fetching/curating ontologies (OWL2/SHACL/…), SHACL gates, and integration adapters.
++- Contract: Produces ontology artifacts used by KG mapping and validation.
++
++```{toctree}
++:maxdepth: 2
++:glob:
++
++*
++```
+diff --git a/docs/source/00-map/index.md b/docs/source/00-map/index.md
+new file mode 100644
+index 0000000..9999999
+--- /dev/null
++++ b/docs/source/00-map/index.md
+@@ -0,0 +1,17 @@
++# Map of the Project
++
++This section mirrors the repository so agents (and humans) can navigate by package.
++
++```{toctree}
++:maxdepth: 2
++
++ContentDownload/index
++DocParsing/index
++HybridSearch/index
++OntologyDownload/index
++```
+diff --git a/docs/source/_static/.gitkeep b/docs/source/_static/.gitkeep
+new file mode 100644
+index 0000000..e69de29
+--- /dev/null
++++ b/docs/source/_static/.gitkeep
+@@ -0,0 +1 @@
+diff --git a/docs/source/_templates/.gitkeep b/docs/source/_templates/.gitkeep
+new file mode 100644
+index 0000000..e69de29
+--- /dev/null
++++ b/docs/source/_templates/.gitkeep
+@@ -0,0 +1 @@
+diff --git a/docs/source/conf.py b/docs/source/conf.py
+new file mode 100644
+index 0000000..aaaaaaa
+--- /dev/null
++++ b/docs/source/conf.py
+@@ -0,0 +1,137 @@
++import os
++import sys
++import importlib
++from datetime import date
++
++# --- paths ---
++PROJECT_ROOT = os.path.abspath(os.path.join(__file__, "..", "..", ".."))
++SRC_ROOT = os.path.join(PROJECT_ROOT, "src")
++sys.path.insert(0, SRC_ROOT)  # so autodoc/linkcode can resolve modules
++
++# --- project ---
++project = "DocsToKG"
++author = "Paul Heyse"
++release = os.getenv("DOCSTOKG_VERSION", "0.x")
++html_title = f"{project} {release}"
++
++# --- extensions ---
++extensions = [
++    "myst_parser",
++    "sphinx.ext.autodoc", "sphinx.ext.autosummary", "sphinx.ext.napoleon",
++    "sphinx.ext.intersphinx",
++    "sphinx.ext.viewcode", "sphinx.ext.linkcode",
++    "sphinx.ext.autosectionlabel",
++    "sphinx.ext.githubpages",
++    "sphinx_sitemap",
++    "sphinx_copybutton",
++    "sphinx_design",
++    "autoapi.extension",
++]
++
++autosummary_generate = True
++autodoc_typehints = "description"
++autosectionlabel_prefix_document = True
++nitpicky = True  # warn on missing refs
++templates_path = ["_templates"]
++exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
++
++# --- MyST (Markdown) ---
++myst_enable_extensions = ["colon_fence", "linkify", "substitution", "deflist", "fieldlist"]
++
++# --- theme ---
++html_theme = "pydata_sphinx_theme"
++html_static_path = ["_static"]
++html_last_updated_fmt = "%Y-%m-%d"
++
++# --- site base (required for sitemap) ---
++html_baseurl = "https://paul-heyse.github.io/DocsToKG/"
++
++# --- intersphinx targets ---
++intersphinx_mapping = {
++    "python": ("https://docs.python.org/3", {}),
++    "pydantic": ("https://docs.pydantic.dev/latest/", {}),
++    "numpy": ("https://numpy.org/doc/stable/", {}),
++    "httpx": ("https://www.python-httpx.org/", {}),
++}
++
++# --- Mock heavy/optional imports (even though AutoAPI parses statically) ---
++autodoc_mock_imports = [
++    "faiss", "faiss_gpu", "torch", "cupy", "vllm", "rmm", "raft", "cuvs", "pyarrow",
++]
++
++# --- AutoAPI (complete API docs without importing the package) ---
++autoapi_type = "python"
++autoapi_dirs = [os.path.join(SRC_ROOT, "DocsToKG")]
++autoapi_add_toctree_entry = True
++autoapi_root = "04-api"  # generated under docs/source/04-api
++autoapi_keep_files = False
++
++# --- link back to GitHub lines on each object ---
++def linkcode_resolve(domain, info):
++    if domain != "py":
++        return None
++    modname = info.get("module")
++    fullname = info.get("fullname")
++    if not modname:
++        return None
++    try:
++        mod = importlib.import_module(modname)
++    except Exception:
++        return None
++    import inspect
++    try:
++        obj = mod
++        for part in fullname.split("."):
++            obj = getattr(obj, part)
++        fn = inspect.getsourcefile(obj) or inspect.getfile(obj)
++        source, lineno = inspect.getsourcelines(obj)
++    except Exception:
++        try:
++            fn = inspect.getsourcefile(mod) or inspect.getfile(mod)
++            lineno = 1
++        except Exception:
++            return None
++    fn_rel = os.path.relpath(fn, PROJECT_ROOT).replace("\\", "/")
++    return f"https://github.com/paul-heyse/DocsToKG/blob/main/{fn_rel}#L{lineno}"
+diff --git a/docs/source/index.md b/docs/source/index.md
+new file mode 100644
+index 0000000..bbbbbbb
+--- /dev/null
++++ b/docs/source/index.md
+@@ -0,0 +1,27 @@
++# DocsToKG
++
++Welcome! These docs are structured for **AI agent navigation** and human readability.
++
++```{toctree}
++:maxdepth: 2
++:caption: Map of the Project
++
++00-map/index
++```
++
++```{toctree}
++:maxdepth: 2
++:caption: API Reference
++
++04-api/index
++```
++
++```{note}
++The API pages are generated automatically by **AutoAPI** from the source in `src/DocsToKG`.
++If you add or move modules, simply rebuild the docs.
++```

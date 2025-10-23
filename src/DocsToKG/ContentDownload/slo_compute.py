@@ -4,14 +4,46 @@
 #   "purpose": "SLO metric computation from database",
 #   "sections": [
 #     {
-#       "id": "slo-metrics-computation",
-#       "name": "SLO metric queries",
-#       "anchor": "queries"
+#       "id": "compute-job-completion-rate",
+#       "name": "compute_job_completion_rate",
+#       "anchor": "function-compute-job-completion-rate",
+#       "kind": "function"
 #     },
 #     {
-#       "id": "slo-evaluation",
-#       "name": "SLO evaluation and reporting",
-#       "anchor": "evaluation"
+#       "id": "compute-time-to-complete-percentiles",
+#       "name": "compute_time_to_complete_percentiles",
+#       "anchor": "function-compute-time-to-complete-percentiles",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "compute-crash-recovery-success-rate",
+#       "name": "compute_crash_recovery_success_rate",
+#       "anchor": "function-compute-crash-recovery-success-rate",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "compute-lease-acquisition-latency",
+#       "name": "compute_lease_acquisition_latency",
+#       "anchor": "function-compute-lease-acquisition-latency",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "compute-operation-replay-rate",
+#       "name": "compute_operation_replay_rate",
+#       "anchor": "function-compute-operation-replay-rate",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "compute-all-slo-metrics",
+#       "name": "compute_all_slo_metrics",
+#       "anchor": "function-compute-all-slo-metrics",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "generate-slo-report",
+#       "name": "generate_slo_report",
+#       "anchor": "function-generate-slo-report",
+#       "kind": "function"
 #     }
 #   ]
 # }
@@ -31,7 +63,6 @@ from __future__ import annotations
 
 import sqlite3
 import time
-from typing import Dict
 
 from DocsToKG.ContentDownload import slo_schema
 
@@ -78,7 +109,7 @@ def compute_job_completion_rate(
 def compute_time_to_complete_percentiles(
     conn: sqlite3.Connection,
     window_seconds: int = 86400,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """Compute time-to-completion percentiles.
 
     Parameters
@@ -162,7 +193,7 @@ def compute_crash_recovery_success_rate(
 def compute_lease_acquisition_latency(
     conn: sqlite3.Connection,
     sample_size: int = 1000,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """Compute lease acquisition latency percentiles.
 
     Measures time between job creation and first lease.
@@ -270,7 +301,7 @@ def compute_operation_replay_rate(
 
 def compute_all_slo_metrics(
     conn: sqlite3.Connection,
-) -> Dict[str, slo_schema.SLOMetric]:
+) -> dict[str, slo_schema.SLOMetric]:
     """Compute all SLO metrics.
 
     Parameters

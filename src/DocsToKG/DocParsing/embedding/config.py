@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.embedding.config",
+#   "purpose": "Embedding configuration dataclasses, presets, and validation helpers.",
+#   "sections": [
+#     {
+#       "id": "embedcfg",
+#       "name": "EmbedCfg",
+#       "anchor": "class-embedcfg",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Embedding configuration dataclasses, presets, and validation helpers.
 
@@ -13,9 +28,10 @@ from __future__ import annotations
 import json
 import os
 import sys
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, ClassVar, Dict, Mapping, Optional
+from typing import Any, ClassVar
 
 from DocsToKG.DocParsing.cli_errors import EmbeddingCLIValidationError
 from DocsToKG.DocParsing.config import StageConfigBase
@@ -23,7 +39,7 @@ from DocsToKG.DocParsing.env import data_chunks, data_vectors, detect_data_root
 
 SPLADE_SPARSITY_WARN_THRESHOLD_PCT: float = 1.0
 
-EMBED_PROFILE_PRESETS: Dict[str, Dict[str, Any]] = {
+EMBED_PROFILE_PRESETS: dict[str, dict[str, Any]] = {
     "cpu-small": {
         "batch_size_splade": 16,
         "batch_size_qwen": 16,
@@ -68,20 +84,20 @@ class EmbedCfg(StageConfigBase):
     """Stage configuration container for the embedding pipeline."""
 
     log_level: str = "INFO"
-    data_root: Optional[Path] = None
-    chunks_dir: Optional[Path] = None
-    out_dir: Optional[Path] = None
+    data_root: Path | None = None
+    chunks_dir: Path | None = None
+    out_dir: Path | None = None
     vector_format: str = "jsonl"
     bm25_k1: float = 1.5
     bm25_b: float = 0.75
     batch_size_splade: int = 32
     batch_size_qwen: int = 64
-    splade_max_active_dims: Optional[int] = None
-    splade_model_dir: Optional[Path] = None
+    splade_max_active_dims: int | None = None
+    splade_model_dir: Path | None = None
     splade_attn: str = "auto"
     qwen_dtype: str = "bfloat16"
-    qwen_quant: Optional[str] = None
-    qwen_model_dir: Optional[Path] = None
+    qwen_quant: str | None = None
+    qwen_model_dir: Path | None = None
     qwen_dim: int = 2560
     tp: int = 1
     sparsity_warn_threshold_pct: float = SPLADE_SPARSITY_WARN_THRESHOLD_PCT
@@ -97,35 +113,35 @@ class EmbedCfg(StageConfigBase):
     # Provider-centric configuration
     embedding_device: str = "auto"
     embedding_dtype: str = "auto"
-    embedding_batch_size: Optional[int] = None
-    embedding_max_concurrency: Optional[int] = None
+    embedding_batch_size: int | None = None
+    embedding_max_concurrency: int | None = None
     embedding_normalize_l2: bool = True
-    embedding_cache_dir: Optional[Path] = None
-    embedding_telemetry_tags: Dict[str, str] = field(default_factory=dict)
+    embedding_cache_dir: Path | None = None
+    embedding_telemetry_tags: dict[str, str] = field(default_factory=dict)
     dense_backend: str = "qwen_vllm"
-    dense_qwen_vllm_model_id: Optional[str] = None
-    dense_qwen_vllm_download_dir: Optional[Path] = None
-    dense_qwen_vllm_batch_size: Optional[int] = None
-    dense_qwen_vllm_queue_depth: Optional[int] = None
-    dense_qwen_vllm_quantization: Optional[str] = None
-    dense_qwen_vllm_dimension: Optional[int] = None
-    dense_tei_url: Optional[str] = None
+    dense_qwen_vllm_model_id: str | None = None
+    dense_qwen_vllm_download_dir: Path | None = None
+    dense_qwen_vllm_batch_size: int | None = None
+    dense_qwen_vllm_queue_depth: int | None = None
+    dense_qwen_vllm_quantization: str | None = None
+    dense_qwen_vllm_dimension: int | None = None
+    dense_tei_url: str | None = None
     dense_tei_timeout_seconds: float = 30.0
-    dense_tei_max_inflight: Optional[int] = None
-    dense_sentence_transformers_model_id: Optional[str] = None
-    dense_sentence_transformers_batch_size: Optional[int] = None
-    dense_sentence_transformers_normalize_l2: Optional[bool] = None
-    dense_fallback_backend: Optional[str] = None
+    dense_tei_max_inflight: int | None = None
+    dense_sentence_transformers_model_id: str | None = None
+    dense_sentence_transformers_batch_size: int | None = None
+    dense_sentence_transformers_normalize_l2: bool | None = None
+    dense_fallback_backend: str | None = None
     sparse_backend: str = "splade_st"
-    sparse_splade_st_model_dir: Optional[Path] = None
-    sparse_splade_st_batch_size: Optional[int] = None
-    sparse_splade_st_attn_backend: Optional[str] = None
-    sparse_splade_st_max_active_dims: Optional[int] = None
+    sparse_splade_st_model_dir: Path | None = None
+    sparse_splade_st_batch_size: int | None = None
+    sparse_splade_st_attn_backend: str | None = None
+    sparse_splade_st_max_active_dims: int | None = None
     lexical_backend: str = "local_bm25"
     lexical_local_bm25_k1: float = 1.5
     lexical_local_bm25_b: float = 0.75
 
-    ENV_VARS: ClassVar[Dict[str, str]] = {
+    ENV_VARS: ClassVar[dict[str, str]] = {
         "log_level": "DOCSTOKG_EMBED_LOG_LEVEL",
         "data_root": "DOCSTOKG_EMBED_DATA_ROOT",
         "chunks_dir": "DOCSTOKG_EMBED_CHUNKS_DIR",
@@ -184,7 +200,7 @@ class EmbedCfg(StageConfigBase):
         "lexical_local_bm25_b": "DOCSTOKG_EMBED_BM25_B",
     }
 
-    FIELD_PARSERS: ClassVar[Dict[str, Callable[[Any, Optional[Path]], Any]]] = {
+    FIELD_PARSERS: ClassVar[dict[str, Callable[[Any, Path | None], Any]]] = {
         "config": StageConfigBase._coerce_optional_path,
         "log_level": StageConfigBase._coerce_str,
         "data_root": StageConfigBase._coerce_optional_path,
@@ -456,13 +472,13 @@ class EmbedCfg(StageConfigBase):
             print(f"[docparse embed] {message}", file=sys.stderr)
 
     @staticmethod
-    def _coerce_str_dict(value: Any) -> Dict[str, str]:
+    def _coerce_str_dict(value: Any) -> dict[str, str]:
         if value in (None, "", {}):
             return {}
         if isinstance(value, Mapping):
             return {str(k): str(v) for k, v in value.items()}
         if isinstance(value, (list, tuple)):
-            merged: Dict[str, str] = {}
+            merged: dict[str, str] = {}
             for item in value:
                 if not item:
                     continue
@@ -485,7 +501,7 @@ class EmbedCfg(StageConfigBase):
             try:
                 parsed = json.loads(text)
             except json.JSONDecodeError:
-                pairs: Dict[str, str] = {}
+                pairs: dict[str, str] = {}
                 for segment in text.split(","):
                     if "=" in segment:
                         key, val = segment.split("=", 1)
@@ -502,7 +518,7 @@ class EmbedCfg(StageConfigBase):
                 raise ValueError("telemetry tags must be provided as a mapping")
         raise ValueError(f"Unsupported telemetry tag payload: {value!r}")
 
-    def provider_settings(self) -> Dict[str, Any]:
+    def provider_settings(self) -> dict[str, Any]:
         """Return provider-focused configuration for the embedding factory."""
 
         return {

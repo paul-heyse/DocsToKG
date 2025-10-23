@@ -1,3 +1,66 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.network.redirect",
+#   "purpose": "Safe redirect handling: Manual redirect following with security audit.",
+#   "sections": [
+#     {
+#       "id": "redirecterror",
+#       "name": "RedirectError",
+#       "anchor": "class-redirecterror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "maxredirectsexceeded",
+#       "name": "MaxRedirectsExceeded",
+#       "anchor": "class-maxredirectsexceeded",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "unsaferedirecttarget",
+#       "name": "UnsafeRedirectTarget",
+#       "anchor": "class-unsaferedirecttarget",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "missinglocationheader",
+#       "name": "MissingLocationHeader",
+#       "anchor": "class-missinglocationheader",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "redirectpolicy",
+#       "name": "RedirectPolicy",
+#       "anchor": "class-redirectpolicy",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "safe-get-with-redirect",
+#       "name": "safe_get_with_redirect",
+#       "anchor": "function-safe-get-with-redirect",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "safe-post-with-redirect",
+#       "name": "safe_post_with_redirect",
+#       "anchor": "function-safe-post-with-redirect",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "count-redirect-hops",
+#       "name": "count_redirect_hops",
+#       "anchor": "function-count-redirect-hops",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "format-audit-trail",
+#       "name": "format_audit_trail",
+#       "anchor": "function-format-audit-trail",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Safe redirect handling: Manual redirect following with security audit.
 
 HTTPX disables auto-redirect by default (good security practice). This module
@@ -28,7 +91,6 @@ Example:
 """
 
 import logging
-from typing import List, Optional, Tuple
 
 import httpx
 
@@ -49,7 +111,7 @@ class RedirectError(Exception):
 class MaxRedirectsExceeded(RedirectError):
     """Redirect chain exceeds maximum allowed hops."""
 
-    def __init__(self, max_hops: int, actual_hops: List[str]):
+    def __init__(self, max_hops: int, actual_hops: list[str]):
         self.max_hops = max_hops
         self.actual_hops = actual_hops
         super().__init__(
@@ -141,8 +203,8 @@ def safe_get_with_redirect(
     client: httpx.Client,
     url: str,
     max_hops: int = 5,
-    policy: Optional[RedirectPolicy] = None,
-) -> Tuple[httpx.Response, List[Tuple[str, int]]]:
+    policy: RedirectPolicy | None = None,
+) -> tuple[httpx.Response, list[tuple[str, int]]]:
     """Make GET request with explicit redirect following and auditing.
 
     Follows redirects manually, validating each hop:
@@ -179,7 +241,7 @@ def safe_get_with_redirect(
         policy = RedirectPolicy()
 
     # Audit trail: list of (url, status_code) tuples
-    audit_trail: List[Tuple[str, int]] = []
+    audit_trail: list[tuple[str, int]] = []
 
     current_url = url
     hop_count = 0
@@ -253,7 +315,7 @@ def safe_post_with_redirect(
     client: httpx.Client,
     url: str,
     **kwargs,
-) -> Tuple[httpx.Response, List[Tuple[str, int]]]:
+) -> tuple[httpx.Response, list[tuple[str, int]]]:
     """Make POST request with redirect following.
 
     POST with redirects is tricky (303 implies GET, 307/308 keep POST).
@@ -303,7 +365,7 @@ def count_redirect_hops(response: httpx.Response) -> int:
     return 0
 
 
-def format_audit_trail(audit_trail: List[Tuple[str, int]]) -> str:
+def format_audit_trail(audit_trail: list[tuple[str, int]]) -> str:
     """Format audit trail for logging/display.
 
     Args:

@@ -1,9 +1,37 @@
+## Environment Setup
+
+## Table of Contents
+- [Environment Setup](#environment-setup)
+- [Agents](#agents)
+- [Project Structure & Module Organization](#project-structure-module-organization)
+- [Build, Test, and Development Commands](#build-test-and-development-commands)
+- [Coding Style & Naming Conventions](#coding-style-naming-conventions)
+- [Testing Guidelines](#testing-guidelines)
+- [Commit & Pull Request Guidelines](#commit-pull-request-guidelines)
+
+Use the uv bootstrap to stand up the project environment:
+1. Optionally run `direnv allow` once per machine to trust `.envrc`.
+2. For CPU-only work, run `./scripts/bootstrap_env.sh`.
+3. For GPU work (requires wheels in `.wheelhouse/`), run `./scripts/bootstrap_env.sh --gpu`.
+4. Activate with `direnv exec . <command>` or `source .venv/bin/activate`.
+
+The script installs uv if it is missing, respects `UV_PROJECT_ENVIRONMENT`, and installs DocsToKG in editable mode. After activation, use the tools in `.venv/bin/` (for example `pytest -q`, `ruff check`, or `python -m DocsToKG.<module>`).
+
 # Repository Guidelines
 
 ## Agents
 
-Please read AGENTS.md at the root directory
+Please read AGENTS.md at the root directory.
 
+- [ContentDownload Agent Guide](<src/DocsToKG/ContentDownload/AGENTS.md>)
+- [DocParsing Agent Guide](<src/DocsToKG/DocParsing/AGENTS.md>)
+- [HybridSearch Agent Guide](<src/DocsToKG/HybridSearch/AGENTS.md>)
+- [OntologyDownload Agent Guide](<src/DocsToKG/OntologyDownload/AGENTS.md>)
+- [OpenSpec Agent Guide](<openspec/AGENTS.md>)
+
+### Code Style Primer
+
+Before modifying code, review the shared standards in [docs/Formats%20and%20Standards/CODESTYLE.md](<docs/Formats%20and%20Standards/CODESTYLE.md>). It covers the Python 3.12+ baseline, uv/ruff/mypy expectations, and the Google-style docstring + NAVMAP conventions that every module must follow.
 ## Project Structure & Module Organization
 
 - `src/DocsToKG/` hosts production code; extend existing domains (`ContentDownload`, `DocParsing`, `HybridSearch`, `OntologyDownload`) before creating new roots.
@@ -12,7 +40,7 @@ Please read AGENTS.md at the root directory
 
 ## Build, Test, and Development Commands
 
-- Run `./scripts/bootstrap_env.sh` to create the venv, install the editable package, and verify the CUDA FAISS wheel; follow with `direnv allow`.
+- Run `./scripts/bootstrap_env.sh` (append `--gpu` when `.wheelhouse/` wheels are present) to create or reuse `.venv`; run `direnv allow` once to trust `.envrc`.
 - `pip install -e .` refreshes dependencies after editing `pyproject.toml`; commit lockstep with the change it enables.
 - `pytest -q` covers the default suite; append `-m real_vectors --real-vectors` or `-m scale_vectors` for GPU smoke tests.
 - Use `./scripts/run_precommit.sh` for Black, Isort, Ruff, and static checks; refresh docs via `python docs/scripts/generate_api_docs.py` and `python docs/scripts/check_links.py --timeout 10`.

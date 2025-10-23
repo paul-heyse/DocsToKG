@@ -1,3 +1,11 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.policy.__init__",
+#   "purpose": "Policy subsystem: defense-in-depth gates for safety enforcement.",
+#   "sections": []
+# }
+# === /NAVMAP ===
+
 """Policy subsystem: defense-in-depth gates for safety enforcement.
 
 One central registry of policy gates that wrap every I/O boundary.

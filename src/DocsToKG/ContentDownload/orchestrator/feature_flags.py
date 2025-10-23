@@ -1,3 +1,54 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.orchestrator.feature_flags",
+#   "purpose": "Feature flags for PR #8 Work Orchestration optimizations.",
+#   "sections": [
+#     {
+#       "id": "is-enabled",
+#       "name": "is_enabled",
+#       "anchor": "function-is-enabled",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "disable-feature",
+#       "name": "disable_feature",
+#       "anchor": "function-disable-feature",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "enable-feature",
+#       "name": "enable_feature",
+#       "anchor": "function-enable-feature",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-ttl",
+#       "name": "get_ttl",
+#       "anchor": "function-get-ttl",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-batch-size",
+#       "name": "get_batch_size",
+#       "anchor": "function-get-batch-size",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-all-flags",
+#       "name": "get_all_flags",
+#       "anchor": "function-get-all-flags",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "log-feature-flags",
+#       "name": "log_feature_flags",
+#       "anchor": "function-log-feature-flags",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Feature flags for PR #8 Work Orchestration optimizations.
 
@@ -44,7 +95,6 @@ if ttl is not None:
 
 import logging
 import os
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +110,7 @@ _FEATURE_FLAGS = {
 }
 
 # Configuration parameters
-_SEMAPHORE_TTL_SECONDS: Optional[int] = (
+_SEMAPHORE_TTL_SECONDS: int | None = (
     int(os.getenv("DOCSTOKG_SEMAPHORE_TTL_SECONDS", "3600"))
     if os.getenv("DOCSTOKG_SEMAPHORE_TTL_SECONDS")
     else 3600
@@ -116,7 +166,7 @@ def enable_feature(feature: str) -> None:
     logger.info(f"Feature enabled: {feature}")
 
 
-def get_ttl(feature: str) -> Optional[int]:
+def get_ttl(feature: str) -> int | None:
     """Get TTL configuration for a feature (semaphore recycling).
 
     Args:

@@ -1,3 +1,36 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.policy.prometheus_endpoint",
+#   "purpose": "Prometheus metrics HTTP endpoint for security gates.",
+#   "sections": [
+#     {
+#       "id": "start-metrics-server",
+#       "name": "start_metrics_server",
+#       "anchor": "function-start-metrics-server",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "stop-metrics-server",
+#       "name": "stop_metrics_server",
+#       "anchor": "function-stop-metrics-server",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-metrics",
+#       "name": "get_metrics",
+#       "anchor": "function-get-metrics",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "is-metrics-server-running",
+#       "name": "is_metrics_server_running",
+#       "anchor": "function-is-metrics-server-running",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Prometheus metrics HTTP endpoint for security gates.
 
 Provides a simple HTTP server that exposes gate metrics for Prometheus scraping.
@@ -12,7 +45,6 @@ Usage:
 """
 
 import logging
-from typing import Optional
 
 try:
     from prometheus_client import REGISTRY, generate_latest
@@ -34,7 +66,7 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 # Global reference to the metrics server
-_metrics_server_instance: Optional[ThreadingWSGIServer] = None
+_metrics_server_instance: ThreadingWSGIServer | None = None
 _metrics_server_running = False
 
 

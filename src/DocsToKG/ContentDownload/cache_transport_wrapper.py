@@ -1,3 +1,30 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.cache_transport_wrapper",
+#   "purpose": "Role-aware HTTP transport wrapper for Hishel caching integration.",
+#   "sections": [
+#     {
+#       "id": "roleawarecachetransport",
+#       "name": "RoleAwareCacheTransport",
+#       "anchor": "class-roleawarecachetransport",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "build-role-aware-cache-transport",
+#       "name": "build_role_aware_cache_transport",
+#       "anchor": "function-build-role-aware-cache-transport",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "policyawarecontroller",
+#       "name": "_PolicyAwareController",
+#       "anchor": "class-policyawarecontroller",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Role-aware HTTP transport wrapper for Hishel caching integration.
 
 Responsibilities
@@ -21,10 +48,10 @@ Design Notes
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from collections.abc import Sequence
+from datetime import UTC, datetime
 from email.utils import format_datetime
 from pathlib import Path
-from typing import Optional, Sequence
 
 import httpcore
 import httpx
@@ -183,12 +210,12 @@ class RoleAwareCacheTransport(httpx.BaseTransport):
             original_controller = getattr(self.cache_transport, "_controller", None)
             if original_controller is None:
                 original_controller = getattr(self.cache_transport, "controller", None)
-            setattr(self.cache_transport, "_controller", controller)
+            self.cache_transport._controller = controller
             try:
                 response = self.cache_transport.handle_request(request)
             finally:
                 if original_controller is not None:
-                    setattr(self.cache_transport, "_controller", original_controller)
+                    self.cache_transport._controller = original_controller
         else:
             # Use default controller
             response = self.cache_transport.handle_request(request)
@@ -392,8 +419,8 @@ class _PolicyAwareController(Controller):
     def __init__(
         self,
         *,
-        ttl_s: Optional[int],
-        swrv_s: Optional[int],
+        ttl_s: int | None,
+        swrv_s: int | None,
         cacheable_methods: Sequence[str],
         cacheable_status_codes: Sequence[int],
     ) -> None:
@@ -470,5 +497,5 @@ class _PolicyAwareController(Controller):
             response.headers = filtered
 
         if not any(key.lower() == b"date" for key, _ in response.headers):
-            now = format_datetime(datetime.now(timezone.utc), usegmt=True)
+            now = format_datetime(datetime.now(UTC), usegmt=True)
             response.headers.append((b"date", now.encode("ascii")))

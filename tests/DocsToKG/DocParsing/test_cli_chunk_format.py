@@ -15,7 +15,6 @@ from DocsToKG.DocParsing.cli_unified import app
 from DocsToKG.DocParsing.config_adapter import ConfigurationAdapter
 from DocsToKG.DocParsing.settings import Format
 
-
 runner = CliRunner()
 
 
@@ -68,5 +67,5 @@ def test_cli_chunk_format_option_propagates(monkeypatch, tmp_path):
 
     config = captured["config"]
 
-    assert getattr(config, "format") == "jsonl"
+    assert config.format == "jsonl"
     assert "✅ Chunk stage completed successfully" in result.stdout

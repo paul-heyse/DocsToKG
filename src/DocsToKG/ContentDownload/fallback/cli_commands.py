@@ -1,3 +1,54 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.fallback.cli_commands",
+#   "purpose": "Extended CLI Commands - UPDATED with Telemetry Storage Integration.",
+#   "sections": [
+#     {
+#       "id": "telemetryanalyzer",
+#       "name": "TelemetryAnalyzer",
+#       "anchor": "class-telemetryanalyzer",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "cmd-fallback-stats",
+#       "name": "cmd_fallback_stats",
+#       "anchor": "function-cmd-fallback-stats",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "configurationtuner",
+#       "name": "ConfigurationTuner",
+#       "anchor": "class-configurationtuner",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "cmd-fallback-tune",
+#       "name": "cmd_fallback_tune",
+#       "anchor": "function-cmd-fallback-tune",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "strategyexplainer",
+#       "name": "StrategyExplainer",
+#       "anchor": "class-strategyexplainer",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "cmd-fallback-explain",
+#       "name": "cmd_fallback_explain",
+#       "anchor": "function-cmd-fallback-explain",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "cmd-fallback-config",
+#       "name": "cmd_fallback_config",
+#       "anchor": "function-cmd-fallback-config",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Extended CLI Commands - UPDATED with Telemetry Storage Integration
 
@@ -13,7 +64,7 @@ from __future__ import annotations
 import json
 import logging
 from collections import defaultdict
-from typing import Any, Dict, List
+from typing import Any
 
 from DocsToKG.ContentDownload.fallback.loader import load_fallback_plan
 from DocsToKG.ContentDownload.fallback.telemetry_storage import get_telemetry_storage
@@ -30,12 +81,12 @@ logger = logging.getLogger(__name__)
 class TelemetryAnalyzer:
     """Analyzes fallback strategy telemetry data from real storage."""
 
-    def __init__(self, records: List[Dict[str, Any]]):
+    def __init__(self, records: list[dict[str, Any]]):
         """Initialize analyzer with telemetry records."""
         self.records = records
         self.total_attempts = len(records)
 
-    def get_overall_stats(self) -> Dict[str, Any]:
+    def get_overall_stats(self) -> dict[str, Any]:
         """Get overall performance statistics."""
         if not self.records:
             return {}
@@ -66,7 +117,7 @@ class TelemetryAnalyzer:
             ),
         }
 
-    def get_tier_stats(self) -> Dict[str, Dict[str, Any]]:
+    def get_tier_stats(self) -> dict[str, dict[str, Any]]:
         """Get statistics per tier."""
         tier_data = defaultdict(lambda: {"attempts": 0, "successes": 0, "elapsed_times": []})
 
@@ -96,7 +147,7 @@ class TelemetryAnalyzer:
 
         return result
 
-    def get_source_stats(self) -> Dict[str, Dict[str, Any]]:
+    def get_source_stats(self) -> dict[str, dict[str, Any]]:
         """Get statistics per source."""
         source_data = defaultdict(
             lambda: {"attempts": 0, "successes": 0, "errors": 0, "timeouts": 0}
@@ -130,7 +181,7 @@ class TelemetryAnalyzer:
 
         return result
 
-    def get_failure_reasons(self, top_n: int = 5) -> Dict[str, int]:
+    def get_failure_reasons(self, top_n: int = 5) -> dict[str, int]:
         """Get top N failure reasons."""
         reasons = defaultdict(int)
         for record in self.records:
@@ -220,13 +271,13 @@ def cmd_fallback_stats(args: Any) -> None:
 class ConfigurationTuner:
     """Analyzes performance and generates tuning recommendations."""
 
-    def __init__(self, records: List[Dict[str, Any]], plan: FallbackPlan):
+    def __init__(self, records: list[dict[str, Any]], plan: FallbackPlan):
         """Initialize tuner with telemetry and configuration."""
         self.records = records
         self.plan = plan
         self.analyzer = TelemetryAnalyzer(records)
 
-    def get_recommendations(self) -> List[Dict[str, Any]]:
+    def get_recommendations(self) -> list[dict[str, Any]]:
         """Generate configuration tuning recommendations."""
         recommendations = []
 
@@ -245,7 +296,7 @@ class ConfigurationTuner:
 
         return recommendations
 
-    def get_projections(self, recommendations: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def get_projections(self, recommendations: list[dict[str, Any]]) -> dict[str, Any]:
         """Project performance impact of recommendations."""
         current_stats = self.analyzer.get_overall_stats()
         projected = {

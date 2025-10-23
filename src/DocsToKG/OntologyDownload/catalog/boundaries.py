@@ -1,13 +1,56 @@
 # === NAVMAP v1 ===
 # {
 #   "module": "DocsToKG.OntologyDownload.catalog.boundaries",
-#   "purpose": "Transactional boundaries for FS↔DB choreography",
+#   "purpose": "Transactional boundaries for FS\u2194DB choreography",
 #   "sections": [
-#     {"id": "types", "name": "Boundary Result Types", "anchor": "TYP", "kind": "models"},
-#     {"id": "download", "name": "Download Boundary", "anchor": "DL", "kind": "api"},
-#     {"id": "extract", "name": "Extraction Boundary", "anchor": "EX", "kind": "api"},
-#     {"id": "validation", "name": "Validation Boundary", "anchor": "VAL", "kind": "api"},
-#     {"id": "latest", "name": "Set Latest Boundary", "anchor": "LAT", "kind": "api"}
+#     {
+#       "id": "downloadboundaryresult",
+#       "name": "DownloadBoundaryResult",
+#       "anchor": "class-downloadboundaryresult",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "extractionboundaryresult",
+#       "name": "ExtractionBoundaryResult",
+#       "anchor": "class-extractionboundaryresult",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "validationboundaryresult",
+#       "name": "ValidationBoundaryResult",
+#       "anchor": "class-validationboundaryresult",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "setlatestboundaryresult",
+#       "name": "SetLatestBoundaryResult",
+#       "anchor": "class-setlatestboundaryresult",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "download-boundary",
+#       "name": "download_boundary",
+#       "anchor": "function-download-boundary",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "extraction-boundary",
+#       "name": "extraction_boundary",
+#       "anchor": "function-extraction-boundary",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validation-boundary",
+#       "name": "validation_boundary",
+#       "anchor": "function-validation-boundary",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "set-latest-boundary",
+#       "name": "set_latest_boundary",
+#       "anchor": "function-set-latest-boundary",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===
@@ -28,10 +71,10 @@ import contextlib
 import json
 import logging
 import time
+from collections.abc import Generator
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Generator, Optional
 from uuid import uuid4
 
 try:  # pragma: no cover
@@ -66,7 +109,7 @@ class DownloadBoundaryResult:
     version_id: str
     fs_relpath: str
     size: int
-    etag: Optional[str]
+    etag: str | None
     inserted: bool
 
 
@@ -113,7 +156,7 @@ def download_boundary(
     version_id: str,
     fs_relpath: str,
     size: int,
-    etag: Optional[str] = None,
+    etag: str | None = None,
 ) -> Generator[DownloadBoundaryResult, None, None]:
     """Transactional boundary for download operations.
 
@@ -383,7 +426,7 @@ def validation_boundary(
     file_id: str,
     validator: str,
     status: str,
-    details: Optional[dict] = None,
+    details: dict | None = None,
 ) -> Generator[ValidationBoundaryResult, None, None]:
     """Transactional boundary for validation operations.
 

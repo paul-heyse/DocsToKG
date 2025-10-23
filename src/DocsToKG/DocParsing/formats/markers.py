@@ -1,3 +1,11 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.formats.markers",
+#   "purpose": "Shim layer preserving legacy structural marker helper imports.",
+#   "sections": []
+# }
+# === /NAVMAP ===
+
 """Shim layer preserving legacy structural marker helper imports.
 
 Earlier releases exposed structural marker utilities from ``formats.markers``.

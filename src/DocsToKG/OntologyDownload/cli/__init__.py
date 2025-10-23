@@ -1,3 +1,11 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.cli.__init__",
+#   "purpose": "CLI subpackage for observability and operations commands.",
+#   "sections": []
+# }
+# === /NAVMAP ===
+
 """CLI subpackage for observability and operations commands."""
 
 # Re-export from parent cli.py module (use importlib to avoid circular import)

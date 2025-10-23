@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.storage.localfs_duckdb",
+#   "purpose": "Local filesystem + DuckDB storage backend implementation.",
+#   "sections": [
+#     {
+#       "id": "localduckdbstorage",
+#       "name": "LocalDuckDBStorage",
+#       "anchor": "class-localduckdbstorage",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Local filesystem + DuckDB storage backend implementation.
 
 Implements the StorageBackend protocol for local filesystem storage with
@@ -21,7 +36,7 @@ import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 from ..observability.events import emit_event
 from .base import StorageBackend, StoredObject, StoredStat
@@ -392,7 +407,7 @@ class LocalDuckDBStorage(StorageBackend):
             version_id=version,
         )
 
-    def get_latest_version(self) -> Optional[str]:
+    def get_latest_version(self) -> str | None:
         """Get latest version pointer from DB.
 
         Returns DB-authoritative pointer. JSON mirror is not consulted.

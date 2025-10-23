@@ -1,5 +1,19 @@
 # DocsToKG • HybridSearch (Level-2 Spec)
 
+> **Go‑Forward Decisions (2025-10-23) — HybridSearch**
+>
+> 1. **Canonical vector format**: **Parquet** is the first‑class vector format for ingestion; JSONL remains supported for compatibility. Partition path: `Embeddings/{family=dense|sparse|lexical}/fmt=parquet/YYYY/MM/<doc_id>.parquet`. Parquet footers carry `docparse.provider`, `model_id`, `dtype`, and `cfg_hash`.
+> 2. **UUID alignment (strict)**: Default `vector_cache_limit = 0` (fail on first drift) to guarantee a deterministic UUID ↔ FAISS‑id bijection. Lenient modes are opt‑in.
+> 3. **Index selection**: **Flat** < 1M vectors; **IVFFlat** ≥ 1M; **IVFPQ** when memory‑bounded. Defaults match this policy unless explicitly overridden.
+> 4. **GPU resources**: Use FAISS **StandardGpuResources** with pre‑allocated scratch (1 GiB default); replicate only when configured. **FP16** remains **experimental** and **off** by default.
+> 5. **cuVS integration**: Auto‑detect; current wheel has cuVS **disabled**. Keep `use_cuvs: null` (auto) with clear diagnostics; do not block ingestion/query if disabled.
+> 6. **Fusion & diversification**: **RRF** default weights `{bm25: 0.35, splade: 0.0, dense: 0.65}`, `k0 = 60.0`; **MMR enabled** by default with `λ = 0.7`.
+> 7. **Namespace routing**: LRU‑evict to snapshots when `max_active_namespaces` exceeded; lazy restore on demand. Queries are always **namespace‑scoped**.
+> 8. **Observability**: Emit Prometheus metrics prefixed `hybrid_*` (seconds‑based histograms), structured JSONL logs, and OTel spans (`run_id`, `config_hash`, `namespace`). Keep metric names stable with the north‑star dashboard.
+> 9. **Security posture**: API must **not** return raw dense vectors; only UUIDs/scores/metadata. Snapshots may be encrypted at rest (deployment policy).
+> 10. **Acceptance gates**: Retrieval latencies **p50 ≤ 150ms / p99 ≤ 600ms**, hybrid uplift **≥ +5% nDCG@10** vs best single retriever, deterministic fusion ranking, UUID bijection preserved across restore.
+
+
 ## Purpose & Non-Goals
 
 **Purpose:** Serve hybrid retrieval with FAISS GPU + lexical scorers, deterministic fusion, snapshots, and diagnostics.
@@ -271,6 +285,11 @@ sequenceDiagram
 
 ### Index Types
 
+
+> **Policy with cuVS (binding):** <1M → FAISS Flat; 1–10M → cuVS IVF‑Flat; ≥10M → cuVS CAGRA (or cuVS IVF‑PQ for memory‑bounded deployments).
+
+> **Default policy (go‑forward):** Flat for <1M vectors; IVFFlat for ≥1M; IVFPQ when memory‑bounded. FP16 is **off by default** and treated as experimental.
+
 | Type | Description | CPU Train | GPU Migrate | Query Latency | Memory |
 |------|-------------|-----------|-------------|---------------|---------|
 | `Flat` | Brute-force exact search | ✅ | ✅ | Low (150ms p50) | High (N×D×4 bytes) |
@@ -304,6 +323,8 @@ dense:
 
 ### cuVS Integration
 
+**Default (go‑forward):** `use_cuvs: auto` → prefer cuVS when present; otherwise fall back to FAISS with a diagnostic. Expose `--use-cuvs`, `--cuvs-index`, and basic build knobs (graph degree, itopk, refine ratio).
+
 **Current Status:** FAISS wheel built with cuVS support **disabled** (FAISS internals don't call cuVS kernels yet).
 
 **Future:** When enabled, cuVS provides:
@@ -326,6 +347,8 @@ print(state)  # CuvsState(enabled=False, reason="faiss wheel built without cuVS"
 ---
 
 ## Fusion & Scoring
+
+**Go‑forward note:** Keep `use_cuvs: null` (auto). If the wheel lacks cuVS, log a diagnostic and proceed with standard FAISS; do **not** error the pipeline.
 
 ### Reciprocal Rank Fusion (RRF)
 
@@ -546,6 +569,8 @@ retrieval:
 ## Observability
 
 ### Metrics (Prometheus)
+- Include a `backend` label (`cuvs`|`faiss`) on `hybrid_*` metrics for parity canaries and regressions.
+
 
 ```
 # Ingestion
@@ -702,3 +727,8 @@ hybrid_search (45.4ms)
 - ✅ Namespace isolation verified (zero cross-namespace leakage)
 - ✅ Snapshot restore <3 seconds (cold start)
 - ✅ All 7 tests passing (unit + integration + chaos)
+
+
+### Non-regression Guard (cuVS vs FAISS)
+- During index (re)builds, evaluate a canary query set and compare **nDCG@10**.
+- If cuVS degrades >1% relative to FAISS baseline, route the namespace to FAISS and emit an alert.

@@ -1,3 +1,30 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.catalog.dedup_policy",
+#   "purpose": "Smart deduplication policy and recommendations.",
+#   "sections": [
+#     {
+#       "id": "dedupcandidate",
+#       "name": "DedupCandidate",
+#       "anchor": "class-dedupcandidate",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "deduppolicy",
+#       "name": "DedupPolicy",
+#       "anchor": "class-deduppolicy",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "deduppolicyanalyzer",
+#       "name": "DedupPolicyAnalyzer",
+#       "anchor": "class-deduppolicyanalyzer",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Smart deduplication policy and recommendations.
 
 Provides cost-aware dedup analysis with:
@@ -13,7 +40,6 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
 
 from DocsToKG.ContentDownload.catalog.models import DocumentRecord
 
@@ -47,7 +73,7 @@ class DedupPolicy:
     min_file_size: int = 1_000_000  # 1MB default
     max_age_days: int = 90
     cost_threshold: float = 0.10  # 10% cost savings threshold
-    resolver_allowlist: Optional[list[str]] = None
+    resolver_allowlist: list[str] | None = None
 
     def __post_init__(self):
         """Validate policy."""
@@ -62,7 +88,7 @@ class DedupPolicy:
 class DedupPolicyAnalyzer:
     """Analyze dedup opportunities using smart policies."""
 
-    def __init__(self, policy: Optional[DedupPolicy] = None):
+    def __init__(self, policy: DedupPolicy | None = None):
         """Initialize analyzer.
 
         Args:

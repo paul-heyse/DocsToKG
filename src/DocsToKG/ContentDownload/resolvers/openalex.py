@@ -16,7 +16,8 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Iterable
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, Any
 
 import httpx
 
@@ -40,7 +41,7 @@ class OpenAlexResolver:
 
     name = "openalex"
 
-    def is_enabled(self, config: Any, artifact: "WorkArtifact") -> bool:
+    def is_enabled(self, config: Any, artifact: WorkArtifact) -> bool:
         """Return ``True`` when OpenAlex metadata includes candidate URLs.
 
         Args:
@@ -56,7 +57,7 @@ class OpenAlexResolver:
         self,
         client: httpx.Client,  # noqa: ARG002 - unused, kept for signature parity
         config: Any,
-        artifact: "WorkArtifact",
+        artifact: WorkArtifact,
     ) -> Iterable[ResolverResult]:
         """Yield URLs surfaced directly from OpenAlex metadata.
 

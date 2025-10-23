@@ -1,3 +1,30 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.statistics",
+#   "purpose": "Lightweight runtime metrics for DocsToKG content downloads.",
+#   "sections": [
+#     {
+#       "id": "resolverstats",
+#       "name": "ResolverStats",
+#       "anchor": "class-resolverstats",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "bandwidthtracker",
+#       "name": "BandwidthTracker",
+#       "anchor": "class-bandwidthtracker",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "downloadstatistics",
+#       "name": "DownloadStatistics",
+#       "anchor": "class-downloadstatistics",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Lightweight runtime metrics for DocsToKG content downloads.
 
 Responsibilities
@@ -24,8 +51,9 @@ from __future__ import annotations
 import threading
 import time
 from collections import defaultdict
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Mapping, Optional
+from typing import Any
 
 from DocsToKG.ContentDownload.core import ReasonCode
 
@@ -45,7 +73,7 @@ class ResolverStats:
     failures: int = 0
     total_bytes: int = 0
     total_time_ms: float = 0.0
-    failures_by_reason: Dict[str, int] = field(default_factory=lambda: defaultdict(int))
+    failures_by_reason: dict[str, int] = field(default_factory=lambda: defaultdict(int))
 
     @property
     def success_rate(self) -> float:
@@ -77,7 +105,7 @@ class BandwidthTracker:
             window_seconds: Time window for bandwidth calculation
         """
         self._window_seconds = window_seconds
-        self._samples: List[tuple[float, int]] = []  # (timestamp, bytes)
+        self._samples: list[tuple[float, int]] = []  # (timestamp, bytes)
         self._lock = threading.Lock()
         self._total_bytes = 0
 
@@ -146,24 +174,24 @@ class DownloadStatistics:
         self.total_time_ms = 0.0
 
         # Per-resolver statistics
-        self.resolver_stats: Dict[str, ResolverStats] = defaultdict(ResolverStats)
+        self.resolver_stats: dict[str, ResolverStats] = defaultdict(ResolverStats)
 
         # Classification statistics
-        self.by_classification: Dict[str, int] = defaultdict(int)
+        self.by_classification: dict[str, int] = defaultdict(int)
 
         # Failure analysis
-        self.failures_by_reason: Dict[str, int] = defaultdict(int)
-        self.failures_by_domain: Dict[str, int] = defaultdict(int)
+        self.failures_by_reason: dict[str, int] = defaultdict(int)
+        self.failures_by_domain: dict[str, int] = defaultdict(int)
 
         # Performance metrics
         self.bandwidth_tracker = BandwidthTracker()
-        self.download_times: List[float] = []  # For percentile calculation
+        self.download_times: list[float] = []  # For percentile calculation
 
         # Size statistics
-        self.sizes_mb: List[float] = []
+        self.sizes_mb: list[float] = []
 
         # Rate limiter statistics: host -> role -> stats
-        self._rate_limiter_metrics: Dict[str, Dict[str, Dict[str, Any]]] = defaultdict(
+        self._rate_limiter_metrics: dict[str, dict[str, dict[str, Any]]] = defaultdict(
             lambda: defaultdict(
                 lambda: {
                     "acquire_total": 0,
@@ -177,18 +205,18 @@ class DownloadStatistics:
 
     def record_attempt(
         self,
-        resolver: Optional[str] = None,
+        resolver: str | None = None,
         success: bool = False,
-        classification: Optional[str] = None,
-        reason: Optional[str] = None,
-        bytes_downloaded: Optional[int] = None,
-        elapsed_ms: Optional[float] = None,
-        domain: Optional[str] = None,
-        metadata: Optional[Mapping[str, Any]] = None,
-        rate_limiter_wait_ms: Optional[float] = None,
-        rate_limiter_backend: Optional[str] = None,
-        rate_limiter_role: Optional[str] = None,
-        from_cache: Optional[bool] = None,
+        classification: str | None = None,
+        reason: str | None = None,
+        bytes_downloaded: int | None = None,
+        elapsed_ms: float | None = None,
+        domain: str | None = None,
+        metadata: Mapping[str, Any] | None = None,
+        rate_limiter_wait_ms: float | None = None,
+        rate_limiter_backend: str | None = None,
+        rate_limiter_role: str | None = None,
+        from_cache: bool | None = None,
         rate_limiter_blocked: bool = False,
     ) -> None:
         """Record a download attempt with all relevant metrics.
@@ -344,7 +372,7 @@ class DownloadStatistics:
         """Get total elapsed time since tracker creation."""
         return time.time() - self._start_time
 
-    def get_top_failures(self, limit: int = 5) -> List[tuple[str, int]]:
+    def get_top_failures(self, limit: int = 5) -> list[tuple[str, int]]:
         """Get top failure reasons by count.
 
         Args:
@@ -359,7 +387,7 @@ class DownloadStatistics:
             )
         return sorted_failures[:limit]
 
-    def get_top_failing_domains(self, limit: int = 5) -> List[tuple[str, int]]:
+    def get_top_failing_domains(self, limit: int = 5) -> list[tuple[str, int]]:
         """Get domains with most failures.
 
         Args:
@@ -374,13 +402,13 @@ class DownloadStatistics:
             )
         return sorted_domains[:limit]
 
-    def rate_limiter_metrics_snapshot(self) -> Dict[str, Dict[str, Dict[str, Any]]]:
+    def rate_limiter_metrics_snapshot(self) -> dict[str, dict[str, dict[str, Any]]]:
         """Return a snapshot of aggregated rate limiter metrics."""
 
         with self._lock:
-            snapshot: Dict[str, Dict[str, Dict[str, Any]]] = {}
+            snapshot: dict[str, dict[str, dict[str, Any]]] = {}
             for host, roles in self._rate_limiter_metrics.items():
-                host_view: Dict[str, Dict[str, Any]] = {}
+                host_view: dict[str, dict[str, Any]] = {}
                 for role, stats in roles.items():
                     host_view[role] = {
                         "acquire_total": stats["acquire_total"],

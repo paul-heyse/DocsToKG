@@ -1,3 +1,24 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.policy.path_gate",
+#   "purpose": "Path Safety Validation Gate.",
+#   "sections": [
+#     {
+#       "id": "pathpolicyerror",
+#       "name": "PathPolicyError",
+#       "anchor": "class-pathpolicyerror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "validate-path-safety",
+#       "name": "validate_path_safety",
+#       "anchor": "function-validate-path-safety",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Path Safety Validation Gate.
 
@@ -16,7 +37,6 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +49,7 @@ class PathPolicyError(ValueError):
 
 def validate_path_safety(
     final_path: str,
-    artifact_root: Optional[str] = None,
+    artifact_root: str | None = None,
 ) -> str:
     """
     Validate that final_path is safe to write to.

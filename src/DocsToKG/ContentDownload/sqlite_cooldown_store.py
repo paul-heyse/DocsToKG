@@ -52,10 +52,11 @@ from __future__ import annotations
 
 import sqlite3
 import time
+from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, ContextManager, Optional
+from typing import ContextManager
 
 # Optional import: uses project's existing lock utilities if available
 try:
@@ -160,7 +161,7 @@ class SQLiteCooldownStore:
 
     # ── CooldownStore API (Protocol) ───────────────────────────────────────
 
-    def get_until(self, host: str) -> Optional[float]:
+    def get_until(self, host: str) -> float | None:
         """
         Retrieve cooldown deadline for a host, converted to monotonic time.
 

@@ -3,9 +3,84 @@
 #   "module": "DocsToKG.OntologyDownload.net",
 #   "purpose": "Provide a shared HTTPX client with Hishel caching for ontology networking",
 #   "sections": [
-#     {"id": "constants", "name": "Constants & globals", "anchor": "CONST", "kind": "constants"},
-#     {"id": "helpers", "name": "Client construction helpers", "anchor": "HELP", "kind": "helpers"},
-#     {"id": "api", "name": "Public API", "anchor": "API", "kind": "api"}
+#     {
+#       "id": "ensure-cache-dir",
+#       "name": "_ensure_cache_dir",
+#       "anchor": "function-ensure-cache-dir",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-ssl-context",
+#       "name": "_build_ssl_context",
+#       "anchor": "function-build-ssl-context",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "controller",
+#       "name": "_controller",
+#       "anchor": "function-controller",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "request-hook",
+#       "name": "_request_hook",
+#       "anchor": "function-request-hook",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "response-hook",
+#       "name": "_response_hook",
+#       "anchor": "function-response-hook",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "timeout-for",
+#       "name": "_timeout_for",
+#       "anchor": "function-timeout-for",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "limits-for",
+#       "name": "_limits_for",
+#       "anchor": "function-limits-for",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-http-client",
+#       "name": "_build_http_client",
+#       "anchor": "function-build-http-client",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "close-client-unlocked",
+#       "name": "_close_client_unlocked",
+#       "anchor": "function-close-client-unlocked",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "configure-http-client",
+#       "name": "configure_http_client",
+#       "anchor": "function-configure-http-client",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "reset-http-client",
+#       "name": "reset_http_client",
+#       "anchor": "function-reset-http-client",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-http-client",
+#       "name": "get_http_client",
+#       "anchor": "function-get-http-client",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "set-client-unlocked",
+#       "name": "_set_client_unlocked",
+#       "anchor": "function-set-client-unlocked",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===
@@ -47,8 +122,8 @@ import logging
 import ssl
 import threading
 import time
+from collections.abc import Callable, Iterable, Mapping, MutableMapping
 from pathlib import Path
-from typing import Callable, Dict, Iterable, Mapping, MutableMapping, Optional
 
 import certifi
 import httpx
@@ -64,11 +139,11 @@ HTTP_CACHE_DIR: Path = CACHE_DIR / "http" / "ontology"
 CACHE_TIME_TO_LIVE = 12 * 60 * 60  # 12 hours before cleaning storage
 CACHE_SWEEP_INTERVAL = 30 * 60  # sweep every 30 minutes
 _CLIENT_LOCK = threading.RLock()
-_HTTP_CLIENT: Optional[httpx.Client] = None
-_CLIENT_FACTORY: Optional[Callable[[], Optional[httpx.Client]]] = None
+_HTTP_CLIENT: httpx.Client | None = None
+_CLIENT_FACTORY: Callable[[], httpx.Client | None] | None = None
 _DEFAULT_CONFIG = DownloadConfiguration()
-_EXTRA_REQUEST_HOOKS: Dict[str, Iterable] = {}
-_EXTRA_RESPONSE_HOOKS: Dict[str, Iterable] = {}
+_EXTRA_REQUEST_HOOKS: dict[str, Iterable] = {}
+_EXTRA_RESPONSE_HOOKS: dict[str, Iterable] = {}
 
 # --- Client construction helpers ----------------------------------------------
 
@@ -96,10 +171,10 @@ def _controller() -> Controller:
 
 def _request_hook(request: httpx.Request) -> None:
     extension_payload = request.extensions.pop("ontology_headers", None)
-    config: Optional[DownloadConfiguration] = None
-    extra_headers: Dict[str, str] = {}
-    correlation_id: Optional[str] = None
-    request_id: Optional[str] = None
+    config: DownloadConfiguration | None = None
+    extra_headers: dict[str, str] = {}
+    correlation_id: str | None = None
+    request_id: str | None = None
 
     if isinstance(extension_payload, Mapping):
         cfg = extension_payload.get("config")
@@ -118,7 +193,7 @@ def _request_hook(request: httpx.Request) -> None:
     cfg = config or _DEFAULT_CONFIG
     polite = cfg.polite_http_headers(correlation_id=correlation_id, request_id=request_id)
 
-    merged: Dict[str, str] = {}
+    merged: dict[str, str] = {}
     merged.update(polite)
     merged.update(extra_headers)
     for header, value in merged.items():
@@ -153,7 +228,7 @@ def _response_hook(response: httpx.Response) -> None:
 
     cache_hit = bool(response.extensions.get("from_cache"))
     cache_metadata = response.extensions.get("cache_metadata")
-    cache_info: Dict[str, object] = {"from_cache": cache_hit}
+    cache_info: dict[str, object] = {"from_cache": cache_hit}
     if isinstance(cache_metadata, Mapping):
         revalidated = cache_metadata.get("revalidated")
         if isinstance(revalidated, bool):
@@ -200,7 +275,7 @@ def _limits_for(config: DownloadConfiguration) -> httpx.Limits:
     )
 
 
-def _build_http_client(cache_root: Path, config: Optional[DownloadConfiguration]) -> httpx.Client:
+def _build_http_client(cache_root: Path, config: DownloadConfiguration | None) -> httpx.Client:
     cfg = config or _DEFAULT_CONFIG
     limits = _limits_for(cfg)
     timeout = _timeout_for(cfg)
@@ -267,12 +342,12 @@ def _close_client_unlocked() -> None:
 
 
 def configure_http_client(
-    client: Optional[httpx.Client] = None,
+    client: httpx.Client | None = None,
     *,
-    factory: Optional[Callable[[], Optional[httpx.Client]]] = None,
-    request_hooks: Optional[Mapping[str, Iterable]] = None,
-    response_hooks: Optional[Mapping[str, Iterable]] = None,
-    default_config: Optional[DownloadConfiguration] = None,
+    factory: Callable[[], httpx.Client | None] | None = None,
+    request_hooks: Mapping[str, Iterable] | None = None,
+    response_hooks: Mapping[str, Iterable] | None = None,
+    default_config: DownloadConfiguration | None = None,
 ) -> None:
     """Override the shared HTTPX client or register a factory for tests."""
 
@@ -309,7 +384,7 @@ def reset_http_client() -> None:
         _close_client_unlocked()
 
 
-def get_http_client(config: Optional[DownloadConfiguration] = None) -> httpx.Client:
+def get_http_client(config: DownloadConfiguration | None = None) -> httpx.Client:
     """Return the shared HTTPX client, creating it if necessary."""
 
     with _CLIENT_LOCK:

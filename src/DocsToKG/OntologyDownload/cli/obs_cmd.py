@@ -1,3 +1,42 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.cli.obs_cmd",
+#   "purpose": "Observability CLI commands: tail, stats, export.",
+#   "sections": [
+#     {
+#       "id": "get-duckdb-connection",
+#       "name": "_get_duckdb_connection",
+#       "anchor": "function-get-duckdb-connection",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "format-table",
+#       "name": "_format_table",
+#       "anchor": "function-format-table",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "obs-tail",
+#       "name": "obs_tail",
+#       "anchor": "function-obs-tail",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "obs-stats",
+#       "name": "obs_stats",
+#       "anchor": "function-obs-stats",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "obs-export",
+#       "name": "obs_export",
+#       "anchor": "function-obs-export",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Observability CLI commands: tail, stats, export.
 
 Provides:
@@ -8,7 +47,6 @@ Provides:
 
 import logging
 from pathlib import Path
-from typing import Optional
 
 import typer
 
@@ -98,19 +136,19 @@ def obs_tail(
         "-n",
         help="Number of recent events to show",
     ),
-    level: Optional[str] = typer.Option(
+    level: str | None = typer.Option(
         None,
         "--level",
         "-l",
         help="Filter by level (INFO, WARN, ERROR)",
     ),
-    event_type: Optional[str] = typer.Option(
+    event_type: str | None = typer.Option(
         None,
         "--type",
         "-t",
         help="Filter by event type (e.g., 'net.request')",
     ),
-    service: Optional[str] = typer.Option(
+    service: str | None = typer.Option(
         None,
         "--service",
         "-s",
@@ -171,7 +209,7 @@ def obs_tail(
 
 @app.command(name="stats")
 def obs_stats(
-    query_name: Optional[str] = typer.Argument(
+    query_name: str | None = typer.Argument(
         None,
         help="Name of stock query to run (e.g., 'net_request_p95_latency')",
     ),
@@ -248,19 +286,19 @@ def obs_export(
         ...,
         help="Path to export events to (.json, .jsonl, .parquet, .csv)",
     ),
-    level: Optional[str] = typer.Option(
+    level: str | None = typer.Option(
         None,
         "--level",
         "-l",
         help="Filter by level (INFO, WARN, ERROR)",
     ),
-    event_type: Optional[str] = typer.Option(
+    event_type: str | None = typer.Option(
         None,
         "--type",
         "-t",
         help="Filter by event type",
     ),
-    since: Optional[str] = typer.Option(
+    since: str | None = typer.Option(
         None,
         "--since",
         help="Filter events since timestamp (ISO 8601)",

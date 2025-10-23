@@ -3,11 +3,348 @@
 #   "module": "DocsToKG.OntologyDownload.settings",
 #   "purpose": "Define configuration models, environment overrides, optional dependency shims, and storage backends",
 #   "sections": [
-#     {"id": "config-models", "name": "Configuration Models", "anchor": "CFG", "kind": "api"},
-#     {"id": "env-overrides", "name": "Environment Overrides", "anchor": "ENV", "kind": "helpers"},
-#     {"id": "config-loading", "name": "Configuration Loading & Validation", "anchor": "LOD", "kind": "api"},
-#     {"id": "opt-deps", "name": "Optional Dependency Shims", "anchor": "OPT", "kind": "helpers"},
-#     {"id": "storage", "name": "Storage Backends", "anchor": "STO", "kind": "api"}
+#     {
+#       "id": "ensure-python-version",
+#       "name": "ensure_python_version",
+#       "anchor": "function-ensure-python-version",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "coerce-sequence",
+#       "name": "_coerce_sequence",
+#       "anchor": "function-coerce-sequence",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-rate-limit-to-rps",
+#       "name": "parse_rate_limit_to_rps",
+#       "anchor": "function-parse-rate-limit-to-rps",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "loggingconfiguration",
+#       "name": "LoggingConfiguration",
+#       "anchor": "class-loggingconfiguration",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "databaseconfiguration",
+#       "name": "DatabaseConfiguration",
+#       "anchor": "class-databaseconfiguration",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "validationconfig",
+#       "name": "ValidationConfig",
+#       "anchor": "class-validationconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "downloadconfiguration",
+#       "name": "DownloadConfiguration",
+#       "anchor": "class-downloadconfiguration",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "plannerconfig",
+#       "name": "PlannerConfig",
+#       "anchor": "class-plannerconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "duckdbsettings",
+#       "name": "DuckDBSettings",
+#       "anchor": "class-duckdbsettings",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "storagesettings",
+#       "name": "StorageSettings",
+#       "anchor": "class-storagesettings",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "defaultsconfig",
+#       "name": "DefaultsConfig",
+#       "anchor": "class-defaultsconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "resolvedconfig",
+#       "name": "ResolvedConfig",
+#       "anchor": "class-resolvedconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "rebuild-pydantic-models",
+#       "name": "_rebuild_pydantic_models",
+#       "anchor": "function-rebuild-pydantic-models",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "read-env-value",
+#       "name": "_read_env_value",
+#       "anchor": "function-read-env-value",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "read-env-int",
+#       "name": "_read_env_int",
+#       "anchor": "function-read-env-int",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "read-env-float",
+#       "name": "_read_env_float",
+#       "anchor": "function-read-env-float",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "read-env-path",
+#       "name": "_read_env_path",
+#       "anchor": "function-read-env-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-default-config",
+#       "name": "get_default_config",
+#       "anchor": "function-get-default-config",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "invalidate-default-config-cache",
+#       "name": "invalidate_default_config_cache",
+#       "anchor": "function-invalidate-default-config-cache",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-env-overrides",
+#       "name": "get_env_overrides",
+#       "anchor": "function-get-env-overrides",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "apply-env-overrides",
+#       "name": "_apply_env_overrides",
+#       "anchor": "function-apply-env-overrides",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-resolved-config",
+#       "name": "build_resolved_config",
+#       "anchor": "function-build-resolved-config",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-schema",
+#       "name": "_validate_schema",
+#       "anchor": "function-validate-schema",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "normalize-config-path",
+#       "name": "normalize_config_path",
+#       "anchor": "function-normalize-config-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-raw-yaml",
+#       "name": "load_raw_yaml",
+#       "anchor": "function-load-raw-yaml",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-config",
+#       "name": "load_config",
+#       "anchor": "function-load-config",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-config",
+#       "name": "validate_config",
+#       "anchor": "function-validate-config",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "create-stub-module",
+#       "name": "_create_stub_module",
+#       "anchor": "function-create-stub-module",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "create-stub-bnode",
+#       "name": "_create_stub_bnode",
+#       "anchor": "function-create-stub-bnode",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "create-stub-literal",
+#       "name": "_create_stub_literal",
+#       "anchor": "function-create-stub-literal",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "create-stub-uri",
+#       "name": "_create_stub_uri",
+#       "anchor": "function-create-stub-uri",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "stubnamespace",
+#       "name": "_StubNamespace",
+#       "anchor": "class-stubnamespace",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "stubnamespacemanager",
+#       "name": "_StubNamespaceManager",
+#       "anchor": "class-stubnamespacemanager",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "stubgraph",
+#       "name": "_StubGraph",
+#       "anchor": "class-stubgraph",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "import-module",
+#       "name": "_import_module",
+#       "anchor": "function-import-module",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "create-pystow-stub",
+#       "name": "_create_pystow_stub",
+#       "anchor": "function-create-pystow-stub",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "create-rdflib-stub",
+#       "name": "_create_rdflib_stub",
+#       "anchor": "function-create-rdflib-stub",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "create-pronto-stub",
+#       "name": "_create_pronto_stub",
+#       "anchor": "function-create-pronto-stub",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "create-owlready-stub",
+#       "name": "_create_owlready_stub",
+#       "anchor": "function-create-owlready-stub",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-pystow",
+#       "name": "get_pystow",
+#       "anchor": "function-get-pystow",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-rdflib",
+#       "name": "get_rdflib",
+#       "anchor": "function-get-rdflib",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-pronto",
+#       "name": "get_pronto",
+#       "anchor": "function-get-pronto",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-owlready2",
+#       "name": "get_owlready2",
+#       "anchor": "function-get-owlready2",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "storagebackend",
+#       "name": "StorageBackend",
+#       "anchor": "class-storagebackend",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "safe-identifiers",
+#       "name": "_safe_identifiers",
+#       "anchor": "function-safe-identifiers",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "directory-size",
+#       "name": "_directory_size",
+#       "anchor": "function-directory-size",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "localstoragebackend",
+#       "name": "LocalStorageBackend",
+#       "anchor": "class-localstoragebackend",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "fsspecstoragebackend",
+#       "name": "FsspecStorageBackend",
+#       "anchor": "class-fsspecstoragebackend",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "get-storage-backend",
+#       "name": "get_storage_backend",
+#       "anchor": "function-get-storage-backend",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "httpsettings",
+#       "name": "HttpSettings",
+#       "anchor": "class-httpsettings",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "cachesettings",
+#       "name": "CacheSettings",
+#       "anchor": "class-cachesettings",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "retrysettings",
+#       "name": "RetrySettings",
+#       "anchor": "class-retrysettings",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "loggingsettings",
+#       "name": "LoggingSettings",
+#       "anchor": "class-loggingsettings",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "telemetrysettings",
+#       "name": "TelemetrySettings",
+#       "anchor": "class-telemetrysettings",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "securitysettings",
+#       "name": "SecuritySettings",
+#       "anchor": "class-securitysettings",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "ratelimitsettings",
+#       "name": "RateLimitSettings",
+#       "anchor": "class-ratelimitsettings",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "extractionsettings",
+#       "name": "ExtractionSettings",
+#       "anchor": "class-extractionsettings",
+#       "kind": "class"
+#     }
 #   ]
 # }
 # === /NAVMAP ===
@@ -36,21 +373,14 @@ import stat
 import sys
 import threading
 import uuid
-from datetime import datetime, timezone
+from collections.abc import Callable, Iterable, Mapping
+from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from types import ModuleType
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
-    Dict,
-    Iterable,
-    List,
-    Mapping,
-    Optional,
     Protocol,
-    Set,
-    Tuple,
 )
 
 import httpx
@@ -94,7 +424,7 @@ def ensure_python_version(
         raise UnsupportedPythonError(f"Python >= {required} required; found {found}")
 
 
-def _coerce_sequence(value: Optional[Iterable[str]]) -> List[str]:
+def _coerce_sequence(value: Iterable[str] | None) -> list[str]:
     if value is None:
         return []
     if isinstance(value, str):
@@ -108,7 +438,7 @@ ConfigError = UserConfigError  # Backwards compatibility alias
 _RATE_LIMIT_PATTERN = re.compile(r"^([\d.]+)/(second|sec|s|minute|min|m|hour|h)$")
 
 
-def parse_rate_limit_to_rps(limit_str: Optional[str]) -> Optional[float]:
+def parse_rate_limit_to_rps(limit_str: str | None) -> float | None:
     """Convert a rate limit expression into requests-per-second."""
 
     if not limit_str:
@@ -151,7 +481,7 @@ class LoggingConfiguration(BaseModel):
 class DatabaseConfiguration(BaseModel):
     """DuckDB catalog configuration for ontology metadata tracking."""
 
-    db_path: Optional[Path] = Field(
+    db_path: Path | None = Field(
         default=None,
         description="Path to DuckDB file; defaults to ~/.data/ontology-fetcher/.catalog/ontofetch.duckdb",
     )
@@ -160,11 +490,11 @@ class DatabaseConfiguration(BaseModel):
         default=True,
         description="Enable file-based locks to serialize writers; readers bypass locks",
     )
-    threads: Optional[int] = Field(
+    threads: int | None = Field(
         default=None,
         description="Number of threads for query execution; None uses CPU count",
     )
-    memory_limit: Optional[str] = Field(
+    memory_limit: str | None = Field(
         default=None,
         description="Memory limit as string (e.g., '8GB'); None uses auto",
     )
@@ -192,7 +522,7 @@ class ValidationConfig(BaseModel):
         default=False,
         description="When true, run heavy validators (rdflib, owlready2) in a process pool for isolation.",
     )
-    process_pool_validators: List[str] = Field(
+    process_pool_validators: list[str] = Field(
         default_factory=lambda: ["rdflib", "owlready2"],
         description="Validator names that should run in the process pool when enabled.",
     )
@@ -211,10 +541,10 @@ class DownloadConfiguration(BaseModel):
       :func:`DocsToKG.OntologyDownload.net.configure_http_client`).
     """
 
-    _session_factory: Optional[Callable[[], Any]] = PrivateAttr(default=None)
-    _bucket_provider: Optional[
-        Callable[[Optional[str], "DownloadConfiguration", Optional[str]], Any]
-    ] = PrivateAttr(default=None)
+    _session_factory: Callable[[], Any] | None = PrivateAttr(default=None)
+    _bucket_provider: Callable[[str | None, DownloadConfiguration, str | None], Any] | None = (
+        PrivateAttr(default=None)
+    )
 
     max_retries: int = Field(default=5, ge=0, le=20)
     timeout_sec: int = Field(default=30, gt=0, le=300)
@@ -274,14 +604,14 @@ class DownloadConfiguration(BaseModel):
         default=False,
         description="When true, abort on DNS resolution failures instead of logging a warning.",
     )
-    rate_limits: Dict[str, str] = Field(
+    rate_limits: dict[str, str] = Field(
         default_factory=lambda: {
             "ols": "4/second",
             "bioportal": "2/second",
             "lov": "1/second",
         }
     )
-    allowed_hosts: Optional[List[str]] = Field(default=None)
+    allowed_hosts: list[str] | None = Field(default=None)
     allow_private_networks_for_host_allowlist: bool = Field(
         default=False,
         description=(
@@ -296,8 +626,8 @@ class DownloadConfiguration(BaseModel):
             " Defaults to False so host allowlists continue to enforce TLS unless explicitly opted in."
         ),
     )
-    allowed_ports: Optional[List[int]] = Field(default=None)
-    polite_headers: Dict[str, str] = Field(
+    allowed_ports: list[int] | None = Field(default=None)
+    polite_headers: dict[str, str] = Field(
         default_factory=lambda: {
             "User-Agent": "DocsToKG-OntologyDownloader/1.0 (+https://github.com/allenai/DocsToKG)",
         }
@@ -306,14 +636,14 @@ class DownloadConfiguration(BaseModel):
         default="pyrate",
         description="Selects the rate limiter backend. Only the pyrate-limiter manager is supported.",
     )
-    shared_rate_limit_dir: Optional[Path] = Field(
+    shared_rate_limit_dir: Path | None = Field(
         default=None,
         description="Directory used to persist shared token bucket state across processes",
     )
 
     @field_validator("rate_limits")
     @classmethod
-    def validate_rate_limits(cls, value: Dict[str, str]) -> Dict[str, str]:
+    def validate_rate_limits(cls, value: dict[str, str]) -> dict[str, str]:
         """Ensure per-resolver rate limits follow the supported syntax."""
 
         for service, limit in value.items():
@@ -326,7 +656,7 @@ class DownloadConfiguration(BaseModel):
 
     @field_validator("allowed_ports")
     @classmethod
-    def validate_allowed_ports(cls, value: Optional[List[int]]) -> Optional[List[int]]:
+    def validate_allowed_ports(cls, value: list[int] | None) -> list[int] | None:
         """Normalise and validate the optional port allowlist from configuration.
 
         Args:
@@ -340,7 +670,7 @@ class DownloadConfiguration(BaseModel):
         """
         if value is None:
             return None
-        normalized: List[int] = []
+        normalized: list[int] = []
         for port in value:
             if not isinstance(port, int):
                 raise ValueError("allowed_ports entries must be integers")
@@ -367,7 +697,7 @@ class DownloadConfiguration(BaseModel):
 
         return int(self.max_checksum_response_bytes)
 
-    def parse_service_rate_limit(self, service: str) -> Optional[float]:
+    def parse_service_rate_limit(self, service: str) -> float | None:
         """Return service-specific rate limits expressed as requests per second."""
 
         limit_str = self.rate_limits.get(service)
@@ -381,33 +711,33 @@ class DownloadConfiguration(BaseModel):
             )
         return parsed
 
-    def allowed_port_set(self) -> Set[int]:
+    def allowed_port_set(self) -> set[int]:
         """Return the union of default ports and user-configured allowances."""
 
-        ports: Set[int] = {80, 443}
+        ports: set[int] = {80, 443}
         if self.allowed_ports:
             ports.update(self.allowed_ports)
         return ports
 
     def normalized_allowed_hosts(
         self,
-    ) -> Optional[Tuple[Set[str], Set[str], Dict[str, Set[int]], Set[str]]]:
+    ) -> tuple[set[str], set[str], dict[str, set[int]], set[str]] | None:
         """Split allowed host list into exact domains, wildcard suffixes, per-host ports, and IP literals."""
 
         if not self.allowed_hosts:
             return None
 
-        exact: Set[str] = set()
-        suffixes: Set[str] = set()
-        host_ports: Dict[str, Set[int]] = {}
-        ip_literals: Set[str] = set()
+        exact: set[str] = set()
+        suffixes: set[str] = set()
+        host_ports: dict[str, set[int]] = {}
+        ip_literals: set[str] = set()
 
         for entry in self.allowed_hosts:
             candidate = entry.strip()
             if not candidate:
                 continue
 
-            port: Optional[int] = None
+            port: int | None = None
             working = candidate
             if working.startswith("["):
                 end_bracket = working.find("]")
@@ -471,13 +801,13 @@ class DownloadConfiguration(BaseModel):
     def polite_http_headers(
         self,
         *,
-        correlation_id: Optional[str] = None,
-        request_id: Optional[str] = None,
-        timestamp: Optional[datetime] = None,
-    ) -> Dict[str, str]:
+        correlation_id: str | None = None,
+        request_id: str | None = None,
+        timestamp: datetime | None = None,
+    ) -> dict[str, str]:
         """Compute polite HTTP headers for outbound resolver requests."""
 
-        headers: Dict[str, str] = {
+        headers: dict[str, str] = {
             str(key): str(value)
             for key, value in (self.polite_headers or {}).items()
             if str(value).strip()
@@ -488,7 +818,7 @@ class DownloadConfiguration(BaseModel):
                 "DocsToKG-OntologyDownloader/1.0 (+https://github.com/allenai/DocsToKG)"
             )
 
-        moment = timestamp or datetime.now(timezone.utc)
+        moment = timestamp or datetime.now(UTC)
         if request_id is None:
             seed = correlation_id or uuid.uuid4().hex[:12]
             request_id = f"{seed}-{moment.strftime('%Y%m%dT%H%M%SZ')}"
@@ -499,7 +829,7 @@ class DownloadConfiguration(BaseModel):
 
         return headers
 
-    def set_session_factory(self, factory: Optional[Callable[[], Any]]) -> None:
+    def set_session_factory(self, factory: Callable[[], Any] | None) -> None:
         """Set a custom factory used to construct HTTPX clients."""
 
         if factory is None:
@@ -508,7 +838,7 @@ class DownloadConfiguration(BaseModel):
         if not callable(factory):
             raise TypeError("session_factory must be callable and return an httpx.Client or None")
 
-        def _wrapped() -> Optional[httpx.Client]:
+        def _wrapped() -> httpx.Client | None:
             candidate = factory()
             if candidate is None or isinstance(candidate, httpx.Client):
                 return candidate
@@ -516,14 +846,14 @@ class DownloadConfiguration(BaseModel):
 
         self._session_factory = _wrapped
 
-    def get_session_factory(self) -> Optional[Callable[[], Any]]:
+    def get_session_factory(self) -> Callable[[], Any] | None:
         """Return the custom HTTPX client factory, if one has been configured."""
 
         return self._session_factory
 
     def set_bucket_provider(
         self,
-        provider: Optional[Callable[[Optional[str], "DownloadConfiguration", Optional[str]], Any]],
+        provider: Callable[[str | None, DownloadConfiguration, str | None], Any] | None,
     ) -> None:
         """Set a custom provider responsible for returning token buckets."""
 
@@ -531,7 +861,7 @@ class DownloadConfiguration(BaseModel):
 
     def get_bucket_provider(
         self,
-    ) -> Optional[Callable[[Optional[str], "DownloadConfiguration", Optional[str]], Any]]:
+    ) -> Callable[[str | None, DownloadConfiguration, str | None], Any] | None:
         """Return the configured token bucket provider, if present."""
 
         return self._bucket_provider
@@ -540,8 +870,8 @@ class DownloadConfiguration(BaseModel):
         self,
         *,
         deep: bool = False,
-        update: Optional[Mapping[str, Any]] = None,
-    ) -> "DownloadConfiguration":
+        update: Mapping[str, Any] | None = None,
+    ) -> DownloadConfiguration:
         """Copy the model ensuring private attributes propagate."""
 
         copied = super().model_copy(deep=deep, update=update)
@@ -559,7 +889,7 @@ class PlannerConfig(BaseModel):
         default=True,
         description="When false, planner metadata HTTP probes are skipped after URL validation.",
     )
-    head_precheck_hosts: List[str] = Field(
+    head_precheck_hosts: list[str] = Field(
         default_factory=list,
         description=(
             "Collection of hostnames (exact or suffixes prefixed with a dot) that require a "
@@ -648,11 +978,11 @@ class StorageSettings(BaseModel):
 class DefaultsConfig(BaseModel):
     """Composite configuration applied when no per-spec overrides exist."""
 
-    accept_licenses: List[str] = Field(
+    accept_licenses: list[str] = Field(
         default_factory=lambda: ["CC-BY-4.0", "CC0-1.0", "OGL-UK-3.0"]
     )
-    normalize_to: List[str] = Field(default_factory=lambda: ["ttl"])
-    prefer_source: List[str] = Field(default_factory=lambda: ["obo", "ols", "bioportal", "direct"])
+    normalize_to: list[str] = Field(default_factory=lambda: ["ttl"])
+    prefer_source: list[str] = Field(default_factory=lambda: ["obo", "ols", "bioportal", "direct"])
     http: DownloadConfiguration = Field(default_factory=DownloadConfiguration)
     planner: PlannerConfig = Field(default_factory=PlannerConfig)
     validation: ValidationConfig = Field(default_factory=ValidationConfig)
@@ -673,7 +1003,7 @@ class DefaultsConfig(BaseModel):
 
     @field_validator("prefer_source")
     @classmethod
-    def validate_prefer_source(cls, value: List[str]) -> List[str]:
+    def validate_prefer_source(cls, value: list[str]) -> list[str]:
         """Ensure preferred resolvers belong to the supported resolver set."""
 
         unknown = [resolver for resolver in value if resolver not in _VALID_RESOLVERS]
@@ -685,12 +1015,12 @@ class DefaultsConfig(BaseModel):
 
     @field_validator("accept_licenses")
     @classmethod
-    def normalize_accept_licenses(cls, value: List[str]) -> List[str]:
+    def normalize_accept_licenses(cls, value: list[str]) -> list[str]:
         """Normalize accept_licenses entries to canonical SPDX identifiers."""
 
         from .resolvers import normalize_license_to_spdx
 
-        normalized: List[str] = []
+        normalized: list[str] = []
         for entry in value:
             if not isinstance(entry, str) or not entry.strip():
                 continue
@@ -708,10 +1038,10 @@ class ResolvedConfig(BaseModel):
     """Materialised configuration combining defaults and fetch specifications."""
 
     defaults: DefaultsConfig
-    specs: List["FetchSpec"] = Field(default_factory=list)
+    specs: list[FetchSpec] = Field(default_factory=list)
 
     @classmethod
-    def from_defaults(cls) -> "ResolvedConfig":
+    def from_defaults(cls) -> ResolvedConfig:
         """Construct a resolved configuration populated with default values only."""
 
         defaults = DefaultsConfig()
@@ -749,7 +1079,7 @@ class ResolvedConfig(BaseModel):
 
 
 _DEFAULT_CONFIG_LOCK = threading.RLock()
-_DEFAULT_CONFIG_CACHE: Optional[ResolvedConfig] = None
+_DEFAULT_CONFIG_CACHE: ResolvedConfig | None = None
 
 _HAS_PYDANTIC_SETTINGS = hasattr(BaseSettings, "model_dump")
 
@@ -772,7 +1102,7 @@ def _rebuild_pydantic_models() -> None:
         pass
 
 
-def _read_env_value(name: str) -> Optional[str]:
+def _read_env_value(name: str) -> str | None:
     """Fetch and normalise an environment variable, treating empty values as absent."""
 
     raw = os.environ.get(name)
@@ -782,21 +1112,21 @@ def _read_env_value(name: str) -> Optional[str]:
     return value or None
 
 
-def _read_env_int(name: str) -> Optional[int]:
+def _read_env_int(name: str) -> int | None:
     value = _read_env_value(name)
     if value is None:
         return None
     return int(value)
 
 
-def _read_env_float(name: str) -> Optional[float]:
+def _read_env_float(name: str) -> float | None:
     value = _read_env_value(name)
     if value is None:
         return None
     return float(value)
 
 
-def _read_env_path(name: str) -> Optional[Path]:
+def _read_env_path(name: str) -> Path | None:
     value = _read_env_value(name)
     if value is None:
         return None
@@ -833,20 +1163,18 @@ if _HAS_PYDANTIC_SETTINGS:
     class EnvironmentOverrides(BaseSettings):
         """Pydantic settings model exposing environment-derived overrides."""
 
-        max_retries: Optional[int] = Field(default=None, alias="ONTOFETCH_MAX_RETRIES")
-        timeout_sec: Optional[int] = Field(default=None, alias="ONTOFETCH_TIMEOUT_SEC")
-        download_timeout_sec: Optional[int] = Field(
+        max_retries: int | None = Field(default=None, alias="ONTOFETCH_MAX_RETRIES")
+        timeout_sec: int | None = Field(default=None, alias="ONTOFETCH_TIMEOUT_SEC")
+        download_timeout_sec: int | None = Field(
             default=None, alias="ONTOFETCH_DOWNLOAD_TIMEOUT_SEC"
         )
-        per_host_rate_limit: Optional[str] = Field(
-            default=None, alias="ONTOFETCH_PER_HOST_RATE_LIMIT"
-        )
-        backoff_factor: Optional[float] = Field(default=None, alias="ONTOFETCH_BACKOFF_FACTOR")
-        log_level: Optional[str] = Field(default=None, alias="ONTOFETCH_LOG_LEVEL")
-        shared_rate_limit_dir: Optional[Path] = Field(
+        per_host_rate_limit: str | None = Field(default=None, alias="ONTOFETCH_PER_HOST_RATE_LIMIT")
+        backoff_factor: float | None = Field(default=None, alias="ONTOFETCH_BACKOFF_FACTOR")
+        log_level: str | None = Field(default=None, alias="ONTOFETCH_LOG_LEVEL")
+        shared_rate_limit_dir: Path | None = Field(
             default=None, alias="ONTOFETCH_SHARED_RATE_LIMIT_DIR"
         )
-        max_uncompressed_size_gb: Optional[float] = Field(
+        max_uncompressed_size_gb: float | None = Field(
             default=None, alias="ONTOFETCH_MAX_UNCOMPRESSED_SIZE_GB"
         )
 
@@ -859,7 +1187,7 @@ else:
     class EnvironmentOverrides:
         """Fallback environment reader when ``pydantic-settings`` is unavailable."""
 
-        model_config: Dict[str, object] = {}
+        model_config: dict[str, object] = {}
 
         def __init__(self) -> None:
             self.max_retries = _read_env_int("ONTOFETCH_MAX_RETRIES")
@@ -871,18 +1199,18 @@ else:
             self.shared_rate_limit_dir = _read_env_path("ONTOFETCH_SHARED_RATE_LIMIT_DIR")
             self.max_uncompressed_size_gb = _read_env_float("ONTOFETCH_MAX_UNCOMPRESSED_SIZE_GB")
 
-        max_retries: Optional[int]
-        timeout_sec: Optional[int]
-        download_timeout_sec: Optional[int]
-        per_host_rate_limit: Optional[str]
-        backoff_factor: Optional[float]
-        log_level: Optional[str]
-        shared_rate_limit_dir: Optional[Path]
-        max_uncompressed_size_gb: Optional[float]
+        max_retries: int | None
+        timeout_sec: int | None
+        download_timeout_sec: int | None
+        per_host_rate_limit: str | None
+        backoff_factor: float | None
+        log_level: str | None
+        shared_rate_limit_dir: Path | None
+        max_uncompressed_size_gb: float | None
 
         def model_dump(
             self, *, by_alias: bool = False, exclude_none: bool = False
-        ) -> Dict[str, object]:
+        ) -> dict[str, object]:
             """Return environment-derived overrides mirroring ``BaseSettings.model_dump``.
 
             Args:
@@ -892,7 +1220,7 @@ else:
             Returns:
                 Dict[str, object]: Mapping of configuration keys to environment-provided values.
             """
-            data: Dict[str, object] = {
+            data: dict[str, object] = {
                 "max_retries": self.max_retries,
                 "timeout_sec": self.timeout_sec,
                 "download_timeout_sec": self.download_timeout_sec,
@@ -907,7 +1235,7 @@ else:
             return data
 
 
-def get_env_overrides() -> Dict[str, str]:
+def get_env_overrides() -> dict[str, str]:
     """Return environment-derived overrides as stringified key/value pairs."""
 
     env = EnvironmentOverrides()
@@ -995,7 +1323,7 @@ def build_resolved_config(raw_config: Mapping[str, object]) -> ResolvedConfig:
 
     from .planning import merge_defaults  # imported lazily to avoid circular dependency
 
-    fetch_specs: List["FetchSpec"] = []
+    fetch_specs: list[FetchSpec] = []
     for index, entry in enumerate(ontologies, start=1):
         if not isinstance(entry, Mapping):
             raise UserConfigError(f"Ontology entry #{index} must be a mapping")
@@ -1004,8 +1332,8 @@ def build_resolved_config(raw_config: Mapping[str, object]) -> ResolvedConfig:
     return ResolvedConfig(defaults=defaults, specs=fetch_specs)
 
 
-def _validate_schema(raw: Mapping[str, object], config: Optional[ResolvedConfig] = None) -> None:
-    errors: List[str] = []
+def _validate_schema(raw: Mapping[str, object], config: ResolvedConfig | None = None) -> None:
+    errors: list[str] = []
     defaults = raw.get("defaults")
     if defaults is not None and not isinstance(defaults, Mapping):
         errors.append("'defaults' section must be a mapping when provided")
@@ -1090,13 +1418,13 @@ def validate_config(config_path: Path) -> ResolvedConfig:
 _STUB_ATTR = "_ontofetch_stub"
 _BNODE_COUNTER = 0
 
-_pystow: Optional[Any] = None
-_rdflib: Optional[Any] = None
-_pronto: Optional[Any] = None
-_owlready2: Optional[Any] = None
+_pystow: Any | None = None
+_rdflib: Any | None = None
+_pronto: Any | None = None
+_owlready2: Any | None = None
 
 
-def _create_stub_module(name: str, attrs: Dict[str, Any]) -> ModuleType:
+def _create_stub_module(name: str, attrs: dict[str, Any]) -> ModuleType:
     module = ModuleType(name)
     for key, value in attrs.items():
         setattr(module, key, value)
@@ -1104,7 +1432,7 @@ def _create_stub_module(name: str, attrs: Dict[str, Any]) -> ModuleType:
     return module
 
 
-def _create_stub_bnode(value: Optional[str] = None) -> str:
+def _create_stub_bnode(value: str | None = None) -> str:
     global _BNODE_COUNTER
     if value is not None:
         return value
@@ -1120,7 +1448,7 @@ def _create_stub_literal(value: Any = None) -> str:
     return str(value)
 
 
-def _create_stub_uri(value: Optional[str] = None) -> str:
+def _create_stub_uri(value: str | None = None) -> str:
     if value is None:
         return "<>"
     if value.startswith("<") and value.endswith(">"):
@@ -1138,7 +1466,7 @@ class _StubNamespace:
 
 class _StubNamespaceManager:
     def __init__(self) -> None:
-        self._bindings: Dict[str, str] = {}
+        self._bindings: dict[str, str] = {}
 
     def bind(self, prefix: str, namespace: str) -> None:
         """Register a namespace binding in the lightweight stub manager."""
@@ -1155,16 +1483,16 @@ class _StubGraph:
     _ontofetch_stub = True
 
     def __init__(self) -> None:
-        self._triples: List[tuple[str, str, str]] = []
+        self._triples: list[tuple[str, str, str]] = []
         self._last_text = "# Stub TTL output\n"
         self.namespace_manager = _StubNamespaceManager()
 
-    def parse(self, source: str, format: Optional[str] = None, **_kwargs: object) -> "_StubGraph":
+    def parse(self, source: str, format: str | None = None, **_kwargs: object) -> _StubGraph:
         """Parse a Turtle-like text file into an in-memory triple list."""
 
         text = Path(source).read_text()
         self._last_text = text
-        triples: List[tuple[str, str, str]] = []
+        triples: list[tuple[str, str, str]] = []
         for raw_line in text.splitlines():
             line = raw_line.strip()
             if not line or line.startswith("#"):
@@ -1194,7 +1522,7 @@ class _StubGraph:
         return self
 
     def serialize(
-        self, destination: Optional[Any] = None, format: Optional[str] = None, **_kwargs: object
+        self, destination: Any | None = None, format: str | None = None, **_kwargs: object
     ):
         """Serialise parsed triples to the supplied destination."""
 
@@ -1324,7 +1652,7 @@ def _create_pronto_stub() -> ModuleType:
     class _StubOntology:
         _ontofetch_stub = True
 
-        def __init__(self, _path: Optional[str] = None) -> None:
+        def __init__(self, _path: str | None = None) -> None:
             self.path = _path
 
         def terms(self) -> Iterable[str]:
@@ -1347,12 +1675,12 @@ def _create_owlready_stub() -> ModuleType:
         def __init__(self, iri: str) -> None:
             self.iri = iri
 
-        def load(self) -> "_StubOntology":
+        def load(self) -> _StubOntology:
             """Provide fluent API parity with owlready2 ontologies."""
 
             return self
 
-        def classes(self) -> List[str]:
+        def classes(self) -> list[str]:
             """Return example ontology classes for tests and fallbacks."""
 
             return ["Class1", "Class2", "Class3"]
@@ -1452,10 +1780,10 @@ class StorageBackend(Protocol):
     def ensure_local_version(self, ontology_id: str, version: str) -> Path:
         """Ensure a local directory exists for the requested ontology version."""
 
-    def available_versions(self, ontology_id: str) -> List[str]:
+    def available_versions(self, ontology_id: str) -> list[str]:
         """Return sorted version identifiers available for *ontology_id*."""
 
-    def available_ontologies(self) -> List[str]:
+    def available_ontologies(self) -> list[str]:
         """Return sorted ontology identifiers known to the backend."""
 
     def finalize_version(self, ontology_id: str, version: str, local_dir: Path) -> None:
@@ -1477,7 +1805,7 @@ class StorageBackend(Protocol):
         """Return the total size in bytes for files rooted at *path*."""
 
 
-def _safe_identifiers(ontology_id: str, version: str) -> Tuple[str, str]:
+def _safe_identifiers(ontology_id: str, version: str) -> tuple[str, str]:
     """Return identifiers sanitised for filesystem usage."""
 
     from .io import sanitize_filename  # Local import to avoid circular dependency
@@ -1526,7 +1854,7 @@ class LocalStorageBackend:
         base.mkdir(parents=True, exist_ok=True)
         return base
 
-    def available_versions(self, ontology_id: str) -> List[str]:
+    def available_versions(self, ontology_id: str) -> list[str]:
         """List version identifiers currently stored for ``ontology_id``."""
 
         safe_id, _ = _safe_identifiers(ontology_id, "unused")
@@ -1536,7 +1864,7 @@ class LocalStorageBackend:
         versions = [entry.name for entry in base.iterdir() if entry.is_dir()]
         return sorted(versions)
 
-    def available_ontologies(self) -> List[str]:
+    def available_ontologies(self) -> list[str]:
         """List ontology identifiers known to the local backend."""
 
         if not self.root.exists():
@@ -1624,7 +1952,7 @@ class FsspecStorageBackend(LocalStorageBackend):
         safe_id, safe_version = _safe_identifiers(ontology_id, version)
         return (self.base_path / safe_id / safe_version).with_suffix("")
 
-    def available_versions(self, ontology_id: str) -> List[str]:
+    def available_versions(self, ontology_id: str) -> list[str]:
         """Combine local and remote version identifiers for ``ontology_id``."""
 
         local_versions = super().available_versions(ontology_id)
@@ -1639,7 +1967,7 @@ class FsspecStorageBackend(LocalStorageBackend):
         ]
         return sorted({*local_versions, *remote_versions})
 
-    def available_ontologies(self) -> List[str]:
+    def available_ontologies(self) -> list[str]:
         """Return the union of ontology ids present locally and in remote storage."""
 
         local = set(super().available_ontologies())
@@ -1909,11 +2237,11 @@ class SecuritySettings(BaseModel):
 
     model_config = ConfigDict(frozen=True, validate_assignment=False)
 
-    allowed_hosts: Optional[List[str]] = Field(
+    allowed_hosts: list[str] | None = Field(
         default=None,
         description="Comma-separated allowed hosts (supports *.suffix, IP/CIDR, host:port)",
     )
-    allowed_ports: Optional[List[int]] = Field(
+    allowed_ports: list[int] | None = Field(
         default=None,
         description="Allowed ports; defaults to 80,443 if not specified",
     )
@@ -1932,7 +2260,7 @@ class SecuritySettings(BaseModel):
 
     @field_validator("allowed_ports", mode="before")
     @classmethod
-    def parse_ports(cls, v: Any) -> Optional[List[int]]:
+    def parse_ports(cls, v: Any) -> list[int] | None:
         """Parse and validate port list."""
         if v is None:
             return None
@@ -1947,22 +2275,22 @@ class SecuritySettings(BaseModel):
 
     def normalized_allowed_hosts(
         self,
-    ) -> Optional[Tuple[Set[str], Set[str], Dict[str, Set[int]], Set[str]]]:
+    ) -> tuple[set[str], set[str], dict[str, set[int]], set[str]] | None:
         """Parse allowed_hosts into exact domains, wildcard suffixes, per-host ports, and IP literals."""
         if not self.allowed_hosts:
             return None
 
-        exact: Set[str] = set()
-        suffixes: Set[str] = set()
-        host_ports: Dict[str, Set[int]] = {}
-        ip_literals: Set[str] = set()
+        exact: set[str] = set()
+        suffixes: set[str] = set()
+        host_ports: dict[str, set[int]] = {}
+        ip_literals: set[str] = set()
 
         for entry in self.allowed_hosts:
             candidate = entry.strip()
             if not candidate:
                 continue
 
-            port: Optional[int] = None
+            port: int | None = None
             working = candidate
 
             # Handle IPv6 literals [::1]:port
@@ -2032,7 +2360,7 @@ class SecuritySettings(BaseModel):
 
         return exact, suffixes, host_ports, ip_literals
 
-    def allowed_port_set(self) -> Set[int]:
+    def allowed_port_set(self) -> set[int]:
         """Return the set of allowed ports (defaults to 80, 443)."""
         if self.allowed_ports:
             return set(self.allowed_ports)
@@ -2044,15 +2372,15 @@ class RateLimitSettings(BaseModel):
 
     model_config = ConfigDict(frozen=True, validate_assignment=False)
 
-    default: Optional[str] = Field(
+    default: str | None = Field(
         default=None,
         description="Default rate limit (e.g., '10/second', '60/minute')",
     )
-    per_service: Dict[str, str] = Field(
+    per_service: dict[str, str] = Field(
         default_factory=dict,
         description="Per-service rate limits (e.g., {'ols': '4/second'})",
     )
-    shared_dir: Optional[Path] = Field(
+    shared_dir: Path | None = Field(
         default=None,
         description="Directory for shared SQLite token bucket state",
     )
@@ -2063,7 +2391,7 @@ class RateLimitSettings(BaseModel):
 
     @field_validator("default", mode="before")
     @classmethod
-    def validate_rate_string(cls, v: Optional[str]) -> Optional[str]:
+    def validate_rate_string(cls, v: str | None) -> str | None:
         """Validate rate limit string format."""
         if v is None:
             return None
@@ -2073,7 +2401,7 @@ class RateLimitSettings(BaseModel):
 
     @field_validator("per_service", mode="before")
     @classmethod
-    def validate_per_service(cls, v: Any) -> Dict[str, str]:
+    def validate_per_service(cls, v: Any) -> dict[str, str]:
         """Parse and validate per-service rate limits."""
         if isinstance(v, str):
             # Parse CSV format: "ols:4/second;bioportal:2/second"
@@ -2090,7 +2418,7 @@ class RateLimitSettings(BaseModel):
             return v
         return {}
 
-    def parse_service_rate_limit(self, service: str) -> Optional[float]:
+    def parse_service_rate_limit(self, service: str) -> float | None:
         """Parse service-specific rate limit to requests-per-second."""
         rate_str = self.per_service.get(service)
         if rate_str is None:
@@ -2154,14 +2482,14 @@ class ExtractionSettings(BaseModel):
 
     # Integrity settings
     hash_enable: bool = Field(default=True, description="Compute file digests")
-    hash_algorithms: List[str] = Field(
+    hash_algorithms: list[str] = Field(
         default_factory=lambda: ["sha256"],
         description="Hash algorithms (e.g., sha256, sha1)",
     )
-    include_globs: List[str] = Field(
+    include_globs: list[str] = Field(
         default_factory=list, description="Include patterns (empty = all)"
     )
-    exclude_globs: List[str] = Field(default_factory=list, description="Exclude patterns")
+    exclude_globs: list[str] = Field(default_factory=list, description="Exclude patterns")
     timestamps_mode: str = Field(
         default="preserve",
         description="Timestamp handling (preserve, normalize, source_date_epoch)",

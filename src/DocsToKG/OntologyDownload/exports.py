@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.exports",
+#   "purpose": "Export manifest and public API surface.",
+#   "sections": [
+#     {
+#       "id": "exportspec",
+#       "name": "ExportSpec",
+#       "anchor": "class-exportspec",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Export manifest and public API surface.
 
 This module defines the public API and export configuration for OntologyDownload.

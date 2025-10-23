@@ -1,3 +1,72 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.fallback.loader",
+#   "purpose": "Configuration loader for fallback strategy.",
+#   "sections": [
+#     {
+#       "id": "configurationerror",
+#       "name": "ConfigurationError",
+#       "anchor": "class-configurationerror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "load-from-yaml",
+#       "name": "load_from_yaml",
+#       "anchor": "function-load-from-yaml",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-from-env",
+#       "name": "load_from_env",
+#       "anchor": "function-load-from-env",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-from-cli",
+#       "name": "load_from_cli",
+#       "anchor": "function-load-from-cli",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-fast-profile",
+#       "name": "_get_fast_profile",
+#       "anchor": "function-get-fast-profile",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-reliable-profile",
+#       "name": "_get_reliable_profile",
+#       "anchor": "function-get-reliable-profile",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "merge-configs",
+#       "name": "merge_configs",
+#       "anchor": "function-merge-configs",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-config",
+#       "name": "validate_config",
+#       "anchor": "function-validate-config",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-fallback-plan",
+#       "name": "build_fallback_plan",
+#       "anchor": "function-build-fallback-plan",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-fallback-plan",
+#       "name": "load_fallback_plan",
+#       "anchor": "function-load-fallback-plan",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Configuration loader for fallback strategy.
 
 This module provides functions to load fallback configuration from multiple
@@ -28,7 +97,7 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 import yaml  # type: ignore[import-untyped]
 
@@ -47,7 +116,7 @@ class ConfigurationError(ValueError):
     pass
 
 
-def load_from_yaml(yaml_path: Path) -> Dict[str, Any]:
+def load_from_yaml(yaml_path: Path) -> dict[str, Any]:
     """Load fallback plan from YAML file.
 
     Fallback strategy is enabled by default with no backward compatibility
@@ -82,7 +151,7 @@ def load_from_yaml(yaml_path: Path) -> Dict[str, Any]:
     return config
 
 
-def load_from_env() -> Dict[str, Any]:
+def load_from_env() -> dict[str, Any]:
     """Load configuration from environment variables.
 
     Supports variables matching pattern: DOCSTOKG_FALLBACK_*
@@ -96,7 +165,7 @@ def load_from_env() -> Dict[str, Any]:
     Returns:
         Dictionary with environment overrides
     """
-    config: Dict[str, Any] = {}
+    config: dict[str, Any] = {}
 
     # Budget overrides
     budgets = {}
@@ -113,7 +182,7 @@ def load_from_env() -> Dict[str, Any]:
         config["budgets"] = budgets
 
     # Gate overrides
-    gates: Dict[str, Any] = {}
+    gates: dict[str, Any] = {}
     if "DOCSTOKG_FALLBACK_OFFLINE_BEHAVIOR" in os.environ:
         gates["offline_behavior"] = os.environ["DOCSTOKG_FALLBACK_OFFLINE_BEHAVIOR"]
         logger.debug("Loaded offline_behavior from env")
@@ -130,7 +199,7 @@ def load_from_env() -> Dict[str, Any]:
     return config
 
 
-def load_from_cli(cli_dict: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+def load_from_cli(cli_dict: dict[str, Any] | None) -> dict[str, Any]:
     """Load configuration from CLI arguments dictionary.
 
     Expected keys:
@@ -150,7 +219,7 @@ def load_from_cli(cli_dict: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     if not cli_dict:
         return {}
 
-    config: Dict[str, Any] = {}
+    config: dict[str, Any] = {}
 
     # Handle preset modes
     if cli_dict.get("fallback_fast_mode"):
@@ -187,7 +256,7 @@ def load_from_cli(cli_dict: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     return config
 
 
-def _get_fast_profile() -> Dict[str, Any]:
+def _get_fast_profile() -> dict[str, Any]:
     """Return FAST tuning profile."""
     return {
         "budgets": {
@@ -199,7 +268,7 @@ def _get_fast_profile() -> Dict[str, Any]:
     }
 
 
-def _get_reliable_profile() -> Dict[str, Any]:
+def _get_reliable_profile() -> dict[str, Any]:
     """Return HIGH RELIABILITY tuning profile."""
     return {
         "budgets": {
@@ -212,10 +281,10 @@ def _get_reliable_profile() -> Dict[str, Any]:
 
 
 def merge_configs(
-    yaml_config: Dict[str, Any],
-    env_config: Dict[str, Any],
-    cli_config: Dict[str, Any],
-) -> Dict[str, Any]:
+    yaml_config: dict[str, Any],
+    env_config: dict[str, Any],
+    cli_config: dict[str, Any],
+) -> dict[str, Any]:
     """Merge configurations with proper precedence.
 
     Precedence (highest to lowest):
@@ -233,7 +302,7 @@ def merge_configs(
     Returns:
         Merged configuration dictionary
     """
-    merged: Dict[str, Any] = {}
+    merged: dict[str, Any] = {}
 
     # Merge each section (budgets, tiers, policies, gates, thresholds)
     for section in ["budgets", "tiers", "policies", "gates", "thresholds", "metadata"]:
@@ -267,7 +336,7 @@ def merge_configs(
     return merged
 
 
-def validate_config(config: Dict[str, Any]) -> bool:
+def validate_config(config: dict[str, Any]) -> bool:
     """Validate configuration structure and content.
 
     Checks:
@@ -317,7 +386,7 @@ def validate_config(config: Dict[str, Any]) -> bool:
     return True
 
 
-def build_fallback_plan(config: Dict[str, Any]) -> FallbackPlan:
+def build_fallback_plan(config: dict[str, Any]) -> FallbackPlan:
     """Build FallbackPlan from configuration dictionary.
 
     Constructs TierPlan, AttemptPolicy, and FallbackPlan objects
@@ -345,7 +414,7 @@ def build_fallback_plan(config: Dict[str, Any]) -> FallbackPlan:
         tiers.append(tier)
 
     # Build policies
-    policies: Dict[str, AttemptPolicy] = {}
+    policies: dict[str, AttemptPolicy] = {}
     for source_name, policy_config in config["policies"].items():
         policy = AttemptPolicy(
             name=source_name,
@@ -368,9 +437,9 @@ def build_fallback_plan(config: Dict[str, Any]) -> FallbackPlan:
 
 
 def load_fallback_plan(
-    yaml_path: Optional[Path] = None,
-    env_overrides: Optional[Dict[str, Any]] = None,
-    cli_overrides: Optional[Dict[str, Any]] = None,
+    yaml_path: Path | None = None,
+    env_overrides: dict[str, Any] | None = None,
+    cli_overrides: dict[str, Any] | None = None,
 ) -> FallbackPlan:
     """Load and merge fallback configuration into a FallbackPlan.
 

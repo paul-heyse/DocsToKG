@@ -3,9 +3,66 @@
 #   "module": "DocsToKG.OntologyDownload.io.rate_limit",
 #   "purpose": "Expose pyrate-limiter backed throttling for ontology downloads",
 #   "sections": [
-#     {"id": "interfaces", "name": "Limiter Handle Interface", "anchor": "IFC", "kind": "api"},
-#     {"id": "pyrate-manager", "name": "Pyrate Limiter Manager", "anchor": "PRT", "kind": "api"},
-#     {"id": "public-api", "name": "Facade & Helpers", "anchor": "API", "kind": "helpers"}
+#     {
+#       "id": "ratelimiterhandle",
+#       "name": "RateLimiterHandle",
+#       "anchor": "class-ratelimiterhandle",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "table-name-for-key",
+#       "name": "_table_name_for_key",
+#       "anchor": "function-table-name-for-key",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-rate-string",
+#       "name": "_parse_rate_string",
+#       "anchor": "function-parse-rate-string",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "normalise-shared-dir",
+#       "name": "_normalise_shared_dir",
+#       "anchor": "function-normalise-shared-dir",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "limiteradapter",
+#       "name": "_LimiterAdapter",
+#       "anchor": "class-limiteradapter",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "limiterentry",
+#       "name": "_LimiterEntry",
+#       "anchor": "class-limiterentry",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "pyratelimitermanager",
+#       "name": "_PyrateLimiterManager",
+#       "anchor": "class-pyratelimitermanager",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "get-bucket",
+#       "name": "get_bucket",
+#       "anchor": "function-get-bucket",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "apply-retry-after",
+#       "name": "apply_retry_after",
+#       "anchor": "function-apply-retry-after",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "reset",
+#       "name": "reset",
+#       "anchor": "function-reset",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===
@@ -28,7 +85,7 @@ import time
 from dataclasses import dataclass
 from fractions import Fraction
 from pathlib import Path
-from typing import Dict, List, Optional, Protocol, Set, Tuple
+from typing import Protocol
 
 from pyrate_limiter import Duration, Limiter, Rate
 from pyrate_limiter.buckets import InMemoryBucket
@@ -68,7 +125,7 @@ def _table_name_for_key(name: str) -> str:
     return f"rl_{token}"
 
 
-def _parse_rate_string(limit_text: str) -> List[Rate]:
+def _parse_rate_string(limit_text: str) -> list[Rate]:
     match = _RATE_LIMIT_PATTERN.match(limit_text.strip())
     if not match:
         raise ValueError(
@@ -90,7 +147,7 @@ def _parse_rate_string(limit_text: str) -> List[Rate]:
     return rates
 
 
-def _normalise_shared_dir(shared_dir: Optional[Path]) -> Optional[Path]:
+def _normalise_shared_dir(shared_dir: Path | None) -> Path | None:
     if shared_dir is None:
         return None
     base = Path(shared_dir).expanduser()
@@ -185,15 +242,15 @@ class _PyrateLimiterManager:
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
-        self._limiters: Dict[Tuple[str, str], _LimiterEntry] = {}
-        self._logged: Set[str] = set()
+        self._limiters: dict[tuple[str, str], _LimiterEntry] = {}
+        self._logged: set[str] = set()
 
     def get_bucket(
         self,
         *,
         http_config: DownloadConfiguration,
-        service: Optional[str],
-        host: Optional[str],
+        service: str | None,
+        host: str | None,
     ) -> RateLimiterHandle:
         """Return a cached limiter handle for ``(service, host)``."""
         service_key = (service or "_").lower()
@@ -238,9 +295,7 @@ class _PyrateLimiterManager:
             self._limiters.clear()
             self._logged.clear()
 
-    def _resolve_limit_text(
-        self, http_config: DownloadConfiguration, service: Optional[str]
-    ) -> str:
+    def _resolve_limit_text(self, http_config: DownloadConfiguration, service: str | None) -> str:
         if service:
             override = http_config.rate_limits.get(service)
             if override:
@@ -255,7 +310,7 @@ class _PyrateLimiterManager:
         service_key: str,
         host_key: str,
         limiter_name: str,
-    ) -> Tuple[_LimiterAdapter, str]:
+    ) -> tuple[_LimiterAdapter, str]:
         rates = _parse_rate_string(limit_text)
         bucket, backend_signature = self._create_bucket(
             rates=rates,
@@ -276,10 +331,10 @@ class _PyrateLimiterManager:
     def _create_bucket(
         self,
         *,
-        rates: List[Rate],
-        shared_dir: Optional[Path],
+        rates: list[Rate],
+        shared_dir: Path | None,
         limiter_name: str,
-    ) -> Tuple[InMemoryBucket | SQLiteBucket, str]:
+    ) -> tuple[InMemoryBucket | SQLiteBucket, str]:
         normalised = _normalise_shared_dir(shared_dir)
         if normalised is None:
             return InMemoryBucket(rates), "memory"
@@ -301,7 +356,7 @@ class _PyrateLimiterManager:
         backend_signature = f"sqlite:{resolved}:{table_name}"
         return bucket, backend_signature
 
-    def _expected_backend_signature(self, shared_dir: Optional[Path], limiter_name: str) -> str:
+    def _expected_backend_signature(self, shared_dir: Path | None, limiter_name: str) -> str:
         normalised = _normalise_shared_dir(shared_dir)
         if normalised is None:
             return "memory"
@@ -335,8 +390,8 @@ _PYRATE_MANAGER = _PyrateLimiterManager()
 def get_bucket(
     *,
     http_config: DownloadConfiguration,
-    service: Optional[str],
-    host: Optional[str],
+    service: str | None,
+    host: str | None,
 ) -> RateLimiterHandle:
     """Return the configured rate limiter handle for ``service``/``host``."""
 
@@ -356,10 +411,10 @@ def get_bucket(
 def apply_retry_after(
     *,
     http_config: DownloadConfiguration,
-    service: Optional[str],
-    host: Optional[str],
+    service: str | None,
+    host: str | None,
     delay: float,
-) -> Optional[float]:
+) -> float | None:
     """Return the parsed delay."""
 
     if delay <= 0:

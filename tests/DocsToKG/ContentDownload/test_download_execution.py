@@ -47,7 +47,7 @@ class _LeakTrackingSession:
             def __init__(self) -> None:
                 self._response: _StreamResponse | None = None
 
-            def __enter__(self) -> "_StreamResponse":
+            def __enter__(self) -> _StreamResponse:
                 session.stream_calls += 1
                 session.active_streams += 1
                 if session.active_streams > session.limit:
@@ -137,4 +137,3 @@ def test_stream_candidate_payload_closes_response_on_not_modified() -> None:
     assert result.path_tmp == ""
     assert session.stream_calls == 1
     assert session.active_streams == 0
-

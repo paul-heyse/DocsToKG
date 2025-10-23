@@ -1,3 +1,36 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.catalog.connectors.cli_integration",
+#   "purpose": "CLI Integration for CatalogConnector.",
+#   "sections": [
+#     {
+#       "id": "environmentdetector",
+#       "name": "EnvironmentDetector",
+#       "anchor": "class-environmentdetector",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "cliconfigbuilder",
+#       "name": "CLIConfigBuilder",
+#       "anchor": "class-cliconfigbuilder",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "create-connector-from-cli",
+#       "name": "create_connector_from_cli",
+#       "anchor": "function-create-connector-from-cli",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-cli-help-text",
+#       "name": "get_cli_help_text",
+#       "anchor": "function-get-cli-help-text",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 CLI Integration for CatalogConnector
 
@@ -15,7 +48,7 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
-from typing import Any, Dict, Literal, Optional
+from typing import Any, Literal
 
 from .config import load_catalog_config
 from .connector import CatalogConnector
@@ -144,7 +177,7 @@ class EnvironmentDetector:
         return None
 
     @staticmethod
-    def suggest_provider_config() -> Dict[str, str]:
+    def suggest_provider_config() -> dict[str, str]:
         """Suggest provider and configuration based on environment.
 
         Returns:
@@ -198,7 +231,7 @@ class CLIConfigBuilder:
 
     def build_connector(
         self,
-        cli_overrides: Optional[Dict[str, Any]] = None,
+        cli_overrides: dict[str, Any] | None = None,
     ) -> CatalogConnector:
         """Build and return a CatalogConnector instance.
 
@@ -255,8 +288,8 @@ class CLIConfigBuilder:
 
     def get_config_dict(
         self,
-        cli_overrides: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        cli_overrides: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Get configuration dictionary without creating connector.
 
         Args:
@@ -301,7 +334,7 @@ class CLIConfigBuilder:
 def create_connector_from_cli(
     provider: Literal["development", "enterprise", "cloud"] | None = None,
     config_file: str | None = None,
-    cli_overrides: Optional[Dict[str, Any]] = None,
+    cli_overrides: dict[str, Any] | None = None,
     auto_discover: bool = True,
 ) -> CatalogConnector:
     """Convenience function to create connector from CLI context.

@@ -1,3 +1,60 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.network.retry",
+#   "purpose": "Network retry policies: Tenacity-based backoff for resilient HTTP.",
+#   "sections": [
+#     {
+#       "id": "parse-retry-after-value",
+#       "name": "_parse_retry_after_value",
+#       "anchor": "function-parse-retry-after-value",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "extract-retry-after-seconds",
+#       "name": "_extract_retry_after_seconds",
+#       "anchor": "function-extract-retry-after-seconds",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "retryafterorbackoff",
+#       "name": "_RetryAfterOrBackoff",
+#       "anchor": "class-retryafterorbackoff",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "create-http-retry-policy",
+#       "name": "create_http_retry_policy",
+#       "anchor": "function-create-http-retry-policy",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "create-idempotent-retry-policy",
+#       "name": "create_idempotent_retry_policy",
+#       "anchor": "function-create-idempotent-retry-policy",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "create-aggressive-retry-policy",
+#       "name": "create_aggressive_retry_policy",
+#       "anchor": "function-create-aggressive-retry-policy",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "create-rate-limit-retry-policy",
+#       "name": "create_rate_limit_retry_policy",
+#       "anchor": "function-create-rate-limit-retry-policy",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "retry-http-request",
+#       "name": "retry_http_request",
+#       "anchor": "function-retry-http-request",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Network retry policies: Tenacity-based backoff for resilient HTTP.
 
 Provides retry policies for resilient HTTP requests with exponential backoff.
@@ -26,8 +83,7 @@ Example:
 
 import email.utils
 import logging
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 import httpx
 from tenacity import (
@@ -51,7 +107,7 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 
 
-def _parse_retry_after_value(value: Optional[str]) -> Optional[float]:
+def _parse_retry_after_value(value: str | None) -> float | None:
     """Convert a Retry-After header value into a delay in seconds."""
     if not value:
         return None
@@ -64,13 +120,13 @@ def _parse_retry_after_value(value: Optional[str]) -> Optional[float]:
         except (TypeError, ValueError):
             return None
         if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        delay = (dt - datetime.now(timezone.utc)).total_seconds()
+            dt = dt.replace(tzinfo=UTC)
+        delay = (dt - datetime.now(UTC)).total_seconds()
 
     return max(0.0, delay)
 
 
-def _extract_retry_after_seconds(candidate: object) -> Optional[float]:
+def _extract_retry_after_seconds(candidate: object) -> float | None:
     """Extract Retry-After guidance from an HTTPX response-like object."""
     if candidate is None:
         return None
@@ -93,7 +149,7 @@ class _RetryAfterOrBackoff(wait_base):
             return min(delay, float(self._max_delay_seconds))
         return float(self._fallback_wait(retry_state))
 
-    def _retry_after_delay(self, retry_state: RetryCallState) -> Optional[float]:
+    def _retry_after_delay(self, retry_state: RetryCallState) -> float | None:
         outcome = retry_state.outcome
         if outcome is None:
             return None
@@ -184,7 +240,7 @@ def create_http_retry_policy(
 def create_idempotent_retry_policy(
     max_attempts: int = 6,
     max_delay_seconds: int = 60,
-    methods: Optional[list] = None,
+    methods: list | None = None,
 ) -> Retrying:
     """Create retry policy with idempotency enforcement.
 

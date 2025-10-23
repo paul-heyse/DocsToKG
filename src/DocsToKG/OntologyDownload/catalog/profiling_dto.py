@@ -1,3 +1,24 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.catalog.profiling_dto",
+#   "purpose": "Data Transfer Objects for query profiling.",
+#   "sections": [
+#     {
+#       "id": "planstep",
+#       "name": "PlanStep",
+#       "anchor": "class-planstep",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "queryprofile",
+#       "name": "QueryProfile",
+#       "anchor": "class-queryprofile",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Data Transfer Objects for query profiling.
 
 Represents query performance metrics and optimization information from

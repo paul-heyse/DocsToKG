@@ -3,11 +3,78 @@
 #   "module": "DocsToKG.ContentDownload.urls",
 #   "purpose": "URL canonicalization policies for content downloads",
 #   "sections": [
-#     {"id": "urlpolicy", "name": "UrlPolicy", "anchor": "class-urlpolicy", "kind": "class"},
-#     {"id": "configure-url-policy", "name": "configure_url_policy", "anchor": "function-configure-url-policy", "kind": "function"},
-#     {"id": "canonical-for-index", "name": "canonical_for_index", "anchor": "function-canonical-for-index", "kind": "function"},
-#     {"id": "canonical-for-request", "name": "canonical_for_request", "anchor": "function-canonical-for-request", "kind": "function"},
-#     {"id": "reset-url-policy", "name": "reset_url_policy_for_tests", "anchor": "function-reset-url-policy-for-tests", "kind": "function"}
+#     {
+#       "id": "urlpolicy",
+#       "name": "UrlPolicy",
+#       "anchor": "class-urlpolicy",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "strip-fragment",
+#       "name": "_strip_fragment",
+#       "anchor": "function-strip-fragment",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-bool",
+#       "name": "_parse_bool",
+#       "anchor": "function-parse-bool",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-param-allowlist-spec",
+#       "name": "parse_param_allowlist_spec",
+#       "anchor": "function-parse-param-allowlist-spec",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "configure-url-policy",
+#       "name": "configure_url_policy",
+#       "anchor": "function-configure-url-policy",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "apply-environment-overrides",
+#       "name": "_apply_environment_overrides",
+#       "anchor": "function-apply-environment-overrides",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-url-policy",
+#       "name": "get_url_policy",
+#       "anchor": "function-get-url-policy",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "reset-url-policy-for-tests",
+#       "name": "reset_url_policy_for_tests",
+#       "anchor": "function-reset-url-policy-for-tests",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "select-param-allowlist",
+#       "name": "_select_param_allowlist",
+#       "anchor": "function-select-param-allowlist",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "canonical-for-index",
+#       "name": "canonical_for_index",
+#       "anchor": "function-canonical-for-index",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "canonical-for-request",
+#       "name": "canonical_for_request",
+#       "anchor": "function-canonical-for-request",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "canonical-host",
+#       "name": "canonical_host",
+#       "anchor": "function-canonical-host",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===
@@ -111,11 +178,11 @@ Example Usage
 from __future__ import annotations
 
 import os
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, Union
+from typing import Any, Literal
 from urllib.parse import urlsplit, urlunsplit
 
-from typing_extensions import Literal
 from url_normalize import url_normalize
 
 Role = Literal["metadata", "landing", "artifact"]
@@ -157,14 +224,14 @@ class UrlPolicy:
     """Policy container for canonicalization behaviour."""
 
     default_scheme: str = DEFAULT_SCHEME
-    filter_for: Dict[Role, bool] = field(
+    filter_for: dict[Role, bool] = field(
         default_factory=lambda: dict(FILTER_FOR)  # copy to avoid mutations on the module constant
     )
-    param_allowlist_global: Tuple[str, ...] = ()
-    param_allowlist_per_domain: Dict[str, Tuple[str, ...]] = field(default_factory=dict)
-    default_domain_per_host: Dict[str, str] = field(default_factory=dict)
+    param_allowlist_global: tuple[str, ...] = ()
+    param_allowlist_per_domain: dict[str, tuple[str, ...]] = field(default_factory=dict)
+    default_domain_per_host: dict[str, str] = field(default_factory=dict)
 
-    def copy(self) -> "UrlPolicy":
+    def copy(self) -> UrlPolicy:
         return UrlPolicy(
             default_scheme=self.default_scheme,
             filter_for=dict(self.filter_for),
@@ -188,7 +255,7 @@ def _strip_fragment(value: str) -> str:
     return urlunsplit((parts.scheme, parts.netloc, parts.path, parts.query, ""))
 
 
-def _parse_bool(value: Optional[str]) -> Optional[bool]:
+def _parse_bool(value: str | None) -> bool | None:
     if value is None:
         return None
     text = value.strip().lower()
@@ -203,14 +270,14 @@ def _parse_bool(value: Optional[str]) -> Optional[bool]:
 
 def parse_param_allowlist_spec(
     spec: str,
-) -> Tuple[Tuple[str, ...], Dict[str, Tuple[str, ...]]]:
+) -> tuple[tuple[str, ...], dict[str, tuple[str, ...]]]:
     """Parse allowlist specification strings into global and per-domain mappings."""
 
     if not spec:
         return (), {}
 
-    global_params: List[str] = []
-    per_domain: Dict[str, List[str]] = {}
+    global_params: list[str] = []
+    per_domain: dict[str, list[str]] = {}
 
     for chunk in spec.split(";"):
         text = chunk.strip()
@@ -242,11 +309,11 @@ def parse_param_allowlist_spec(
 
 def configure_url_policy(
     *,
-    default_scheme: Optional[str] = None,
-    filter_landing: Optional[bool] = None,
-    param_allowlist_global: Optional[Iterable[str]] = None,
-    param_allowlist_per_domain: Optional[Mapping[str, Iterable[str]]] = None,
-    default_domain_per_host: Optional[Mapping[str, str]] = None,
+    default_scheme: str | None = None,
+    filter_landing: bool | None = None,
+    param_allowlist_global: Iterable[str] | None = None,
+    param_allowlist_per_domain: Mapping[str, Iterable[str]] | None = None,
+    default_domain_per_host: Mapping[str, str] | None = None,
 ) -> None:
     """Override the global URL policy."""
 
@@ -320,7 +387,7 @@ def reset_url_policy_for_tests() -> None:
     _apply_environment_overrides()
 
 
-def _select_param_allowlist() -> Optional[Union[List[str], Dict[str, List[str]]]]:
+def _select_param_allowlist() -> list[str] | dict[str, list[str]] | None:
     global_allowlist = _POLICY.param_allowlist_global
     domain_map = _POLICY.param_allowlist_per_domain
 
@@ -344,7 +411,7 @@ def canonical_for_request(
     url: str,
     *,
     role: Role,
-    origin_host: Optional[str] = None,
+    origin_host: str | None = None,
 ) -> str:
     """Normalize ``url`` before issuing an HTTP request."""
 
@@ -352,8 +419,8 @@ def canonical_for_request(
         raise TypeError("canonical_for_request expected a URL string, received None.")
 
     # Build kwargs dict with proper typing for url_normalize
-    kwargs_dict: Dict[str, Any] = {"default_scheme": _POLICY.default_scheme}
-    default_domain: Optional[str] = None
+    kwargs_dict: dict[str, Any] = {"default_scheme": _POLICY.default_scheme}
+    default_domain: str | None = None
     if origin_host:
         host_key = origin_host.strip().lower()
         default_domain = _POLICY.default_domain_per_host.get(host_key, host_key)

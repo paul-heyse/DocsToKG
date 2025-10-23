@@ -3,9 +3,30 @@
 #   "module": "DocsToKG.ContentDownload.telemetry_helpers",
 #   "purpose": "Convenience functions for structured event emission across HTTP, rate limiting, circuit breaker, and fallback layers",
 #   "sections": [
-#     {"id": "emit-http-event", "name": "emit_http_event", "anchor": "function-emit-http-event", "kind": "function"},
-#     {"id": "emit-rate-event", "name": "emit_rate_event", "anchor": "function-emit-rate-event", "kind": "function"},
-#     {"id": "emit-fallback-attempt", "name": "emit_fallback_attempt", "anchor": "function-emit-fallback-attempt", "kind": "function"}
+#     {
+#       "id": "emit-http-event",
+#       "name": "emit_http_event",
+#       "anchor": "function-emit-http-event",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-rate-event",
+#       "name": "emit_rate_event",
+#       "anchor": "function-emit-rate-event",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-breaker-transition",
+#       "name": "emit_breaker_transition",
+#       "anchor": "function-emit-breaker-transition",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-fallback-attempt",
+#       "name": "emit_fallback_attempt",
+#       "anchor": "function-emit-fallback-attempt",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===
@@ -73,7 +94,7 @@ This ensures telemetry is **non-breaking** and **optional** throughout the pipel
 from __future__ import annotations
 
 import time
-from typing import Any, Optional
+from typing import Any
 
 
 def emit_http_event(
@@ -82,18 +103,18 @@ def emit_http_event(
     host: str,
     role: str,
     method: str,
-    status: Optional[int] = None,
-    url_hash: Optional[str] = None,
-    from_cache: Optional[int] = None,
-    revalidated: Optional[int] = None,
-    stale: Optional[int] = None,
-    retry_count: Optional[int] = None,
-    retry_after_s: Optional[int] = None,
-    rate_delay_ms: Optional[int] = None,
-    breaker_state: Optional[str] = None,
-    breaker_recorded: Optional[str] = None,
-    elapsed_ms: Optional[int] = None,
-    error: Optional[str] = None,
+    status: int | None = None,
+    url_hash: str | None = None,
+    from_cache: int | None = None,
+    revalidated: int | None = None,
+    stale: int | None = None,
+    retry_count: int | None = None,
+    retry_after_s: int | None = None,
+    rate_delay_ms: int | None = None,
+    breaker_state: str | None = None,
+    breaker_recorded: str | None = None,
+    elapsed_ms: int | None = None,
+    error: str | None = None,
 ) -> None:
     """Emit HTTP event to telemetry bus.
 
@@ -165,8 +186,8 @@ def emit_rate_event(
     host: str,
     role: str,
     action: str,
-    delay_ms: Optional[int] = None,
-    max_delay_ms: Optional[int] = None,
+    delay_ms: int | None = None,
+    max_delay_ms: int | None = None,
 ) -> None:
     """Emit rate limiter event to telemetry bus.
 
@@ -209,7 +230,7 @@ def emit_breaker_transition(
     scope: str,
     old_state: str,
     new_state: str,
-    reset_timeout_s: Optional[int] = None,
+    reset_timeout_s: int | None = None,
 ) -> None:
     """Emit circuit breaker state transition to telemetry bus.
 
@@ -248,15 +269,15 @@ def emit_breaker_transition(
 def emit_fallback_attempt(
     telemetry: Any,
     run_id: str,
-    work_id: Optional[str] = None,
-    artifact_id: Optional[str] = None,
-    tier: Optional[str] = None,
-    source: Optional[str] = None,
-    host: Optional[str] = None,
-    outcome: Optional[str] = None,
-    reason: Optional[str] = None,
-    status: Optional[int] = None,
-    elapsed_ms: Optional[int] = None,
+    work_id: str | None = None,
+    artifact_id: str | None = None,
+    tier: str | None = None,
+    source: str | None = None,
+    host: str | None = None,
+    outcome: str | None = None,
+    reason: str | None = None,
+    status: int | None = None,
+    elapsed_ms: int | None = None,
 ) -> None:
     """Emit fallback attempt to telemetry bus.
 

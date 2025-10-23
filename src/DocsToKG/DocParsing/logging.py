@@ -1,3 +1,72 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.logging",
+#   "purpose": "Structured logging adapters and manifest logging helpers for DocParsing.",
+#   "sections": [
+#     {
+#       "id": "structuredlogger",
+#       "name": "StructuredLogger",
+#       "anchor": "class-structuredlogger",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "get-logger",
+#       "name": "get_logger",
+#       "anchor": "function-get-logger",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "log-event",
+#       "name": "log_event",
+#       "anchor": "function-log-event",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "stringify-path",
+#       "name": "_stringify_path",
+#       "anchor": "function-stringify-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "manifest-log-skip",
+#       "name": "manifest_log_skip",
+#       "anchor": "function-manifest-log-skip",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "manifest-log-success",
+#       "name": "manifest_log_success",
+#       "anchor": "function-manifest-log-success",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "manifest-log-failure",
+#       "name": "manifest_log_failure",
+#       "anchor": "function-manifest-log-failure",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "summarize-manifest",
+#       "name": "summarize_manifest",
+#       "anchor": "function-summarize-manifest",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "set-stage-telemetry",
+#       "name": "set_stage_telemetry",
+#       "anchor": "function-set-stage-telemetry",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "telemetry-scope",
+#       "name": "telemetry_scope",
+#       "anchor": "function-telemetry-scope",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Structured logging adapters and manifest logging helpers for DocParsing.
 
 Stages emit both console-friendly logs and JSON payloads that feed telemetry
@@ -12,8 +81,9 @@ import contextlib
 import contextvars
 import logging
 from collections import Counter, defaultdict
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Dict, Optional, Sequence
+from typing import Any
 
 from DocsToKG.OntologyDownload.logging_utils import JSONFormatter
 
@@ -24,15 +94,13 @@ from .telemetry import StageTelemetry
 class StructuredLogger(logging.LoggerAdapter):
     """Logger adapter that enriches structured logs with shared context."""
 
-    def __init__(
-        self, logger: logging.Logger, base_fields: Optional[Dict[str, Any]] = None
-    ) -> None:
+    def __init__(self, logger: logging.Logger, base_fields: dict[str, Any] | None = None) -> None:
         """Store underlying logger and initial structured ``base_fields``."""
 
         super().__init__(logger, {})
-        self.base_fields: Dict[str, Any] = dict(base_fields or {})
+        self.base_fields: dict[str, Any] = dict(base_fields or {})
 
-    def process(self, msg: str, kwargs: Dict[str, Any]) -> tuple[str, Dict[str, Any]]:
+    def process(self, msg: str, kwargs: dict[str, Any]) -> tuple[str, dict[str, Any]]:
         """Merge adapter context into ``extra`` metadata for structured output."""
 
         extra = kwargs.setdefault("extra", {})
@@ -44,14 +112,14 @@ class StructuredLogger(logging.LoggerAdapter):
         kwargs["extra"] = extra
         return msg, kwargs
 
-    def bind(self, **fields: object) -> "StructuredLogger":
+    def bind(self, **fields: object) -> StructuredLogger:
         """Attach additional persistent fields to the adapter and return ``self``."""
 
         filtered = {k: v for k, v in fields.items() if v is not None}
         self.base_fields.update(filtered)
         return self
 
-    def child(self, **fields: object) -> "StructuredLogger":
+    def child(self, **fields: object) -> StructuredLogger:
         """Create a new adapter inheriting context with optional overrides."""
 
         merged = dict(self.base_fields)
@@ -60,7 +128,7 @@ class StructuredLogger(logging.LoggerAdapter):
 
 
 def get_logger(
-    name: str, level: str = "INFO", *, base_fields: Optional[Dict[str, Any]] = None
+    name: str, level: str = "INFO", *, base_fields: dict[str, Any] | None = None
 ) -> StructuredLogger:
     """Get a structured JSON logger configured for console output."""
 
@@ -74,7 +142,7 @@ def get_logger(
     adapter = getattr(logger, "_docparse_adapter", None)
     if not isinstance(adapter, StructuredLogger):
         adapter = StructuredLogger(logger, base_fields)
-        setattr(logger, "_docparse_adapter", adapter)
+        logger._docparse_adapter = adapter
     elif base_fields:
         adapter.bind(**base_fields)
     return adapter
@@ -133,15 +201,15 @@ def manifest_log_skip(
     input_hash: str,
     output_path: Path | str,
     duration_s: float = 0.0,
-    schema_version: Optional[str] = None,
-    hash_alg: Optional[str] = None,
+    schema_version: str | None = None,
+    hash_alg: str | None = None,
     **extra: object,
 ) -> None:
     """Record a manifest entry indicating the pipeline skipped work."""
 
     telemetry = _STAGE_TELEMETRY_VAR.get()
     if telemetry is not None:
-        metadata: Dict[str, Any] = {
+        metadata: dict[str, Any] = {
             "stage": stage,
             "status": "skip",
             "duration_s": float(duration_s),
@@ -161,7 +229,7 @@ def manifest_log_skip(
         )
         return
 
-    payload: Dict[str, object] = {
+    payload: dict[str, object] = {
         "stage": stage,
         "doc_id": doc_id,
         "status": "skip",
@@ -185,14 +253,14 @@ def manifest_log_success(
     input_path: Path | str,
     input_hash: str,
     output_path: Path | str,
-    hash_alg: Optional[str] = None,
+    hash_alg: str | None = None,
     **extra: object,
 ) -> None:
     """Record a manifest entry marking successful pipeline output."""
 
     telemetry = _STAGE_TELEMETRY_VAR.get()
     if telemetry is not None:
-        metadata: Dict[str, Any] = {
+        metadata: dict[str, Any] = {
             "stage": stage,
             "status": "success",
             "duration_s": float(duration_s),
@@ -203,7 +271,7 @@ def manifest_log_success(
             "output_path": _stringify_path(output_path),
         }
         metadata.update(extra)
-        tokens: Optional[int] = None
+        tokens: int | None = None
         for key in ("tokens", "chunk_count", "vector_count"):
             value = metadata.get(key)
             if isinstance(value, int):
@@ -220,7 +288,7 @@ def manifest_log_success(
         )
         return
 
-    payload: Dict[str, object] = {
+    payload: dict[str, object] = {
         "stage": stage,
         "doc_id": doc_id,
         "status": "success",
@@ -245,14 +313,14 @@ def manifest_log_failure(
     input_hash: str,
     output_path: Path | str,
     error: str,
-    hash_alg: Optional[str] = None,
+    hash_alg: str | None = None,
     **extra: object,
 ) -> None:
     """Record a manifest entry describing a failed pipeline attempt."""
 
     telemetry = _STAGE_TELEMETRY_VAR.get()
     if telemetry is not None:
-        metadata: Dict[str, Any] = {
+        metadata: dict[str, Any] = {
             "stage": stage,
             "status": "failure",
             "duration_s": float(duration_s),
@@ -274,7 +342,7 @@ def manifest_log_failure(
         )
         return
 
-    payload: Dict[str, object] = {
+    payload: dict[str, object] = {
         "stage": stage,
         "doc_id": doc_id,
         "status": "failure",
@@ -290,12 +358,12 @@ def manifest_log_failure(
     manifest_append(**payload)
 
 
-def summarize_manifest(entries: Sequence[dict]) -> Dict[str, Any]:
+def summarize_manifest(entries: Sequence[dict]) -> dict[str, Any]:
     """Compute status counts and durations for manifest ``entries``."""
 
-    status_counter: Dict[str, Counter] = defaultdict(Counter)
-    duration_totals: Dict[str, float] = defaultdict(float)
-    total_entries: Dict[str, int] = defaultdict(int)
+    status_counter: dict[str, Counter] = defaultdict(Counter)
+    duration_totals: dict[str, float] = defaultdict(float)
+    total_entries: dict[str, int] = defaultdict(int)
     for entry in entries:
         stage = entry.get("stage", "unknown")
         status = entry.get("status", "unknown")
@@ -306,7 +374,7 @@ def summarize_manifest(entries: Sequence[dict]) -> Dict[str, Any]:
         except (TypeError, ValueError):
             continue
 
-    summary: Dict[str, Dict[str, object]] = {}
+    summary: dict[str, dict[str, object]] = {}
     for stage, total in total_entries.items():
         summary[stage] = {
             "total": total,
@@ -329,19 +397,19 @@ __all__ = [
 ]
 
 
-_STAGE_TELEMETRY_VAR: contextvars.ContextVar[Optional[StageTelemetry]] = contextvars.ContextVar(
+_STAGE_TELEMETRY_VAR: contextvars.ContextVar[StageTelemetry | None] = contextvars.ContextVar(
     "docparse_stage_telemetry", default=None
 )
 
 
-def set_stage_telemetry(stage_telemetry: Optional[StageTelemetry]) -> None:
+def set_stage_telemetry(stage_telemetry: StageTelemetry | None) -> None:
     """Register ``stage_telemetry`` for manifest logging helpers."""
 
     _STAGE_TELEMETRY_VAR.set(stage_telemetry)
 
 
 @contextlib.contextmanager
-def telemetry_scope(stage_telemetry: Optional[StageTelemetry]):
+def telemetry_scope(stage_telemetry: StageTelemetry | None):
     """Context manager that temporarily installs ``stage_telemetry``."""
 
     token = _STAGE_TELEMETRY_VAR.set(stage_telemetry)

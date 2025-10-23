@@ -1,3 +1,90 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.policy.errors",
+#   "purpose": "Policy error codes and helpers for centralized error handling.",
+#   "sections": [
+#     {
+#       "id": "errorcode",
+#       "name": "ErrorCode",
+#       "anchor": "class-errorcode",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "policyok",
+#       "name": "PolicyOK",
+#       "anchor": "class-policyok",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "policyreject",
+#       "name": "PolicyReject",
+#       "anchor": "class-policyreject",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "policyexception",
+#       "name": "PolicyException",
+#       "anchor": "class-policyexception",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "urlpolicyexception",
+#       "name": "URLPolicyException",
+#       "anchor": "class-urlpolicyexception",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "filesystempolicyexception",
+#       "name": "FilesystemPolicyException",
+#       "anchor": "class-filesystempolicyexception",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "extractionpolicyexception",
+#       "name": "ExtractionPolicyException",
+#       "anchor": "class-extractionpolicyexception",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "storagepolicyexception",
+#       "name": "StoragePolicyException",
+#       "anchor": "class-storagepolicyexception",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "configurationpolicyexception",
+#       "name": "ConfigurationPolicyException",
+#       "anchor": "class-configurationpolicyexception",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "dbboundaryexception",
+#       "name": "DbBoundaryException",
+#       "anchor": "class-dbboundaryexception",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "raise-policy-error",
+#       "name": "raise_policy_error",
+#       "anchor": "function-raise-policy-error",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "scrub-details",
+#       "name": "_scrub_details",
+#       "anchor": "function-scrub-details",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-policy-error-event",
+#       "name": "_emit_policy_error_event",
+#       "anchor": "function-emit-policy-error-event",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Policy error codes and helpers for centralized error handling.
 
 One error catalog used across all policy gates. Each gate raises through
@@ -6,7 +93,7 @@ the central helpers to ensure consistent emission, typing, and metrics.
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any
 
 # ============================================================================
 # Error Codes (Canonical Catalog)
@@ -80,7 +167,7 @@ class PolicyOK:
 
     gate_name: str
     elapsed_ms: float
-    details: Optional[Dict[str, Any]] = None
+    details: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -90,7 +177,7 @@ class PolicyReject:
     gate_name: str
     error_code: ErrorCode
     elapsed_ms: float
-    details: Dict[str, Any]  # Non-secret context (no URLs, paths with secrets, etc.)
+    details: dict[str, Any]  # Non-secret context (no URLs, paths with secrets, etc.)
 
 
 # Type alias for gate results
@@ -109,7 +196,7 @@ class PolicyException(Exception):
         self,
         error_code: ErrorCode,
         message: str,
-        details: Optional[Dict[str, Any]] = None,
+        details: dict[str, Any] | None = None,
     ):
         """Initialize policy exception.
 
@@ -168,7 +255,7 @@ class DbBoundaryException(PolicyException):
 def raise_policy_error(
     error_code: ErrorCode,
     message: str,
-    details: Optional[Dict[str, Any]] = None,
+    details: dict[str, Any] | None = None,
     exception_class: type = PolicyException,
 ) -> None:
     """Raise a policy error with central emission.
@@ -193,7 +280,7 @@ def raise_policy_error(
     raise exception_class(error_code, message, safe_details)
 
 
-def _scrub_details(details: Dict[str, Any]) -> Dict[str, Any]:
+def _scrub_details(details: dict[str, Any]) -> dict[str, Any]:
     """Remove sensitive information from detail dict.
 
     Filters out:
@@ -230,7 +317,7 @@ def _scrub_details(details: Dict[str, Any]) -> Dict[str, Any]:
 def _emit_policy_error_event(
     error_code: ErrorCode,
     message: str,
-    details: Dict[str, Any],
+    details: dict[str, Any],
 ) -> None:
     """Emit a policy.error event (stub for observability integration).
 

@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.redis_cooldown_store",
+#   "purpose": "Redis-backed cooldown store for distributed circuit breaker coordination.",
+#   "sections": [
+#     {
+#       "id": "rediscooldownstore",
+#       "name": "RedisCooldownStore",
+#       "anchor": "class-rediscooldownstore",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Redis-backed cooldown store for distributed circuit breaker coordination.
 
 Implements the CooldownStore protocol from breakers.py using Redis for
@@ -16,8 +31,8 @@ from __future__ import annotations
 
 import json
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Optional
 from urllib.parse import urlparse
 
 try:
@@ -55,7 +70,7 @@ class RedisCooldownStore:
     key_prefix: str = "breaker:cooldown:"
     now_wall: Callable[[], float] = time.time
     now_mono: Callable[[], float] = time.monotonic
-    _client: Optional[redis.Redis] = None
+    _client: redis.Redis | None = None
 
     def __post_init__(self) -> None:
         url = urlparse(self.dsn)
@@ -81,7 +96,7 @@ class RedisCooldownStore:
 
     # ---- CooldownStore API (protocol from breakers.py) ----
 
-    def get_until(self, host: str) -> Optional[float]:
+    def get_until(self, host: str) -> float | None:
         """
         Return monotonic deadline for host if a cooldown exists and is in the future.
 

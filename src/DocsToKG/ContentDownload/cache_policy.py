@@ -1,3 +1,24 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.cache_policy",
+#   "purpose": "Cache policy resolution and request routing.",
+#   "sections": [
+#     {
+#       "id": "cachedecision",
+#       "name": "CacheDecision",
+#       "anchor": "class-cachedecision",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "cacherouter",
+#       "name": "CacheRouter",
+#       "anchor": "class-cacherouter",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Cache policy resolution and request routing.
 
 Responsibilities
@@ -19,7 +40,6 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Optional
 
 from DocsToKG.ContentDownload.cache_loader import (
     CacheConfig,
@@ -35,8 +55,8 @@ class CacheDecision:
     """Decision whether and how to cache a specific request."""
 
     use_cache: bool
-    ttl_s: Optional[int] = None
-    swrv_s: Optional[int] = None
+    ttl_s: int | None = None
+    swrv_s: int | None = None
     body_key: bool = False
 
 

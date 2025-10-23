@@ -3,11 +3,102 @@
 #   "module": "DocsToKG.OntologyDownload.io.filesystem",
 #   "purpose": "Provide filesystem utilities for sanitisation, hashing, masking, and archive extraction",
 #   "sections": [
-#     {"id": "limits", "name": "Archive Limits & Helpers", "anchor": "LIM", "kind": "helpers"},
-#     {"id": "sanitisation", "name": "Filename Sanitisation & Identifiers", "anchor": "SAN", "kind": "helpers"},
-#     {"id": "masking", "name": "Sensitive Data Masking", "anchor": "MSK", "kind": "helpers"},
-#     {"id": "hashing", "name": "Hashing Utilities", "anchor": "HAS", "kind": "helpers"},
-#     {"id": "archives", "name": "Archive Extraction Utilities", "anchor": "ARC", "kind": "api"}
+#     {
+#       "id": "compute-config-hash",
+#       "name": "_compute_config_hash",
+#       "anchor": "function-compute-config-hash",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "write-audit-manifest",
+#       "name": "_write_audit_manifest",
+#       "anchor": "function-write-audit-manifest",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolve-max-uncompressed-bytes",
+#       "name": "_resolve_max_uncompressed_bytes",
+#       "anchor": "function-resolve-max-uncompressed-bytes",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "sanitize-filename",
+#       "name": "sanitize_filename",
+#       "anchor": "function-sanitize-filename",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "generate-correlation-id",
+#       "name": "generate_correlation_id",
+#       "anchor": "function-generate-correlation-id",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "mask-sensitive-data",
+#       "name": "mask_sensitive_data",
+#       "anchor": "function-mask-sensitive-data",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "sha256-file",
+#       "name": "sha256_file",
+#       "anchor": "function-sha256-file",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "compute-file-hash",
+#       "name": "_compute_file_hash",
+#       "anchor": "function-compute-file-hash",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-member-path",
+#       "name": "_validate_member_path",
+#       "anchor": "function-validate-member-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "compute-archive-sha256",
+#       "name": "_compute_archive_sha256",
+#       "anchor": "function-compute-archive-sha256",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "generate-encapsulation-root-name",
+#       "name": "_generate_encapsulation_root_name",
+#       "anchor": "function-generate-encapsulation-root-name",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "check-compression-ratio",
+#       "name": "_check_compression_ratio",
+#       "anchor": "function-check-compression-ratio",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "enforce-uncompressed-ceiling",
+#       "name": "_enforce_uncompressed_ceiling",
+#       "anchor": "function-enforce-uncompressed-ceiling",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "extract-archive-safe",
+#       "name": "extract_archive_safe",
+#       "anchor": "function-extract-archive-safe",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "materialize-cached-file",
+#       "name": "_materialize_cached_file",
+#       "anchor": "function-materialize-cached-file",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "format-bytes",
+#       "name": "format_bytes",
+#       "anchor": "function-format-bytes",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===
@@ -31,9 +122,8 @@ import os
 import re
 import shutil
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
-from typing import Dict, List, Optional
 
 import libarchive
 
@@ -78,11 +168,11 @@ def _write_audit_manifest(
     extract_root: Path,
     archive_path: Path,
     policy: ExtractionSettings,
-    entries_metadata: List[
-        tuple[str, Path, int, Optional[str]]
+    entries_metadata: list[
+        tuple[str, Path, int, str | None]
     ],  # (orig_path, normalized_path, size, sha256)
-    telemetry: "ExtractionTelemetryEvent",
-    metrics: "ExtractionMetrics",
+    telemetry: ExtractionTelemetryEvent,
+    metrics: ExtractionMetrics,
 ) -> None:
     """Write deterministic audit JSON manifest for extraction.
 
@@ -105,7 +195,7 @@ def _write_audit_manifest(
         manifest = {
             "schema_version": "1.0",
             "run_id": telemetry.run_id,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "archive_path": str(archive_path),
             "archive_sha256": archive_sha256.hexdigest(),
             "archive_size_bytes": archive_path.stat().st_size,
@@ -156,7 +246,7 @@ def _write_audit_manifest(
         )
 
 
-def _resolve_max_uncompressed_bytes(limit: Optional[int]) -> Optional[int]:
+def _resolve_max_uncompressed_bytes(limit: int | None) -> int | None:
     """Return the effective archive expansion limit, honoring runtime overrides."""
 
     if limit is not None:
@@ -187,13 +277,13 @@ def generate_correlation_id() -> str:
     return uuid.uuid4().hex[:12]
 
 
-def mask_sensitive_data(payload: Dict[str, object]) -> Dict[str, object]:
+def mask_sensitive_data(payload: dict[str, object]) -> dict[str, object]:
     """Return a copy of ``payload`` with common secret fields masked."""
 
     sensitive_keys = {"authorization", "api_key", "apikey", "token", "secret", "password"}
     token_pattern = re.compile(r"^[A-Za-z0-9+/=_-]{32,}$")
 
-    def _mask_header_pair(item: object) -> Optional[object]:
+    def _mask_header_pair(item: object) -> object | None:
         """Mask values for header-like key/value tuples."""
 
         if isinstance(item, tuple) and len(item) == 2 and isinstance(item[0], str):
@@ -201,7 +291,7 @@ def mask_sensitive_data(payload: Dict[str, object]) -> Dict[str, object]:
             return (item[0], _mask_value(item[1], key_lower))
         return None
 
-    def _mask_value(value: object, key_hint: Optional[str] = None) -> object:
+    def _mask_value(value: object, key_hint: str | None = None) -> object:
         if isinstance(value, dict):
             return {
                 sub_key: _mask_value(sub_value, sub_key.lower())
@@ -244,7 +334,7 @@ def mask_sensitive_data(payload: Dict[str, object]) -> Dict[str, object]:
                 return "***masked***"
         return value
 
-    masked: Dict[str, object] = {}
+    masked: dict[str, object] = {}
     for key, value in payload.items():
         lower = key.lower()
         if lower in sensitive_keys:
@@ -324,7 +414,7 @@ def _check_compression_ratio(
     total_uncompressed: int,
     compressed_size: int,
     archive: Path,
-    logger: Optional[logging.Logger],
+    logger: logging.Logger | None,
     archive_type: str,
 ) -> None:
     """Ensure compressed archives do not expand beyond the permitted ratio."""
@@ -354,9 +444,9 @@ def _check_compression_ratio(
 def _enforce_uncompressed_ceiling(
     *,
     total_uncompressed: int,
-    limit_bytes: Optional[int],
+    limit_bytes: int | None,
     archive: Path,
-    logger: Optional[logging.Logger],
+    logger: logging.Logger | None,
     archive_type: str,
 ) -> None:
     """Ensure uncompressed payload stays within configured limits."""
@@ -386,10 +476,10 @@ def extract_archive_safe(
     archive_path: Path,
     destination: Path,
     *,
-    logger: Optional[logging.Logger] = None,
-    max_uncompressed_bytes: Optional[int] = None,
-    extraction_policy: Optional[ExtractionSettings] = None,
-) -> List[Path]:
+    logger: logging.Logger | None = None,
+    max_uncompressed_bytes: int | None = None,
+    extraction_policy: ExtractionSettings | None = None,
+) -> list[Path]:
     """Extract archives safely using libarchive with validation and compression checks.
 
     This function uses libarchive for automatic format and compression detection, eliminating
@@ -465,7 +555,7 @@ def extract_archive_safe(
         telemetry.config_hash = _compute_config_hash(policy)
 
         # Phase 1: Pre-scan validation without writing
-        entries_to_extract: List[tuple[str, Path, bool]] = []  # (orig_name, validated_path, is_dir)
+        entries_to_extract: list[tuple[str, Path, bool]] = []  # (orig_name, validated_path, is_dir)
         total_uncompressed = 0
 
         # Initialize Phase 2 validator for comprehensive security checks
@@ -580,9 +670,9 @@ def extract_archive_safe(
         guardian.verify_space_available(total_uncompressed, extract_root)
 
         # Phase 4: Extract (only if pre-scan passed)
-        extracted_files: List[Path] = []
-        extracted_dirs: List[Path] = []
-        entries_metadata: List[tuple[str, Path, int, Optional[str]]] = []  # For audit manifest
+        extracted_files: list[Path] = []
+        extracted_dirs: list[Path] = []
+        entries_metadata: list[tuple[str, Path, int, str | None]] = []  # For audit manifest
 
         with libarchive.file_reader(str(archive_path)) as archive:
             for entry, (orig_pathname, validated_path, is_dir) in zip(

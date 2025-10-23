@@ -1,3 +1,30 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.cli_telemetry_summary",
+#   "purpose": "CLI for telemetry summary and SLO evaluation.",
+#   "sections": [
+#     {
+#       "id": "load-one",
+#       "name": "load_one",
+#       "anchor": "function-load-one",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "summarize",
+#       "name": "summarize",
+#       "anchor": "function-summarize",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "main",
+#       "name": "main",
+#       "anchor": "function-main",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """CLI for telemetry summary and SLO evaluation.
 
 Computes SLIs from telemetry database and evaluates against SLO targets.
@@ -14,7 +41,6 @@ import json
 import sqlite3
 import sys
 import time
-from typing import Optional
 
 # SLO targets (tune to your environment)
 SLO = {
@@ -28,7 +54,7 @@ SLO = {
 }
 
 
-def load_one(conn: sqlite3.Connection, sql: str, params: tuple) -> Optional[float]:
+def load_one(conn: sqlite3.Connection, sql: str, params: tuple) -> float | None:
     """Load single value from query result."""
     cur = conn.execute(sql, params)
     row = cur.fetchone()

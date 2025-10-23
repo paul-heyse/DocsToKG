@@ -8,14 +8,15 @@ so that downstream tooling can rely on a consistent structure.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 __all__ = ["migrate_manifest"]
 
 LOGGER = logging.getLogger(__name__)
 
 
-def migrate_manifest(payload: Mapping[str, Any]) -> Dict[str, Any]:
+def migrate_manifest(payload: Mapping[str, Any]) -> dict[str, Any]:
     """Return a migrated manifest payload compatible with the latest schema.
 
     Args:
@@ -25,7 +26,7 @@ def migrate_manifest(payload: Mapping[str, Any]) -> Dict[str, Any]:
         Dictionary upgraded to the current schema version.
     """
 
-    upgraded: Dict[str, Any] = dict(payload)
+    upgraded: dict[str, Any] = dict(payload)
     version = str(upgraded.get("schema_version", "") or "")
 
     if version in {"", "1.0"}:
@@ -49,7 +50,12 @@ def migrate_manifest(payload: Mapping[str, Any]) -> Dict[str, Any]:
 #   "module": "DocsToKG.OntologyDownload.migrations",
 #   "purpose": "Upgrade historic ontology manifests to the current schema version",
 #   "sections": [
-#     {"id": "helpers", "name": "Migration Helpers", "anchor": "MIG", "kind": "api"}
+#     {
+#       "id": "migrate-manifest",
+#       "name": "migrate_manifest",
+#       "anchor": "function-migrate-manifest",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===

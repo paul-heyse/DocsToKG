@@ -1,3 +1,30 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.fallback.integration",
+#   "purpose": "Integration of fallback orchestrator into the download pipeline.",
+#   "sections": [
+#     {
+#       "id": "try-fallback-resolution",
+#       "name": "try_fallback_resolution",
+#       "anchor": "function-try-fallback-resolution",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "is-fallback-enabled",
+#       "name": "is_fallback_enabled",
+#       "anchor": "function-is-fallback-enabled",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-fallback-plan-path",
+#       "name": "get_fallback_plan_path",
+#       "anchor": "function-get-fallback-plan-path",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Integration of fallback orchestrator into the download pipeline.
 
 This module provides utilities to integrate the FallbackOrchestrator into
@@ -15,8 +42,9 @@ Responsibilities:
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional
+from typing import Any
 
 from DocsToKG.ContentDownload.fallback.loader import load_fallback_plan
 from DocsToKG.ContentDownload.fallback.orchestrator import FallbackOrchestrator
@@ -27,15 +55,15 @@ logger = logging.getLogger(__name__)
 
 def try_fallback_resolution(
     *,
-    context: Dict[str, Any],
-    adapters: Dict[str, Callable[[Any, Dict[str, Any]], AttemptResult]],
-    breaker: Optional[Any] = None,
-    rate: Optional[Any] = None,
-    head_client: Optional[Any] = None,
-    raw_client: Optional[Any] = None,
-    telemetry: Optional[Any] = None,
-    fallback_plan_path: Optional[Path] = None,
-) -> Optional[AttemptResult]:
+    context: dict[str, Any],
+    adapters: dict[str, Callable[[Any, dict[str, Any]], AttemptResult]],
+    breaker: Any | None = None,
+    rate: Any | None = None,
+    head_client: Any | None = None,
+    raw_client: Any | None = None,
+    telemetry: Any | None = None,
+    fallback_plan_path: Path | None = None,
+) -> AttemptResult | None:
     """Attempt PDF resolution using the fallback strategy.
 
     This is a non-blocking resolution attempt. If the fallback strategy
@@ -114,7 +142,7 @@ def is_fallback_enabled(options: Any) -> bool:
     return bool(getattr(options, "enable_fallback_strategy", False))
 
 
-def get_fallback_plan_path(options: Any) -> Optional[Path]:
+def get_fallback_plan_path(options: Any) -> Path | None:
     """Get fallback plan YAML path from options.
 
     Args:

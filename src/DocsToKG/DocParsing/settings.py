@@ -1,3 +1,168 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.settings",
+#   "purpose": "Unified Pydantic v2 Settings for DocParsing configuration management.",
+#   "sections": [
+#     {
+#       "id": "loglevel",
+#       "name": "LogLevel",
+#       "anchor": "class-loglevel",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "logformat",
+#       "name": "LogFormat",
+#       "anchor": "class-logformat",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "runnerpolicy",
+#       "name": "RunnerPolicy",
+#       "anchor": "class-runnerpolicy",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "runnerschedule",
+#       "name": "RunnerSchedule",
+#       "anchor": "class-runnerschedule",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "runneradaptive",
+#       "name": "RunnerAdaptive",
+#       "anchor": "class-runneradaptive",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "doctagsmode",
+#       "name": "DoctagsMode",
+#       "anchor": "class-doctagsmode",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "format",
+#       "name": "Format",
+#       "anchor": "class-format",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "densebackend",
+#       "name": "DenseBackend",
+#       "anchor": "class-densebackend",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "teicompression",
+#       "name": "TeiCompression",
+#       "anchor": "class-teicompression",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "attnbackend",
+#       "name": "AttnBackend",
+#       "anchor": "class-attnbackend",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "spladenorm",
+#       "name": "SpladeNorm",
+#       "anchor": "class-spladenorm",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "appcfg",
+#       "name": "AppCfg",
+#       "anchor": "class-appcfg",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "runnercfg",
+#       "name": "RunnerCfg",
+#       "anchor": "class-runnercfg",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "doctagscfg",
+#       "name": "DocTagsCfg",
+#       "anchor": "class-doctagscfg",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "chunkcfg",
+#       "name": "ChunkCfg",
+#       "anchor": "class-chunkcfg",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "qwenvllmcfg",
+#       "name": "QwenVLLMCfg",
+#       "anchor": "class-qwenvllmcfg",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "teicfg",
+#       "name": "TEICfg",
+#       "anchor": "class-teicfg",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "sentencetransformerscfg",
+#       "name": "SentenceTransformersCfg",
+#       "anchor": "class-sentencetransformerscfg",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "densecfg",
+#       "name": "DenseCfg",
+#       "anchor": "class-densecfg",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "spladestcfg",
+#       "name": "SpladeSTCfg",
+#       "anchor": "class-spladestcfg",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "sparsecfg",
+#       "name": "SparseCfg",
+#       "anchor": "class-sparsecfg",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "localbm25cfg",
+#       "name": "LocalBM25Cfg",
+#       "anchor": "class-localbm25cfg",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "lexicalcfg",
+#       "name": "LexicalCfg",
+#       "anchor": "class-lexicalcfg",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "vectorscfg",
+#       "name": "VectorsCfg",
+#       "anchor": "class-vectorscfg",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "embedcfg",
+#       "name": "EmbedCfg",
+#       "anchor": "class-embedcfg",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "settings",
+#       "name": "Settings",
+#       "anchor": "class-settings",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Unified Pydantic v2 Settings for DocParsing configuration management.
 
@@ -21,7 +186,7 @@ import hashlib
 import json
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -132,13 +297,11 @@ class AppCfg(BaseSettings):
         extra="ignore",
     )
 
-    profile: Optional[str] = Field(
-        None, description="Profile name to load from docstokg.toml/.yaml"
-    )
+    profile: str | None = Field(None, description="Profile name to load from docstokg.toml/.yaml")
     data_root: Path = Field(
         Path("Data"), description="Root directory for all data (DocTags/Chunks/Vectors/Manifests)"
     )
-    manifests_root: Optional[Path] = Field(
+    manifests_root: Path | None = Field(
         None, description="Override Manifests directory (default: data_root/Manifests)"
     )
     models_root: Path = Field(
@@ -161,7 +324,7 @@ class AppCfg(BaseSettings):
     strict_config: bool = Field(
         True, description="Treat unknown/deprecated keys as errors (false = warn)"
     )
-    random_seed: Optional[int] = Field(None, description="Random seed for reproducibility")
+    random_seed: int | None = Field(None, description="Random seed for reproducibility")
 
     @field_validator("data_root", "manifests_root", "models_root", "log_dir", mode="before")
     @classmethod
@@ -358,7 +521,7 @@ class QwenVLLMCfg(BaseModel):
     tensor_parallelism: int = 1
     max_model_len: int = 8192
     gpu_memory_utilization: float = 0.9
-    download_dir: Optional[Path] = None
+    download_dir: Path | None = None
     warmup: bool = True
 
     @field_validator("gpu_memory_utilization")
@@ -373,8 +536,8 @@ class QwenVLLMCfg(BaseModel):
 class TEICfg(BaseModel):
     """Text Embeddings Inference HTTP backend."""
 
-    url: Optional[str] = None  # Required when backend=tei
-    api_key: Optional[str] = None
+    url: str | None = None  # Required when backend=tei
+    api_key: str | None = None
     timeout_s: float = 30.0
     verify_tls: bool = True
     compression: TeiCompression = TeiCompression.AUTO
@@ -391,15 +554,15 @@ class TEICfg(BaseModel):
 class SentenceTransformersCfg(BaseModel):
     """Sentence-Transformers dense embedding."""
 
-    model_id: Optional[str] = None
-    revision: Optional[str] = None
+    model_id: str | None = None
+    revision: str | None = None
     device: str = "auto"
     dtype: str = "auto"  # auto|float32|float16|bfloat16
     batch_size: int = 64
-    max_seq_length: Optional[int] = None
+    max_seq_length: int | None = None
     trust_remote_code: bool = False
     use_memory_map: bool = True
-    intra_op_threads: Optional[int] = None
+    intra_op_threads: int | None = None
 
 
 class DenseCfg(BaseModel):
@@ -420,14 +583,14 @@ class SpladeSTCfg(BaseModel):
     """SPLADE sparse embedding via Sentence-Transformers."""
 
     model_id: str = "naver/splade-cocondenser-ensembledistil"
-    revision: Optional[str] = None
+    revision: str | None = None
     device: str = "auto"
     dtype: str = "auto"  # auto|float32|float16|bfloat16
     batch_size: int = 64
     topk_per_doc: int = 0  # 0 = all
     prune_below: float = 0.0
     normalize_doclen: SpladeNorm = SpladeNorm.L2
-    tokenizer_id: Optional[str] = None
+    tokenizer_id: str | None = None
     attn_backend: AttnBackend = AttnBackend.AUTO
 
 
@@ -486,7 +649,7 @@ class VectorsCfg(BaseModel):
     """Vector output format configuration."""
 
     format: Format = Format.PARQUET
-    expected_dim: Optional[int] = None  # For validation
+    expected_dim: int | None = None  # For validation
 
 
 # ============================================================================
@@ -562,14 +725,14 @@ class Settings(BaseModel):
     chunk: ChunkCfg = Field(default_factory=ChunkCfg)
     embed: EmbedCfg = Field(default_factory=EmbedCfg)
 
-    def model_dump_redacted(self, **kwargs: Any) -> Dict[str, Any]:
+    def model_dump_redacted(self, **kwargs: Any) -> dict[str, Any]:
         """Dump config with sensitive fields redacted."""
         import re
 
         result = self.model_dump(**kwargs)
         pattern = re.compile(r"(?i)(token|secret|password|api[_-]?key)")
 
-        def redact_dict(d: Dict[str, Any]) -> Dict[str, Any]:
+        def redact_dict(d: dict[str, Any]) -> dict[str, Any]:
             for key, val in d.items():
                 if pattern.search(key):
                     d[key] = "***REDACTED***"
@@ -579,7 +742,7 @@ class Settings(BaseModel):
 
         return redact_dict(result)
 
-    def compute_stage_hashes(self) -> Dict[str, str]:
+    def compute_stage_hashes(self) -> dict[str, str]:
         """Compute stable content hashes per stage."""
         hashes = {}
         for stage_name in ["app", "runner", "doctags", "chunk", "embed"]:

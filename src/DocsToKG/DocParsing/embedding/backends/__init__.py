@@ -1,3 +1,11 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.embedding.backends.__init__",
+#   "purpose": "Embedding backend abstractions for DocsToKG DocParsing.",
+#   "sections": []
+# }
+# === /NAVMAP ===
+
 """Embedding backend abstractions for DocsToKG DocParsing."""
 
 from .base import (

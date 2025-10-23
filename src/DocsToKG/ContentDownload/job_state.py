@@ -63,7 +63,6 @@ from __future__ import annotations
 
 import sqlite3
 import time
-from typing import Optional
 
 
 def advance_state(
@@ -135,7 +134,7 @@ def get_current_state(
     cx: sqlite3.Connection,
     *,
     job_id: str,
-) -> Optional[str]:
+) -> str | None:
     """Get the current state of a job.
 
     Parameters

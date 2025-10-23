@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.fallback.orchestrator",
+#   "purpose": "Fallback & Resiliency Orchestrator.",
+#   "sections": [
+#     {
+#       "id": "fallbackorchestrator",
+#       "name": "FallbackOrchestrator",
+#       "anchor": "class-fallbackorchestrator",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Fallback & Resiliency Orchestrator
 
@@ -22,8 +37,9 @@ from __future__ import annotations
 import logging
 import threading
 import time
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any, Callable, Dict, Optional
+from typing import Any
 
 from .types import AttemptResult, FallbackPlan
 
@@ -53,11 +69,11 @@ class FallbackOrchestrator:
     def __init__(
         self,
         plan: FallbackPlan,
-        breaker: Optional[Any] = None,
-        rate_limiter: Optional[Any] = None,
-        clients: Optional[Dict[str, Any]] = None,
-        telemetry: Optional[Any] = None,
-        logger: Optional[logging.Logger] = None,
+        breaker: Any | None = None,
+        rate_limiter: Any | None = None,
+        clients: dict[str, Any] | None = None,
+        telemetry: Any | None = None,
+        logger: logging.Logger | None = None,
     ) -> None:
         """Initialize orchestrator.
 
@@ -79,13 +95,13 @@ class FallbackOrchestrator:
         # Budget tracking (mutable state)
         self._attempt_count = 0
         self._budget_lock = threading.Lock()
-        self._start_time: Optional[float] = None
+        self._start_time: float | None = None
         self._cancellation_flag = threading.Event()
 
     def resolve_pdf(
         self,
-        context: Dict[str, Any],
-        adapters: Dict[str, Callable[[Any, Dict[str, Any]], AttemptResult]],
+        context: dict[str, Any],
+        adapters: dict[str, Callable[[Any, dict[str, Any]], AttemptResult]],
     ) -> AttemptResult:
         """Resolve PDF using tiered strategy.
 
@@ -142,8 +158,8 @@ class FallbackOrchestrator:
     def _resolve_tier(
         self,
         tier: Any,
-        context: Dict[str, Any],
-        adapters: Dict[str, Callable[[Any, Dict[str, Any]], AttemptResult]],
+        context: dict[str, Any],
+        adapters: dict[str, Callable[[Any, dict[str, Any]], AttemptResult]],
     ) -> AttemptResult:
         """Resolve a single tier (parallel sources).
 
@@ -234,7 +250,7 @@ class FallbackOrchestrator:
             meta={"tier": tier.name, "sources_tried": len(available_sources)},
         )
 
-    def _health_gate(self, source_name: str, context: Dict[str, Any]) -> Optional[AttemptResult]:
+    def _health_gate(self, source_name: str, context: dict[str, Any]) -> AttemptResult | None:
         """Check health gate for a source.
 
         Evaluates:
@@ -281,7 +297,7 @@ class FallbackOrchestrator:
         return None
 
     def _emit_telemetry(
-        self, tier_name: str, result: AttemptResult, context: Dict[str, Any]
+        self, tier_name: str, result: AttemptResult, context: dict[str, Any]
     ) -> None:
         """Emit attempt telemetry.
 
@@ -331,7 +347,7 @@ class FallbackOrchestrator:
             return 0
         return int((time.time() - self._start_time) * 1000)
 
-    def _remaining_timeout_s(self) -> Optional[float]:
+    def _remaining_timeout_s(self) -> float | None:
         """Get remaining timeout in seconds."""
         remaining_ms = self.plan.budgets.get("total_timeout_ms", float("inf")) - self._elapsed_ms()
         if remaining_ms <= 0:

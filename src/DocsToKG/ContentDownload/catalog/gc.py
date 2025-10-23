@@ -1,3 +1,42 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.catalog.gc",
+#   "purpose": "Garbage collection and retention utilities for the artifact catalog.",
+#   "sections": [
+#     {
+#       "id": "find-orphans",
+#       "name": "find_orphans",
+#       "anchor": "function-find-orphans",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "retention-filter",
+#       "name": "retention_filter",
+#       "anchor": "function-retention-filter",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "collect-referenced-paths",
+#       "name": "collect_referenced_paths",
+#       "anchor": "function-collect-referenced-paths",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "delete-orphan-files",
+#       "name": "delete_orphan_files",
+#       "anchor": "function-delete-orphan-files",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "retentionpolicy",
+#       "name": "RetentionPolicy",
+#       "anchor": "class-retentionpolicy",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Garbage collection and retention utilities for the artifact catalog.
 
 Provides tools for:
@@ -11,7 +50,6 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import List, Set
 
 from DocsToKG.ContentDownload.catalog.models import DocumentRecord
 
@@ -20,9 +58,9 @@ logger = logging.getLogger(__name__)
 
 def find_orphans(
     root_dir: str,
-    referenced_paths: Set[str],
+    referenced_paths: set[str],
     follow_symlinks: bool = False,
-) -> List[str]:
+) -> list[str]:
     """Find orphaned files in storage root not referenced by catalog.
 
     Walks the entire root_dir and identifies files that are not in the
@@ -36,7 +74,7 @@ def find_orphans(
     Returns:
         List of absolute paths to orphaned files
     """
-    orphans: List[str] = []
+    orphans: list[str] = []
     root = Path(root_dir)
 
     if not root.exists():
@@ -56,9 +94,9 @@ def find_orphans(
 
 
 def retention_filter(
-    records: List[DocumentRecord],
+    records: list[DocumentRecord],
     retention_days: int,
-) -> List[DocumentRecord]:
+) -> list[DocumentRecord]:
     """Filter records older than retention policy.
 
     Args:
@@ -79,8 +117,8 @@ def retention_filter(
 
 
 def collect_referenced_paths(
-    records: List[DocumentRecord],
-) -> Set[str]:
+    records: list[DocumentRecord],
+) -> set[str]:
     """Extract all referenced storage URIs from catalog records.
 
     Args:
@@ -112,7 +150,7 @@ def collect_referenced_paths(
 
 
 def delete_orphan_files(
-    orphan_paths: List[str],
+    orphan_paths: list[str],
     dry_run: bool = True,
 ) -> int:
     """Delete orphaned files with optional dry-run mode.
