@@ -37,3 +37,11 @@ No eligible files after excludes.
 - Broken: rate limiter was configured without blocking semantics so polite client proceeded with HTTP calls even after slot acquisition failed.
 - Fix: enable pyrate limiter blocking (max_delay + retry) and raise `PolicyError` when acquisition returns False to stop the HTTP request.
 - TODO: add integration coverage that exercises fail-fast mode and verifies blocked requests never reach the transport.
+
+<!-- 2025-10-23 04:29:43Z UTC -->
+## Pass 2 — find and fix real bugs
+
+### Batch 0 (Pass 2)
+- Broken: HTTP retry policies ignored `Retry-After` guidance, causing immediate reattempts that violate polite backoff promises under 429/503 responses.
+- Fix: Added a `_RetryAfterOrBackoff` wait strategy that parses `Retry-After` hints and wired it into the default, idempotent, aggressive, and rate-limit retry builders so they fall back to jittered exponential waits when no header is present.
+- TODO: Add a retry-policy unit test that asserts we honour header and HTTP-date variants of `Retry-After`.

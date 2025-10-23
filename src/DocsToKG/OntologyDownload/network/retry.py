@@ -31,6 +31,7 @@ from typing import Optional
 
 import httpx
 from tenacity import (
+    RetryCallState,
     Retrying,
     before_sleep_log,
     retry_if_exception_type,
@@ -38,6 +39,7 @@ from tenacity import (
     stop_after_delay,
     wait_random_exponential,
 )
+from tenacity.wait import wait_base
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +47,67 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 # Retry Policies
 # ============================================================================
+
+
+def _parse_retry_after_value(value: Optional[str]) -> Optional[float]:
+    """Convert a Retry-After header value into a delay in seconds."""
+    if not value:
+        return None
+
+    try:
+        delay = float(int(value))
+    except ValueError:
+        try:
+            dt = email.utils.parsedate_to_datetime(value)
+        except (TypeError, ValueError):
+            return None
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        delay = (dt - datetime.now(timezone.utc)).total_seconds()
+
+    return max(0.0, delay)
+
+
+def _extract_retry_after_seconds(candidate: object) -> Optional[float]:
+    """Extract Retry-After guidance from an HTTPX response-like object."""
+    if candidate is None:
+        return None
+    headers = getattr(candidate, "headers", None)
+    if headers is None:
+        return None
+    return _parse_retry_after_value(headers.get("Retry-After"))
+
+
+class _RetryAfterOrBackoff(wait_base):
+    """Wait strategy that honours Retry-After before falling back to backoff."""
+
+    def __init__(self, fallback_wait: wait_base, max_delay_seconds: int) -> None:
+        self._fallback_wait = fallback_wait
+        self._max_delay_seconds = max_delay_seconds
+
+    def __call__(self, retry_state: RetryCallState) -> float:
+        delay = self._retry_after_delay(retry_state)
+        if delay is not None:
+            return min(delay, float(self._max_delay_seconds))
+        return float(self._fallback_wait(retry_state))
+
+    def _retry_after_delay(self, retry_state: RetryCallState) -> Optional[float]:
+        outcome = retry_state.outcome
+        if outcome is None:
+            return None
+
+        exc = outcome.exception()
+        if exc is not None:
+            delay = _extract_retry_after_seconds(getattr(exc, "response", None))
+            if delay is not None:
+                return delay
+
+        try:
+            response = outcome.result()
+        except Exception:
+            return None
+
+        return _extract_retry_after_seconds(response)
 
 
 def create_http_retry_policy(
@@ -79,44 +142,25 @@ def create_http_retry_policy(
         - This is for explicit retry control over complex flows
     """
 
-    def wait_with_retry_after(retry_state):
-        """Wait strategy: respect Retry-After header if present."""
-        exc = retry_state.outcome.exception()
-
-        # Check for Retry-After header in the response
-        if exc and hasattr(exc, "response") and exc.response:
-            retry_after_header = exc.response.headers.get("Retry-After")
-            if retry_after_header:
-                try:
-                    # Try parsing as integer (seconds)
-                    return int(retry_after_header)
-                except ValueError:
-                    # Parse as HTTP-date
-                    try:
-                        dt = email.utils.parsedate_to_datetime(retry_after_header)
-                        now = datetime.now(timezone.utc)
-                        delay_sec = (dt - now).total_seconds()
-                        return max(0, delay_sec)
-                    except (TypeError, ValueError):
-                        pass
-
-        # Fall back to exponential backoff
-        return 0  # Let exponential strategy compute the wait
-
     def retry_on_status(response):
         """Retry on 429 (rate-limit) or 5xx (server error)."""
         if hasattr(response, "status_code"):
             return response.status_code in {429, 500, 502, 503, 504}
         return False
 
-    return Retrying(
-        # Stop after deadline (not just attempts)
-        stop=stop_after_delay(max_delay_seconds),
-        # Full-jitter exponential backoff: spreads retries, reduces contention
-        wait=wait_random_exponential(
+    wait_strategy = _RetryAfterOrBackoff(
+        fallback_wait=wait_random_exponential(
             multiplier=0.5,  # Initial: 0.5s * 2^attempt
             max=min(60, max_delay_seconds),  # Cap at deadline
         ),
+        max_delay_seconds=max_delay_seconds,
+    )
+
+    return Retrying(
+        # Stop after deadline (not just attempts)
+        stop=stop_after_delay(max_delay_seconds),
+        # Wait strategy that honours Retry-After header when present
+        wait=wait_strategy,
         # Retry on transient network errors
         retry=(
             retry_if_exception_type(
@@ -176,9 +220,12 @@ def create_idempotent_retry_policy(
 
     return Retrying(
         stop=stop_after_delay(max_delay_seconds),
-        wait=wait_random_exponential(
-            multiplier=0.5,
-            max=min(60, max_delay_seconds),
+        wait=_RetryAfterOrBackoff(
+            fallback_wait=wait_random_exponential(
+                multiplier=0.5,
+                max=min(60, max_delay_seconds),
+            ),
+            max_delay_seconds=max_delay_seconds,
         ),
         retry=(
             retry_if_exception_type((httpx.ConnectError, httpx.ConnectTimeout, httpx.ReadTimeout))
@@ -207,9 +254,12 @@ def create_aggressive_retry_policy(
     """
     return Retrying(
         stop=stop_after_delay(max_delay_seconds),
-        wait=wait_random_exponential(
-            multiplier=0.5,
-            max=min(300, max_delay_seconds),  # Allow up to 5-minute wait
+        wait=_RetryAfterOrBackoff(
+            fallback_wait=wait_random_exponential(
+                multiplier=0.5,
+                max=min(300, max_delay_seconds),  # Allow up to 5-minute wait
+            ),
+            max_delay_seconds=max_delay_seconds,
         ),
         retry=(
             retry_if_exception_type(
@@ -241,30 +291,14 @@ def create_rate_limit_retry_policy(
         Configured Tenacity Retrying object
     """
 
-    def wait_rate_limit(retry_state):
-        """Wait strategy: mandatory Retry-After respect."""
-        exc = retry_state.outcome.exception() or retry_state.outcome.result()
-
-        # Check for explicit Retry-After
-        if hasattr(exc, "response") and exc.response:
-            retry_after = exc.response.headers.get("Retry-After")
-            if retry_after:
-                try:
-                    return int(retry_after)
-                except ValueError:
-                    try:
-                        dt = email.utils.parsedate_to_datetime(retry_after)
-                        delay = (dt - datetime.now(timezone.utc)).total_seconds()
-                        return max(1, delay)  # At least 1 second
-                    except Exception:
-                        pass
-
-        # Fall back to exponential backoff
-        return 0
+    wait_strategy = _RetryAfterOrBackoff(
+        fallback_wait=wait_random_exponential(multiplier=1.0, max=min(30, max_delay_seconds)),
+        max_delay_seconds=max_delay_seconds,
+    )
 
     return Retrying(
         stop=stop_after_delay(max_delay_seconds),
-        wait=wait_rate_limit,
+        wait=wait_strategy,
         # Only retry on 429
         retry=retry_if_result(lambda r: hasattr(r, "status_code") and r.status_code == 429),
         before_sleep=before_sleep_log(logger, logging.WARNING),
