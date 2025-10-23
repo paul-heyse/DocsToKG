@@ -124,6 +124,9 @@ class RateAcquisition:
     acquired: bool
     delay_ms: int
     policy_max_delay_ms: int
+    host: str = ""
+    role: Role = "metadata"
+    concurrency_held: bool = False
 
 
 class RateLimitRegistry:
@@ -257,6 +260,9 @@ class RateLimitRegistry:
             if not self._global_sem.acquire(blocking=False):
                 raise RateLimitExceeded("Global in-flight ceiling exceeded")
 
+        concurrency_held = False
+        concurrency_key: Optional[Tuple[str, Role]] = None
+
         try:
             policy = self._effective_policy(host, role)
 
@@ -264,7 +270,14 @@ class RateLimitRegistry:
             if method == "HEAD" and not policy.count_head:
                 if self._tele:
                     self._tele.emit_head_skipped(host=host)
-                return RateAcquisition(acquired=True, delay_ms=0, policy_max_delay_ms=0)
+                return RateAcquisition(
+                    acquired=True,
+                    delay_ms=0,
+                    policy_max_delay_ms=0,
+                    host=host,
+                    role=role,
+                    concurrency_held=False,
+                )
 
             # Per-role concurrency cap
             key = (host, role)
@@ -273,12 +286,19 @@ class RateLimitRegistry:
                     raise RateLimitExceeded(
                         f"Per-role concurrency ceiling exceeded for {host}/{role}"
                     )
+                concurrency_held = True
+                concurrency_key = key
 
             # Get or create limiter
             limiter = self._get_or_create_limiter(host, role)
             if not limiter:
                 return RateAcquisition(
-                    acquired=True, delay_ms=0, policy_max_delay_ms=policy.max_delay_ms
+                    acquired=True,
+                    delay_ms=0,
+                    policy_max_delay_ms=policy.max_delay_ms,
+                    host=host,
+                    role=role,
+                    concurrency_held=concurrency_held,
                 )
 
             # Bounded wait acquisition
@@ -334,10 +354,22 @@ class RateLimitRegistry:
             )
 
             return RateAcquisition(
-                acquired=True, delay_ms=elapsed_ms, policy_max_delay_ms=policy.max_delay_ms
+                acquired=True,
+                delay_ms=elapsed_ms,
+                policy_max_delay_ms=policy.max_delay_ms,
+                host=host,
+                role=role,
+                concurrency_held=concurrency_held,
             )
 
         except Exception:
+            if concurrency_held and concurrency_key:
+                try:
+                    self._sem[concurrency_key].release()
+                except ValueError:
+                    LOGGER.warning(
+                        "Semaphore imbalance detected while rolling back %s/%s", host, role
+                    )
             # Release global semaphore on error
             if self._global_sem:
                 self._global_sem.release()
@@ -366,6 +398,16 @@ class RateLimitRegistry:
         """Release the global in-flight semaphore (called after request completes)."""
         if self._global_sem:
             self._global_sem.release()
+
+    def release_concurrency(self, *, host: str, role: Role) -> None:
+        """Release the per-role concurrency semaphore, if held."""
+        key = (host, role)
+        sem = self._sem.get(key)
+        if sem:
+            try:
+                sem.release()
+            except ValueError:
+                LOGGER.warning("Per-role semaphore imbalance detected for %s/%s", host, role)
 
     def tick_aimd(self) -> None:
         """Periodic AIMD adjustment (call every aimd.window_s seconds)."""
@@ -433,8 +475,9 @@ class RateLimitedTransport(httpx.BaseTransport):
         host: str = str(request.url.host or "unknown").lower()
 
         # Acquire rate limit tokens
+        acquisition: Optional[RateAcquisition] = None
         try:
-            self._reg.acquire(host=host, role=role, method=request.method)
+            acquisition = self._reg.acquire(host=host, role=role, method=request.method)
         except RateLimitExceeded as e:
             LOGGER.warning(f"Rate limit exceeded: {e}")
             raise
@@ -451,6 +494,8 @@ class RateLimitedTransport(httpx.BaseTransport):
 
             return response
         finally:
+            if acquisition and acquisition.concurrency_held:
+                self._reg.release_concurrency(host=host, role=role)
             # Release global in-flight ceiling
             self._reg.release_inflight()
 

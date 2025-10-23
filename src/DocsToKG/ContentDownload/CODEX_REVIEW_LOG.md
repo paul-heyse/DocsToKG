@@ -56,3 +56,10 @@ No eligible files after excludes.
 - Keyed limiter `release` silently created a brand-new semaphore when a key was missing, inflating concurrency caps instead of detecting the logic error.
 - Reworked `_get_semaphore` to optionally skip creation, gate TTL eviction on idle semaphores, and make `release` raise if no tracked semaphore exists.
 - TODO: Consider tracking active permit counts explicitly so TTL eviction can safely reap entries without private attribute checks.
+
+<!-- 2025-10-23 04:46:08Z UTC -->
+## Pass 1 — find and fix real bugs
+### Batch 1 (Pass 1)
+- Per-role limiter never released its `BoundedSemaphore` permit, so concurrency hit zero after a few requests.
+- Added explicit tracking of semaphore acquisition, rolling back on failures and releasing post-request.
+- TODO: Add stress test exercising `max_concurrent` behaviour once concurrency harness is in place.
