@@ -254,7 +254,7 @@ import uuid
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, fields
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 import pyarrow.parquet as pq
 
@@ -263,7 +263,31 @@ from docling_core.transforms.chunker.base import BaseChunk
 from docling_core.transforms.chunker.hybrid_chunker import HybridChunker
 from docling_core.transforms.chunker.tokenizer.huggingface import HuggingFaceTokenizer
 from docling_core.types.doc.document import DoclingDocument, DocTagsDocument
-from transformers import AutoTokenizer
+
+if TYPE_CHECKING:  # pragma: no cover - typing hook only
+    from transformers import AutoTokenizer as AutoTokenizerType
+else:  # pragma: no cover - typing fallback for runtime
+    AutoTokenizerType = Any
+
+try:  # pragma: no cover - import guard tested indirectly via docs build
+    from transformers import AutoTokenizer as _AutoTokenizer
+except Exception as exc:  # pragma: no cover - safety net for optional dep
+    _AutoTokenizer = None  # type: ignore[assignment]
+    _AUTO_TOKENIZER_IMPORT_ERROR: Exception | None = exc
+else:
+    _AUTO_TOKENIZER_IMPORT_ERROR = None
+
+
+def _resolve_auto_tokenizer() -> AutoTokenizerType:
+    """Return the Hugging Face AutoTokenizer ensuring the optional dependency exists."""
+
+    if _AutoTokenizer is None:
+        message = (
+            "transformers.AutoTokenizer is unavailable. Install the optional "
+            "DocsToKG[docs] extras or GPU profile to enable chunking utilities."
+        )
+        raise RuntimeError(message) from _AUTO_TOKENIZER_IMPORT_ERROR
+    return _AutoTokenizer
 
 # --- Globals ---
 
@@ -651,7 +675,7 @@ def _chunk_worker_initializer(cfg: ChunkWorkerConfig) -> None:
     """Initialise shared tokenizer/chunker state for worker processes."""
 
     tokenizer_cls = HuggingFaceTokenizer
-    auto_tokenizer = AutoTokenizer
+    auto_tokenizer = _resolve_auto_tokenizer()
     tokenizer = tokenizer_cls(
         tokenizer=auto_tokenizer.from_pretrained(cfg.tokenizer_model, use_fast=True),
         max_tokens=cfg.max_tokens,
@@ -2156,7 +2180,8 @@ def _run_validate_only(
     )
 
     ensure_model_environment()
-    hf = AutoTokenizer.from_pretrained(tokenizer_model, use_fast=True)
+    hf_cls = _resolve_auto_tokenizer()
+    hf = hf_cls.from_pretrained(tokenizer_model, use_fast=True)
     tokenizer = HuggingFaceTokenizer(tokenizer=hf, max_tokens=cfg.max_tokens)
     provider_cls = _resolve_serializer_provider(str(cfg.serializer_provider))
     provider = provider_cls()

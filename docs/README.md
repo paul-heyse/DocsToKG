@@ -59,3 +59,13 @@ python docs/sphinx_implementation/fix_xrefs.py \
 ```
 
 The script parses unresolved-reference warnings, looks up the true targets in local + intersphinx inventories, and rewrites source roles/targets so future builds stay clean.
+
+## Vendored HTTPX inventory
+
+HTTPX does not publish an intersphinx inventory upstream. Run the helper script to refresh the local copy before rebuilding docs:
+
+```bash
+UV_NO_SYNC=1 uv run python docs/scripts/fetch_httpx_inventory.py
+```
+
+This writes `objects.inv` to `docs/_static/inventories/httpx/`, which is referenced by `conf.py` for intersphinx resolution.

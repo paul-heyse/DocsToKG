@@ -705,11 +705,6 @@ def embed(
                     param_name="format",
                 ) from exc
         if dense_backend:
-            # Note: embed config doesn't have simple dense_backend field,
-            # so we'd need to handle this through config or skip for now
-            pass
-        app_ctx.settings.embed.resume = resume
-        app_ctx.settings.embed.force = force
             try:
                 app_ctx.settings.embed.dense.backend = DenseBackend(dense_backend.lower())
             except ValueError as exc:
@@ -718,6 +713,9 @@ def embed(
                     f"Dense backend must be one of: {valid}.",
                     param_name="dense-backend",
                 ) from exc
+
+        app_ctx.settings.embed.resume = resume
+        app_ctx.settings.embed.force = force
         if workers:
             app_ctx.settings.runner.workers = workers
         if policy:

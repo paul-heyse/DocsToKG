@@ -17,6 +17,7 @@ PROJECT_ROOT = os.path.abspath(os.path.join(__file__, "..", "..", ".."))
 SRC_ROOT = os.path.join(PROJECT_ROOT, "src")
 sys.path.insert(0, SRC_ROOT)
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "_ext")))
+INV_DIR = os.path.join(PROJECT_ROOT, "docs", "_static", "inventories")
 
 
 def _read_version() -> str:
@@ -121,7 +122,7 @@ rediraffe_redirects = {}
 rediraffe_redirects_external = {}
 
 # --- Code auto-linking -----------------------------------------------------
-codeautolink_autodoc_inject = True
+codeautolink_autodoc_inject = False  # autoapi injects its own examples; keep disabled to avoid spurious warnings
 codeautolink_concat_default = True
 
 # --- intersphinx mappings --------------------------------------------------
@@ -129,7 +130,7 @@ intersphinx_mapping = {
     "python": ("https://docs.python.org/3/", None),
     "pydantic": ("https://docs.pydantic.dev/latest/", None),
     "numpy": ("https://numpy.org/doc/stable/", None),
-    "httpx": ("https://www.python-httpx.org/en/latest/", None),
+    "httpx": ("https://example.invalid/httpx-local", os.path.join(INV_DIR, 'httpx', 'objects.inv')),
     "tenacity": ("https://tenacity.readthedocs.io/en/stable/", None),
 }
 
@@ -152,6 +153,11 @@ autodoc_mock_imports = [
     "regex",
     "url_normalize",
     "pydantic_core",
+    "transformers",
+    "transformers.utils",
+    "transformers.utils.generic",
+    "safetensors",
+    "safetensors.torch",
 ]
 
 # --- AutoAPI ---------------------------------------------------------------
