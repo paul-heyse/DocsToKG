@@ -36,6 +36,11 @@ No eligible files after excludes.
 <!-- 2025-10-23 04:06:56Z UTC -->
 ## Pass 2 — find and fix real bugs
 
+### Batch 0 (Pass 2)
+- Broken: `CatalogSchema.get_table_info` tried to read a `total_bytes` column from every table, so schema introspection crashed on tables without that column (e.g., `versions`, `validations`).
+- Fix: quote identifiers, count rows with `COUNT(*)`, and only sum size-oriented columns when they exist to keep size accounting optional and prevent DuckDB exceptions.
+- TODO: extend the inspector to use `duckdb_table_storage_info` so we can report physical size even when no logical size column is stored.
+
 <!-- 2025-10-23 04:24:41Z UTC -->
 ## Pass 1 — find and fix real bugs
 ### Batch 0 (Pass 1)
@@ -81,3 +86,6 @@ No eligible files after excludes.
 
 <!-- 2025-10-23 06:52:53Z UTC -->
 ## Pass 1 — find and fix real bugs
+
+<!-- 2025-10-23 06:57:32Z UTC -->
+## Pass 2 — find and fix real bugs

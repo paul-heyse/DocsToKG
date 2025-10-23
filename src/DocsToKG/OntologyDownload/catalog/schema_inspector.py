@@ -14,7 +14,18 @@ NAVMAP:
 
 from __future__ import annotations
 
+import logging
+
 from .schema_dto import ColumnInfo, IndexInfo, SchemaInfo, TableSchema
+
+logger = logging.getLogger(__name__)
+
+
+def _quote_identifier(identifier: str) -> str:
+    """Return identifier quoted for DuckDB (double-quoted)."""
+    if "\x00" in identifier:
+        raise ValueError("Identifier contains null byte")
+    return f"\"{identifier.replace('\"', '\"\"')}\""
 
 
 class CatalogSchema:
@@ -123,13 +134,42 @@ class CatalogSchema:
                 )
                 indexes.append(idx)
 
-        # Get table stats
-        stats_query = (
-            f"SELECT count(*), sum(total_bytes) FROM (SELECT total_bytes FROM {table_name})"
+        safe_table_name = _quote_identifier(table_name)
+
+        # Row count via COUNT(*) to avoid relying on virtual columns
+        row_count = 0
+        try:
+            stats_rows = self.repo.query_one(f"SELECT COUNT(*) FROM {safe_table_name}", [])
+        except Exception as exc:  # pragma: no cover - defensive guard
+            logger.warning(
+                "failed to count rows for table",
+                extra={"table": table_name, "error": str(exc)},
+            )
+            stats_rows = None
+        if stats_rows and stats_rows[0] is not None:
+            row_count = int(stats_rows[0])
+
+        # Determine size_bytes if the table exposes a size column
+        size_bytes = 0
+        size_column = next(
+            (col.name for col in columns if col.name in {"size_bytes", "total_bytes", "bytes"}),
+            None,
         )
-        stats_rows = self.repo.query_one(stats_query, [])
-        row_count = stats_rows[0] if stats_rows and stats_rows[0] else 0
-        size_bytes = stats_rows[1] if stats_rows and stats_rows[1] else 0
+        if size_column:
+            safe_size_column = _quote_identifier(size_column)
+            try:
+                size_row = self.repo.query_one(
+                    f"SELECT COALESCE(SUM({safe_size_column}), 0) FROM {safe_table_name}",
+                    [],
+                )
+            except Exception as exc:  # pragma: no cover - defensive guard
+                logger.warning(
+                    "failed to aggregate size column for table",
+                    extra={"table": table_name, "column": size_column, "error": str(exc)},
+                )
+                size_row = None
+            if size_row and size_row[0] is not None:
+                size_bytes = int(size_row[0])
 
         return TableSchema(
             name=table_name,
