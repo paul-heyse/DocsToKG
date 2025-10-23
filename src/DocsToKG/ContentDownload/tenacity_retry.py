@@ -164,7 +164,7 @@ def _make_retry_predicate(
     method: str,
     offline: bool = False,
     breaker_open: bool = False,
-) -> Callable[[Any], bool]:
+) -> tuple[Callable[[BaseException], bool], Callable[[Any], bool]]:
     """Create a retry predicate for Tenacity.
 
     Args:
@@ -174,7 +174,7 @@ def _make_retry_predicate(
         breaker_open: Whether circuit breaker is open
 
     Returns:
-        Predicate function for Tenacity
+        Tuple[predicate_for_exception, predicate_for_result]
     """
     # Check if method is retryable
     if method not in cfg.methods:
@@ -183,37 +183,38 @@ def _make_retry_predicate(
             pass
         else:
             # Method not retryable, never retry
-            def never_retry(outcome: Any) -> bool:
+            def never_retry_exception(_: BaseException) -> bool:
                 return False
 
-            return never_retry
+            def never_retry_result(_: Any) -> bool:
+                return False
 
-    def predicate(outcome: Any) -> bool:
-        """Check if outcome should be retried."""
-        exception = outcome.exception()
-        if exception is not None:
-            return is_retryable(
-                method=method,
-                exception=exception,
-                offline=offline,
-                breaker_open=breaker_open,
-                cfg=cfg,
-            )
+            return never_retry_exception, never_retry_result
 
-        # Check response status
-        value = outcome.value()
-        if hasattr(value, "status_code"):
-            return is_retryable(
-                method=method,
-                status=value.status_code,
-                offline=offline,
-                breaker_open=breaker_open,
-                cfg=cfg,
-            )
+    def exception_predicate(exception: BaseException) -> bool:
+        """Check if an exception should trigger a retry."""
+        return is_retryable(
+            method=method,
+            exception=exception,
+            offline=offline,
+            breaker_open=breaker_open,
+            cfg=cfg,
+        )
 
-        return False
+    def result_predicate(value: Any) -> bool:
+        """Check if a result value should trigger a retry."""
+        status = getattr(value, "status_code", None)
+        if status is None:
+            return False
+        return is_retryable(
+            method=method,
+            status=status,
+            offline=offline,
+            breaker_open=breaker_open,
+            cfg=cfg,
+        )
 
-    return predicate
+    return exception_predicate, result_predicate
 
 
 def build_tenacity_retrying(
@@ -235,8 +236,8 @@ def build_tenacity_retrying(
     Returns:
         Configured Tenacity Retrying controller
     """
-    # Build retry predicate
-    retry_predicate = _make_retry_predicate(
+    # Build retry predicates
+    retry_exc_predicate, retry_result_predicate = _make_retry_predicate(
         cfg, method=method, offline=offline, breaker_open=breaker_open
     )
 
@@ -261,7 +262,7 @@ def build_tenacity_retrying(
 
     # Create Retrying controller
     return tenacity.Retrying(
-        retry=retry_if_exception(retry_predicate) | retry_if_result(retry_predicate),
+        retry=retry_if_exception(retry_exc_predicate) | retry_if_result(retry_result_predicate),
         stop=stop_policy,
         wait=wait_strategy,
         sleep=time.sleep,

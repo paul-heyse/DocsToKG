@@ -103,6 +103,12 @@ No eligible files after excludes.
 
 <!-- 2025-10-23 05:59:43Z UTC -->
 ## Pass 5 — find and fix real bugs
+### Batch 0 (Pass 5)
+- Broken: Tenacity retry predicate assumed `RetryCallState.outcome` objects and called `.exception()`, so when Tenacity passed the raw exception the policy raised `AttributeError` and aborted retries instead of classifying the failure.
+- Fix:
+  - Split predicate handling for exceptions vs. results and return both callables from `_make_retry_predicate`.
+  - Wire `retry_if_exception` and `retry_if_result` to the appropriate predicate so Tenacity no longer triggers spurious errors.
+- TODO: Backfill a unit test that exercises Tenacity retries on exception paths to guard the signature contract.
 
 <!-- 2025-10-23 06:00:14Z UTC -->
 ## Pass 1 — find and fix real bugs
@@ -136,3 +142,6 @@ No eligible files after excludes.
   - Plumbed `proxies` through `get_http_session` when constructing the shared client.
   - Extended the debug log to note whether a proxy mapping is active for easier diagnosis.
 - TODO: Add a smoke test that verifies proxy URLs are honoured by the shared client.
+
+<!-- 2025-10-23 07:01:53Z UTC -->
+## Pass 5 — find and fix real bugs
