@@ -100,3 +100,10 @@ No eligible files after excludes.
 
 <!-- 2025-10-23 07:02:09Z UTC -->
 ## Pass 3 — find and fix real bugs
+
+<!-- 2025-10-23 07:04:34Z UTC -->
+## Pass 4 — find and fix real bugs
+### Batch 0 (Pass 4)
+- Broken: `catalog.prune.list_orphans()` referenced a non-existent `service` column on `extracted_files`, so DuckDB raised a binder error once prune staged or counted orphans.
+- Fix: join `extracted_files` to `versions` when building canonical paths in both the listing and counting queries so the column exists.
+- TODO: add a prune smoke test that exercises `list_orphans()` against a populated in-memory DuckDB catalog.

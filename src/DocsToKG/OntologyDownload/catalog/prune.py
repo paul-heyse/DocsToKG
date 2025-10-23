@@ -148,8 +148,9 @@ def list_orphans(
           AND relpath NOT IN (
             SELECT fs_relpath FROM artifacts
             UNION ALL
-            SELECT CONCAT(service, '/', version_id, '/', relpath_in_version)
-            FROM extracted_files
+            SELECT v.service || '/' || f.version_id || '/' || f.relpath_in_version
+            FROM extracted_files AS f
+            JOIN versions AS v ON v.version_id = f.version_id
         )
         ORDER BY size_bytes DESC
         """,
@@ -162,8 +163,8 @@ def count_orphans(cfg: duckdb.DuckDBPyConnection, *, scope: str = PRUNE_SCOPE) -
     """Count total orphaned files (for quick checks)."""
     row = cfg.execute(
         "SELECT COUNT(*) FROM staging_fs_listing WHERE scope = ? AND relpath NOT IN ("
-        "SELECT fs_relpath FROM artifacts UNION ALL SELECT CONCAT(service, '/', version_id, '/', relpath_in_version)"
-        " FROM extracted_files)",
+        "SELECT fs_relpath FROM artifacts UNION ALL SELECT v.service || '/' || f.version_id || '/' || f.relpath_in_version"
+        " FROM extracted_files AS f JOIN versions AS v ON v.version_id = f.version_id)",
         [scope],
     ).fetchone()
     return row[0] if row else 0
