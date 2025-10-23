@@ -122,32 +122,35 @@ class TokenBucket:
             TimeoutError: If tokens not available within timeout_s
         """
         start = time.monotonic()
+        total_wait_s = 0.0
 
         while True:
             with self._lock:
                 self._refill()
                 if self.tokens >= tokens:
                     self.tokens -= tokens
-                    return 0.0  # No wait
+                    return total_wait_s
 
-            elapsed = time.monotonic() - start
-            if elapsed > timeout_s:
+                deficit = max(tokens - self.tokens, 0.0)
+
+            if time.monotonic() - start > timeout_s:
                 raise TimeoutError(f"Could not acquire {tokens} tokens within {timeout_s}s")
 
-            # Sleep a bit before retrying
             if self.refill_per_sec > 0:
-                sleep_ms = min(100, (tokens - self.tokens) / self.refill_per_sec * 1000)
+                wait_s = min(deficit / self.refill_per_sec, 0.1)
             else:
-                # No refill, just wait a bit before retrying
-                sleep_ms = 100
-            time.sleep(sleep_ms / 1000.0)
+                wait_s = 0.1
 
-            elapsed = time.monotonic() - start
-            if elapsed > timeout_s:
+            wait_s = max(wait_s, 0.0)
+
+            time.sleep(wait_s)
+            total_wait_s += wait_s
+
+            if time.monotonic() - start > timeout_s:
                 raise TimeoutError(f"Could not acquire {tokens} tokens within {timeout_s}s")
 
         # This should not be reached, but satisfy type checker
-        return 0.0
+        return total_wait_s
 
     def refund(self, tokens: float) -> None:
         """Refund tokens to the bucket."""
