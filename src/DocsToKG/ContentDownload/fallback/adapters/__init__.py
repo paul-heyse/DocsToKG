@@ -1,3 +1,30 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.fallback.adapters.__init__",
+#   "purpose": "Fallback source adapters for PDF resolution.",
+#   "sections": [
+#     {
+#       "id": "head-pdf",
+#       "name": "head_pdf",
+#       "anchor": "function-head-pdf",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "canonicalize-url",
+#       "name": "canonicalize_url",
+#       "anchor": "function-canonicalize-url",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-retry-after",
+#       "name": "parse_retry_after",
+#       "anchor": "function-parse-retry-after",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Fallback source adapters for PDF resolution.
 
 This package contains adapters for 7 different sources:
@@ -29,9 +56,9 @@ def head_pdf(
     url: str,
     client: Any,
     timeout_s: float = 10.0,
-    breaker: Optional[Any] = None,
-    logger_: Optional[logging.Logger] = None,
-) -> Tuple[bool, int, Optional[str], str]:
+    breaker: Any | None = None,
+    logger_: logging.Logger | None = None,
+) -> tuple[bool, int, str | None, str]:
     """Validate a PDF URL via HEAD request with content-type checking.
 
     Args:
@@ -97,7 +124,7 @@ def canonicalize_url(url: str, role: str = "artifact") -> str:
     return url
 
 
-def parse_retry_after(resp: Any, cap_s: int = 900) -> Optional[int]:
+def parse_retry_after(resp: Any, cap_s: int = 900) -> int | None:
     """Parse Retry-After header from response.
 
     Args:

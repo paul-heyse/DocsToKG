@@ -1,3 +1,11 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.api.__init__",
+#   "purpose": "ContentDownload API Surface.",
+#   "sections": []
+# }
+# === /NAVMAP ===
+
 """
 ContentDownload API Surface
 

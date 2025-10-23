@@ -1,3 +1,42 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.pyalex_shim",
+#   "purpose": "PyAlex configuration shims for polite resolver defaults.",
+#   "sections": [
+#     {
+#       "id": "load-pyalex-module",
+#       "name": "_load_pyalex_module",
+#       "anchor": "function-load-pyalex-module",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-config",
+#       "name": "get_config",
+#       "anchor": "function-get-config",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "set-config-attr",
+#       "name": "_set_config_attr",
+#       "anchor": "function-set-config-attr",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "apply-mailto",
+#       "name": "apply_mailto",
+#       "anchor": "function-apply-mailto",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "configproxy",
+#       "name": "ConfigProxy",
+#       "anchor": "class-configproxy",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """PyAlex configuration shims for polite resolver defaults.
 
 Responsibilities
@@ -22,12 +61,12 @@ from __future__ import annotations
 
 import importlib
 import sys
-from typing import Any, Optional
+from typing import Any
 
 __all__ = ["apply_mailto", "ConfigProxy", "get_config"]
 
 
-def _load_pyalex_module() -> Optional[Any]:
+def _load_pyalex_module() -> Any | None:
     """Return the currently registered ``pyalex`` module if available."""
 
     module = sys.modules.get("pyalex")
@@ -39,7 +78,7 @@ def _load_pyalex_module() -> Optional[Any]:
         return None
 
 
-def get_config() -> Optional[Any]:
+def get_config() -> Any | None:
     """Return the live ``pyalex`` config object, handling late module swaps."""
 
     module = _load_pyalex_module()

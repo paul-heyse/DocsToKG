@@ -667,16 +667,10 @@ WORKDIR /home/docstokg
 ```dockerfile
 FROM docstokg/base:${VERSION} AS builder
 
-# Install dependencies
-COPY requirements.txt /tmp/
-RUN pip install --user --no-cache-dir -r /tmp/requirements.txt
-
-# Copy application code
-COPY --chown=docstokg:docstokg src/DocsToKG /home/docstokg/src/DocsToKG
+# Install application code + deps
 COPY --chown=docstokg:docstokg pyproject.toml /home/docstokg/
-
-# Install package
-RUN pip install --user --no-cache-dir -e .
+COPY --chown=docstokg:docstokg src /home/docstokg/src
+RUN cd /home/docstokg && pip install --user --no-cache-dir -e .[dev,docs]
 
 # Runtime stage
 FROM docstokg/base:${VERSION}

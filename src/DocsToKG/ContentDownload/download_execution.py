@@ -1,3 +1,90 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.download_execution",
+#   "purpose": "Download Execution Stage - Canonical Implementation.",
+#   "sections": [
+#     {
+#       "id": "log-io-attempt",
+#       "name": "_log_io_attempt",
+#       "anchor": "function-log-io-attempt",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "ctx-get",
+#       "name": "_ctx_get",
+#       "anchor": "function-ctx-get",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "infer-user-agent",
+#       "name": "_infer_user_agent",
+#       "anchor": "function-infer-user-agent",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolve-domain-policy",
+#       "name": "_resolve_domain_policy",
+#       "anchor": "function-resolve-domain-policy",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolve-plan-hints",
+#       "name": "_resolve_plan_hints",
+#       "anchor": "function-resolve-plan-hints",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "coerce-allowed-types",
+#       "name": "_coerce_allowed_types",
+#       "anchor": "function-coerce-allowed-types",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "effective-max-bytes",
+#       "name": "_effective_max_bytes",
+#       "anchor": "function-effective-max-bytes",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolve-storage-tmp-root",
+#       "name": "_resolve_storage_tmp_root",
+#       "anchor": "function-resolve-storage-tmp-root",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "prepare-staging-destination",
+#       "name": "_prepare_staging_destination",
+#       "anchor": "function-prepare-staging-destination",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "cleanup-staging-artifacts",
+#       "name": "_cleanup_staging_artifacts",
+#       "anchor": "function-cleanup-staging-artifacts",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "prepare-candidate-download",
+#       "name": "prepare_candidate_download",
+#       "anchor": "function-prepare-candidate-download",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "stream-candidate-payload",
+#       "name": "stream_candidate_payload",
+#       "anchor": "function-stream-candidate-payload",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "finalize-candidate-download",
+#       "name": "finalize_candidate_download",
+#       "anchor": "function-finalize-candidate-download",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Download Execution Stage - Canonical Implementation
 
@@ -21,10 +108,11 @@ import shutil
 import tempfile
 import time
 import uuid
+from collections.abc import Mapping
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Mapping, Optional
+from typing import Any
 from urllib.parse import urlsplit
 
 from DocsToKG.ContentDownload.api import (
@@ -56,18 +144,18 @@ LOGGER = logging.getLogger(__name__)
 def _log_io_attempt(
     telemetry: Any,
     *,
-    run_id: Optional[str],
+    run_id: str | None,
     resolver_name: str,
     url: str,
     verb: str,
     status: str,
-    http_status: Optional[int] = None,
-    reason: Optional[str] = None,
-    elapsed_ms: Optional[int] = None,
-    content_type: Optional[str] = None,
-    bytes_written: Optional[int] = None,
-    content_length_hdr: Optional[int] = None,
-    extra: Optional[Mapping[str, Any]] = None,
+    http_status: int | None = None,
+    reason: str | None = None,
+    elapsed_ms: int | None = None,
+    content_type: str | None = None,
+    bytes_written: int | None = None,
+    content_length_hdr: int | None = None,
+    extra: Mapping[str, Any] | None = None,
 ) -> None:
     """Emit a :class:`SimplifiedAttemptRecord` via ``telemetry.log_io_attempt``."""
 
@@ -132,7 +220,7 @@ def _infer_user_agent(ctx: Any) -> str:
 
     http_config = _ctx_get(ctx, "http_config", None)
     if http_config and hasattr(http_config, "user_agent"):
-        return getattr(http_config, "user_agent")
+        return http_config.user_agent
 
     candidate = _ctx_get(ctx, "user_agent", None)
     if isinstance(candidate, str) and candidate.strip():
@@ -147,7 +235,7 @@ def _infer_user_agent(ctx: Any) -> str:
     return default
 
 
-def _resolve_domain_policy(ctx: Any, url: str) -> Optional[Mapping[str, Any]]:
+def _resolve_domain_policy(ctx: Any, url: str) -> Mapping[str, Any] | None:
     """Return domain-specific policy mapping for ``url`` if configured."""
 
     rules = _ctx_get(ctx, "domain_content_rules", None)
@@ -205,7 +293,7 @@ def _coerce_allowed_types(policy: Mapping[str, Any]) -> tuple[str, ...]:
     return ()
 
 
-def _effective_max_bytes(plan: DownloadPlan, ctx: Any) -> Optional[int]:
+def _effective_max_bytes(plan: DownloadPlan, ctx: Any) -> int | None:
     """Return the effective max-bytes limit considering plan overrides and context."""
 
     if plan.max_bytes_override is not None:
@@ -217,7 +305,7 @@ def _effective_max_bytes(plan: DownloadPlan, ctx: Any) -> Optional[int]:
 
     download_policy = _ctx_get(ctx, "download_policy", None)
     if download_policy and hasattr(download_policy, "max_bytes"):
-        limit = getattr(download_policy, "max_bytes")
+        limit = download_policy.max_bytes
         if isinstance(limit, int):
             return limit
 
@@ -241,10 +329,10 @@ def _resolve_storage_tmp_root() -> Path:
 
 
 def _prepare_staging_destination(
-    run_id: Optional[str],
+    run_id: str | None,
     resolver_name: str,
     *,
-    filename: Optional[str] = None,
+    filename: str | None = None,
 ) -> tuple[Path, Path]:
     """Allocate a dedicated staging directory for a download attempt."""
 
@@ -260,8 +348,8 @@ def _prepare_staging_destination(
 
 
 def _cleanup_staging_artifacts(
-    path_tmp: Optional[Path | str],
-    staging_dir: Optional[Path | str],
+    path_tmp: Path | str | None,
+    staging_dir: Path | str | None,
 ) -> None:
     """Best-effort cleanup for staging files and directories."""
 
@@ -284,7 +372,7 @@ def prepare_candidate_download(
     session: Any = None,
     ctx: Any = None,
     telemetry: Any = None,
-    run_id: Optional[str] = None,
+    run_id: str | None = None,
 ) -> DownloadPlan:
     """
     Preflight validation before streaming.
@@ -364,12 +452,12 @@ def stream_candidate_payload(
     plan: DownloadPlan,
     *,
     session: Any = None,
-    timeout_s: Optional[float] = None,
+    timeout_s: float | None = None,
     chunk_size: int = 1 << 20,  # 1 MB default
-    max_bytes: Optional[int] = None,
+    max_bytes: int | None = None,
     verify_content_length: bool = True,
     telemetry: Any = None,
-    run_id: Optional[str] = None,
+    run_id: str | None = None,
 ) -> DownloadStreamResult:
     """
     Stream HTTP payload to a temporary file using atomic write.
@@ -420,7 +508,7 @@ def stream_candidate_payload(
         head = session.head(url, **head_kwargs)
         elapsed_ms = (time.monotonic_ns() - t0) // 1_000_000
         head_headers = getattr(head, "headers", None)
-        head_content_type: Optional[str] = None
+        head_content_type: str | None = None
         if head_headers:
             ct_raw = head_headers.get("Content-Type")
             if isinstance(ct_raw, str):
@@ -449,17 +537,17 @@ def stream_candidate_payload(
     if base_headers:
         get_kwargs["headers"] = dict(base_headers)
 
-    staging_dir: Optional[Path] = None
-    tmp_path: Optional[Path] = None
+    staging_dir: Path | None = None
+    tmp_path: Path | None = None
     bytes_streamed = 0
     bytes_written = 0
     content_type = ""
     from_cache = False
     revalidated = False
-    expected_len: Optional[int] = None
-    http_status: Optional[int] = None
-    not_modified_result: Optional[DownloadStreamResult] = None
-    stream_result: Optional[DownloadStreamResult] = None
+    expected_len: int | None = None
+    http_status: int | None = None
+    not_modified_result: DownloadStreamResult | None = None
+    stream_result: DownloadStreamResult | None = None
     resp_started = False
 
     try:
@@ -659,11 +747,11 @@ def finalize_candidate_download(
     plan: DownloadPlan,
     stream: DownloadStreamResult,
     *,
-    final_path: Optional[str] = None,
+    final_path: str | None = None,
     storage_settings: Any = None,
-    storage_root: Optional[str] = None,
+    storage_root: str | None = None,
     telemetry: Any = None,
-    run_id: Optional[str] = None,
+    run_id: str | None = None,
 ) -> DownloadOutcome:
     """
     Finalize downloaded artifact (move to final location).

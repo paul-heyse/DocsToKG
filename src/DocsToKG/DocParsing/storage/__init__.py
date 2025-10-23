@@ -1,3 +1,11 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.storage.__init__",
+#   "purpose": "DocParsing Storage Layer.",
+#   "sections": []
+# }
+# === /NAVMAP ===
+
 """
 DocParsing Storage Layer
 

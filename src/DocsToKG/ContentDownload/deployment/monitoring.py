@@ -1,3 +1,66 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.deployment.monitoring",
+#   "purpose": "Production monitoring and alerting system with comprehensive observability.",
+#   "sections": [
+#     {
+#       "id": "alertseverity",
+#       "name": "AlertSeverity",
+#       "anchor": "class-alertseverity",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "metrictype",
+#       "name": "MetricType",
+#       "anchor": "class-metrictype",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "threshold",
+#       "name": "Threshold",
+#       "anchor": "class-threshold",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "alert",
+#       "name": "Alert",
+#       "anchor": "class-alert",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "metric",
+#       "name": "Metric",
+#       "anchor": "class-metric",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "metricscollector",
+#       "name": "MetricsCollector",
+#       "anchor": "class-metricscollector",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "alertmanager",
+#       "name": "AlertManager",
+#       "anchor": "class-alertmanager",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "productionmonitor",
+#       "name": "ProductionMonitor",
+#       "anchor": "class-productionmonitor",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "get-production-monitor",
+#       "name": "get_production_monitor",
+#       "anchor": "function-get-production-monitor",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Production monitoring and alerting system with comprehensive observability.
 
 Provides real-time metrics collection, anomaly detection, and alert management
@@ -9,10 +72,11 @@ from __future__ import annotations
 import logging
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 LOGGER = logging.getLogger(__name__)
 
@@ -86,7 +150,7 @@ class Alert:
     threshold: Threshold
     metric_value: float
     timestamp: float = field(default_factory=time.time)
-    context: Dict[str, Any] = field(default_factory=dict)
+    context: dict[str, Any] = field(default_factory=dict)
 
     @property
     def severity(self) -> AlertSeverity:
@@ -107,8 +171,8 @@ class Metric:
     value: float
     metric_type: MetricType
     timestamp: float = field(default_factory=time.time)
-    tags: Dict[str, str] = field(default_factory=dict)
-    labels: Dict[str, Any] = field(default_factory=dict)
+    tags: dict[str, str] = field(default_factory=dict)
+    labels: dict[str, Any] = field(default_factory=dict)
 
 
 class MetricsCollector:
@@ -116,7 +180,7 @@ class MetricsCollector:
 
     def __init__(self) -> None:
         """Initialize metrics collector."""
-        self._metrics: Dict[str, List[Metric]] = {}
+        self._metrics: dict[str, list[Metric]] = {}
         self._lock = threading.Lock()
 
     def record_metric(
@@ -124,7 +188,7 @@ class MetricsCollector:
         name: str,
         value: float,
         metric_type: MetricType,
-        tags: Optional[Dict[str, str]] = None,
+        tags: dict[str, str] | None = None,
     ) -> None:
         """Record a metric measurement.
 
@@ -150,7 +214,7 @@ class MetricsCollector:
             if len(self._metrics[name]) > 1000:
                 self._metrics[name] = self._metrics[name][-1000:]
 
-    def get_metric_summary(self, name: str) -> Optional[Dict[str, Any]]:
+    def get_metric_summary(self, name: str) -> dict[str, Any] | None:
         """Get summary statistics for metric.
 
         Args:
@@ -177,7 +241,7 @@ class MetricsCollector:
                 "p99": values[int(len(values) * 0.99)],
             }
 
-    def get_recent_metrics(self, name: str, seconds: float = 300) -> List[Metric]:
+    def get_recent_metrics(self, name: str, seconds: float = 300) -> list[Metric]:
         """Get recent metrics within time window.
 
         Args:
@@ -200,9 +264,9 @@ class AlertManager:
 
     def __init__(self) -> None:
         """Initialize alert manager."""
-        self._thresholds: Dict[str, List[Threshold]] = {}
-        self._alerts: List[Alert] = []
-        self._alert_handlers: List[Callable[[Alert], None]] = []
+        self._thresholds: dict[str, list[Threshold]] = {}
+        self._alerts: list[Alert] = []
+        self._alert_handlers: list[Callable[[Alert], None]] = []
         self._lock = threading.Lock()
 
     def register_threshold(self, threshold: Threshold) -> None:
@@ -225,7 +289,7 @@ class AlertManager:
         with self._lock:
             self._alert_handlers.append(handler)
 
-    def check_thresholds(self, metric: Metric) -> List[Alert]:
+    def check_thresholds(self, metric: Metric) -> list[Alert]:
         """Check if metric violates any thresholds.
 
         Args:
@@ -265,8 +329,8 @@ class AlertManager:
         return alerts
 
     def get_recent_alerts(
-        self, severity: Optional[AlertSeverity] = None, seconds: float = 300
-    ) -> List[Alert]:
+        self, severity: AlertSeverity | None = None, seconds: float = 300
+    ) -> list[Alert]:
         """Get recent alerts.
 
         Args:
@@ -294,7 +358,7 @@ class ProductionMonitor:
         self.metrics = MetricsCollector()
         self.alerts = AlertManager()
         self._running = False
-        self._monitor_thread: Optional[threading.Thread] = None
+        self._monitor_thread: threading.Thread | None = None
 
     def start_monitoring(self) -> None:
         """Start monitoring system."""
@@ -333,7 +397,7 @@ class ProductionMonitor:
         name: str,
         value: float,
         metric_type: MetricType = MetricType.GAUGE,
-        tags: Optional[Dict[str, str]] = None,
+        tags: dict[str, str] | None = None,
     ) -> None:
         """Record a metric.
 
@@ -354,7 +418,7 @@ class ProductionMonitor:
         # Check thresholds
         self.alerts.check_thresholds(metric)
 
-    def get_health_status(self) -> Dict[str, Any]:
+    def get_health_status(self) -> dict[str, Any]:
         """Get system health status.
 
         Returns:
@@ -372,7 +436,7 @@ class ProductionMonitor:
 
 
 # Global monitoring instance
-_GLOBAL_MONITOR: Optional[ProductionMonitor] = None
+_GLOBAL_MONITOR: ProductionMonitor | None = None
 
 
 def get_production_monitor() -> ProductionMonitor:

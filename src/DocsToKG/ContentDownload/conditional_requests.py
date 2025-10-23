@@ -1,3 +1,48 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.conditional_requests",
+#   "purpose": "RFC 7232 conditional request handling (ETag and Last-Modified).",
+#   "sections": [
+#     {
+#       "id": "entityvalidator",
+#       "name": "EntityValidator",
+#       "anchor": "class-entityvalidator",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "parse-entity-validator",
+#       "name": "parse_entity_validator",
+#       "anchor": "function-parse-entity-validator",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-conditional-headers",
+#       "name": "build_conditional_headers",
+#       "anchor": "function-build-conditional-headers",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "should-revalidate",
+#       "name": "should_revalidate",
+#       "anchor": "function-should-revalidate",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "merge-validators",
+#       "name": "merge_validators",
+#       "anchor": "function-merge-validators",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "is-validator-available",
+#       "name": "is_validator_available",
+#       "anchor": "function-is-validator-available",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """RFC 7232 conditional request handling (ETag and Last-Modified).
 
 Responsibilities
@@ -20,10 +65,10 @@ Design Notes
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from email.utils import parsedate_to_datetime
-from typing import Mapping, Optional
 
 LOGGER = logging.getLogger(__name__)
 
@@ -42,10 +87,10 @@ class EntityValidator:
         last_modified_dt: Parsed datetime object for last_modified
     """
 
-    etag: Optional[str] = None
+    etag: str | None = None
     etag_strong: bool = False
-    last_modified: Optional[str] = None
-    last_modified_dt: Optional[datetime] = None
+    last_modified: str | None = None
+    last_modified_dt: datetime | None = None
 
 
 def parse_entity_validator(headers: Mapping[str, str]) -> EntityValidator:
@@ -75,7 +120,7 @@ def parse_entity_validator(headers: Mapping[str, str]) -> EntityValidator:
         'Wed, 21 Oct 2025 07:28:00 GMT'
     """
     # Parse ETag (case-insensitive)
-    etag: Optional[str] = None
+    etag: str | None = None
     etag_strong = False
     for key, value in headers.items():
         if key.lower() == "etag":
@@ -85,8 +130,8 @@ def parse_entity_validator(headers: Mapping[str, str]) -> EntityValidator:
             break
 
     # Parse Last-Modified (case-insensitive)
-    last_modified: Optional[str] = None
-    last_modified_dt: Optional[datetime] = None
+    last_modified: str | None = None
+    last_modified_dt: datetime | None = None
     for key, value in headers.items():
         if key.lower() == "last-modified":
             last_modified = value.strip()

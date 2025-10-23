@@ -1,3 +1,24 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.embedding.cli",
+#   "purpose": "CLI parser utilities for configuring the DocParsing embedding stage.",
+#   "sections": [
+#     {
+#       "id": "build-parser",
+#       "name": "build_parser",
+#       "anchor": "function-build-parser",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-args",
+#       "name": "parse_args",
+#       "anchor": "function-parse-args",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """CLI parser utilities for configuring the DocParsing embedding stage.
 
 IMPORTANT: This module is INTERNAL CLI INFRASTRUCTURE
@@ -30,7 +51,6 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
-from typing import Tuple
 
 from DocsToKG.DocParsing.config import parse_args_with_overrides
 from DocsToKG.DocParsing.core import CLIOption, build_subcommand
@@ -38,7 +58,7 @@ from DocsToKG.DocParsing.doctags import add_data_root_option, add_resume_force_o
 
 from .config import EMBED_PROFILE_PRESETS, SPLADE_SPARSITY_WARN_THRESHOLD_PCT
 
-EMBED_CLI_OPTIONS: Tuple[CLIOption, ...] = (
+EMBED_CLI_OPTIONS: tuple[CLIOption, ...] = (
     CLIOption(
         ("--config",),
         {"type": Path, "default": None, "help": "Path to stage config file (JSON/YAML/TOML)."},

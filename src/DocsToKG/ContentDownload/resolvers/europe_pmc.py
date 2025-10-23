@@ -16,7 +16,8 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Iterable, List
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, Any
 
 import httpx
 
@@ -40,7 +41,7 @@ class EuropePmcResolver(ApiResolverBase):
 
     name = "europe_pmc"
 
-    def is_enabled(self, config: Any, artifact: "WorkArtifact") -> bool:
+    def is_enabled(self, config: Any, artifact: WorkArtifact) -> bool:
         """Return ``True`` when a DOI is available for Europe PMC lookups.
 
         Args:
@@ -56,7 +57,7 @@ class EuropePmcResolver(ApiResolverBase):
         self,
         client: httpx.Client,
         config: Any,
-        artifact: "WorkArtifact",
+        artifact: WorkArtifact,
     ) -> Iterable[ResolverResult]:
         """Yield PDF URLs announced by the Europe PMC REST API.
 
@@ -89,7 +90,7 @@ class EuropePmcResolver(ApiResolverBase):
                 return
             yield error
             return
-        candidates: List[str] = []
+        candidates: list[str] = []
         for result in (data.get("resultList", {}) or {}).get("result", []) or []:
             full_text = result.get("fullTextUrlList", {}) or {}
             for entry in full_text.get("fullTextUrl", []) or []:

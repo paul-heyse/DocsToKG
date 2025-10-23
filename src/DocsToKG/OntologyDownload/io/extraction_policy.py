@@ -3,9 +3,30 @@
 #   "module": "DocsToKG.OntologyDownload.io.extraction_policy",
 #   "purpose": "Configuration and validation for the 10 archive extraction hardening policies",
 #   "sections": [
-#     {"id": "policy", "name": "Extraction Policy", "anchor": "POL", "kind": "pydantic"},
-#     {"id": "defaults", "name": "Defaults & Factory", "anchor": "DEF", "kind": "factory"},
-#     {"id": "validation", "name": "Policy Validation", "anchor": "VAL", "kind": "validators"}
+#     {
+#       "id": "extractionsettings",
+#       "name": "ExtractionSettings",
+#       "anchor": "class-extractionsettings",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "safe-defaults",
+#       "name": "safe_defaults",
+#       "anchor": "function-safe-defaults",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "lenient-defaults",
+#       "name": "lenient_defaults",
+#       "anchor": "function-lenient-defaults",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "strict-defaults",
+#       "name": "strict_defaults",
+#       "anchor": "function-strict-defaults",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===

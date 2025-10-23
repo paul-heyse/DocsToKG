@@ -1,10 +1,74 @@
 # === NAVMAP v1 ===
 # {
-#   "module": "src.DocsToKG.OntologyDownload.cli.db_cmd",
+#   "module": "DocsToKG.OntologyDownload.cli.db_cmd",
 #   "purpose": "CLI commands for DuckDB catalog operations (Task 1.2)",
 #   "sections": [
-#     {"id": "imports", "name": "Imports & Setup", "anchor": "IMP", "kind": "infra"},
-#     {"id": "commands", "name": "CLI Commands", "anchor": "CMDS", "kind": "commands"}
+#     {
+#       "id": "get-duckdb-connection",
+#       "name": "_get_duckdb_connection",
+#       "anchor": "function-get-duckdb-connection",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "format-output",
+#       "name": "_format_output",
+#       "anchor": "function-format-output",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "migrate",
+#       "name": "migrate",
+#       "anchor": "function-migrate",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "latest",
+#       "name": "latest",
+#       "anchor": "function-latest",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "versions",
+#       "name": "versions",
+#       "anchor": "function-versions",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "files",
+#       "name": "files",
+#       "anchor": "function-files",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "stats",
+#       "name": "stats",
+#       "anchor": "function-stats",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "delta",
+#       "name": "delta",
+#       "anchor": "function-delta",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "doctor",
+#       "name": "doctor",
+#       "anchor": "function-doctor",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "prune",
+#       "name": "prune",
+#       "anchor": "function-prune",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "backup",
+#       "name": "backup",
+#       "anchor": "function-backup",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===
@@ -21,7 +85,6 @@ import logging
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 import typer
 
@@ -109,7 +172,7 @@ def migrate(
 @app.command()
 def latest(
     action: str = typer.Argument("get", help="Action: 'get' or 'set'"),
-    version: Optional[str] = typer.Option(None, "--version", help="Version to set"),
+    version: str | None = typer.Option(None, "--version", help="Version to set"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Dry run for set action"),
     fmt: str = typer.Option("table", "--format", help="Output format: 'json' or 'table'"),
 ) -> None:
@@ -154,7 +217,7 @@ def latest(
 
 @app.command()
 def versions(
-    service: Optional[str] = typer.Option(None, "--service", help="Filter by service"),
+    service: str | None = typer.Option(None, "--service", help="Filter by service"),
     limit: int = typer.Option(50, "--limit", help="Maximum versions to display"),
     fmt: str = typer.Option("table", "--format", help="Output format: 'json' or 'table'"),
 ) -> None:
@@ -181,7 +244,7 @@ def versions(
 @app.command()
 def files(
     version: str = typer.Option(..., "--version", help="Version ID"),
-    format_filter: Optional[str] = typer.Option(None, "--format", help="Filter by format"),
+    format_filter: str | None = typer.Option(None, "--format", help="Filter by format"),
     fmt: str = typer.Option("table", "--format-output", help="Output format: 'json' or 'table'"),
 ) -> None:
     """List files in a version."""

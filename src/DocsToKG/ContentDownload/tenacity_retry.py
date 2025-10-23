@@ -1,3 +1,42 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.tenacity_retry",
+#   "purpose": "Tenacity retry strategies and classification for ContentDownload.",
+#   "sections": [
+#     {
+#       "id": "is-retryable",
+#       "name": "is_retryable",
+#       "anchor": "function-is-retryable",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "waitretryafter",
+#       "name": "_WaitRetryAfter",
+#       "anchor": "class-waitretryafter",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "make-retry-predicate",
+#       "name": "_make_retry_predicate",
+#       "anchor": "function-make-retry-predicate",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-tenacity-retrying",
+#       "name": "build_tenacity_retrying",
+#       "anchor": "function-build-tenacity-retrying",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "default-before-sleep-hook",
+#       "name": "_default_before_sleep_hook",
+#       "anchor": "function-default-before-sleep-hook",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Tenacity retry strategies and classification for ContentDownload.
 
 Provides:
@@ -12,8 +51,9 @@ from __future__ import annotations
 import email.utils
 import logging
 import time
+from collections.abc import Callable
 from datetime import datetime
-from typing import Any, Callable, Optional
+from typing import Any
 
 import httpx
 import tenacity
@@ -28,8 +68,8 @@ LOGGER = logging.getLogger(__name__)
 def is_retryable(
     *,
     method: str,
-    status: Optional[int] = None,
-    exception: Optional[BaseException] = None,
+    status: int | None = None,
+    exception: BaseException | None = None,
     offline: bool = False,
     breaker_open: bool = False,
     cfg: RetriesConfig,
@@ -222,7 +262,7 @@ def build_tenacity_retrying(
     method: str = "GET",
     offline: bool = False,
     breaker_open: bool = False,
-    before_sleep_hook: Optional[Callable[[RetryCallState], None]] = None,
+    before_sleep_hook: Callable[[RetryCallState], None] | None = None,
 ) -> tenacity.Retrying:
     """Build a Tenacity Retrying controller.
 

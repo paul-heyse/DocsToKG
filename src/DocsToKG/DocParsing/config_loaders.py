@@ -1,3 +1,30 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.config_loaders",
+#   "purpose": "Utility loaders that hydrate DocParsing configs from YAML and TOML sources.",
+#   "sections": [
+#     {
+#       "id": "configloaderror",
+#       "name": "ConfigLoadError",
+#       "anchor": "class-configloaderror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "load-yaml-markers",
+#       "name": "load_yaml_markers",
+#       "anchor": "function-load-yaml-markers",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-toml-markers",
+#       "name": "load_toml_markers",
+#       "anchor": "function-load-toml-markers",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Utility loaders that hydrate DocParsing configs from YAML and TOML sources.
 
 DocParsing stages rely on human-editable marker files to tune structural

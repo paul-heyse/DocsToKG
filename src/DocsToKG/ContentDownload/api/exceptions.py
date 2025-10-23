@@ -1,3 +1,24 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.api.exceptions",
+#   "purpose": "Canonical Exception Types for Download Pipeline.",
+#   "sections": [
+#     {
+#       "id": "skipdownload",
+#       "name": "SkipDownload",
+#       "anchor": "class-skipdownload",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "downloaderror",
+#       "name": "DownloadError",
+#       "anchor": "class-downloaderror",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Canonical Exception Types for Download Pipeline
 
@@ -10,8 +31,6 @@ while allowing clean short-circuit logic.
 """
 
 from __future__ import annotations
-
-from typing import Optional
 
 from .types import ReasonCode
 
@@ -35,7 +54,7 @@ class SkipDownload(Exception):
             return plan
     """
 
-    def __init__(self, reason: ReasonCode, message: Optional[str] = None) -> None:
+    def __init__(self, reason: ReasonCode, message: str | None = None) -> None:
         """
         Initialize skip signal.
 
@@ -69,7 +88,7 @@ class DownloadError(Exception):
             return result
     """
 
-    def __init__(self, reason: ReasonCode, message: Optional[str] = None) -> None:
+    def __init__(self, reason: ReasonCode, message: str | None = None) -> None:
         """
         Initialize error signal.
 

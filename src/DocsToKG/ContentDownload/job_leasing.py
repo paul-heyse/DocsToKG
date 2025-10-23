@@ -4,6 +4,12 @@
 #   "purpose": "Concurrency-safe job leasing for multi-worker coordination",
 #   "sections": [
 #     {
+#       "id": "row-to-dict",
+#       "name": "_row_to_dict",
+#       "anchor": "function-row-to-dict",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "lease-next-job",
 #       "name": "lease_next_job",
 #       "anchor": "function-lease-next-job",

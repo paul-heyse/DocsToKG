@@ -138,3 +138,4 @@ $RECYCLE.BIN/
 # local caches
 .wheelhouse/
 ci/wheels/
+docs/build/

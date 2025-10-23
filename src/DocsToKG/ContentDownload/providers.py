@@ -1,3 +1,24 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.providers",
+#   "purpose": "Source adapter interfaces for the DocsToKG content download pipeline.",
+#   "sections": [
+#     {
+#       "id": "workprovider",
+#       "name": "WorkProvider",
+#       "anchor": "class-workprovider",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "openalexworkprovider",
+#       "name": "OpenAlexWorkProvider",
+#       "anchor": "class-openalexworkprovider",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Source adapter interfaces for the DocsToKG content download pipeline.
 
 Responsibilities
@@ -24,16 +45,16 @@ Design Notes
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from collections.abc import Iterable as IterableABC
-from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, Iterator, Optional, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from pyalex import Works
 
 from DocsToKG.ContentDownload.core import WorkArtifact
 
-ArtifactFactory = Callable[[Dict[str, Any], Path, Path, Path], WorkArtifact]
+ArtifactFactory = Callable[[dict[str, Any], Path, Path, Path], WorkArtifact]
 
 
 @runtime_checkable
@@ -57,19 +78,19 @@ class OpenAlexWorkProvider:
     def __init__(
         self,
         *,
-        query: Optional[Works] = None,
-        works_iterable: Optional[Iterable[Dict[str, Any]]] = None,
+        query: Works | None = None,
+        works_iterable: Iterable[dict[str, Any]] | None = None,
         artifact_factory: ArtifactFactory,
         pdf_dir: Path,
         html_dir: Path,
         xml_dir: Path,
         per_page: int = 200,
-        max_results: Optional[int] = None,
+        max_results: int | None = None,
         retry_attempts: int = 3,
         retry_backoff: float = 1.0,
-        retry_max_delay: Optional[float] = 75.0,
-        retry_after_cap: Optional[float] = None,
-        iterate_openalex_func: Optional[Callable[..., Iterable[Dict[str, Any]]]] = None,
+        retry_max_delay: float | None = 75.0,
+        retry_after_cap: float | None = None,
+        iterate_openalex_func: Callable[..., Iterable[dict[str, Any]]] | None = None,
     ) -> None:
         if query is None and works_iterable is None:
             raise ValueError("Provide an OpenAlex query or an iterable of works.")
@@ -83,9 +104,7 @@ class OpenAlexWorkProvider:
         if not 1 <= normalized_per_page <= 200:
             raise ValueError("OpenAlex per_page must be between 1 and 200")
         self._per_page = normalized_per_page
-        if max_results is None:
-            self._max_results = None
-        elif max_results < 0:
+        if max_results is None or max_results < 0:
             self._max_results = None
         else:
             self._max_results = max_results
@@ -132,7 +151,7 @@ class OpenAlexWorkProvider:
     def __iter__(self) -> Iterator[WorkArtifact]:
         return self.iter_artifacts()
 
-    def _iterate_openalex(self) -> Iterable[Dict[str, Any]]:
+    def _iterate_openalex(self) -> Iterable[dict[str, Any]]:
         assert self._query is not None  # For mypy; guarded by caller.
         yield from self._iterate_openalex_func(
             self._query,
@@ -144,7 +163,7 @@ class OpenAlexWorkProvider:
             retry_after_cap=self._retry_after_cap,
         )
 
-    def _iter_source(self) -> Iterator[Dict[str, Any]]:
+    def _iter_source(self) -> Iterator[dict[str, Any]]:
         if self._works_iterable is not None:
             yield from iter(self._works_iterable)
             return

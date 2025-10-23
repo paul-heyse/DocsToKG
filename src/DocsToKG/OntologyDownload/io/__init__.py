@@ -1,3 +1,11 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.io.__init__",
+#   "purpose": "Aggregated IO helpers for DocsToKG ontology downloads.",
+#   "sections": []
+# }
+# === /NAVMAP ===
+
 """Aggregated IO helpers for DocsToKG ontology downloads.
 
 This subpackage bundles filesystem utilities (archive extraction, checksum

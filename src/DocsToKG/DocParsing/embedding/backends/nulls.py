@@ -1,3 +1,36 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.embedding.backends.nulls",
+#   "purpose": "Null provider implementations used for disabled backends.",
+#   "sections": [
+#     {
+#       "id": "nullmixin",
+#       "name": "_NullMixin",
+#       "anchor": "class-nullmixin",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "nulldenseprovider",
+#       "name": "NullDenseProvider",
+#       "anchor": "class-nulldenseprovider",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "nullsparseprovider",
+#       "name": "NullSparseProvider",
+#       "anchor": "class-nullsparseprovider",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "nulllexicalprovider",
+#       "name": "NullLexicalProvider",
+#       "anchor": "class-nulllexicalprovider",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Null provider implementations used for disabled backends.
 
 These providers intentionally raise :class:`ProviderError` with a

@@ -18,7 +18,8 @@ from __future__ import annotations
 
 import logging
 import warnings
-from typing import TYPE_CHECKING, Any, Iterable, Mapping
+from collections.abc import Iterable, Mapping
+from typing import TYPE_CHECKING, Any
 
 import httpx
 
@@ -56,7 +57,7 @@ class LandingPageResolver:
         super().__init__()
         self._robots_cache = RobotsCache(ttl_sec=3600)
 
-    def is_enabled(self, config: Any, artifact: "WorkArtifact") -> bool:
+    def is_enabled(self, config: Any, artifact: WorkArtifact) -> bool:
         """Return ``True`` when landing page URLs are available to scrape.
 
         Args:
@@ -72,7 +73,7 @@ class LandingPageResolver:
         self,
         client: httpx.Client,
         config: Any,
-        artifact: "WorkArtifact",
+        artifact: WorkArtifact,
     ) -> Iterable[ResolverResult]:
         """Scrape landing pages for PDF links and yield matching results.
 

@@ -17,7 +17,8 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Tuple
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, Any
 
 import httpx
 
@@ -45,7 +46,7 @@ class UnpaywallResolver:
 
     name = "unpaywall"
 
-    def is_enabled(self, config: Any, artifact: "WorkArtifact") -> bool:
+    def is_enabled(self, config: Any, artifact: WorkArtifact) -> bool:
         """Return ``True`` when unpaywall credentials and a DOI are provided.
 
         Args:
@@ -61,7 +62,7 @@ class UnpaywallResolver:
         self,
         client: httpx.Client,
         config: Any,
-        artifact: "WorkArtifact",
+        artifact: WorkArtifact,
     ) -> Iterable[ResolverResult]:
         """Yield Unpaywall-sourced PDF URLs for ``artifact``.
 
@@ -135,7 +136,7 @@ class UnpaywallResolver:
             )
             return
 
-        candidates: List[Tuple[str, Dict[str, Any]]] = []
+        candidates: list[tuple[str, dict[str, Any]]] = []
         best = (data or {}).get("best_oa_location") or {}
         url = best.get("url_for_pdf")
         if url:

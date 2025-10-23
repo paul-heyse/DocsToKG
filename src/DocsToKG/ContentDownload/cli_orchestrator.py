@@ -3,11 +3,36 @@
 #   "module": "DocsToKG.ContentDownload.cli_orchestrator",
 #   "purpose": "CLI commands for work orchestration (queue management)",
 #   "sections": [
-#     {"id": "queue_enqueue", "name": "queue_enqueue", "anchor": "#function-queue-enqueue", "kind": "function"},
-#     {"id": "queue_import", "name": "queue_import", "anchor": "#function-queue-import", "kind": "function"},
-#     {"id": "queue_run", "name": "queue_run", "anchor": "#function-queue-run", "kind": "function"},
-#     {"id": "queue_stats", "name": "queue_stats", "anchor": "#function-queue-stats", "kind": "function"},
-#     {"id": "queue_retry_failed", "name": "queue_retry_failed", "anchor": "#function-queue-retry-failed", "kind": "function"}
+#     {
+#       "id": "queue-enqueue",
+#       "name": "queue_enqueue",
+#       "anchor": "function-queue-enqueue",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "queue-import",
+#       "name": "queue_import",
+#       "anchor": "function-queue-import",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "queue-run",
+#       "name": "queue_run",
+#       "anchor": "function-queue-run",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "queue-stats",
+#       "name": "queue_stats",
+#       "anchor": "function-queue-stats",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "queue-retry-failed",
+#       "name": "queue_retry_failed",
+#       "anchor": "function-queue-retry-failed",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===
@@ -44,8 +69,8 @@ from __future__ import annotations
 import json
 import logging
 import time
+from datetime import UTC
 from pathlib import Path
-from typing import Optional
 
 import typer
 
@@ -112,7 +137,7 @@ def queue_import(
     queue_path: str = typer.Option(
         "state/workqueue.sqlite", "--queue", help="Path to work queue database"
     ),
-    limit: Optional[int] = typer.Option(
+    limit: int | None = typer.Option(
         None, "--limit", help="Max artifacts to import (default: all)"
     ),
 ) -> None:
@@ -175,7 +200,7 @@ def queue_run(
         "state/workqueue.sqlite", "--queue", help="Path to work queue database"
     ),
     workers: int = typer.Option(8, "--workers", help="Number of worker threads"),
-    max_per_resolver: Optional[str] = typer.Option(
+    max_per_resolver: str | None = typer.Option(
         None, "--max-per-resolver", help="Per-resolver limits (e.g., unpaywall:2,crossref:3)"
     ),
     max_per_host: int = typer.Option(4, "--max-per-host", help="Per-host concurrency limit"),
@@ -310,9 +335,9 @@ def queue_retry_failed(
                 return
 
             # Retry failed jobs
-            from datetime import datetime, timezone
+            from datetime import datetime
 
-            now_iso = datetime.now(timezone.utc).isoformat()
+            now_iso = datetime.now(UTC).isoformat()
             retried = 0
 
             for job_id, artifact_id, attempts in failed_jobs:

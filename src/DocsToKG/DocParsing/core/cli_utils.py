@@ -1,3 +1,54 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.core.cli_utils",
+#   "purpose": "Shared CLI building blocks for DocParsing subcommands.",
+#   "sections": [
+#     {
+#       "id": "clioption",
+#       "name": "CLIOption",
+#       "anchor": "class-clioption",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "build-subcommand",
+#       "name": "build_subcommand",
+#       "anchor": "function-build-subcommand",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "preview-list",
+#       "name": "preview_list",
+#       "anchor": "function-preview-list",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "merge-args",
+#       "name": "merge_args",
+#       "anchor": "function-merge-args",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "scan-pdf-html",
+#       "name": "scan_pdf_html",
+#       "anchor": "function-scan-pdf-html",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "directory-contains-suffixes",
+#       "name": "directory_contains_suffixes",
+#       "anchor": "function-directory-contains-suffixes",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "detect-mode",
+#       "name": "detect_mode",
+#       "anchor": "function-detect-mode",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Shared CLI building blocks for DocParsing subcommands.
 
 Controllers across DocTags, chunking, and embedding rely on the same option
@@ -11,9 +62,10 @@ from __future__ import annotations
 
 import argparse
 import os
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Sequence, Tuple
+from typing import Any
 
 PDF_SUFFIXES: tuple[str, ...] = (".pdf",)
 HTML_SUFFIXES: tuple[str, ...] = (".html", ".htm")
@@ -35,8 +87,8 @@ __all__ = [
 class CLIOption:
     """Declarative CLI argument specification used by ``build_subcommand``."""
 
-    flags: Tuple[str, ...]
-    kwargs: Dict[str, Any]
+    flags: tuple[str, ...]
+    kwargs: dict[str, Any]
 
 
 def build_subcommand(
@@ -49,7 +101,7 @@ def build_subcommand(
     return parser
 
 
-def preview_list(items: List[str], limit: int = 5) -> List[str]:
+def preview_list(items: list[str], limit: int = 5) -> list[str]:
     """Return a truncated preview list with remainder hint."""
 
     if len(items) <= limit:
@@ -59,7 +111,7 @@ def preview_list(items: List[str], limit: int = 5) -> List[str]:
     return preview
 
 
-def merge_args(parser: argparse.ArgumentParser, overrides: Dict[str, Any]) -> argparse.Namespace:
+def merge_args(parser: argparse.ArgumentParser, overrides: dict[str, Any]) -> argparse.Namespace:
     """Merge override values into the default parser namespace."""
 
     base = parser.parse_args([])

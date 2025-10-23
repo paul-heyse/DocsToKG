@@ -49,7 +49,6 @@ import statistics
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional
 
 
 @dataclass
@@ -65,9 +64,9 @@ class HostMetrics:
     e5xx: int  # 5xx errors (all)
     e503: int  # 503 Service Unavailable specifically
     timeouts: int  # network timeouts/exceptions
-    retry_after_samples: List[float] = field(default_factory=list)
+    retry_after_samples: list[float] = field(default_factory=list)
     open_events: int = 0
-    open_durations_s: List[float] = field(default_factory=list)
+    open_durations_s: list[float] = field(default_factory=list)
     half_open_success_trials: int = 0
     half_open_fail_trials: int = 0
     max_consecutive_failures: int = 0
@@ -79,16 +78,16 @@ class HostAdvice:
 
     host: str
     # Circuit breaker knobs
-    suggest_fail_max: Optional[int] = None
-    suggest_reset_timeout_s: Optional[int] = None
-    suggest_success_threshold: Optional[int] = None
-    suggest_trial_calls_metadata: Optional[int] = None
-    suggest_trial_calls_artifact: Optional[int] = None
+    suggest_fail_max: int | None = None
+    suggest_reset_timeout_s: int | None = None
+    suggest_success_threshold: int | None = None
+    suggest_trial_calls_metadata: int | None = None
+    suggest_trial_calls_artifact: int | None = None
     # Rate limiting knobs
-    suggest_metadata_rps_multiplier: Optional[float] = None
-    suggest_artifact_rps_multiplier: Optional[float] = None
+    suggest_metadata_rps_multiplier: float | None = None
+    suggest_artifact_rps_multiplier: float | None = None
     # Reasoning snippets
-    reasons: List[str] = field(default_factory=list)
+    reasons: list[str] = field(default_factory=list)
 
 
 class BreakerAdvisor:
@@ -122,7 +121,7 @@ class BreakerAdvisor:
         """Get a database connection."""
         return sqlite3.connect(self.db_path, timeout=2.0)
 
-    def read_metrics(self, now: Optional[float] = None) -> Dict[str, HostMetrics]:
+    def read_metrics(self, now: float | None = None) -> dict[str, HostMetrics]:
         """Read and aggregate metrics from telemetry in a sliding window.
 
         Returns
@@ -132,7 +131,7 @@ class BreakerAdvisor:
         """
         now = now or time.time()
         since = now - self.window_s
-        metrics: Dict[str, HostMetrics] = {}
+        metrics: dict[str, HostMetrics] = {}
 
         try:
             with self._conn() as cx:
@@ -180,7 +179,7 @@ class BreakerAdvisor:
                         (since,),
                     ).fetchall()
 
-                    open_started: Dict[str, float] = {}
+                    open_started: dict[str, float] = {}
                     for host, ts, old_s, new_s, reset_s in trans:
                         if host not in metrics:
                             metrics[host] = HostMetrics(host, self.window_s, 0, 0, 0, 0, 0, 0, 0)
@@ -225,7 +224,7 @@ class BreakerAdvisor:
 
         return metrics
 
-    def advise(self, metrics: Dict[str, HostMetrics]) -> Dict[str, HostAdvice]:
+    def advise(self, metrics: dict[str, HostMetrics]) -> dict[str, HostAdvice]:
         """Produce tuning advice based on metrics.
 
         Heuristics:
@@ -239,7 +238,7 @@ class BreakerAdvisor:
         dict[str, HostAdvice]
             Recommendations keyed by hostname
         """
-        advice: Dict[str, HostAdvice] = {}
+        advice: dict[str, HostAdvice] = {}
 
         for host, h in metrics.items():
             a = HostAdvice(host=host, reasons=[])
@@ -255,7 +254,7 @@ class BreakerAdvisor:
                 a.reasons.append(f"High 429 ratio {r429:.1%}: reduce metadata RPS 20%")
 
             # (2) Estimate unhealthy cooldown period
-            est_cool_s: Optional[int] = None
+            est_cool_s: int | None = None
             if h.retry_after_samples:
                 est_cool_s = int(min(900, max(15, statistics.median(h.retry_after_samples))))
             elif h.open_durations_s:

@@ -42,7 +42,10 @@ def test_wayback_iter_urls_emits_success_telemetry(monkeypatch: pytest.MonkeyPat
     snapshot_metadata = {"discovery_method": "availability", "mimetype": "application/pdf"}
 
     def fake_discover(*_args, **_kwargs):
-        return "https://web.archive.org/web/20200101120000/http://example.org/paper.pdf", snapshot_metadata
+        return (
+            "https://web.archive.org/web/20200101120000/http://example.org/paper.pdf",
+            snapshot_metadata,
+        )
 
     monkeypatch.setattr(resolver, "_discover_snapshots", fake_discover)
 

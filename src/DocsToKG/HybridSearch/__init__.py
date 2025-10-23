@@ -1,6 +1,6 @@
 # === NAVMAP v1 ===
 # {
-#   "module": "DocsToKG.HybridSearch",
+#   "module": "DocsToKG.HybridSearch.__init__",
 #   "purpose": "Hybrid search public API facade",
 #   "sections": []
 # }

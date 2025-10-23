@@ -16,7 +16,8 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Iterable
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, Any
 
 from DocsToKG.ContentDownload.core import strip_prefix
 from DocsToKG.ContentDownload.resolvers.base import (
@@ -39,7 +40,7 @@ class ArxivResolver:
 
     name = "arxiv"
 
-    def is_enabled(self, config: Any, artifact: "WorkArtifact") -> bool:
+    def is_enabled(self, config: Any, artifact: WorkArtifact) -> bool:
         """Return ``True`` when the work exposes an arXiv identifier.
 
         Args:
@@ -53,9 +54,9 @@ class ArxivResolver:
 
     def iter_urls(
         self,
-        client: "httpx.Client",  # noqa: ARG002 - unused, kept for signature parity
+        client: httpx.Client,  # noqa: ARG002 - unused, kept for signature parity
         config: Any,
-        artifact: "WorkArtifact",
+        artifact: WorkArtifact,
     ) -> Iterable[ResolverResult]:
         """Yield the canonical arXiv PDF URL for ``artifact`` when available.
 

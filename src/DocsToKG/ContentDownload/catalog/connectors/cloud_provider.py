@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.catalog.connectors.cloud_provider",
+#   "purpose": "Cloud Provider (RDS + S3).",
+#   "sections": [
+#     {
+#       "id": "cloudprovider",
+#       "name": "CloudProvider",
+#       "anchor": "class-cloudprovider",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Cloud Provider (RDS + S3)
 
@@ -19,7 +34,7 @@ import logging
 import threading
 import time
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from .base import (
     DocumentRecord,
@@ -36,7 +51,7 @@ logger = logging.getLogger(__name__)
 class CloudProvider:
     """Cloud provider - RDS + S3 (AWS)."""
 
-    def __init__(self, config: Dict[str, Any]) -> None:
+    def __init__(self, config: dict[str, Any]) -> None:
         """Initialize cloud provider."""
         self.config = config
         self.connection_url = config.get("connection_url")
@@ -46,12 +61,12 @@ class CloudProvider:
         self.pool_size = config.get("pool_size", 10)
         self.max_overflow = config.get("max_overflow", 20)
         self.echo_sql = config.get("echo_sql", False)
-        self.engine: Optional[Any] = None
-        self.s3_client: Optional[Any] = None
+        self.engine: Any | None = None
+        self.s3_client: Any | None = None
         self._lock = threading.RLock()
         self._initialized = False
 
-    def open(self, config: Dict[str, Any]) -> None:
+    def open(self, config: dict[str, Any]) -> None:
         """Initialize RDS + S3 backend."""
         with self._lock:
             if self._initialized:
@@ -208,11 +223,11 @@ class CloudProvider:
         artifact_id: str,
         source_url: str,
         resolver: str,
-        content_type: Optional[str] = None,
+        content_type: str | None = None,
         bytes: int = 0,
-        sha256: Optional[str] = None,
+        sha256: str | None = None,
         storage_uri: str = "",
-        run_id: Optional[str] = None,
+        run_id: str | None = None,
     ) -> DocumentRecord:
         """Register a document or get existing record (idempotent)."""
         if not self.engine:
@@ -280,7 +295,7 @@ class CloudProvider:
 
                 raise ProviderOperationError(f"Register or get failed: {e}") from e
 
-    def get_by_artifact(self, artifact_id: str) -> List[DocumentRecord]:
+    def get_by_artifact(self, artifact_id: str) -> list[DocumentRecord]:
         """Get all records for a given artifact_id."""
         if not self.engine:
             raise ProviderOperationError("Database not initialized")
@@ -302,7 +317,7 @@ class CloudProvider:
             except Exception as e:
                 raise ProviderOperationError(f"Query failed: {e}") from e
 
-    def get_by_sha256(self, sha256: str) -> List[DocumentRecord]:
+    def get_by_sha256(self, sha256: str) -> list[DocumentRecord]:
         """Get all records with a given SHA-256 hash."""
         if not self.engine:
             raise ProviderOperationError("Database not initialized")
@@ -324,7 +339,7 @@ class CloudProvider:
             except Exception as e:
                 raise ProviderOperationError(f"Query failed: {e}") from e
 
-    def find_duplicates(self) -> List[Tuple[str, int]]:
+    def find_duplicates(self) -> list[tuple[str, int]]:
         """Find all SHA-256 hashes with more than one record."""
         if not self.engine:
             raise ProviderOperationError("Database not initialized")
@@ -398,7 +413,7 @@ class CloudProvider:
             except Exception as e:
                 raise ProviderOperationError(f"Verification failed: {e}") from e
 
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         """Get catalog statistics."""
         if not self.engine:
             raise ProviderOperationError("Database not initialized")

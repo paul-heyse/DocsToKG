@@ -1,3 +1,30 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.ratelimit.tenacity_learning",
+#   "purpose": "Per-provider rate limit learning using Tenacity callbacks.",
+#   "sections": [
+#     {
+#       "id": "providerbehavior",
+#       "name": "ProviderBehavior",
+#       "anchor": "class-providerbehavior",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "providerbehaviortracker",
+#       "name": "ProviderBehaviorTracker",
+#       "anchor": "class-providerbehaviortracker",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "create-learning-retry-policy",
+#       "name": "create_learning_retry_policy",
+#       "anchor": "function-create-learning-retry-policy",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Per-provider rate limit learning using Tenacity callbacks.
 
 Tenacity's `before_sleep` callbacks let us track provider behavior without
@@ -49,7 +76,7 @@ import json
 import logging
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 from tenacity import RetryCallState, Retrying, stop_after_delay, wait_random_exponential
 
@@ -70,7 +97,7 @@ class ProviderBehavior:
     recovery_times: list = field(default_factory=list)
     applied_reduction_pct: float = 0.0
 
-    def record_429(self, retry_after: Optional[int] = None) -> None:
+    def record_429(self, retry_after: int | None = None) -> None:
         """Record a 429 response.
 
         Args:
@@ -95,7 +122,7 @@ class ProviderBehavior:
         # Return median recovery time
         return float(sorted_times[len(sorted_times) // 2])
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize for JSON persistence."""
         return asdict(self)
 
@@ -107,14 +134,14 @@ class ProviderBehaviorTracker:
     persistence across process restarts.
     """
 
-    def __init__(self, persistence_path: Optional[Path] = None):
+    def __init__(self, persistence_path: Path | None = None):
         """Initialize tracker.
 
         Args:
             persistence_path: Optional path to JSON file for persistence
         """
         self.persistence_path = persistence_path
-        self.behaviors: Dict[Tuple[str, str], ProviderBehavior] = {}
+        self.behaviors: dict[tuple[str, str], ProviderBehavior] = {}
 
         if persistence_path and persistence_path.exists():
             self._load()
@@ -144,7 +171,7 @@ class ProviderBehaviorTracker:
         if hasattr(exc, "response") and exc.response:
             if exc.response.status_code == 429:
                 retry_after = exc.response.headers.get("Retry-After")
-                retry_after_int: Optional[int] = None
+                retry_after_int: int | None = None
                 if retry_after:
                     try:
                         retry_after_int = int(retry_after)
@@ -221,7 +248,7 @@ class ProviderBehaviorTracker:
         effective = max(1, int(config_limit * reduction_factor))
         return effective
 
-    def get_provider_status(self, provider: str, host: str) -> Dict[str, Any]:
+    def get_provider_status(self, provider: str, host: str) -> dict[str, Any]:
         """Get current learning state.
 
         Args:

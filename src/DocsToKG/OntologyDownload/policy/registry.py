@@ -1,3 +1,36 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.policy.registry",
+#   "purpose": "Central registry of policy gates and decorator for gate registration.",
+#   "sections": [
+#     {
+#       "id": "gatemetadata",
+#       "name": "GateMetadata",
+#       "anchor": "class-gatemetadata",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "policyregistry",
+#       "name": "PolicyRegistry",
+#       "anchor": "class-policyregistry",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "get-registry",
+#       "name": "get_registry",
+#       "anchor": "function-get-registry",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "policy-gate",
+#       "name": "policy_gate",
+#       "anchor": "function-policy-gate",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Central registry of policy gates and decorator for gate registration.
 
 All gates register with this registry:
@@ -9,8 +42,9 @@ All gates register with this registry:
 
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Optional
 
 from DocsToKG.OntologyDownload.policy.errors import PolicyResult
 
@@ -53,8 +87,8 @@ class PolicyRegistry:
     def __init__(self):
         """Initialize registry (only once)."""
         if not hasattr(self, "_gates"):
-            self._gates: Dict[str, GateMetadata] = {}
-            self._stats: Dict[str, Dict[str, Any]] = {}
+            self._gates: dict[str, GateMetadata] = {}
+            self._stats: dict[str, dict[str, Any]] = {}
             self._registry_lock = threading.Lock()
 
     def register(
@@ -125,7 +159,7 @@ class PolicyRegistry:
             raise KeyError(f"Gate '{name}' not found. Available: {available}")
         return self._gates[name].callable
 
-    def list_gates(self) -> Dict[str, GateMetadata]:
+    def list_gates(self) -> dict[str, GateMetadata]:
         """Get all registered gates.
 
         Returns:
@@ -134,7 +168,7 @@ class PolicyRegistry:
         with self._registry_lock:
             return dict(self._gates)
 
-    def gates_by_domain(self, domain: str) -> Dict[str, GateMetadata]:
+    def gates_by_domain(self, domain: str) -> dict[str, GateMetadata]:
         """Get all gates in a specific domain.
 
         Args:
@@ -197,7 +231,7 @@ class PolicyRegistry:
                 stats["total_ms"] += elapsed_ms
             raise
 
-    def get_stats(self, gate_name: str) -> Dict[str, Any]:
+    def get_stats(self, gate_name: str) -> dict[str, Any]:
         """Get statistics for a gate.
 
         Args:
@@ -227,7 +261,7 @@ class PolicyRegistry:
 
         return stats
 
-    def reset_stats(self, gate_name: Optional[str] = None) -> None:
+    def reset_stats(self, gate_name: str | None = None) -> None:
         """Reset statistics for a gate or all gates.
 
         Args:
@@ -263,7 +297,7 @@ class PolicyRegistry:
 
 
 # Global registry instance
-_registry: Optional[PolicyRegistry] = None
+_registry: PolicyRegistry | None = None
 
 
 def get_registry() -> PolicyRegistry:

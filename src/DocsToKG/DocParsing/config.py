@@ -1,3 +1,96 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.config",
+#   "purpose": "Configuration helpers for DocParsing stages.",
+#   "sections": [
+#     {
+#       "id": "load-config-mapping",
+#       "name": "load_config_mapping",
+#       "anchor": "function-load-config-mapping",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "manifest-value",
+#       "name": "_manifest_value",
+#       "anchor": "function-manifest-value",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "coerce-path",
+#       "name": "_coerce_path",
+#       "anchor": "function-coerce-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "coerce-optional-path",
+#       "name": "_coerce_optional_path",
+#       "anchor": "function-coerce-optional-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "coerce-bool",
+#       "name": "_coerce_bool",
+#       "anchor": "function-coerce-bool",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "coerce-int",
+#       "name": "_coerce_int",
+#       "anchor": "function-coerce-int",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "coerce-float",
+#       "name": "_coerce_float",
+#       "anchor": "function-coerce-float",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "coerce-str",
+#       "name": "_coerce_str",
+#       "anchor": "function-coerce-str",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "coerce-str-tuple",
+#       "name": "_coerce_str_tuple",
+#       "anchor": "function-coerce-str-tuple",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "namespace-setdefault",
+#       "name": "_namespace_setdefault",
+#       "anchor": "function-namespace-setdefault",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "annotate-cli-overrides",
+#       "name": "annotate_cli_overrides",
+#       "anchor": "function-annotate-cli-overrides",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-args-with-overrides",
+#       "name": "parse_args_with_overrides",
+#       "anchor": "function-parse-args-with-overrides",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "ensure-cli-metadata",
+#       "name": "ensure_cli_metadata",
+#       "anchor": "function-ensure-cli-metadata",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "stageconfigbase",
+#       "name": "StageConfigBase",
+#       "anchor": "class-stageconfigbase",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Configuration helpers for DocParsing stages.
 
@@ -12,9 +105,10 @@ from __future__ import annotations
 import argparse
 import json
 import os
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field, fields
 from pathlib import Path
-from typing import Any, Callable, ClassVar, Dict, Iterable, Mapping, Optional, Set, Tuple
+from typing import Any, ClassVar
 
 from .config_loaders import ConfigLoadError, load_toml_markers, load_yaml_markers
 
@@ -25,7 +119,7 @@ _ARGPARSE_SENTINEL = object()
 # ---------------------------------------------------------------------------
 
 
-def load_config_mapping(path: Path) -> Dict[str, Any]:
+def load_config_mapping(path: Path) -> dict[str, Any]:
     """Load a configuration mapping from JSON, YAML, or TOML."""
 
     raw = path.read_text(encoding="utf-8")
@@ -61,7 +155,7 @@ def _manifest_value(value: Any) -> Any:
     return value
 
 
-def _coerce_path(value: object, base_dir: Optional[Path] = None) -> Path:
+def _coerce_path(value: object, base_dir: Path | None = None) -> Path:
     """Convert ``value`` into an absolute :class:`Path`."""
 
     if isinstance(value, Path):
@@ -75,7 +169,7 @@ def _coerce_path(value: object, base_dir: Optional[Path] = None) -> Path:
     return path.resolve()
 
 
-def _coerce_optional_path(value: object, base_dir: Optional[Path] = None) -> Optional[Path]:
+def _coerce_optional_path(value: object, base_dir: Path | None = None) -> Path | None:
     """Convert optional path-like values."""
 
     if value in (None, "", False):
@@ -87,7 +181,7 @@ _TRUE_BOOL_LITERALS = frozenset({"1", "true", "t", "yes", "y", "on"})
 _FALSE_BOOL_LITERALS = frozenset({"0", "false", "f", "no", "n", "off", ""})
 
 
-def _coerce_bool(value: object, _base_dir: Optional[Path] = None) -> bool:
+def _coerce_bool(value: object, _base_dir: Path | None = None) -> bool:
     """Convert supported string and numeric representations into booleans.
 
     Raises:
@@ -116,7 +210,7 @@ def _coerce_bool(value: object, _base_dir: Optional[Path] = None) -> bool:
     )
 
 
-def _coerce_int(value: object, _base_dir: Optional[Path] = None) -> int:
+def _coerce_int(value: object, _base_dir: Path | None = None) -> int:
     """Convert ``value`` to ``int``."""
 
     if isinstance(value, int):
@@ -124,7 +218,7 @@ def _coerce_int(value: object, _base_dir: Optional[Path] = None) -> int:
     return int(str(value).strip())
 
 
-def _coerce_float(value: object, _base_dir: Optional[Path] = None) -> float:
+def _coerce_float(value: object, _base_dir: Path | None = None) -> float:
     """Convert ``value`` to ``float``."""
 
     if isinstance(value, float):
@@ -134,13 +228,13 @@ def _coerce_float(value: object, _base_dir: Optional[Path] = None) -> float:
     return float(str(value).strip())
 
 
-def _coerce_str(value: object, _base_dir: Optional[Path] = None) -> str:
+def _coerce_str(value: object, _base_dir: Path | None = None) -> str:
     """Return ``value`` coerced to string."""
 
     return str(value)
 
 
-def _coerce_str_tuple(value: object, _base_dir: Optional[Path] = None) -> Tuple[str, ...]:
+def _coerce_str_tuple(value: object, _base_dir: Path | None = None) -> tuple[str, ...]:
     """Return ``value`` as a tuple of strings."""
 
     if value is None:
@@ -198,7 +292,7 @@ def annotate_cli_overrides(
     *,
     explicit: Iterable[str],
     defaults: Mapping[str, Any],
-) -> Set[str]:
+) -> set[str]:
     """Attach CLI override metadata to ``namespace`` and return the explicit set."""
 
     if not hasattr(namespace, "__dict__"):  # pragma: no cover - defensive
@@ -212,7 +306,7 @@ def annotate_cli_overrides(
 
 
 def parse_args_with_overrides(
-    parser: argparse.ArgumentParser, argv: Optional[Iterable[str]] = None
+    parser: argparse.ArgumentParser, argv: Iterable[str] | None = None
 ) -> argparse.Namespace:
     """Parse CLI arguments while tracking which options were explicitly provided."""
 
@@ -233,8 +327,8 @@ def parse_args_with_overrides(
         for action, original in option_actions:
             action.default = original
 
-    explicit: Set[str] = set()
-    defaults: Dict[str, Any] = {}
+    explicit: set[str] = set()
+    defaults: dict[str, Any] = {}
     for action, original in option_actions:
         dest = action.dest
         defaults[dest] = original
@@ -248,11 +342,11 @@ def parse_args_with_overrides(
     return namespace
 
 
-def ensure_cli_metadata(namespace: Any) -> Set[str]:
+def ensure_cli_metadata(namespace: Any) -> set[str]:
     """Ensure ``namespace`` carries CLI metadata, defaulting to treating all fields as explicit."""
 
     if hasattr(namespace, "_cli_explicit_overrides"):
-        return getattr(namespace, "_cli_explicit_overrides")
+        return namespace._cli_explicit_overrides
     if hasattr(namespace, "__dict__"):
         candidates = {name for name in vars(namespace) if not name.startswith("_")}
         annotate_cli_overrides(namespace, explicit=candidates, defaults={})
@@ -264,8 +358,8 @@ def ensure_cli_metadata(namespace: Any) -> Set[str]:
 class StageConfigBase:
     """Base dataclass for stage configuration objects."""
 
-    config: Optional[Path] = None
-    overrides: Set[str] = field(
+    config: Path | None = None
+    overrides: set[str] = field(
         default_factory=set,
         init=False,
         repr=False,
@@ -273,8 +367,8 @@ class StageConfigBase:
         metadata={"manifest": False},
     )
 
-    ENV_VARS: ClassVar[Dict[str, str]] = {}
-    FIELD_PARSERS: ClassVar[Dict[str, Callable[[Any, Optional[Path]], Any]]] = {}
+    ENV_VARS: ClassVar[dict[str, str]] = {}
+    FIELD_PARSERS: ClassVar[dict[str, Callable[[Any, Path | None], Any]]] = {}
 
     def apply_env(self) -> None:
         """Overlay configuration from environment variables."""
@@ -337,7 +431,7 @@ class StageConfigBase:
             self.overrides.add(name)
 
     @classmethod
-    def from_env(cls) -> "StageConfigBase":
+    def from_env(cls) -> StageConfigBase:
         """Instantiate a configuration populated solely from environment variables."""
 
         cfg = cls()
@@ -348,17 +442,17 @@ class StageConfigBase:
     def finalize(self) -> None:  # pragma: no cover - overridden by subclasses
         """Hook allowing subclasses to normalise derived fields."""
 
-    def to_manifest(self) -> Dict[str, Any]:
+    def to_manifest(self) -> dict[str, Any]:
         """Return a manifest-friendly snapshot of the configuration."""
 
-        payload: Dict[str, Any] = {}
+        payload: dict[str, Any] = {}
         for field_def in fields(self):
             if not field_def.metadata.get("manifest", True):
                 continue
             payload[field_def.name] = _manifest_value(getattr(self, field_def.name))
         return payload
 
-    def _coerce_field(self, name: str, value: Any, base_dir: Optional[Path]) -> Any:
+    def _coerce_field(self, name: str, value: Any, base_dir: Path | None) -> Any:
         """Run field-specific coercion logic before manifest serialization."""
 
         parser = self.FIELD_PARSERS.get(name)

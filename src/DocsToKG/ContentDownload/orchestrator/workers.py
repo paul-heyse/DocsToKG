@@ -3,7 +3,18 @@
 #   "module": "DocsToKG.ContentDownload.orchestrator.workers",
 #   "purpose": "Job execution wrapper with concurrency control and telemetry",
 #   "sections": [
-#     {"id": "worker", "name": "Worker", "anchor": "#class-worker", "kind": "class"}
+#     {
+#       "id": "worker",
+#       "name": "Worker",
+#       "anchor": "class-worker",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "artifactvalidationerror",
+#       "name": "_ArtifactValidationError",
+#       "anchor": "class-artifactvalidationerror",
+#       "kind": "class"
+#     }
 #   ]
 # }
 # === /NAVMAP ===
@@ -42,8 +53,9 @@ import json
 import logging
 import random
 import threading
+from collections.abc import Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Mapping, Optional, Tuple
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from DocsToKG.ContentDownload.orchestrator.limits import KeyedLimiter
@@ -75,10 +87,10 @@ class Worker:
     def __init__(
         self,
         worker_id: str,
-        queue: "WorkQueue",
-        pipeline: "ResolverPipeline",
-        resolver_limiter: "KeyedLimiter",
-        host_limiter: "KeyedLimiter",
+        queue: WorkQueue,
+        pipeline: ResolverPipeline,
+        resolver_limiter: KeyedLimiter,
+        host_limiter: KeyedLimiter,
         heartbeat_sec: int,
         max_job_attempts: int,
         retry_backoff: int,
@@ -165,7 +177,7 @@ class Worker:
                 )
                 return
 
-            limiter_tokens: list[tuple["KeyedLimiter", str]] = []
+            limiter_tokens: list[tuple[KeyedLimiter, str]] = []
             try:
                 limiter_tokens = self._acquire_limiter_slots(job, artifact)
             except Exception as e:
@@ -228,14 +240,14 @@ class Worker:
 
     def _acquire_limiter_slots(
         self, job: Mapping[str, Any], artifact: Any
-    ) -> list[tuple["KeyedLimiter", str]]:
+    ) -> list[tuple[KeyedLimiter, str]]:
         """Acquire resolver and host limiter slots for this job.
 
         Returns a list of (limiter, key) tuples representing acquired slots.
         Slots are released in LIFO order via :meth:`_release_limiter_slots`.
         """
 
-        tokens: list[tuple["KeyedLimiter", str]] = []
+        tokens: list[tuple[KeyedLimiter, str]] = []
 
         resolver_key = self._extract_resolver_key(job, artifact)
         host_key_value = self._extract_host_key(job, artifact)
@@ -265,7 +277,7 @@ class Worker:
 
         return tokens
 
-    def _release_limiter_slots(self, tokens: list[tuple["KeyedLimiter", str]]) -> None:
+    def _release_limiter_slots(self, tokens: list[tuple[KeyedLimiter, str]]) -> None:
         """Release limiter slots acquired for this job."""
 
         while tokens:
@@ -285,7 +297,7 @@ class Worker:
                     exc,
                 )
 
-    def _extract_resolver_key(self, job: Mapping[str, Any], artifact: Any) -> Optional[str]:
+    def _extract_resolver_key(self, job: Mapping[str, Any], artifact: Any) -> str | None:
         """Determine resolver limiter key for the job if available."""
 
         candidates: list[Mapping[str, Any]] = [job]
@@ -302,7 +314,7 @@ class Worker:
 
         return None
 
-    def _extract_host_key(self, job: Mapping[str, Any], artifact: Any) -> Optional[str]:
+    def _extract_host_key(self, job: Mapping[str, Any], artifact: Any) -> str | None:
         """Determine host limiter key for the job if available."""
 
         for mapping in (job, artifact if isinstance(artifact, Mapping) else None):
@@ -315,7 +327,7 @@ class Worker:
 
         return None
 
-    def _first_url(self, payload: Mapping[str, Any]) -> Optional[str]:
+    def _first_url(self, payload: Mapping[str, Any]) -> str | None:
         """Return the first URL candidate found in payload."""
 
         url_fields = (
@@ -351,7 +363,7 @@ class Worker:
         return None
 
     @staticmethod
-    def _coerce_url(value: Any) -> Optional[str]:
+    def _coerce_url(value: Any) -> str | None:
         """Normalize different URL field shapes to a string."""
 
         if isinstance(value, str) and value.strip():
@@ -366,7 +378,7 @@ class Worker:
 
     def _deserialize_job(
         self, job: Mapping[str, Any]
-    ) -> Tuple[WorkArtifact, Optional[DownloadContext]]:
+    ) -> tuple[WorkArtifact, DownloadContext | None]:
         """Return a typed artifact/context pair for the leased job."""
 
         artifact_json = job.get("artifact_json", "{}")
@@ -401,7 +413,7 @@ class Worker:
         else:
             artifact = self._build_work_artifact(artifact_payload)
 
-        context: Optional[DownloadContext] = None
+        context: DownloadContext | None = None
         if isinstance(context_payload, DownloadContext):
             context = context_payload
         elif context_payload:

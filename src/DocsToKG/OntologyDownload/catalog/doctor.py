@@ -1,13 +1,56 @@
 # === NAVMAP v1 ===
 # {
 #   "module": "DocsToKG.OntologyDownload.catalog.doctor",
-#   "purpose": "Database health checks and FS↔DB reconciliation",
+#   "purpose": "Database health checks and FS\u2194DB reconciliation",
 #   "sections": [
-#     {"id": "types", "name": "Doctor Result Types", "anchor": "TYP", "kind": "models"},
-#     {"id": "scan", "name": "Filesystem Scanning", "anchor": "SCAN", "kind": "api"},
-#     {"id": "check", "name": "Health Checks", "anchor": "CHK", "kind": "api"},
-#     {"id": "detect", "name": "Drift Detection", "anchor": "DFT", "kind": "api"},
-#     {"id": "repair", "name": "Auto-Repair Actions", "anchor": "RPR", "kind": "api"}
+#     {
+#       "id": "doctorissue",
+#       "name": "DoctorIssue",
+#       "anchor": "class-doctorissue",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "doctorreport",
+#       "name": "DoctorReport",
+#       "anchor": "class-doctorreport",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "healthcheckresult",
+#       "name": "HealthCheckResult",
+#       "anchor": "class-healthcheckresult",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "quick-health-check",
+#       "name": "quick_health_check",
+#       "anchor": "function-quick-health-check",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "scan-filesystem-artifacts",
+#       "name": "scan_filesystem_artifacts",
+#       "anchor": "function-scan-filesystem-artifacts",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "scan-filesystem-files",
+#       "name": "scan_filesystem_files",
+#       "anchor": "function-scan-filesystem-files",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "detect-db-fs-drifts",
+#       "name": "detect_db_fs_drifts",
+#       "anchor": "function-detect-db-fs-drifts",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "generate-doctor-report",
+#       "name": "generate_doctor_report",
+#       "anchor": "function-generate-doctor-report",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===
@@ -26,10 +69,10 @@ from __future__ import annotations
 import json
 import logging
 import time
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Iterable, Optional
 
 try:  # pragma: no cover
     import duckdb
@@ -57,12 +100,12 @@ class DoctorIssue:
     """A detected DB↔FS mismatch."""
 
     issue_type: str  # 'missing_db_row' | 'missing_fs_file' | 'latest_mismatch'
-    artifact_id: Optional[str]
-    file_id: Optional[str]
-    fs_path: Optional[Path]
+    artifact_id: str | None
+    file_id: str | None
+    fs_path: Path | None
     description: str
     severity: str  # 'info' | 'warning' | 'error'
-    size_bytes: Optional[int] = None
+    size_bytes: int | None = None
 
 
 @dataclass(frozen=True)
@@ -215,8 +258,8 @@ def detect_db_fs_drifts(
     artifacts_root: Path,
     extracted_root: Path,
     *,
-    fs_artifacts: Optional[Iterable[tuple[Path, int]]] = None,
-    fs_files: Optional[Iterable[tuple[Path, int]]] = None,
+    fs_artifacts: Iterable[tuple[Path, int]] | None = None,
+    fs_files: Iterable[tuple[Path, int]] | None = None,
 ) -> list[DoctorIssue]:
     """Detect mismatches between DB and filesystem.
 

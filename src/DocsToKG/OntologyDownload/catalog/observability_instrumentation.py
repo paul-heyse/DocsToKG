@@ -3,11 +3,102 @@
 #   "module": "DocsToKG.OntologyDownload.catalog.observability_instrumentation",
 #   "purpose": "Observability wiring for catalog operations (Task 1.3)",
 #   "sections": [
-#     {"id": "boundary_events", "name": "Boundary Event Helpers", "anchor": "BOUND", "kind": "utils"},
-#     {"id": "doctor_events", "name": "Doctor Operation Events", "anchor": "DOC", "kind": "utils"},
-#     {"id": "prune_events", "name": "Prune Operation Events", "anchor": "PRUNE", "kind": "utils"},
-#     {"id": "cli_events", "name": "CLI Command Events", "anchor": "CLI", "kind": "utils"},
-#     {"id": "perf_events", "name": "Performance Events", "anchor": "PERF", "kind": "utils"}
+#     {
+#       "id": "emit-boundary-begin",
+#       "name": "emit_boundary_begin",
+#       "anchor": "function-emit-boundary-begin",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-boundary-success",
+#       "name": "emit_boundary_success",
+#       "anchor": "function-emit-boundary-success",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-boundary-error",
+#       "name": "emit_boundary_error",
+#       "anchor": "function-emit-boundary-error",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-doctor-begin",
+#       "name": "emit_doctor_begin",
+#       "anchor": "function-emit-doctor-begin",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-doctor-issue-found",
+#       "name": "emit_doctor_issue_found",
+#       "anchor": "function-emit-doctor-issue-found",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-doctor-fixed",
+#       "name": "emit_doctor_fixed",
+#       "anchor": "function-emit-doctor-fixed",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-doctor-complete",
+#       "name": "emit_doctor_complete",
+#       "anchor": "function-emit-doctor-complete",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-prune-begin",
+#       "name": "emit_prune_begin",
+#       "anchor": "function-emit-prune-begin",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-prune-orphan-found",
+#       "name": "emit_prune_orphan_found",
+#       "anchor": "function-emit-prune-orphan-found",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-prune-deleted",
+#       "name": "emit_prune_deleted",
+#       "anchor": "function-emit-prune-deleted",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-cli-command-begin",
+#       "name": "emit_cli_command_begin",
+#       "anchor": "function-emit-cli-command-begin",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-cli-command-success",
+#       "name": "emit_cli_command_success",
+#       "anchor": "function-emit-cli-command-success",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-cli-command-error",
+#       "name": "emit_cli_command_error",
+#       "anchor": "function-emit-cli-command-error",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-slow-operation",
+#       "name": "emit_slow_operation",
+#       "anchor": "function-emit-slow-operation",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-slow-query",
+#       "name": "emit_slow_query",
+#       "anchor": "function-emit-slow-query",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "timedoperation",
+#       "name": "TimedOperation",
+#       "anchor": "class-timedoperation",
+#       "kind": "class"
+#     }
 #   ]
 # }
 # === /NAVMAP ===
@@ -24,7 +115,6 @@ from __future__ import annotations
 import logging
 import time
 from contextvars import ContextVar
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +140,7 @@ def emit_boundary_begin(
     artifact_id: str,
     version_id: str,
     service: str,
-    extra_payload: Optional[dict] = None,
+    extra_payload: dict | None = None,
 ) -> None:
     """Emit boundary operation begin event.
 
@@ -84,7 +174,7 @@ def emit_boundary_success(
     artifact_id: str,
     version_id: str,
     duration_ms: float,
-    extra_payload: Optional[dict] = None,
+    extra_payload: dict | None = None,
 ) -> None:
     """Emit boundary operation success event.
 
@@ -119,7 +209,7 @@ def emit_boundary_error(
     version_id: str,
     error: Exception,
     duration_ms: float,
-    extra_payload: Optional[dict] = None,
+    extra_payload: dict | None = None,
 ) -> None:
     """Emit boundary operation error event.
 
@@ -171,7 +261,7 @@ def emit_doctor_issue_found(
     description: str,
     *,
     affected_records: int = 1,
-    extra: Optional[dict] = None,
+    extra: dict | None = None,
 ) -> None:
     """Emit doctor issue found event."""
 
@@ -265,10 +355,10 @@ def emit_prune_begin(dry_run: bool = False) -> None:
 def emit_prune_orphan_found(
     *,
     item_type: str = "file",
-    item_id: Optional[str] = None,
-    path: Optional[str] = None,
+    item_id: str | None = None,
+    path: str | None = None,
     size_bytes: int = 0,
-    age_days: Optional[int] = None,
+    age_days: int | None = None,
 ) -> None:
     """Emit prune orphan found event.
 
@@ -304,7 +394,7 @@ def emit_prune_deleted(
     *,
     deleted_count: int,
     freed_bytes: int,
-    duration_ms: Optional[float] = None,
+    duration_ms: float | None = None,
     dry_run: bool = False,
 ) -> None:
     """Emit prune completion event.
@@ -336,7 +426,7 @@ def emit_prune_deleted(
 # ============================================================================
 
 
-def emit_cli_command_begin(command: str, args: Optional[dict] = None) -> float:
+def emit_cli_command_begin(command: str, args: dict | None = None) -> float:
     """Emit CLI command begin event.
 
     Args:
@@ -367,7 +457,7 @@ def emit_cli_command_begin(command: str, args: Optional[dict] = None) -> float:
 def emit_cli_command_success(
     command: str,
     duration_ms: float,
-    result_summary: Optional[dict] = None,
+    result_summary: dict | None = None,
 ) -> None:
     """Emit CLI command success event.
 
@@ -426,7 +516,7 @@ def emit_slow_operation(
     operation: str,
     duration_ms: float,
     threshold_ms: float = 1000,
-    details: Optional[dict] = None,
+    details: dict | None = None,
 ) -> None:
     """Emit slow operation warning event.
 
@@ -503,7 +593,7 @@ class TimedOperation:
         self.operation_name = operation_name
         self.start_time = 0.0
 
-    def __enter__(self) -> "TimedOperation":
+    def __enter__(self) -> TimedOperation:
         """Enter context and start timer."""
         self.start_time = time.time()
         return self

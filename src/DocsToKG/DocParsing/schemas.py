@@ -1,3 +1,11 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.schemas",
+#   "purpose": "Deprecated shim for DocParsing schema helpers.",
+#   "sections": []
+# }
+# === /NAVMAP ===
+
 """Deprecated shim for DocParsing schema helpers.
 
 `DocsToKG.DocParsing.schemas` historically hosted schema metadata and validators,

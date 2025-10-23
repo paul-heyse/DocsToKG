@@ -1,10 +1,24 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.catalog.models",
+#   "purpose": "Data models for the artifact catalog.",
+#   "sections": [
+#     {
+#       "id": "documentrecord",
+#       "name": "DocumentRecord",
+#       "anchor": "class-documentrecord",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Data models for the artifact catalog."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,10 +46,10 @@ class DocumentRecord:
     artifact_id: str
     source_url: str
     resolver: str
-    content_type: Optional[str]
+    content_type: str | None
     bytes: int
-    sha256: Optional[str]
+    sha256: str | None
     storage_uri: str
     created_at: datetime
     updated_at: datetime
-    run_id: Optional[str] = None
+    run_id: str | None = None

@@ -3,24 +3,114 @@
 #   "module": "DocsToKG.DocParsing.formats.__init__",
 #   "purpose": "Data models and validators for DocParsing artifact formats",
 #   "sections": [
-#     {"id": "schema-kind", "name": "SchemaKind", "anchor": "SC", "kind": "class"},
-#     {"id": "coerce-kind", "name": "_coerce_kind", "anchor": "CK", "kind": "function"},
-#     {"id": "default-schema-version", "name": "get_default_schema_version", "anchor": "GD", "kind": "function"},
-#     {"id": "compatible-versions", "name": "get_compatible_versions", "anchor": "GV", "kind": "function"},
-#     {"id": "validate-schema-version", "name": "validate_schema_version", "anchor": "VS", "kind": "function"},
-#     {"id": "ensure-chunk-schema", "name": "ensure_chunk_schema", "anchor": "EC", "kind": "function"},
-#     {"id": "provenance-metadata", "name": "ProvenanceMetadata", "anchor": "PM", "kind": "class"},
-#     {"id": "chunk-row", "name": "ChunkRow", "anchor": "CR", "kind": "class"},
-#     {"id": "bm25-vector", "name": "BM25Vector", "anchor": "B2", "kind": "class"},
-#     {"id": "splade-vector", "name": "SPLADEVector", "anchor": "SV", "kind": "class"},
-#     {"id": "dense-vector", "name": "DenseVector", "anchor": "DV", "kind": "class"},
-#     {"id": "vector-row", "name": "VectorRow", "anchor": "VR", "kind": "class"},
-#     {"id": "validate-chunk-row", "name": "validate_chunk_row", "anchor": "VC", "kind": "function"},
-#     {"id": "pydantic-validate-vector-row", "name": "_pydantic_validate_vector_row", "anchor": "PV", "kind": "function"},
-#     {"id": "validate-vector-row", "name": "validate_vector_row", "anchor": "VV", "kind": "function"},
-#     {"id": "get-docling-version", "name": "get_docling_version", "anchor": "GDV", "kind": "function"},
-#     {"id": "caption-picture-serializer", "name": "CaptionPlusAnnotationPictureSerializer", "anchor": "CS", "kind": "class"},
-#     {"id": "rich-serializer-provider", "name": "RichSerializerProvider", "anchor": "RS", "kind": "class"}
+#     {
+#       "id": "schemakind",
+#       "name": "SchemaKind",
+#       "anchor": "class-schemakind",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "coerce-kind",
+#       "name": "_coerce_kind",
+#       "anchor": "function-coerce-kind",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-default-schema-version",
+#       "name": "get_default_schema_version",
+#       "anchor": "function-get-default-schema-version",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-compatible-versions",
+#       "name": "get_compatible_versions",
+#       "anchor": "function-get-compatible-versions",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-schema-version",
+#       "name": "validate_schema_version",
+#       "anchor": "function-validate-schema-version",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "ensure-chunk-schema",
+#       "name": "ensure_chunk_schema",
+#       "anchor": "function-ensure-chunk-schema",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "provenancemetadata",
+#       "name": "ProvenanceMetadata",
+#       "anchor": "class-provenancemetadata",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "chunkrow",
+#       "name": "ChunkRow",
+#       "anchor": "class-chunkrow",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "bm25vector",
+#       "name": "BM25Vector",
+#       "anchor": "class-bm25vector",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "spladevector",
+#       "name": "SPLADEVector",
+#       "anchor": "class-spladevector",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "densevector",
+#       "name": "DenseVector",
+#       "anchor": "class-densevector",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "vectorrow",
+#       "name": "VectorRow",
+#       "anchor": "class-vectorrow",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "validate-chunk-row",
+#       "name": "validate_chunk_row",
+#       "anchor": "function-validate-chunk-row",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "pydantic-validate-vector-row",
+#       "name": "_pydantic_validate_vector_row",
+#       "anchor": "function-pydantic-validate-vector-row",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-vector-row",
+#       "name": "validate_vector_row",
+#       "anchor": "function-validate-vector-row",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-docling-version",
+#       "name": "get_docling_version",
+#       "anchor": "function-get-docling-version",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "captionplusannotationpictureserializer",
+#       "name": "CaptionPlusAnnotationPictureSerializer",
+#       "anchor": "class-captionplusannotationpictureserializer",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "richserializerprovider",
+#       "name": "RichSerializerProvider",
+#       "anchor": "class-richserializerprovider",
+#       "kind": "class"
+#     }
 #   ]
 # }
 # === /NAVMAP ===
@@ -52,8 +142,9 @@ Dependencies:
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from enum import Enum
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, override
 
 from docling_core.transforms.chunker.hierarchical_chunker import (
     ChunkingDocSerializer,
@@ -74,7 +165,6 @@ from docling_core.types.doc.document import (
     PictureMoleculeData,
 )
 from docling_core.types.doc.document import DoclingDocument as _Doc
-from typing_extensions import override
 
 try:
     from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -97,20 +187,20 @@ class SchemaKind(str, Enum):
     VECTOR = "vector"
 
 
-_DEFAULT_VERSIONS: Dict[SchemaKind, SchemaVersion] = {
+_DEFAULT_VERSIONS: dict[SchemaKind, SchemaVersion] = {
     SchemaKind.CHUNK: "docparse/1.1.0",
     SchemaKind.VECTOR: "embeddings/1.0.0",
 }
 
-_COMPATIBLE_VERSIONS: Dict[SchemaKind, Tuple[SchemaVersion, ...]] = {
+_COMPATIBLE_VERSIONS: dict[SchemaKind, tuple[SchemaVersion, ...]] = {
     SchemaKind.CHUNK: ("docparse/1.0.0", "docparse/1.1.0"),
     SchemaKind.VECTOR: ("embeddings/1.0.0",),
 }
 
 CHUNK_SCHEMA_VERSION: SchemaVersion = _DEFAULT_VERSIONS[SchemaKind.CHUNK]
 VECTOR_SCHEMA_VERSION: SchemaVersion = _DEFAULT_VERSIONS[SchemaKind.VECTOR]
-COMPATIBLE_CHUNK_VERSIONS: Tuple[SchemaVersion, ...] = _COMPATIBLE_VERSIONS[SchemaKind.CHUNK]
-COMPATIBLE_VECTOR_VERSIONS: Tuple[SchemaVersion, ...] = _COMPATIBLE_VERSIONS[SchemaKind.VECTOR]
+COMPATIBLE_CHUNK_VERSIONS: tuple[SchemaVersion, ...] = _COMPATIBLE_VERSIONS[SchemaKind.CHUNK]
+COMPATIBLE_VECTOR_VERSIONS: tuple[SchemaVersion, ...] = _COMPATIBLE_VERSIONS[SchemaKind.VECTOR]
 
 
 def _coerce_kind(kind: SchemaKind | str) -> SchemaKind:
@@ -130,7 +220,7 @@ def get_default_schema_version(kind: SchemaKind | str) -> SchemaVersion:
     return _DEFAULT_VERSIONS[_coerce_kind(kind)]
 
 
-def get_compatible_versions(kind: SchemaKind | str) -> Tuple[SchemaVersion, ...]:
+def get_compatible_versions(kind: SchemaKind | str) -> tuple[SchemaVersion, ...]:
     """Return the tuple of compatible versions for ``kind``."""
 
     return _COMPATIBLE_VERSIONS[_coerce_kind(kind)]
@@ -140,8 +230,8 @@ def validate_schema_version(
     version: SchemaVersion,
     kind: SchemaKind | str,
     *,
-    compatible_versions: Optional[Iterable[SchemaVersion]] = None,
-    context: Optional[str] = None,
+    compatible_versions: Iterable[SchemaVersion] | None = None,
+    context: str | None = None,
 ) -> SchemaVersion:
     """Validate that ``version`` is compatible for ``kind``."""
 
@@ -159,8 +249,8 @@ def validate_schema_version(
 def ensure_chunk_schema(
     rec: dict,
     *,
-    default_version: Optional[SchemaVersion] = None,
-    context: Optional[str] = None,
+    default_version: SchemaVersion | None = None,
+    context: str | None = None,
 ) -> dict:
     """Ensure ``rec`` declares a compatible chunk schema version."""
 
@@ -232,13 +322,13 @@ class ProvenanceMetadata(BaseModel):
         default=False, description="Whether chunk includes image classifications"
     )
     num_images: int = Field(default=0, ge=0, description="Number of images in chunk")
-    image_confidence: Optional[float] = Field(
+    image_confidence: float | None = Field(
         default=None,
         ge=0.0,
         le=1.0,
         description="Confidence score associated with image annotations when available",
     )
-    picture_meta: Optional[Dict[str, Any]] = Field(
+    picture_meta: dict[str, Any] | None = Field(
         default=None,
         description="Machine-readable picture metadata emitted by serializers (captions, classifications, SMILES).",
     )
@@ -300,48 +390,46 @@ class ChunkRow(BaseModel):
     doc_id: str = Field(..., min_length=1, description="Document identifier")
     source_path: str = Field(..., description="Path to source DocTags file")
     chunk_id: int = Field(..., ge=0, description="Sequential chunk index within document")
-    source_chunk_idxs: List[int] = Field(
+    source_chunk_idxs: list[int] = Field(
         ..., description="Original chunk indices before coalescence"
     )
     num_tokens: int = Field(..., gt=0, description="Token count (must be positive)")
     text: str = Field(..., min_length=1, description="Chunk text content")
-    doc_items_refs: List[str] = Field(default_factory=list, description="Document item references")
-    page_nos: List[int] = Field(default_factory=list, description="Page numbers")
+    doc_items_refs: list[str] = Field(default_factory=list, description="Document item references")
+    page_nos: list[int] = Field(default_factory=list, description="Page numbers")
     schema_version: str = Field(
         default=CHUNK_SCHEMA_VERSION, description="Schema version identifier"
     )
-    start_offset: Optional[int] = Field(
+    start_offset: int | None = Field(
         default=None,
         ge=0,
         description="Character offset of the chunk within the source document",
     )
-    has_image_captions: Optional[bool] = Field(
+    has_image_captions: bool | None = Field(
         default=None,
         description=(
             "Convenience flag mirroring provenance.has_image_captions for quick filtering"
         ),
     )
-    has_image_classification: Optional[bool] = Field(
+    has_image_classification: bool | None = Field(
         default=None,
         description=(
             "Convenience flag mirroring provenance.has_image_classification for quick filtering"
         ),
     )
-    num_images: Optional[int] = Field(
+    num_images: int | None = Field(
         default=None,
         ge=0,
         description="Convenience count mirroring provenance.num_images",
     )
-    image_confidence: Optional[float] = Field(
+    image_confidence: float | None = Field(
         default=None,
         ge=0.0,
         le=1.0,
         description="Optional confidence mirroring provenance.image_confidence",
     )
-    provenance: Optional["ProvenanceMetadata"] = Field(
-        None, description="Optional provenance metadata"
-    )
-    uuid: Optional[str] = Field(None, description="Optional UUID for chunk")
+    provenance: ProvenanceMetadata | None = Field(None, description="Optional provenance metadata")
+    uuid: str | None = Field(None, description="Optional UUID for chunk")
 
     @field_validator("schema_version")
     @classmethod
@@ -382,7 +470,7 @@ class ChunkRow(BaseModel):
 
     @field_validator("page_nos")
     @classmethod
-    def validate_page_nos(cls, value: List[int]) -> List[int]:
+    def validate_page_nos(cls, value: list[int]) -> list[int]:
         """Normalise and validate page numbering information.
 
         Args:
@@ -417,15 +505,15 @@ class BM25Vector(BaseModel):
         BM25Vector(terms=['doc'], weights=[1.2], k1=1.5, b=0.75, avgdl=100.0, N=10)
     """
 
-    terms: List[str] = Field(..., description="Token terms")
-    weights: List[float] = Field(..., description="BM25 weights for each term")
+    terms: list[str] = Field(..., description="Token terms")
+    weights: list[float] = Field(..., description="BM25 weights for each term")
     k1: float = Field(default=1.5, ge=0, description="BM25 k1 parameter")
     b: float = Field(default=0.75, ge=0, le=1, description="BM25 b parameter")
     avgdl: float = Field(..., gt=0, description="Average document length in corpus")
     N: int = Field(..., gt=0, description="Total documents in corpus")
 
     @model_validator(mode="after")
-    def validate_parallel_lists(self) -> "BM25Vector":
+    def validate_parallel_lists(self) -> BM25Vector:
         """Verify that token and weight collections are aligned.
 
         Args:
@@ -456,11 +544,11 @@ class SPLADEVector(BaseModel):
     """
 
     model_id: str = Field(default="naver/splade-v3", description="SPLADE model identifier")
-    tokens: List[str] = Field(..., description="SPLADE token vocabulary")
-    weights: List[float] = Field(..., description="SPLADE activation weights")
+    tokens: list[str] = Field(..., description="SPLADE token vocabulary")
+    weights: list[float] = Field(..., description="SPLADE activation weights")
 
     @model_validator(mode="after")
-    def validate_parallel_lists(self) -> "SPLADEVector":
+    def validate_parallel_lists(self) -> SPLADEVector:
         """Ensure token and weight arrays stay in lock-step.
 
         Args:
@@ -493,12 +581,12 @@ class DenseVector(BaseModel):
     """
 
     model_id: str = Field(..., description="Embedding model identifier")
-    vector: List[float] = Field(..., description="Dense embedding vector")
-    dimension: Optional[int] = Field(None, description="Expected vector dimension")
+    vector: list[float] = Field(..., description="Dense embedding vector")
+    dimension: int | None = Field(None, description="Expected vector dimension")
 
     @field_validator("vector")
     @classmethod
-    def validate_vector(cls, value: List[float]) -> List[float]:
+    def validate_vector(cls, value: list[float]) -> list[float]:
         """Ensure the dense vector contains values to embed.
 
         Args:
@@ -515,7 +603,7 @@ class DenseVector(BaseModel):
         return value
 
     @model_validator(mode="after")
-    def validate_dimension(self) -> "DenseVector":
+    def validate_dimension(self) -> DenseVector:
         """Confirm the vector length matches the declared dimension.
 
         Args:
@@ -558,7 +646,7 @@ class VectorRow(BaseModel):
     BM25: BM25Vector = Field(..., description="BM25 sparse vector")
     SPLADEv3: SPLADEVector = Field(..., description="SPLADE-v3 sparse vector")
     Qwen3_4B: DenseVector = Field(..., alias="Qwen3-4B", description="Qwen3-4B dense vector")
-    model_metadata: Optional[Dict[str, Any]] = Field(
+    model_metadata: dict[str, Any] | None = Field(
         default_factory=dict, description="Additional model metadata"
     )
     schema_version: str = Field(
@@ -650,7 +738,7 @@ def _pydantic_validate_vector_row(row: dict) -> VectorRow:
         raise ValueError(f"Vector row validation failed for UUID={uuid}: {exc}") from exc
 
 
-def validate_vector_row(row: dict, *, expected_dimension: Optional[int] = None) -> VectorRow:
+def validate_vector_row(row: dict, *, expected_dimension: int | None = None) -> VectorRow:
     """Validate a vector JSONL row and optionally enforce the dense dimension."""
 
     vector_row = _pydantic_validate_vector_row(row)
@@ -724,14 +812,14 @@ class CaptionPlusAnnotationPictureSerializer(MarkdownPictureSerializer):
             Serialization result containing Markdown-ready text and spans.
         """
 
-        parts: List[str] = []
+        parts: list[str] = []
         parts_append = parts.append
-        annotations: List[object] = []
-        description_texts: List[str] = []
+        annotations: list[object] = []
+        description_texts: list[str] = []
         descriptions_append = description_texts.append
-        classification_entries: List[Dict[str, Any]] = []
+        classification_entries: list[dict[str, Any]] = []
         classification_append = classification_entries.append
-        molecule_entries: List[Dict[str, Any]] = []
+        molecule_entries: list[dict[str, Any]] = []
         molecule_append = molecule_entries.append
         try:
             annotations = list(item.annotations or [])
@@ -748,7 +836,7 @@ class CaptionPlusAnnotationPictureSerializer(MarkdownPictureSerializer):
         except Exception:  # pragma: no cover - defensive catch
             pass
 
-        confidence_candidates: List[float] = []
+        confidence_candidates: list[float] = []
         add_confidence = confidence_candidates.append
 
         def _maybe_add_conf(value: object) -> None:
@@ -760,7 +848,7 @@ class CaptionPlusAnnotationPictureSerializer(MarkdownPictureSerializer):
             except (TypeError, ValueError):
                 pass
 
-        def _maybe_float(value: object) -> Optional[float]:
+        def _maybe_float(value: object) -> float | None:
             """Convert ``value`` to ``float`` when possible, otherwise return ``None``."""
             try:
                 if value is None:
@@ -831,11 +919,11 @@ class CaptionPlusAnnotationPictureSerializer(MarkdownPictureSerializer):
                     existing_val = None
                 if existing_val is None or candidate > existing_val:
                     flags["image_confidence"] = candidate
-            setattr(item, "_docstokg_flags", flags)
+            item._docstokg_flags = flags
         except Exception:
             pass
 
-        structured_meta: Dict[str, Any] = {}
+        structured_meta: dict[str, Any] = {}
         if caption:
             structured_meta["caption"] = caption
         if description_texts:
@@ -848,7 +936,7 @@ class CaptionPlusAnnotationPictureSerializer(MarkdownPictureSerializer):
             structured_meta["confidence"] = max(confidence_candidates)
         if structured_meta:
             try:
-                setattr(item, "_docstokg_meta", structured_meta)
+                item._docstokg_meta = structured_meta
             except Exception:
                 pass
 
@@ -870,7 +958,7 @@ class RichSerializerProvider(ChunkingSerializerProvider):
 
     markdown_params: MarkdownParams
 
-    def __init__(self, markdown_params: Optional[MarkdownParams] = None) -> None:
+    def __init__(self, markdown_params: MarkdownParams | None = None) -> None:
         """Initialise the serializer provider with Markdown defaults.
 
         Args:
@@ -907,7 +995,7 @@ class RichSerializerProvider(ChunkingSerializerProvider):
             caption and annotation metadata.
         """
 
-        serializer_kwargs: Dict[str, object] = {
+        serializer_kwargs: dict[str, object] = {
             "doc": doc,
             "picture_serializer": self._build_picture_serializer(),
             "table_serializer": self._build_table_serializer(),

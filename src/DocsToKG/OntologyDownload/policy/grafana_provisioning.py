@@ -1,3 +1,36 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.policy.grafana_provisioning",
+#   "purpose": "Grafana provisioning configuration for security gates monitoring.",
+#   "sections": [
+#     {
+#       "id": "get-prometheus-datasource-config",
+#       "name": "get_prometheus_datasource_config",
+#       "anchor": "function-get-prometheus-datasource-config",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-gates-dashboard-config",
+#       "name": "get_gates_dashboard_config",
+#       "anchor": "function-get-gates-dashboard-config",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-alert-rules-config",
+#       "name": "get_alert_rules_config",
+#       "anchor": "function-get-alert-rules-config",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "export-grafana-config",
+#       "name": "export_grafana_config",
+#       "anchor": "function-export-grafana-config",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Grafana provisioning configuration for security gates monitoring.
 
 Provides configuration objects for Grafana data sources and dashboards.
@@ -16,7 +49,7 @@ Usage:
 
 import json
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 try:
     import yaml
@@ -26,7 +59,7 @@ except ImportError:
 
 def get_prometheus_datasource_config(
     prometheus_url: str = "http://localhost:9090",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Get Prometheus data source configuration for Grafana.
 
     Args:
@@ -62,7 +95,7 @@ def get_prometheus_datasource_config(
     }
 
 
-def get_gates_dashboard_config() -> Dict[str, Any]:
+def get_gates_dashboard_config() -> dict[str, Any]:
     """Get Grafana dashboard configuration for security gates.
 
     Returns:
@@ -152,7 +185,7 @@ def get_gates_dashboard_config() -> Dict[str, Any]:
     }
 
 
-def get_alert_rules_config() -> Dict[str, Any]:
+def get_alert_rules_config() -> dict[str, Any]:
     """Get Prometheus alert rules configuration for security gates.
 
     Returns:

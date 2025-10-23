@@ -3,10 +3,36 @@
 #   "module": "DocsToKG.OntologyDownload.catalog.migrations",
 #   "purpose": "Idempotent migration runner for DuckDB catalog schema",
 #   "sections": [
-#     {"id": "types", "name": "Data Types & Constants", "anchor": "TYP", "kind": "models"},
-#     {"id": "migrations", "name": "Migration Definitions", "anchor": "MIG", "kind": "data"},
-#     {"id": "runner", "name": "Migration Runner", "anchor": "RUN", "kind": "api"},
-#     {"id": "queries", "name": "Schema Queries", "anchor": "QRY", "kind": "infra"}
+#     {
+#       "id": "migrationresult",
+#       "name": "MigrationResult",
+#       "anchor": "class-migrationresult",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "get-applied-migrations",
+#       "name": "get_applied_migrations",
+#       "anchor": "function-get-applied-migrations",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "apply-migrations",
+#       "name": "apply_migrations",
+#       "anchor": "function-apply-migrations",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "verify-schema",
+#       "name": "verify_schema",
+#       "anchor": "function-verify-schema",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-schema-version",
+#       "name": "get_schema_version",
+#       "anchor": "function-get-schema-version",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===
@@ -21,7 +47,6 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import List, Optional, Tuple
 
 try:  # pragma: no cover
     import duckdb
@@ -44,7 +69,7 @@ class MigrationResult:
 
     migration_name: str
     applied: bool
-    error: Optional[str] = None
+    error: str | None = None
     rows_affected: int = 0
 
 
@@ -52,7 +77,7 @@ class MigrationResult:
 # MIGRATION DEFINITIONS (MIG)
 # ============================================================================
 
-MIGRATIONS: List[Tuple[str, str]] = [
+MIGRATIONS: list[tuple[str, str]] = [
     (
         "0001_schema_version",
         """
@@ -213,7 +238,7 @@ def get_applied_migrations(conn: duckdb.DuckDBPyConnection) -> set[str]:
 
 def apply_migrations(
     conn: duckdb.DuckDBPyConnection, dry_run: bool = False
-) -> List[MigrationResult]:
+) -> list[MigrationResult]:
     """Apply pending migrations in order.
 
     Migrations are idempotent: already-applied migrations are skipped.
@@ -238,7 +263,7 @@ def apply_migrations(
 
     logger.info(f"Applying {len(pending)} pending migrations: {pending}")
 
-    results: List[MigrationResult] = []
+    results: list[MigrationResult] = []
 
     try:
         conn.begin()

@@ -1,3 +1,36 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.errors.tenacity_policies",
+#   "purpose": "Context-aware retry policies using Tenacity predicates.",
+#   "sections": [
+#     {
+#       "id": "operationtype",
+#       "name": "OperationType",
+#       "anchor": "class-operationtype",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "should-retry-on-429",
+#       "name": "_should_retry_on_429",
+#       "anchor": "function-should-retry-on-429",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "should-retry-on-timeout",
+#       "name": "_should_retry_on_timeout",
+#       "anchor": "function-should-retry-on-timeout",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "create-contextual-retry-policy",
+#       "name": "create_contextual_retry_policy",
+#       "anchor": "function-create-contextual-retry-policy",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Context-aware retry policies using Tenacity predicates.
 
 Extends Tenacity's retry/wait predicates to support operation-aware strategies
@@ -40,8 +73,9 @@ Integration:
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from enum import Enum, auto
-from typing import Any, Callable
+from typing import Any
 
 import httpx
 from tenacity import (

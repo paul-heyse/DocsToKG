@@ -1,3 +1,48 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.network.instrumentation",
+#   "purpose": "HTTP network layer instrumentation and telemetry.",
+#   "sections": [
+#     {
+#       "id": "create-http-event-hooks",
+#       "name": "create_http_event_hooks",
+#       "anchor": "function-create-http-event-hooks",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "redact-url",
+#       "name": "_redact_url",
+#       "anchor": "function-redact-url",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-attempt-number",
+#       "name": "_get_attempt_number",
+#       "anchor": "function-get-attempt-number",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "is-reused-connection",
+#       "name": "_is_reused_connection",
+#       "anchor": "function-is-reused-connection",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-cache-state",
+#       "name": "_get_cache_state",
+#       "anchor": "function-get-cache-state",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-ttfb-ms",
+#       "name": "_get_ttfb_ms",
+#       "anchor": "function-get-ttfb-ms",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """HTTP network layer instrumentation and telemetry.
 
 Emits net.request events for all HTTP calls made by the HTTPX client,
@@ -5,7 +50,7 @@ capturing method, URL, status, timings, and cache state.
 """
 
 import time
-from typing import Any, Optional
+from typing import Any
 
 from DocsToKG.OntologyDownload.observability.events import emit_event
 
@@ -111,7 +156,7 @@ def _get_cache_state(response: Any) -> str:
         return "unknown"
 
 
-def _get_ttfb_ms(response: Any) -> Optional[float]:
+def _get_ttfb_ms(response: Any) -> float | None:
     """Get time-to-first-byte if available."""
     # HTTPX doesn't track TTFB by default
     return None

@@ -4,15 +4,69 @@
 #   "purpose": "Load breaker configuration from YAML with env/CLI overlays",
 #   "sections": [
 #     {
-#       "id": "parse-kv-overrides",
-#       "name": "_parse_kv_overrides",
-#       "anchor": "function-parse-kv-overrides",
+#       "id": "parse-bool",
+#       "name": "_parse_bool",
+#       "anchor": "function-parse-bool",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-int",
+#       "name": "_parse_int",
+#       "anchor": "function-parse-int",
 #       "kind": "function"
 #     },
 #     {
 #       "id": "normalize-host-key",
 #       "name": "_normalize_host_key",
 #       "anchor": "function-normalize-host-key",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-kv-overrides",
+#       "name": "_parse_kv_overrides",
+#       "anchor": "function-parse-kv-overrides",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "merge-policy",
+#       "name": "_merge_policy",
+#       "anchor": "function-merge-policy",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "merge-role-policy",
+#       "name": "_merge_role_policy",
+#       "anchor": "function-merge-role-policy",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "apply-classify-override",
+#       "name": "_apply_classify_override",
+#       "anchor": "function-apply-classify-override",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "apply-rolling-override",
+#       "name": "_apply_rolling_override",
+#       "anchor": "function-apply-rolling-override",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "role-from-str",
+#       "name": "_role_from_str",
+#       "anchor": "function-role-from-str",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "merge-docs",
+#       "name": "_merge_docs",
+#       "anchor": "function-merge-docs",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "merge-breaker-docs",
+#       "name": "merge_breaker_docs",
+#       "anchor": "function-merge-breaker-docs",
 #       "kind": "function"
 #     },
 #     {
@@ -25,6 +79,12 @@
 #       "id": "config-from-yaml",
 #       "name": "_config_from_yaml",
 #       "anchor": "function-config-from-yaml",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "maybe-int",
+#       "name": "_maybe_int",
+#       "anchor": "function-maybe-int",
 #       "kind": "function"
 #     },
 #     {
@@ -85,9 +145,10 @@ Usage:
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping, Sequence
 from dataclasses import replace
 from pathlib import Path
-from typing import Any, Dict, Mapping, Optional, Sequence
+from typing import Any
 
 try:
     import idna  # IDNA 2008 with UTS #46 support
@@ -182,12 +243,12 @@ def _normalize_host_key(host: str) -> str:
         return h.lower()
 
 
-def _parse_kv_overrides(s: str) -> Dict[str, str]:
+def _parse_kv_overrides(s: str) -> dict[str, str]:
     """
     Parse "fail_max:5,reset:60,retry_after_cap:900,trial_calls:2"
     into a dict of raw strings.
     """
-    out: Dict[str, str] = {}
+    out: dict[str, str] = {}
     if not s:
         return out
     for part in s.split(","):
@@ -282,13 +343,13 @@ def _role_from_str(s: str) -> RequestRole:
     return _ROLE_ALIASES[key]
 
 
-def _merge_docs(base: Mapping[str, Any], override: Mapping[str, Any]) -> Dict[str, Any]:
+def _merge_docs(base: Mapping[str, Any], override: Mapping[str, Any]) -> dict[str, Any]:
     """Deep-merge breaker policy dictionaries preserving nested role maps."""
 
     if not override:
         return dict(base)
 
-    result: Dict[str, Any] = dict(base)
+    result: dict[str, Any] = dict(base)
 
     for key, value in override.items():
         if isinstance(value, Mapping):
@@ -340,7 +401,7 @@ def _merge_docs(base: Mapping[str, Any], override: Mapping[str, Any]) -> Dict[st
     return result
 
 
-def merge_breaker_docs(base: Mapping[str, Any], override: Mapping[str, Any]) -> Dict[str, Any]:
+def merge_breaker_docs(base: Mapping[str, Any], override: Mapping[str, Any]) -> dict[str, Any]:
     """Public helper to merge breaker policy documents."""
 
     return _merge_docs(base, override)
@@ -351,7 +412,7 @@ def merge_breaker_docs(base: Mapping[str, Any], override: Mapping[str, Any]) -> 
 # ------------------------------
 
 
-def _load_yaml(path: Optional[str | Path]) -> Dict[str, Any]:
+def _load_yaml(path: str | Path | None) -> dict[str, Any]:
     if not path:
         return {}
     p = Path(path)
@@ -364,7 +425,7 @@ def _load_yaml(path: Optional[str | Path]) -> Dict[str, Any]:
     return data
 
 
-def _config_from_yaml(doc: Dict) -> BreakerConfig:
+def _config_from_yaml(doc: dict) -> BreakerConfig:
     # Defaults
     d = doc.get("defaults", {}) or {}
     defaults = BreakerPolicy(
@@ -414,7 +475,7 @@ def _config_from_yaml(doc: Dict) -> BreakerConfig:
     )
 
     # Hosts
-    hosts_map: Dict[str, BreakerPolicy] = {}
+    hosts_map: dict[str, BreakerPolicy] = {}
     for host, hvals in (doc.get("hosts") or {}).items():
         key = _normalize_host_key(host)
         pol = BreakerPolicy(
@@ -442,7 +503,7 @@ def _config_from_yaml(doc: Dict) -> BreakerConfig:
         hosts_map[key] = pol
 
     # Resolvers (optional)
-    resolvers_map: Dict[str, BreakerPolicy] = {}
+    resolvers_map: dict[str, BreakerPolicy] = {}
     for res, rvals in (doc.get("resolvers") or {}).items():
         resolvers_map[res] = BreakerPolicy(
             fail_max=int(rvals.get("fail_max", defaults.fail_max)),
@@ -467,7 +528,7 @@ def _config_from_yaml(doc: Dict) -> BreakerConfig:
     )
 
 
-def _maybe_int(v) -> Optional[int]:
+def _maybe_int(v) -> int | None:
     if v is None:
         return None
     return int(v)
@@ -554,9 +615,9 @@ def _apply_cli_overrides(
     cli_host_overrides: Sequence[str] | None,
     cli_role_overrides: Sequence[str] | None,
     cli_resolver_overrides: Sequence[str] | None,
-    cli_defaults_override: Optional[str],
-    cli_classify_override: Optional[str],
-    cli_rolling_override: Optional[str],
+    cli_defaults_override: str | None,
+    cli_classify_override: str | None,
+    cli_rolling_override: str | None,
 ) -> BreakerConfig:
     """
     CLI formats:
@@ -658,16 +719,16 @@ def _validate(cfg: BreakerConfig) -> None:
 
 
 def load_breaker_config(
-    yaml_path: Optional[str | Path],
+    yaml_path: str | Path | None,
     *,
     env: Mapping[str, str],
     cli_host_overrides: Sequence[str] | None = None,
     cli_role_overrides: Sequence[str] | None = None,
     cli_resolver_overrides: Sequence[str] | None = None,
-    cli_defaults_override: Optional[str] = None,
-    cli_classify_override: Optional[str] = None,
-    cli_rolling_override: Optional[str] = None,
-    base_doc: Optional[Mapping[str, Any]] = None,
+    cli_defaults_override: str | None = None,
+    cli_classify_override: str | None = None,
+    cli_rolling_override: str | None = None,
+    base_doc: Mapping[str, Any] | None = None,
     extra_yaml_paths: Sequence[str | Path] | None = None,
 ) -> BreakerConfig:
     """
@@ -678,7 +739,7 @@ def load_breaker_config(
     - Role strings are case-insensitive (meta/metadata, landing, artifact).
     - Validates basic invariants (fail_max >=1, reset>0, caps>0).
     """
-    merged_doc: Dict[str, Any] = {}
+    merged_doc: dict[str, Any] = {}
     if base_doc:
         merged_doc = merge_breaker_docs(merged_doc, base_doc)
 

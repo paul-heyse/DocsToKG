@@ -1,10 +1,104 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.resolvers.base",
+#   "purpose": "Shared resolver primitives and helpers.",
+#   "sections": [
+#     {
+#       "id": "resolverregistry",
+#       "name": "ResolverRegistry",
+#       "anchor": "class-resolverregistry",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "registeredresolver",
+#       "name": "RegisteredResolver",
+#       "anchor": "class-registeredresolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "resolverevent",
+#       "name": "ResolverEvent",
+#       "anchor": "class-resolverevent",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "resolvereventreason",
+#       "name": "ResolverEventReason",
+#       "anchor": "class-resolvereventreason",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "resolverresult",
+#       "name": "ResolverResult",
+#       "anchor": "class-resolverresult",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "resolver",
+#       "name": "Resolver",
+#       "anchor": "class-resolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "absolute-url",
+#       "name": "_absolute_url",
+#       "anchor": "function-absolute-url",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "find-pdf-via-meta",
+#       "name": "find_pdf_via_meta",
+#       "anchor": "function-find-pdf-via-meta",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "find-pdf-via-link",
+#       "name": "find_pdf_via_link",
+#       "anchor": "function-find-pdf-via-link",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "find-pdf-via-anchor",
+#       "name": "find_pdf_via_anchor",
+#       "anchor": "function-find-pdf-via-anchor",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "collect-candidate-urls",
+#       "name": "_collect_candidate_urls",
+#       "anchor": "function-collect-candidate-urls",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "apiresolverbase",
+#       "name": "ApiResolverBase",
+#       "anchor": "class-apiresolverbase",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "fetch-unpaywall-data",
+#       "name": "_fetch_unpaywall_data",
+#       "anchor": "function-fetch-unpaywall-data",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "fetch-semantic-scholar-data",
+#       "name": "_fetch_semantic_scholar_data",
+#       "anchor": "function-fetch-semantic-scholar-data",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Shared resolver primitives and helpers."""
 
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping, Sequence
 from types import MappingProxyType
-from typing import Any, Dict, List, Mapping, Optional, Protocol, Sequence
+from typing import Any, Protocol
 from urllib.parse import urljoin
 
 import httpx
@@ -28,7 +122,7 @@ LOGGER = logging.getLogger(__name__)
 class ResolverRegistry:
     """Light-weight registry retaining backwards compatibility with legacy code."""
 
-    _registry: Dict[str, type] = {}
+    _registry: dict[str, type] = {}
 
     @classmethod
     def register(cls, resolver_cls: type) -> None:
@@ -36,7 +130,7 @@ class ResolverRegistry:
         cls._registry[name] = resolver_cls
 
     @classmethod
-    def create_default(cls) -> List[Any]:
+    def create_default(cls) -> list[Any]:
         """Instantiate all registered resolvers (used by some legacy tests)."""
 
         return [resolver_cls() for resolver_cls in cls._registry.values()]
@@ -67,7 +161,7 @@ class ResolverEvent(str):
         return True
 
     @classmethod
-    def from_wire(cls, value: Any) -> "ResolverEvent":
+    def from_wire(cls, value: Any) -> ResolverEvent:
         if isinstance(value, ResolverEvent):
             return value
         if isinstance(value, str):
@@ -99,7 +193,7 @@ class ResolverEventReason(str):
     UNEXPECTED_ERROR = "unexpected-error"
 
     @classmethod
-    def from_wire(cls, value: Any) -> "ResolverEventReason":
+    def from_wire(cls, value: Any) -> ResolverEventReason:
         if isinstance(value, ResolverEventReason):
             return value
         if isinstance(value, str):
@@ -119,20 +213,20 @@ class ResolverResult:
 
     def __init__(
         self,
-        url: Optional[str] = None,
+        url: str | None = None,
         *,
-        referer: Optional[str] = None,
-        canonical_url: Optional[str] = None,
-        metadata: Optional[Mapping[str, Any]] = None,
-        event: Optional[ResolverEvent] = None,
-        event_reason: Optional[ResolverEventReason] = None,
-        http_status: Optional[int] = None,
+        referer: str | None = None,
+        canonical_url: str | None = None,
+        metadata: Mapping[str, Any] | None = None,
+        event: ResolverEvent | None = None,
+        event_reason: ResolverEventReason | None = None,
+        http_status: int | None = None,
         **extra: Any,
     ) -> None:
         self.url = url
         self.referer = referer
         self.canonical_url = canonical_url
-        self.metadata: Dict[str, Any] = dict(metadata or {})
+        self.metadata: dict[str, Any] = dict(metadata or {})
         self.event = event
         self.event_reason = event_reason
         self.http_status = http_status
@@ -158,8 +252,8 @@ class Resolver(Protocol):
         artifact: Any,
         session: Any,
         ctx: Any,
-        telemetry: Optional[Any],
-        run_id: Optional[str],
+        telemetry: Any | None,
+        run_id: str | None,
     ) -> Any: ...
 
 
@@ -198,7 +292,7 @@ def _absolute_url(base: str, href: str) -> str:
     return urljoin(base, href)
 
 
-def find_pdf_via_meta(soup: Any, base_url: str) -> Optional[str]:
+def find_pdf_via_meta(soup: Any, base_url: str) -> str | None:
     if soup is None:
         return None
     tag = getattr(soup, "find", lambda *args, **kwargs: None)(
@@ -210,7 +304,7 @@ def find_pdf_via_meta(soup: Any, base_url: str) -> Optional[str]:
     return None
 
 
-def find_pdf_via_link(soup: Any, base_url: str) -> Optional[str]:
+def find_pdf_via_link(soup: Any, base_url: str) -> str | None:
     if soup is None:
         return None
     for tag in getattr(soup, "find_all", lambda *args, **kwargs: [])("link"):
@@ -228,7 +322,7 @@ def find_pdf_via_link(soup: Any, base_url: str) -> Optional[str]:
     return None
 
 
-def find_pdf_via_anchor(soup: Any, base_url: str) -> Optional[str]:
+def find_pdf_via_anchor(soup: Any, base_url: str) -> str | None:
     if soup is None:
         return None
     for anchor in getattr(soup, "find_all", lambda *args, **kwargs: [])("a"):
@@ -238,7 +332,7 @@ def find_pdf_via_anchor(soup: Any, base_url: str) -> Optional[str]:
     return None
 
 
-def _collect_candidate_urls(node: Any, results: List[str]) -> None:
+def _collect_candidate_urls(node: Any, results: list[str]) -> None:
     if isinstance(node, str):
         value = node.strip()
         if value.startswith("http://") or value.startswith("https://"):
@@ -265,25 +359,25 @@ class ApiResolverBase(RegisteredResolver):
 
     def _request_json(
         self,
-        client: Optional[httpx.Client],
+        client: httpx.Client | None,
         method: str,
         url: str,
         *,
         config: Any,
-        params: Optional[Mapping[str, Any]] = None,
-        headers: Optional[Mapping[str, str]] = None,
+        params: Mapping[str, Any] | None = None,
+        headers: Mapping[str, str] | None = None,
         json: Any = None,
         role: str = "metadata",
         **kwargs: Any,
-    ) -> tuple[Optional[Any], Optional[ResolverResult]]:
-        polite_headers: Dict[str, str] = {}
+    ) -> tuple[Any | None, ResolverResult | None]:
+        polite_headers: dict[str, str] = {}
         base_headers = getattr(config, "polite_headers", None)
         if isinstance(base_headers, Mapping):
             polite_headers.update({k: str(v) for k, v in base_headers.items()})
         if headers:
             polite_headers.update({k: str(v) for k, v in headers.items()})
 
-        timeout: Optional[float] = None
+        timeout: float | None = None
         get_timeout = getattr(config, "get_timeout", None)
         if callable(get_timeout):
             try:
@@ -370,11 +464,11 @@ class ApiResolverBase(RegisteredResolver):
 
 
 def _fetch_unpaywall_data(
-    client: Optional[httpx.Client],
+    client: httpx.Client | None,
     config: Any,
     doi: str,
 ) -> Any:
-    headers: Dict[str, str] = {}
+    headers: dict[str, str] = {}
     base_headers = getattr(config, "polite_headers", None)
     if isinstance(base_headers, Mapping):
         headers.update({k: str(v) for k, v in base_headers.items()})
@@ -407,11 +501,11 @@ def _fetch_unpaywall_data(
 
 
 def _fetch_semantic_scholar_data(
-    client: Optional[httpx.Client],
+    client: httpx.Client | None,
     config: Any,
     doi: str,
 ) -> Any:
-    headers: Dict[str, str] = {}
+    headers: dict[str, str] = {}
     base_headers = getattr(config, "polite_headers", None)
     if isinstance(base_headers, Mapping):
         headers.update({k: str(v) for k, v in base_headers.items()})

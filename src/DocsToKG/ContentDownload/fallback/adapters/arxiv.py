@@ -1,15 +1,36 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.fallback.adapters.arxiv",
+#   "purpose": "arXiv PDF adapter for direct PDF resolution.",
+#   "sections": [
+#     {
+#       "id": "extract-arxiv-id",
+#       "name": "extract_arxiv_id",
+#       "anchor": "function-extract-arxiv-id",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "adapter-arxiv-pdf",
+#       "name": "adapter_arxiv_pdf",
+#       "anchor": "function-adapter-arxiv-pdf",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """arXiv PDF adapter for direct PDF resolution."""
 
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, Optional
+from typing import Any
 
 from DocsToKG.ContentDownload.fallback.adapters import head_pdf
 from DocsToKG.ContentDownload.fallback.types import AttemptPolicy, AttemptResult
 
 
-def extract_arxiv_id(doi: Optional[str]) -> Optional[str]:
+def extract_arxiv_id(doi: str | None) -> str | None:
     """Extract arXiv ID from DOI or context.
 
     arXiv DOIs are typically in the form: 10.48550/arXiv.XXXX.XXXXX
@@ -27,7 +48,7 @@ def extract_arxiv_id(doi: Optional[str]) -> Optional[str]:
 
 def adapter_arxiv_pdf(
     policy: AttemptPolicy,
-    context: Dict[str, Any],
+    context: dict[str, Any],
 ) -> AttemptResult:
     """Query arXiv for PDF via direct URL construction.
 

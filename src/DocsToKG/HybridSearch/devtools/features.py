@@ -1,3 +1,11 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.HybridSearch.devtools.features",
+#   "purpose": "Backward-compatible re-export of feature utilities.",
+#   "sections": []
+# }
+# === /NAVMAP ===
+
 """Backward-compatible re-export of feature utilities.
 
 Historically tests imported ``DocsToKG.HybridSearch.devtools.features`` for the

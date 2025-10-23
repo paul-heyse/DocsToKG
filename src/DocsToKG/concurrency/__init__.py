@@ -1,3 +1,11 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.concurrency.__init__",
+#   "purpose": "Concurrency helpers shared across DocsToKG components.",
+#   "sections": []
+# }
+# === /NAVMAP ===
+
 """
 Concurrency helpers shared across DocsToKG components.
 
@@ -9,4 +17,3 @@ implementations out of module trees that forbid local pools.
 from .executors import create_executor
 
 __all__ = ["create_executor"]
-

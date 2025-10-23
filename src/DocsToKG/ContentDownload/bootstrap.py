@@ -3,9 +3,84 @@
 #   "module": "DocsToKG.ContentDownload.bootstrap",
 #   "purpose": "Bootstrap orchestrator that coordinates all layers (telemetry, HTTP, resolvers, pipeline)",
 #   "sections": [
-#     {"id": "run-from-config", "name": "run_from_config", "anchor": "#function-run-from-config", "kind": "function"},
-#     {"id": "bootstrap-config", "name": "BootstrapConfig", "anchor": "#class-bootstrapconfig", "kind": "class"},
-#     {"id": "run-result", "name": "RunResult", "anchor": "#class-runresult", "kind": "class"}
+#     {
+#       "id": "should-use-new-bootstrap",
+#       "name": "_should_use_new_bootstrap",
+#       "anchor": "function-should-use-new-bootstrap",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "bootstrapconfig",
+#       "name": "BootstrapConfig",
+#       "anchor": "class-bootstrapconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "runresult",
+#       "name": "RunResult",
+#       "anchor": "class-runresult",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "build-bootstrap-config",
+#       "name": "build_bootstrap_config",
+#       "anchor": "function-build-bootstrap-config",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "run-from-config",
+#       "name": "run_from_config",
+#       "anchor": "function-run-from-config",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-telemetry",
+#       "name": "_build_telemetry",
+#       "anchor": "function-build-telemetry",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-client-map",
+#       "name": "_build_client_map",
+#       "anchor": "function-build-client-map",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "translate-http-config",
+#       "name": "_translate_http_config",
+#       "anchor": "function-translate-http-config",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "translate-telemetry-paths",
+#       "name": "_translate_telemetry_paths",
+#       "anchor": "function-translate-telemetry-paths",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-resolver-registry",
+#       "name": "_build_resolver_registry",
+#       "anchor": "function-build-resolver-registry",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-retry-configs",
+#       "name": "_build_retry_configs",
+#       "anchor": "function-build-retry-configs",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "apply-http-config",
+#       "name": "_apply_http_config",
+#       "anchor": "function-apply-http-config",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "process-artifacts",
+#       "name": "_process_artifacts",
+#       "anchor": "function-process-artifacts",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===
@@ -35,9 +110,10 @@ from __future__ import annotations
 
 import importlib
 import logging
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterator, Mapping, Optional
+from typing import Any
 from uuid import uuid4
 
 from DocsToKG.ContentDownload.config import ContentDownloadConfig
@@ -117,11 +193,11 @@ class BootstrapConfig:
     """Complete bootstrap configuration."""
 
     http: HttpConfig = field(default_factory=HttpConfig)
-    telemetry_paths: Optional[Mapping[str, Path]] = None
-    resolver_registry: Optional[dict[str, Any]] = None
-    resolver_retry_configs: Optional[dict[str, RetryConfig]] = None
-    policy_knobs: Optional[dict[str, Any]] = None
-    run_id: Optional[str] = None
+    telemetry_paths: Mapping[str, Path] | None = None
+    resolver_registry: dict[str, Any] | None = None
+    resolver_retry_configs: dict[str, RetryConfig] | None = None
+    policy_knobs: dict[str, Any] | None = None
+    run_id: str | None = None
 
 
 @dataclass
@@ -157,7 +233,7 @@ def build_bootstrap_config(config: ContentDownloadConfig) -> BootstrapConfig:
 
 def run_from_config(
     config: BootstrapConfig,
-    artifacts: Optional[Iterator[Any]] = None,
+    artifacts: Iterator[Any] | None = None,
     dry_run: bool = False,
 ) -> RunResult:
     """
@@ -244,7 +320,7 @@ def run_from_config(
             telemetry.close()
 
 
-def _build_telemetry(paths: Optional[Mapping[str, Path]], run_id: str) -> RunTelemetry:
+def _build_telemetry(paths: Mapping[str, Path] | None, run_id: str) -> RunTelemetry:
     """Build telemetry sinks from configuration.
 
     Creates sinks based on provided telemetry_paths dictionary:
@@ -474,7 +550,7 @@ def _apply_http_config(session: Any, http_config: HttpConfig) -> None:
 
 def _process_artifacts(
     pipeline: ResolverPipeline,
-    artifacts: Optional[Iterator[Any]],
+    artifacts: Iterator[Any] | None,
     telemetry: RunTelemetry,
     run_id: str,
     dry_run: bool,

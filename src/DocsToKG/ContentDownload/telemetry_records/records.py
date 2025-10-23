@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.telemetry_records.records",
+#   "purpose": "Telemetry Record Types - Extended Data Contracts.",
+#   "sections": [
+#     {
+#       "id": "telemetryattemptrecord",
+#       "name": "TelemetryAttemptRecord",
+#       "anchor": "class-telemetryattemptrecord",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Telemetry Record Types - Extended Data Contracts
 
@@ -15,9 +30,10 @@ Design:
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Mapping, Optional
+from typing import Any
 
 # ============================================================================
 # EXTENDED ATTEMPT RECORD - Telemetry Internal Type
@@ -49,17 +65,17 @@ class TelemetryAttemptRecord:
     """
 
     ts: datetime
-    run_id: Optional[str]
-    resolver: Optional[str]
+    run_id: str | None
+    resolver: str | None
     url: str
     verb: str
     status: str
-    http_status: Optional[int] = None
-    content_type: Optional[str] = None
-    reason: Optional[str] = None
-    elapsed_ms: Optional[int] = None
-    bytes_written: Optional[int] = None
-    content_length_hdr: Optional[int] = None
+    http_status: int | None = None
+    content_type: str | None = None
+    reason: str | None = None
+    elapsed_ms: int | None = None
+    bytes_written: int | None = None
+    content_length_hdr: int | None = None
     extra: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:

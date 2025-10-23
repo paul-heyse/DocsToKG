@@ -1,9 +1,30 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.fallback.adapters.landing_scrape",
+#   "purpose": "Landing page scraper adapter for PDF extraction from HTML.",
+#   "sections": [
+#     {
+#       "id": "pdflinkextractor",
+#       "name": "PDFLinkExtractor",
+#       "anchor": "class-pdflinkextractor",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "adapter-landing-scrape-pdf",
+#       "name": "adapter_landing_scrape_pdf",
+#       "anchor": "function-adapter-landing-scrape-pdf",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Landing page scraper adapter for PDF extraction from HTML."""
 
 from __future__ import annotations
 
 from html.parser import HTMLParser
-from typing import Any, Dict, List
+from typing import Any
 from urllib.parse import urljoin
 
 from DocsToKG.ContentDownload.fallback.adapters import head_pdf
@@ -16,10 +37,10 @@ class PDFLinkExtractor(HTMLParser):
     def __init__(self) -> None:
         """Initialize parser."""
         super().__init__()
-        self.pdf_urls: List[str] = []
+        self.pdf_urls: list[str] = []
         self.in_script = False
 
-    def handle_starttag(self, tag: str, attrs: List[tuple]) -> None:
+    def handle_starttag(self, tag: str, attrs: list[tuple]) -> None:
         """Handle HTML tags."""
         attrs_dict = dict(attrs)
 
@@ -57,7 +78,7 @@ class PDFLinkExtractor(HTMLParser):
 
 def adapter_landing_scrape_pdf(
     policy: AttemptPolicy,
-    context: Dict[str, Any],
+    context: dict[str, Any],
 ) -> AttemptResult:
     """Scrape landing page HTML for PDF URLs.
 

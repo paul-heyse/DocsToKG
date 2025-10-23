@@ -3,11 +3,60 @@
 #   "module": "DocsToKG.OntologyDownload.analytics.cli_commands",
 #   "purpose": "CLI commands for analytics and report generation",
 #   "sections": [
-#     {"id": "types", "name": "CLI Result Types", "anchor": "TYP", "kind": "models"},
-#     {"id": "latest", "name": "Latest Report Command", "anchor": "LATEST", "kind": "api"},
-#     {"id": "growth", "name": "Growth Report Command", "anchor": "GROWTH", "kind": "api"},
-#     {"id": "validation", "name": "Validation Report Command", "anchor": "VAL", "kind": "api"},
-#     {"id": "export", "name": "Export Formatters", "anchor": "EXPORT", "kind": "api"}
+#     {
+#       "id": "cmd-report-latest",
+#       "name": "cmd_report_latest",
+#       "anchor": "function-cmd-report-latest",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "cmd-report-growth",
+#       "name": "cmd_report_growth",
+#       "anchor": "function-cmd-report-growth",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "cmd-report-validation",
+#       "name": "cmd_report_validation",
+#       "anchor": "function-cmd-report-validation",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "format-report-json",
+#       "name": "_format_report_json",
+#       "anchor": "function-format-report-json",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "format-report-csv",
+#       "name": "_format_report_csv",
+#       "anchor": "function-format-report-csv",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "format-report-table",
+#       "name": "_format_report_table",
+#       "anchor": "function-format-report-table",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "format-latest-report",
+#       "name": "format_latest_report",
+#       "anchor": "function-format-latest-report",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "format-growth-report",
+#       "name": "format_growth_report",
+#       "anchor": "function-format-growth-report",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "format-validation-report",
+#       "name": "format_validation_report",
+#       "anchor": "function-format-validation-report",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===
@@ -19,7 +68,6 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import asdict
-from typing import Optional
 
 try:  # pragma: no cover
     import polars as pl
@@ -45,7 +93,7 @@ logger = logging.getLogger(__name__)
 
 def cmd_report_latest(
     files_df: pl.DataFrame | pl.LazyFrame,
-    validations_df: Optional[pl.DataFrame | pl.LazyFrame] = None,
+    validations_df: pl.DataFrame | pl.LazyFrame | None = None,
     output_format: str = "table",
 ) -> str:
     """Generate latest version report command.

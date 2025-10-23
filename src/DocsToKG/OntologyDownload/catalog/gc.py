@@ -3,10 +3,60 @@
 #   "module": "DocsToKG.OntologyDownload.catalog.gc",
 #   "purpose": "Garbage collection and prune operations for DuckDB catalog",
 #   "sections": [
-#     {"id": "types", "name": "GC Result Types", "anchor": "TYP", "kind": "models"},
-#     {"id": "orphans", "name": "Orphan Detection", "anchor": "ORPHAN", "kind": "api"},
-#     {"id": "prune", "name": "Prune Operations", "anchor": "PRUNE", "kind": "api"},
-#     {"id": "vacuum", "name": "Vacuum & Defragmentation", "anchor": "VACUUM", "kind": "api"}
+#     {
+#       "id": "orphaneditem",
+#       "name": "OrphanedItem",
+#       "anchor": "class-orphaneditem",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "pruneresult",
+#       "name": "PruneResult",
+#       "anchor": "class-pruneresult",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "vacuumresult",
+#       "name": "VacuumResult",
+#       "anchor": "class-vacuumresult",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "identify-orphaned-artifacts",
+#       "name": "identify_orphaned_artifacts",
+#       "anchor": "function-identify-orphaned-artifacts",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "identify-orphaned-files",
+#       "name": "identify_orphaned_files",
+#       "anchor": "function-identify-orphaned-files",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "prune-by-retention-days",
+#       "name": "prune_by_retention_days",
+#       "anchor": "function-prune-by-retention-days",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "prune-keep-latest-n",
+#       "name": "prune_keep_latest_n",
+#       "anchor": "function-prune-keep-latest-n",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "vacuum-database",
+#       "name": "vacuum_database",
+#       "anchor": "function-vacuum-database",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "garbage-collect",
+#       "name": "garbage_collect",
+#       "anchor": "function-garbage-collect",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===
@@ -27,7 +77,6 @@ import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional
 
 try:  # pragma: no cover
     import duckdb
@@ -54,7 +103,7 @@ class OrphanedItem:
 
     item_type: str  # 'artifact' | 'file'
     item_id: str
-    fs_path: Optional[Path]
+    fs_path: Path | None
     size_bytes: int
     orphaned_at: datetime
 
@@ -308,7 +357,7 @@ def prune_by_retention_days(
 def prune_keep_latest_n(
     conn: duckdb.DuckDBPyConnection,
     keep_count: int = 5,
-    service: Optional[str] = None,
+    service: str | None = None,
     dry_run: bool = True,
 ) -> PruneResult:
     """Prune old versions, keeping only N latest.

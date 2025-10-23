@@ -1,12 +1,44 @@
 # === NAVMAP v1 ===
 # {
 #   "module": "DocsToKG.OntologyDownload.catalog.prune",
-#   "purpose": "Prune orphaned files via staging→v_fs_orphans view; keep DB↔FS synchronized",
+#   "purpose": "Prune orphaned files via staging\u2192v_fs_orphans view; keep DB\u2194FS synchronized",
 #   "sections": [
-#     {"id": "types", "name": "Staging & Result Types", "anchor": "TYP", "kind": "models"},
-#     {"id": "staging", "name": "FS Staging Loader", "anchor": "STG", "kind": "api"},
-#     {"id": "orphans", "name": "Orphan Detection", "anchor": "ORP", "kind": "api"},
-#     {"id": "delete", "name": "Deletion & Cleanup", "anchor": "DEL", "kind": "api"}
+#     {
+#       "id": "prunestats",
+#       "name": "PruneStats",
+#       "anchor": "class-prunestats",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "load-staging-from-fs",
+#       "name": "load_staging_from_fs",
+#       "anchor": "function-load-staging-from-fs",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "list-orphans",
+#       "name": "list_orphans",
+#       "anchor": "function-list-orphans",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "count-orphans",
+#       "name": "count_orphans",
+#       "anchor": "function-count-orphans",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "delete-orphans",
+#       "name": "delete_orphans",
+#       "anchor": "function-delete-orphans",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "prune-with-staging",
+#       "name": "prune_with_staging",
+#       "anchor": "function-prune-with-staging",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===

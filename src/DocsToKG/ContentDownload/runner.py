@@ -3,8 +3,24 @@
 #   "module": "DocsToKG.ContentDownload.runner",
 #   "purpose": "Modern run orchestration using Pydantic v2 config and DownloadPipeline",
 #   "sections": [
-#     {"id": "downloadrun", "name": "DownloadRun", "anchor": "class-downloadrun", "kind": "class"},
-#     {"id": "run-helper", "name": "run", "anchor": "function-run", "kind": "function"}
+#     {
+#       "id": "runresult",
+#       "name": "RunResult",
+#       "anchor": "class-runresult",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "downloadrun",
+#       "name": "DownloadRun",
+#       "anchor": "class-downloadrun",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "run",
+#       "name": "run",
+#       "anchor": "function-run",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===
@@ -31,9 +47,10 @@ Design Principles
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable, Optional
+from typing import Any
 
 from DocsToKG.ContentDownload.bootstrap import (
     BootstrapConfig,
@@ -55,7 +72,7 @@ _LOGGER = logging.getLogger(__name__)
 class RunResult:
     """Result of a download run."""
 
-    run_id: Optional[str]
+    run_id: str | None
     total_processed: int
     successful: int
     failed: int
@@ -270,9 +287,9 @@ class DownloadRun:
 
 
 def run(
-    config_path: Optional[str] = None,
-    artifacts: Optional[Iterable[Any]] = None,
-    cli_overrides: Optional[dict[str, Any]] = None,
+    config_path: str | None = None,
+    artifacts: Iterable[Any] | None = None,
+    cli_overrides: dict[str, Any] | None = None,
 ) -> RunResult:
     """Run download pipeline using canonical bootstrap orchestrator.
 

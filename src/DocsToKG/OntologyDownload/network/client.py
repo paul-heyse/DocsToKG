@@ -1,3 +1,48 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.network.client",
+#   "purpose": "HTTPX + Hishel HTTP Client Factory.",
+#   "sections": [
+#     {
+#       "id": "get-http-client",
+#       "name": "get_http_client",
+#       "anchor": "function-get-http-client",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "close-http-client",
+#       "name": "close_http_client",
+#       "anchor": "function-close-http-client",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "reset-http-client",
+#       "name": "reset_http_client",
+#       "anchor": "function-reset-http-client",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-cache-dir",
+#       "name": "_get_cache_dir",
+#       "anchor": "function-get-cache-dir",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "create-ssl-context",
+#       "name": "_create_ssl_context",
+#       "anchor": "function-create-ssl-context",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "create-http-client",
+#       "name": "_create_http_client",
+#       "anchor": "function-create-http-client",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """HTTPX + Hishel HTTP Client Factory.
 
 Provides a singleton, thread-safe HTTP client with RFC 9111-compliant caching,
@@ -26,7 +71,6 @@ import os
 import ssl
 import threading
 from pathlib import Path
-from typing import Optional
 
 import certifi
 import hishel
@@ -59,10 +103,10 @@ logger = logging.getLogger(__name__)
 # Global Client State
 # ============================================================================
 
-_client: Optional[httpx.Client] = None
+_client: httpx.Client | None = None
 _client_lock = threading.Lock()
-_client_bind_hash: Optional[str] = None
-_client_bind_pid: Optional[int] = None
+_client_bind_hash: str | None = None
+_client_bind_pid: int | None = None
 _config_hash_mismatch_warned = False
 
 

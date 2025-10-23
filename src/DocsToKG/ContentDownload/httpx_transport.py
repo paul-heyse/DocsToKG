@@ -1,3 +1,96 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.httpx_transport",
+#   "purpose": "Shared HTTPX client factory with Hishel caching for ContentDownload.",
+#   "sections": [
+#     {
+#       "id": "resolve-data-root",
+#       "name": "_resolve_data_root",
+#       "anchor": "function-resolve-data-root",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolve-cache-dir",
+#       "name": "_resolve_cache_dir",
+#       "anchor": "function-resolve-cache-dir",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-ssl-context",
+#       "name": "_build_ssl_context",
+#       "anchor": "function-build-ssl-context",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "request-hook",
+#       "name": "_request_hook",
+#       "anchor": "function-request-hook",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "response-hook",
+#       "name": "_response_hook",
+#       "anchor": "function-response-hook",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-event-hooks",
+#       "name": "_build_event_hooks",
+#       "anchor": "function-build-event-hooks",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "configure-http-client",
+#       "name": "configure_http_client",
+#       "anchor": "function-configure-http-client",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "reset-http-client-for-tests",
+#       "name": "reset_http_client_for_tests",
+#       "anchor": "function-reset-http-client-for-tests",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "purge-http-cache",
+#       "name": "purge_http_cache",
+#       "anchor": "function-purge-http-cache",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-http-client",
+#       "name": "get_http_client",
+#       "anchor": "function-get-http-client",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "close-client-unlocked",
+#       "name": "_close_client_unlocked",
+#       "anchor": "function-close-client-unlocked",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-or-create-cache-router",
+#       "name": "_load_or_create_cache_router",
+#       "anchor": "function-load-or-create-cache-router",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "initialize-rate-limiter-from-config",
+#       "name": "initialize_rate_limiter_from_config",
+#       "anchor": "function-initialize-rate-limiter-from-config",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "create-client-unlocked",
+#       "name": "_create_client_unlocked",
+#       "anchor": "function-create-client-unlocked",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Shared HTTPX client factory with Hishel caching for ContentDownload.
 
 Responsibilities
@@ -32,8 +125,8 @@ import shutil
 import ssl
 import threading
 import time
+from collections.abc import Iterable, Mapping, MutableMapping
 from pathlib import Path
-from typing import Dict, Iterable, Mapping, MutableMapping, Optional
 
 import certifi
 import httpx
@@ -52,9 +145,9 @@ from DocsToKG.ContentDownload.ratelimit import (
 LOGGER = logging.getLogger("DocsToKG.ContentDownload.network")
 
 _CLIENT_LOCK = threading.RLock()
-_HTTP_CLIENT: Optional[httpx.Client] = None
-_CURRENT_OVERRIDES: Dict[str, object] = {}
-_CACHE_ROUTER: Optional[CacheRouter] = None
+_HTTP_CLIENT: httpx.Client | None = None
+_CURRENT_OVERRIDES: dict[str, object] = {}
+_CACHE_ROUTER: CacheRouter | None = None
 
 _DEFAULT_TIMEOUT = httpx.Timeout(connect=5.0, read=30.0, write=30.0, pool=5.0)
 _DEFAULT_LIMITS = httpx.Limits(
@@ -129,8 +222,8 @@ def _response_hook(response: httpx.Response) -> None:
     )
 
 
-def _build_event_hooks(extra_hooks: Optional[Mapping[str, Iterable]]) -> Dict[str, list]:
-    hooks: Dict[str, list] = {
+def _build_event_hooks(extra_hooks: Mapping[str, Iterable] | None) -> dict[str, list]:
+    hooks: dict[str, list] = {
         "request": [_request_hook],
         "response": [_response_hook],
     }
@@ -145,9 +238,9 @@ def _build_event_hooks(extra_hooks: Optional[Mapping[str, Iterable]]) -> Dict[st
 
 def configure_http_client(
     *,
-    proxy_mounts: Optional[Mapping[str, httpx.BaseTransport]] = None,
-    transport: Optional[httpx.BaseTransport] = None,
-    event_hooks: Optional[Mapping[str, Iterable]] = None,
+    proxy_mounts: Mapping[str, httpx.BaseTransport] | None = None,
+    transport: httpx.BaseTransport | None = None,
+    event_hooks: Mapping[str, Iterable] | None = None,
 ) -> None:
     """Override HTTPX client configuration and rebuild the singleton on next use."""
 
@@ -248,7 +341,7 @@ def _load_or_create_cache_router() -> CacheRouter:
     return _CACHE_ROUTER
 
 
-def initialize_rate_limiter_from_config(rate_config: Optional[object] = None) -> None:
+def initialize_rate_limiter_from_config(rate_config: object | None = None) -> None:
     """Initialize the global rate limiter with Phase 7 configuration.
 
     Args:
@@ -281,7 +374,7 @@ def _create_client_unlocked() -> None:
     cache_dir = _resolve_cache_dir()
 
     limiter_manager = get_rate_limiter_manager()
-    base_transport: Optional[httpx.BaseTransport] = _CURRENT_OVERRIDES.get("transport")  # type: ignore[assignment]
+    base_transport: httpx.BaseTransport | None = _CURRENT_OVERRIDES.get("transport")  # type: ignore[assignment]
 
     # Load cache router for role-aware caching
     cache_router = _load_or_create_cache_router()
@@ -305,7 +398,7 @@ def _create_client_unlocked() -> None:
 
     event_hooks = _build_event_hooks(_CURRENT_OVERRIDES.get("event_hooks"))  # type: ignore[arg-type]
 
-    mounts: Optional[Mapping[str, httpx.BaseTransport]]
+    mounts: Mapping[str, httpx.BaseTransport] | None
     override_mounts = _CURRENT_OVERRIDES.get("proxy_mounts")  # type: ignore[assignment]
     if override_mounts:
         mounts = dict(override_mounts)  # type: ignore[arg-type]

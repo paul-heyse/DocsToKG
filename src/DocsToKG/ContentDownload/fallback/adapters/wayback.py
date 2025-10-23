@@ -1,14 +1,35 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.fallback.adapters.wayback",
+#   "purpose": "Wayback Machine adapter for archived PDF resolution.",
+#   "sections": [
+#     {
+#       "id": "extract-domain-from-url",
+#       "name": "extract_domain_from_url",
+#       "anchor": "function-extract-domain-from-url",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "adapter-wayback-pdf",
+#       "name": "adapter_wayback_pdf",
+#       "anchor": "function-adapter-wayback-pdf",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Wayback Machine adapter for archived PDF resolution."""
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 from DocsToKG.ContentDownload.fallback.adapters import head_pdf
 from DocsToKG.ContentDownload.fallback.types import AttemptPolicy, AttemptResult
 
 
-def extract_domain_from_url(url: str) -> Optional[str]:
+def extract_domain_from_url(url: str) -> str | None:
     """Extract domain from URL for Wayback queries."""
     try:
         from urllib.parse import urlparse
@@ -21,7 +42,7 @@ def extract_domain_from_url(url: str) -> Optional[str]:
 
 def adapter_wayback_pdf(
     policy: AttemptPolicy,
-    context: Dict[str, Any],
+    context: dict[str, Any],
 ) -> AttemptResult:
     """Query Wayback Machine CDX API for archived PDFs.
 

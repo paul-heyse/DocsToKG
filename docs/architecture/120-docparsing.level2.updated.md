@@ -1,5 +1,18 @@
 # DocsToKG • DocParsing (Level-2 Spec)
 
+> **Go‑Forward Decisions (2025-10-23) — DocParsing**
+>
+> 1. **Unified runner is authoritative.** All stages (DocTags, Chunk, Embed) MUST use the **StagePlan/Worker/Hooks + `run_stage()`** kernel. No stage‑local pools. The unified **orchestrator** is the default for `docparse all`. --retries 3 --retry-backoff-s 2 --timeout-s 30 --error-budget 0.02 --max-queue 2048
+> 2. **CLI surface.** Keep `docparse` with stages (`doctags|chunk|embed|all`) and add runner knobs: **`--retries`**, **`--retry-backoff-s`**, **`--timeout-s`**, **`--error-budget`**, **`--max-queue`** (and `--schedule` if present). Examples below show these flags.
+> 3. **Manifests & provenance.** Every successful run writes: append‑only JSONL manifests **plus** `manifest.sqlite3`. Each stage writes a **`__config__`** row and includes deterministic **`cfg_hash`**. Chunk manifests include **`chunks_format`**.
+> 4. **Vectors & Parquet.** **Parquet is first‑class**: dense/sparse/lexical vectors write to partitioned paths (`family=…/fmt=parquet/YYYY/MM/…`) with footer metadata (`docparse.provider`, `docparse.model_id`, `docparse.dtype`, `docparse.cfg_hash`). JSONL remains supported for compatibility.
+> 5. **Resume semantics.** Default fast resume by `doc_id`; `--verify-hash` enforces strict mode. Fingerprints (`.fp.json`) are maintained across stages.
+> 6. **vLLM/Docling strategy.** Prefer **Docling**; use **vLLM** selectively for hard pages with bounded timeouts; on timeout/503, **fallback** to Docling and log in manifests.
+> 7. **Observability.** Emit structured JSONL logs, **Prometheus** metrics (`docparse_*`) and optional **OpenTelemetry** spans keyed by `run_id` and `cfg_hash`.
+> 8. **Quarantine.** Permanent failures (e.g., corrupted PDFs, dimension mismatches after retries exhausted) go to **`Quarantine/`** with rich metadata; `docparse quarantine {{list|retry|clear|export}}` is part of the interface.
+> 9. **Acceptance gates.** Enforce north‑star budgets for this stage: **parse success ≥ 98%**, **title/abstract fidelity ≥ 99%**, **dim‑mismatch = 0**, and throughput/latency targets per hardware profile.
+
+
 ## Purpose & Non-Goals
 
 **Purpose:** Transform artifacts (PDF/HTML) into **DocTags → Chunks → Embeddings** with **reproducible IDs**, **append-only manifests**, **stage runner architecture**, and **pluggable embedding models**.  
@@ -11,19 +24,19 @@
 
 ```bash
 # Stage 1: Extract structured content from PDFs/HTML
-docparse doctags --mode pdf --input Data/PDFs --output Data/DocTagsFiles \
+docparse doctags --mode pdf --input Data/PDFs --output Data/DocTagsFiles \ --retries 3 --retry-backoff-s 2 --timeout-s 30 --error-budget 0.02 --max-queue 2048
   --workers 4 --gpu true --vllm-endpoint http://localhost:8000
 
 # Stage 2: Chunk DocTags into overlapping segments
-docparse chunk --in-dir Data/DocTagsFiles --out-dir Data/ChunkedDocTagFiles \
+docparse chunk --in-dir Data/DocTagsFiles --out-dir Data/ChunkedDocTagFiles \ --retries 3 --retry-backoff-s 2 --timeout-s 30 --error-budget 0.02 --max-queue 2048
   --chunker hybrid_v1 --max-tokens 512 --stride 64
 
 # Stage 3: Generate embeddings (dense, sparse, lexical)
-docparse embed --chunks-dir Data/ChunkedDocTagFiles --out-dir Data/Embeddings \
+docparse embed --chunks-dir Data/ChunkedDocTagFiles --out-dir Data/Embeddings \ --retries 3 --retry-backoff-s 2 --timeout-s 30 --error-budget 0.02 --max-queue 2048
   --dense qwen3-8b --sparse splade-v3 --bm25 on --batch-size 32
 
 # Unified pipeline (all stages)
-docparse all --resume --data-root Data
+docparse all --resume --data-root Data --retries 3 --retry-backoff-s 2 --timeout-s 30 --error-budget 0.02 --max-queue 2048
 
 # Inspection and planning
 docparse plan --data-root Data --mode auto --limit 10
@@ -231,6 +244,9 @@ class EmbeddingWorker:
 
 ## Manifest Schemas
 
+**Notes (go‑forward):** manifests include a `__config__` entry per stage and a `cfg_hash` for deterministic change tracking; chunk manifests include `chunks_format`.
+
+
 ### DocTags Manifest (JSONL)
 
 ```json
@@ -339,6 +355,9 @@ metadata = {
 - Metadata: Self-describing format
 
 ## vLLM Integration (PDF Parsing)
+
+**Reliability (go‑forward):** vLLM calls use bounded timeouts and retries; on timeout/503 we fallback to Docling and annotate the manifest attempt.
+
 
 **Architecture**:
 
@@ -648,3 +667,10 @@ embedding:
 - Worker crash (process killed)
 - Disk full during write
 - vLLM server restart
+
+
+
+**Parquet vectors (canonical):**
+- Layout: `Embeddings/{family=dense|sparse|lexical}/fmt=parquet/YYYY/MM/<doc_id>.parquet`
+- Footer metadata keys: `docparse.provider`, `docparse.model_id`, `docparse.dtype`, `docparse.cfg_hash`
+- Benefits: columnar scan, compression, Arrow interoperability, partition pruning

@@ -1,3 +1,66 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.embedding.backends.dense.qwen_vllm",
+#   "purpose": "Qwen3/vLLM dense embedding provider.",
+#   "sections": [
+#     {
+#       "id": "qwenvllmconfig",
+#       "name": "QwenVLLMConfig",
+#       "anchor": "class-qwenvllmconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "shutdown-llm-instance",
+#       "name": "_shutdown_llm_instance",
+#       "anchor": "function-shutdown-llm-instance",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "lrucache",
+#       "name": "_LRUCache",
+#       "anchor": "class-lrucache",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "qwen-cache-key",
+#       "name": "_qwen_cache_key",
+#       "anchor": "function-qwen-cache-key",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-vllm-components",
+#       "name": "_get_vllm_components",
+#       "anchor": "function-get-vllm-components",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "qwen-embed-direct",
+#       "name": "_qwen_embed_direct",
+#       "anchor": "function-qwen-embed-direct",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "qwenqueue",
+#       "name": "_QwenQueue",
+#       "anchor": "class-qwenqueue",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "qwenvllmprovider",
+#       "name": "QwenVLLMProvider",
+#       "anchor": "class-qwenvllmprovider",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "flush-llm-cache",
+#       "name": "flush_llm_cache",
+#       "anchor": "function-flush-llm-cache",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Qwen3/vLLM dense embedding provider."""
 
 from __future__ import annotations
@@ -6,10 +69,10 @@ import atexit
 import os
 import queue
 import threading
+from collections.abc import Sequence
 from concurrent.futures import Future
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Sequence, Tuple
 
 from DocsToKG.DocParsing.core.models import QwenCfg
 from DocsToKG.DocParsing.env import (
@@ -29,12 +92,12 @@ class QwenVLLMConfig:
     """Configuration for the Qwen/vLLM provider."""
 
     model_dir: Path
-    model_id: Optional[str] = None
+    model_id: str | None = None
     dtype: str = "bfloat16"
     tensor_parallelism: int = 1
     gpu_memory_utilization: float = 0.60
     batch_size: int = 32
-    quantization: Optional[str] = None
+    quantization: str | None = None
     dimension: int = 2560
     cache_enabled: bool = True
     queue_depth: int = 8
@@ -61,9 +124,7 @@ class _LRUCache:
 
     def __init__(self, maxsize: int = 2) -> None:
         self.maxsize = max(1, maxsize)
-        self._store: "OrderedDict[Tuple[str, str, int, float, Optional[str]], object]" = (
-            OrderedDict()
-        )
+        self._store: OrderedDict[tuple[str, str, int, float, str | None], object] = OrderedDict()
 
     def get(self, key):
         try:
@@ -97,7 +158,7 @@ except ImportError:  # pragma: no cover - fallback
 _QWEN_LLM_CACHE = _LRUCache(maxsize=2)
 
 
-def _qwen_cache_key(cfg: QwenCfg) -> Tuple[str, str, int, float, Optional[str]]:
+def _qwen_cache_key(cfg: QwenCfg) -> tuple[str, str, int, float, str | None]:
     quant = cfg.quantization if cfg.quantization else None
     return (
         str(cfg.model_dir),
@@ -125,8 +186,8 @@ def _get_vllm_components():
 
 
 def _qwen_embed_direct(
-    cfg: QwenCfg, texts: Sequence[str], batch_size: Optional[int]
-) -> List[List[float]]:
+    cfg: QwenCfg, texts: Sequence[str], batch_size: int | None
+) -> list[list[float]]:
     effective_batch = batch_size or cfg.batch_size
     use_cache = bool(getattr(cfg, "cache_enabled", True))
     cache_key = _qwen_cache_key(cfg)
@@ -145,7 +206,7 @@ def _qwen_embed_direct(
         if use_cache:
             _QWEN_LLM_CACHE.put(cache_key, llm)
     pool = pooling_cls(normalize=True, dimensions=int(cfg.dim))
-    out: List[List[float]] = []
+    out: list[list[float]] = []
     try:
         for i in range(0, len(texts), effective_batch):
             batch = list(texts[i : i + effective_batch])
@@ -171,7 +232,7 @@ class _QwenQueue:
 
     def __init__(self, cfg: QwenCfg, maxsize: int) -> None:
         self._cfg = cfg
-        self._queue: "queue.Queue[Tuple[List[str], int, Future[List[List[float]]]] | None]" = (
+        self._queue: queue.Queue[tuple[list[str], int, Future[list[list[float]]]] | None] = (
             queue.Queue(maxsize=max(1, maxsize))
         )
         self._closed = False
@@ -194,10 +255,10 @@ class _QwenQueue:
             finally:
                 self._queue.task_done()
 
-    def embed(self, texts: Sequence[str], batch_size: int) -> List[List[float]]:
+    def embed(self, texts: Sequence[str], batch_size: int) -> list[list[float]]:
         if self._closed:
             raise RuntimeError("Qwen embedding queue has been closed")
-        future: Future[List[List[float]]] = Future()
+        future: Future[list[list[float]]] = Future()
         self._queue.put((list(texts), int(batch_size), future))
         return future.result()
 
@@ -264,7 +325,7 @@ class QwenVLLMProvider(DenseEmbeddingBackend):
         self,
         texts: Sequence[str],
         *,
-        batch_hint: Optional[int] = None,
+        batch_hint: int | None = None,
     ) -> Sequence[Sequence[float]]:
         if not texts:
             return []

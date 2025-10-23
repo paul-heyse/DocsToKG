@@ -16,7 +16,8 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Set, Tuple
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, Any
 from urllib.parse import quote
 
 import httpx
@@ -43,7 +44,7 @@ class CrossrefResolver(ApiResolverBase):
     name = "crossref"
     api_display_name = "Crossref"
 
-    def is_enabled(self, config: Any, artifact: "WorkArtifact") -> bool:
+    def is_enabled(self, config: Any, artifact: WorkArtifact) -> bool:
         """Return ``True`` when the work exposes a DOI Crossref can query.
 
         Args:
@@ -59,7 +60,7 @@ class CrossrefResolver(ApiResolverBase):
         self,
         client: httpx.Client,
         config: Any,
-        artifact: "WorkArtifact",
+        artifact: WorkArtifact,
     ) -> Iterable[ResolverResult]:
         """Yield PDF URLs referenced by Crossref metadata for ``artifact``.
 
@@ -80,7 +81,7 @@ class CrossrefResolver(ApiResolverBase):
             )
             return
         email = config.mailto or config.unpaywall_email
-        params: Optional[Dict[str, str]] = {"mailto": email} if email else None
+        params: dict[str, str] | None = {"mailto": email} if email else None
         data, error = self._request_json(
             client,
             "GET",
@@ -97,7 +98,7 @@ class CrossrefResolver(ApiResolverBase):
         if not isinstance(link_section, list):
             link_section = []
 
-        pdf_candidates: List[Tuple[str, Dict[str, Any]]] = []
+        pdf_candidates: list[tuple[str, dict[str, Any]]] = []
         for entry in link_section:
             if not isinstance(entry, dict):
                 continue
@@ -110,14 +111,14 @@ class CrossrefResolver(ApiResolverBase):
         if not pdf_candidates:
             return
 
-        def _score(candidate: Tuple[str, Dict[str, Any]]) -> int:
+        def _score(candidate: tuple[str, dict[str, Any]]) -> int:
             _, meta = candidate
             version = (meta.get("content-version") or meta.get("content_version") or "").lower()
             return 1 if version == "vor" else 0
 
         pdf_candidates.sort(key=_score, reverse=True)
 
-        seen: Set[str] = set()
+        seen: set[str] = set()
         for url, meta in pdf_candidates:
             try:
                 normalized = canonical_for_index(url)

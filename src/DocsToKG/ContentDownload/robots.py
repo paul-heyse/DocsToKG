@@ -3,7 +3,18 @@
 #   "module": "DocsToKG.ContentDownload.robots",
 #   "purpose": "Robots.txt cache and enforcement for respectful web crawling",
 #   "sections": [
-#     {"id": "robotsCache", "name": "RobotsCache", "anchor": "class-robotscache", "kind": "class"}
+#     {
+#       "id": "cacheentry",
+#       "name": "_CacheEntry",
+#       "anchor": "class-cacheentry",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "robotscache",
+#       "name": "RobotsCache",
+#       "anchor": "class-robotscache",
+#       "kind": "class"
+#     }
 #   ]
 # }
 # === /NAVMAP ===
@@ -78,8 +89,8 @@ import logging
 import threading
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Any, Dict, Optional, Tuple
+from datetime import UTC, datetime
+from typing import Any
 from urllib import robotparser
 from urllib.parse import urlsplit, urlunsplit
 
@@ -96,8 +107,8 @@ class _CacheEntry:
 
     fetched_at: float
     parser: robotparser.RobotFileParser
-    status_code: Optional[int]
-    elapsed_ms: Optional[int]
+    status_code: int | None
+    elapsed_ms: int | None
 
 
 class RobotsCache:
@@ -134,9 +145,9 @@ class RobotsCache:
                     set higher for stable content sources.
         """
         self.ttl_sec = ttl_sec
-        self._cache: Dict[str, _CacheEntry] = {}
+        self._cache: dict[str, _CacheEntry] = {}
         self._cache_lock = threading.RLock()
-        self._host_locks: Dict[str, threading.Lock] = {}
+        self._host_locks: dict[str, threading.Lock] = {}
 
     def is_allowed(
         self,
@@ -144,9 +155,9 @@ class RobotsCache:
         url: str,
         user_agent: str,
         *,
-        telemetry: Optional[Any] = None,
-        run_id: Optional[str] = None,
-        resolver: Optional[str] = None,
+        telemetry: Any | None = None,
+        run_id: str | None = None,
+        resolver: str | None = None,
     ) -> bool:
         """Check if the URL is allowed by the robots.txt policy.
 
@@ -232,7 +243,7 @@ class RobotsCache:
         session: object,
         netloc: str,
         robots_url: str,
-    ) -> Tuple[Optional[_CacheEntry], bool]:
+    ) -> tuple[_CacheEntry | None, bool]:
         """Return a cached entry, fetching when expired."""
 
         now = time.monotonic()
@@ -276,7 +287,7 @@ class RobotsCache:
         self,
         session: object,
         robots_url: str,
-    ) -> Optional[_CacheEntry]:
+    ) -> _CacheEntry | None:
         start = time.perf_counter()
         parser = robotparser.RobotFileParser()
         parser.set_url(robots_url)
@@ -304,7 +315,7 @@ class RobotsCache:
         else:
             response_ctx = contextlib.nullcontext(response_cm)
 
-        status_code: Optional[int] = None
+        status_code: int | None = None
         try:
             with response_ctx as response:
                 status_code = getattr(response, "status_code", None)
@@ -312,9 +323,7 @@ class RobotsCache:
 
                 if status_code == 200:
                     lines = text.splitlines()
-                elif status_code == 404:
-                    lines = []
-                elif status_code is not None and status_code >= 400:
+                elif status_code == 404 or status_code is not None and status_code >= 400:
                     lines = []
                 else:
                     lines = text.splitlines()
@@ -342,11 +351,11 @@ class RobotsCache:
         url: str,
         robots_url: str,
         user_agent: str,
-        telemetry: Optional[Any],
-        run_id: Optional[str],
-        resolver: Optional[str],
-        http_status: Optional[int],
-        elapsed_ms: Optional[int],
+        telemetry: Any | None,
+        run_id: str | None,
+        resolver: str | None,
+        http_status: int | None,
+        elapsed_ms: int | None,
         cache_hit: bool,
     ) -> None:
         from DocsToKG.ContentDownload.telemetry import (
@@ -365,7 +374,7 @@ class RobotsCache:
         }
 
         record = SimplifiedAttemptRecord(
-            ts=datetime.now(timezone.utc),
+            ts=datetime.now(UTC),
             run_id=run_id,
             resolver=resolver,
             url=url,

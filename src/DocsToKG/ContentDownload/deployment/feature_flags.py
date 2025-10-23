@@ -1,3 +1,42 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.deployment.feature_flags",
+#   "purpose": "Feature flags system for safe feature deployment and experimentation.",
+#   "sections": [
+#     {
+#       "id": "rolloutstrategy",
+#       "name": "RolloutStrategy",
+#       "anchor": "class-rolloutstrategy",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "featureflag",
+#       "name": "FeatureFlag",
+#       "anchor": "class-featureflag",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "featureflagmanager",
+#       "name": "FeatureFlagManager",
+#       "anchor": "class-featureflagmanager",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "get-feature-flag-manager",
+#       "name": "get_feature_flag_manager",
+#       "anchor": "function-get-feature-flag-manager",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "is-feature-enabled",
+#       "name": "is_feature_enabled",
+#       "anchor": "function-is-feature-enabled",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Feature flags system for safe feature deployment and experimentation.
 
 Enables safe rollout of new features without requiring code redeployment.
@@ -10,7 +49,7 @@ import json
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any
 
 LOGGER = logging.getLogger(__name__)
 
@@ -32,10 +71,10 @@ class FeatureFlag:
     enabled: bool = False
     strategy: RolloutStrategy = RolloutStrategy.DISABLED
     rollout_percentage: int = 0  # 0-100 for canary rollouts
-    config: Dict[str, Any] = field(default_factory=dict)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    config: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def should_enable(self, user_id: Optional[str] = None) -> bool:
+    def should_enable(self, user_id: str | None = None) -> bool:
         """Determine if feature should be enabled for user."""
         if not self.enabled:
             return False
@@ -60,13 +99,13 @@ class FeatureFlag:
 class FeatureFlagManager:
     """Manages feature flags for application features."""
 
-    def __init__(self, flags: Optional[Dict[str, FeatureFlag]] = None) -> None:
+    def __init__(self, flags: dict[str, FeatureFlag] | None = None) -> None:
         """Initialize feature flag manager.
 
         Args:
             flags: Dictionary of feature flags keyed by name
         """
-        self._flags: Dict[str, FeatureFlag] = flags or {}
+        self._flags: dict[str, FeatureFlag] = flags or {}
         self._lock = __import__("threading").Lock()
 
     def register_flag(self, flag: FeatureFlag) -> None:
@@ -79,7 +118,7 @@ class FeatureFlagManager:
             self._flags[flag.name] = flag
             LOGGER.info(f"Registered feature flag: {flag.name}")
 
-    def is_enabled(self, flag_name: str, user_id: Optional[str] = None) -> bool:
+    def is_enabled(self, flag_name: str, user_id: str | None = None) -> bool:
         """Check if feature is enabled for user.
 
         Args:
@@ -95,7 +134,7 @@ class FeatureFlagManager:
             return False
         return flag.should_enable(user_id)
 
-    def get_flag(self, flag_name: str) -> Optional[FeatureFlag]:
+    def get_flag(self, flag_name: str) -> FeatureFlag | None:
         """Get feature flag by name.
 
         Args:
@@ -142,7 +181,7 @@ class FeatureFlagManager:
         )
         self.update_flag(updated)
 
-    def list_flags(self) -> Dict[str, Dict[str, Any]]:
+    def list_flags(self) -> dict[str, dict[str, Any]]:
         """List all feature flags with status.
 
         Returns:
@@ -177,7 +216,7 @@ class FeatureFlagManager:
 
 
 # Global feature flag manager instance
-_GLOBAL_FLAG_MANAGER: Optional[FeatureFlagManager] = None
+_GLOBAL_FLAG_MANAGER: FeatureFlagManager | None = None
 
 
 def get_feature_flag_manager() -> FeatureFlagManager:
@@ -192,7 +231,7 @@ def get_feature_flag_manager() -> FeatureFlagManager:
     return _GLOBAL_FLAG_MANAGER
 
 
-def is_feature_enabled(flag_name: str, user_id: Optional[str] = None) -> bool:
+def is_feature_enabled(flag_name: str, user_id: str | None = None) -> bool:
     """Check if feature is enabled (convenience function).
 
     Args:
