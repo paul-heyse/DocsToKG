@@ -145,3 +145,12 @@ No eligible files after excludes.
 
 <!-- 2025-10-23 07:01:53Z UTC -->
 ## Pass 5 — find and fix real bugs
+
+<!-- 2025-10-23 07:04:31Z UTC -->
+## Pass 6 — find and fix real bugs
+### Batch 0 (Pass 6)
+- Broken: `stream_download_to_file` leaked its temporary file descriptor whenever the HTTP request failed before the writer context started, eventually exhausting `EMFILE` limits under retry pressure.
+- Fix:
+  - Replace `mkstemp` usage with a `NamedTemporaryFile` context so the descriptor closes on all control-flow paths.
+  - Close streaming `httpx` responses on early failures to avoid connection pool leaks during retries.
+- TODO: Add a regression test that simulates repeated pre-stream failures and asserts file descriptor counts stay stable.

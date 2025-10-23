@@ -83,67 +83,75 @@ def stream_download_to_file(
     dest.parent.mkdir(parents=True, exist_ok=True)
 
     # Temporary file in same directory (atomic rename)
-    temp_fd, temp_path = tempfile.mkstemp(dir=dest.parent, prefix=".tmp-")
+    temp_path: Optional[Path] = None
+    resp: Optional[httpx.Response] = None
+    cache_status = CacheStatus.MISS
+    bytes_written = 0
+
     try:
-        # Send request with audited redirects; STREAM
-        try:
-            resp = request_with_redirect_audit(
-                client,
-                "GET",
-                url,
-                stream=True,
-            )
-            resp.raise_for_status()
-        except httpx.HTTPError as e:
-            status_code = 0
-            http_version = "HTTP/1.1"
+        with tempfile.NamedTemporaryFile(dir=dest.parent, prefix=".tmp-", delete=False) as tmp_file:
+            temp_path = Path(tmp_file.name)
 
-            # Extract response info if available in exception
-            if isinstance(e, httpx.HTTPStatusError):
-                status_code = e.response.status_code
-                http_version = e.response.http_version
-                error_type = "http_error"
-                error_status = RequestStatus.ERROR
-            else:
-                error_type = "network_error"
-                error_status = RequestStatus.NETWORK_ERROR
+            # Send request with audited redirects; STREAM
+            try:
+                resp = request_with_redirect_audit(
+                    client,
+                    "GET",
+                    url,
+                    stream=True,
+                )
+                resp.raise_for_status()
+            except httpx.HTTPError as e:
+                status_code = 0
+                http_version = "HTTP/1.1"
 
-            builder.with_response(status_code, http_version)
-            builder.with_error(error_type, str(e), error_status)
-            emitter.emit(builder.build())
-            raise DownloadError(f"HTTP error: {e}") from e
+                # Extract response info if available in exception
+                if isinstance(e, httpx.HTTPStatusError):
+                    status_code = e.response.status_code
+                    http_version = e.response.http_version
+                    error_type = "http_error"
+                    error_status = RequestStatus.ERROR
+                    e.response.close()
+                else:
+                    error_type = "network_error"
+                    error_status = RequestStatus.NETWORK_ERROR
+                    if resp is not None:
+                        resp.close()
 
-        # Cache status
-        cache_status = CacheStatus.MISS
-        if resp.status_code == 304:
-            cache_status = CacheStatus.REVALIDATED
-        elif resp.extensions.get("from_cache"):
-            cache_status = CacheStatus.HIT
+                builder.with_response(status_code, http_version)
+                builder.with_error(error_type, str(e), error_status)
+                emitter.emit(builder.build())
+                raise DownloadError(f"HTTP error: {e}") from e
 
-        # Update response metadata
-        builder.with_response(resp.status_code, resp.http_version, http2=False)
-        builder.with_cache(cache_status, from_cache=cache_status != CacheStatus.MISS)
+            if resp.status_code == 304:
+                cache_status = CacheStatus.REVALIDATED
+            elif resp.extensions.get("from_cache"):
+                cache_status = CacheStatus.HIT
 
-        # Get content length
-        content_length = int(resp.headers.get("Content-Length", 0) or 0)
-        builder.with_data(bytes_read=content_length)
+            # Update response metadata
+            builder.with_response(resp.status_code, resp.http_version, http2=False)
+            builder.with_cache(cache_status, from_cache=cache_status != CacheStatus.MISS)
 
-        # Stream to temp file
-        bytes_written = 0
-        with os.fdopen(temp_fd, "wb") as tmp_file:
+            # Get content length
+            content_length = int(resp.headers.get("Content-Length", 0) or 0)
+            builder.with_data(bytes_read=content_length)
+
+            # Stream to temp file
             try:
                 for chunk in resp.iter_bytes(chunk_size=chunk_size):
                     if chunk:
                         tmp_file.write(chunk)
                         bytes_written += len(chunk)
 
-                # Fsync both file and directory
                 tmp_file.flush()
                 os.fsync(tmp_file.fileno())
             except Exception as e:
                 builder.with_error("write_error", str(e), RequestStatus.ERROR)
                 emitter.emit(builder.build())
                 raise DownloadError(f"Write error: {e}") from e
+            finally:
+                if resp is not None:
+                    resp.close()
 
         # Verify Content-Length if provided
         if expected_length and bytes_written != expected_length:
@@ -156,12 +164,14 @@ def stream_download_to_file(
 
         # Atomic rename
         try:
+            if temp_path is None:
+                raise DownloadError("Temporary path was not created")
+            os.replace(temp_path, dest)
             dir_fd = os.open(str(dest.parent), os.O_RDONLY)
             try:
                 os.fsync(dir_fd)  # Sync directory
             finally:
                 os.close(dir_fd)
-            os.replace(temp_path, dest)
         except Exception as e:
             builder.with_error("rename_error", str(e), RequestStatus.ERROR)
             emitter.emit(builder.build())
@@ -178,8 +188,8 @@ def stream_download_to_file(
     except Exception:
         # Cleanup temp file on error
         try:
-            if os.path.exists(temp_path):
-                os.unlink(temp_path)
+            if temp_path and temp_path.exists():
+                temp_path.unlink()
         except Exception as e:
             logger.warning(f"Failed to cleanup temp file {temp_path}: {e}")
         raise
