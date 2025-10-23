@@ -85,7 +85,6 @@ import logging
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 import typer
 
@@ -173,7 +172,7 @@ def migrate(
 @app.command()
 def latest(
     action: str = typer.Argument("get", help="Action: 'get' or 'set'"),
-    version: Optional[str] = typer.Option(None, "--version", help="Version to set"),
+    version: str | None = typer.Option(None, "--version", help="Version to set"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Dry run for set action"),
     fmt: str = typer.Option("table", "--format", help="Output format: 'json' or 'table'"),
 ) -> None:
@@ -218,7 +217,7 @@ def latest(
 
 @app.command()
 def versions(
-    service: Optional[str] = typer.Option(None, "--service", help="Filter by service"),
+    service: str | None = typer.Option(None, "--service", help="Filter by service"),
     limit: int = typer.Option(50, "--limit", help="Maximum versions to display"),
     fmt: str = typer.Option("table", "--format", help="Output format: 'json' or 'table'"),
 ) -> None:
@@ -245,7 +244,7 @@ def versions(
 @app.command()
 def files(
     version: str = typer.Option(..., "--version", help="Version ID"),
-    format_filter: Optional[str] = typer.Option(None, "--format", help="Filter by format"),
+    format_filter: str | None = typer.Option(None, "--format", help="Filter by format"),
     fmt: str = typer.Option("table", "--format-output", help="Output format: 'json' or 'table'"),
 ) -> None:
     """List files in a version."""

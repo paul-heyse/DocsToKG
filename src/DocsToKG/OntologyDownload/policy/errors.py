@@ -93,7 +93,7 @@ the central helpers to ensure consistent emission, typing, and metrics.
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any
 
 # ============================================================================
 # Error Codes (Canonical Catalog)
@@ -167,7 +167,7 @@ class PolicyOK:
 
     gate_name: str
     elapsed_ms: float
-    details: Optional[Dict[str, Any]] = None
+    details: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -177,7 +177,7 @@ class PolicyReject:
     gate_name: str
     error_code: ErrorCode
     elapsed_ms: float
-    details: Dict[str, Any]  # Non-secret context (no URLs, paths with secrets, etc.)
+    details: dict[str, Any]  # Non-secret context (no URLs, paths with secrets, etc.)
 
 
 # Type alias for gate results
@@ -196,7 +196,7 @@ class PolicyException(Exception):
         self,
         error_code: ErrorCode,
         message: str,
-        details: Optional[Dict[str, Any]] = None,
+        details: dict[str, Any] | None = None,
     ):
         """Initialize policy exception.
 
@@ -255,7 +255,7 @@ class DbBoundaryException(PolicyException):
 def raise_policy_error(
     error_code: ErrorCode,
     message: str,
-    details: Optional[Dict[str, Any]] = None,
+    details: dict[str, Any] | None = None,
     exception_class: type = PolicyException,
 ) -> None:
     """Raise a policy error with central emission.
@@ -280,7 +280,7 @@ def raise_policy_error(
     raise exception_class(error_code, message, safe_details)
 
 
-def _scrub_details(details: Dict[str, Any]) -> Dict[str, Any]:
+def _scrub_details(details: dict[str, Any]) -> dict[str, Any]:
     """Remove sensitive information from detail dict.
 
     Filters out:
@@ -317,7 +317,7 @@ def _scrub_details(details: Dict[str, Any]) -> Dict[str, Any]:
 def _emit_policy_error_event(
     error_code: ErrorCode,
     message: str,
-    details: Dict[str, Any],
+    details: dict[str, Any],
 ) -> None:
     """Emit a policy.error event (stub for observability integration).
 

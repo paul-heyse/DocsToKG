@@ -52,7 +52,6 @@ import logging
 import os
 import shutil
 from pathlib import Path
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -183,7 +182,7 @@ def dedup_hardlink_or_copy(
 def choose_final_path(
     root_dir: str,
     layout: str,
-    sha256_hex: Optional[str],
+    sha256_hex: str | None,
     artifact_id: str,
     url_basename: str,
 ) -> str:

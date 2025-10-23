@@ -46,7 +46,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 
 @dataclass(frozen=True)
@@ -61,8 +61,8 @@ class StoredObject:
     """
 
     path_rel: str
-    size: Optional[int]
-    etag: Optional[str]
+    size: int | None
+    etag: str | None
     url: str
 
 
@@ -77,8 +77,8 @@ class StoredStat:
     """
 
     size: int
-    etag: Optional[str]
-    last_modified: Optional[float]
+    etag: str | None
+    last_modified: float | None
 
 
 @runtime_checkable
@@ -238,7 +238,7 @@ class StorageBackend(Protocol):
         """
         ...
 
-    def get_latest_version(self) -> Optional[str]:
+    def get_latest_version(self) -> str | None:
         """Get the latest version pointer.
 
         Retrieves the version pointer from storage backend. Returns None

@@ -77,7 +77,6 @@ import contextlib
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional
 
 import pyarrow as pa
 import pyarrow.dataset as ds
@@ -96,11 +95,11 @@ class DatasetSummary:
     schema: pa.Schema
     file_count: int
     total_bytes: int
-    approx_rows: Optional[int]  # May be None if estimation fails
-    partitions: Dict[str, int]  # e.g., {"2025-10": 5 files, ...}
-    sample_doc_ids: List[str]
+    approx_rows: int | None  # May be None if estimation fails
+    partitions: dict[str, int]  # e.g., {"2025-10": 5 files, ...}
+    sample_doc_ids: list[str]
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return {
             "dataset_type": self.dataset_type,
             "schema": str(self.schema),
@@ -119,8 +118,8 @@ class DatasetSummary:
 
 def open_chunks(
     data_root: Path,
-    columns: Optional[List[str]] = None,
-    filters: Optional[str] = None,
+    columns: list[str] | None = None,
+    filters: str | None = None,
 ) -> ds.Dataset:
     """
     Open Chunks Parquet dataset as Arrow Dataset.
@@ -158,8 +157,8 @@ def open_chunks(
 def open_vectors(
     data_root: Path,
     family: str,
-    columns: Optional[List[str]] = None,
-    filters: Optional[str] = None,
+    columns: list[str] | None = None,
+    filters: str | None = None,
 ) -> ds.Dataset:
     """
     Open Vectors Parquet dataset (by family) as Arrow Dataset.
@@ -198,7 +197,7 @@ def open_vectors(
     return dataset
 
 
-def _extract_partition_from_path(file_path: str) -> Optional[str]:
+def _extract_partition_from_path(file_path: str) -> str | None:
     """
     Extract partition key (YYYY-MM) from file path.
 
@@ -220,7 +219,7 @@ def _extract_partition_from_path(file_path: str) -> Optional[str]:
     return None
 
 
-def _extract_doc_id_from_filename(filename: str) -> Optional[str]:
+def _extract_doc_id_from_filename(filename: str) -> str | None:
     """
     Extract doc_id from filename.
 
@@ -262,8 +261,8 @@ def summarize(
 
     # Compute total bytes and collect partition info
     total_bytes = 0
-    partitions: Dict[str, int] = {}
-    sample_doc_ids: List[str] = []
+    partitions: dict[str, int] = {}
+    sample_doc_ids: list[str] = []
 
     for frag in fragments:
         path = getattr(frag, "path", None)
@@ -271,7 +270,7 @@ def summarize(
             continue
 
         path_str = str(path)
-        file_size: Optional[int] = None
+        file_size: int | None = None
 
         filesystem = getattr(frag, "filesystem", None)
         if filesystem is not None:

@@ -16,7 +16,8 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Iterable, List
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, Any
 
 import httpx
 
@@ -40,7 +41,7 @@ class OsfResolver(ApiResolverBase):
 
     name = "osf"
 
-    def is_enabled(self, config: Any, artifact: "WorkArtifact") -> bool:
+    def is_enabled(self, config: Any, artifact: WorkArtifact) -> bool:
         """Return ``True`` when a DOI is available for OSF lookups.
 
         Args:
@@ -56,7 +57,7 @@ class OsfResolver(ApiResolverBase):
         self,
         client: httpx.Client,
         config: Any,
-        artifact: "WorkArtifact",
+        artifact: WorkArtifact,
     ) -> Iterable[ResolverResult]:
         """Yield OSF download URLs corresponding to ``artifact``.
 
@@ -86,7 +87,7 @@ class OsfResolver(ApiResolverBase):
         if error:
             yield error
             return
-        urls: List[str] = []
+        urls: list[str] = []
         for item in data.get("data", []) or []:
             if not isinstance(item, dict):
                 continue

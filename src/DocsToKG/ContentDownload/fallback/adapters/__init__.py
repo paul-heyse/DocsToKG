@@ -56,9 +56,9 @@ def head_pdf(
     url: str,
     client: Any,
     timeout_s: float = 10.0,
-    breaker: Optional[Any] = None,
-    logger_: Optional[logging.Logger] = None,
-) -> Tuple[bool, int, Optional[str], str]:
+    breaker: Any | None = None,
+    logger_: logging.Logger | None = None,
+) -> tuple[bool, int, str | None, str]:
     """Validate a PDF URL via HEAD request with content-type checking.
 
     Args:
@@ -124,7 +124,7 @@ def canonicalize_url(url: str, role: str = "artifact") -> str:
     return url
 
 
-def parse_retry_after(resp: Any, cap_s: int = 900) -> Optional[int]:
+def parse_retry_after(resp: Any, cap_s: int = 900) -> int | None:
     """Parse Retry-After header from response.
 
     Args:

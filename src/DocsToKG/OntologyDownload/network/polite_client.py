@@ -81,7 +81,7 @@ logger = logging.getLogger(__name__)
 
 _polite_client: Optional["PoliteHttpClient"] = None
 _polite_client_lock = threading.Lock()
-_polite_client_pid: Optional[int] = None
+_polite_client_pid: int | None = None
 
 
 # ============================================================================
@@ -104,8 +104,8 @@ class PoliteHttpClient:
 
     def __init__(
         self,
-        service: Optional[str] = None,
-        host: Optional[str] = None,
+        service: str | None = None,
+        host: str | None = None,
     ):
         """Initialize PoliteHttpClient.
 
@@ -130,8 +130,8 @@ class PoliteHttpClient:
     def get(
         self,
         url: str,
-        service: Optional[str] = None,
-        host: Optional[str] = None,
+        service: str | None = None,
+        host: str | None = None,
         weight: int = 1,
         **kwargs,
     ) -> httpx.Response:
@@ -163,8 +163,8 @@ class PoliteHttpClient:
     def post(
         self,
         url: str,
-        service: Optional[str] = None,
-        host: Optional[str] = None,
+        service: str | None = None,
+        host: str | None = None,
         weight: int = 1,
         **kwargs,
     ) -> httpx.Response:
@@ -193,8 +193,8 @@ class PoliteHttpClient:
         self,
         method: str,
         url: str,
-        service: Optional[str] = None,
-        host: Optional[str] = None,
+        service: str | None = None,
+        host: str | None = None,
         weight: int = 1,
         **kwargs,
     ) -> httpx.Response:
@@ -224,8 +224,8 @@ class PoliteHttpClient:
         self,
         method: str,
         url: str,
-        service: Optional[str] = None,
-        host: Optional[str] = None,
+        service: str | None = None,
+        host: str | None = None,
         weight: int = 1,
         **kwargs,
     ) -> httpx.Response:
@@ -356,8 +356,8 @@ class PoliteHttpClient:
 
 
 def get_polite_http_client(
-    service: Optional[str] = None,
-    host: Optional[str] = None,
+    service: str | None = None,
+    host: str | None = None,
 ) -> PoliteHttpClient:
     """Get or create the shared PoliteHttpClient singleton.
 

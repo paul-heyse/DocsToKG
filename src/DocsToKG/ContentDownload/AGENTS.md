@@ -8,6 +8,11 @@ Use the uv bootstrap to stand up the project environment:
 
 The script installs uv if it is missing, respects `UV_PROJECT_ENVIRONMENT`, and installs DocsToKG in editable mode. After activation, use the tools in `.venv/bin/` (for example `pytest -q`, `ruff check`, or `python -m DocsToKG.<module>`).
 
+## Code Style & Architecture References
+
+- Follow the shared guidelines in [docs/Formats and Standards/CODESTYLE.md](<../../../../docs/Formats and Standards/CODESTYLE.md>) for Python 3.12+ support, uv-powered tooling, and Google-style docstrings + NAVMAP requirements.
+- Architecture deep dives: [Content Download overview](<../../../../docs/architecture/100-content-download.updated.md>) and [Level 2 design notes](<../../../../docs/architecture/100-content-download.level2.updated.md>).
+
 ## Mission & Scope
 
 - **Mission**: Coordinate resolver-driven acquisition of OpenAlex-derived scholarly artifacts into structured manifests with deterministic retry, resumability, and telemetry semantics using a shared HTTPX/Hishel transport.

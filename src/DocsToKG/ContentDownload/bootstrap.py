@@ -110,9 +110,10 @@ from __future__ import annotations
 
 import importlib
 import logging
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterator, Mapping, Optional
+from typing import Any
 from uuid import uuid4
 
 from DocsToKG.ContentDownload.config import ContentDownloadConfig
@@ -192,11 +193,11 @@ class BootstrapConfig:
     """Complete bootstrap configuration."""
 
     http: HttpConfig = field(default_factory=HttpConfig)
-    telemetry_paths: Optional[Mapping[str, Path]] = None
-    resolver_registry: Optional[dict[str, Any]] = None
-    resolver_retry_configs: Optional[dict[str, RetryConfig]] = None
-    policy_knobs: Optional[dict[str, Any]] = None
-    run_id: Optional[str] = None
+    telemetry_paths: Mapping[str, Path] | None = None
+    resolver_registry: dict[str, Any] | None = None
+    resolver_retry_configs: dict[str, RetryConfig] | None = None
+    policy_knobs: dict[str, Any] | None = None
+    run_id: str | None = None
 
 
 @dataclass
@@ -232,7 +233,7 @@ def build_bootstrap_config(config: ContentDownloadConfig) -> BootstrapConfig:
 
 def run_from_config(
     config: BootstrapConfig,
-    artifacts: Optional[Iterator[Any]] = None,
+    artifacts: Iterator[Any] | None = None,
     dry_run: bool = False,
 ) -> RunResult:
     """
@@ -319,7 +320,7 @@ def run_from_config(
             telemetry.close()
 
 
-def _build_telemetry(paths: Optional[Mapping[str, Path]], run_id: str) -> RunTelemetry:
+def _build_telemetry(paths: Mapping[str, Path] | None, run_id: str) -> RunTelemetry:
     """Build telemetry sinks from configuration.
 
     Creates sinks based on provided telemetry_paths dictionary:
@@ -549,7 +550,7 @@ def _apply_http_config(session: Any, http_config: HttpConfig) -> None:
 
 def _process_artifacts(
     pipeline: ResolverPipeline,
-    artifacts: Optional[Iterator[Any]],
+    artifacts: Iterator[Any] | None,
     telemetry: RunTelemetry,
     run_id: str,
     dry_run: bool,

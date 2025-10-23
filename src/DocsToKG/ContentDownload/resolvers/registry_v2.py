@@ -49,7 +49,7 @@ Provides resolver registration and instantiation for ContentDownload:
 from __future__ import annotations
 
 import logging
-from typing import Any, ClassVar, Dict, List, Optional, Protocol, Type
+from typing import Any, ClassVar, Protocol
 
 from DocsToKG.ContentDownload.config import ContentDownloadConfig
 
@@ -59,13 +59,13 @@ _LOGGER = logging.getLogger(__name__)
 # Registry
 # ============================================================================
 
-_REGISTRY_V2: Dict[str, Type[Any]] = {}
+_REGISTRY_V2: dict[str, type[Any]] = {}
 
 
 def register_v2(name: str):
     """Decorator to register a resolver with the registry."""
 
-    def deco(cls: Type[Any]) -> Type[Any]:
+    def deco(cls: type[Any]) -> type[Any]:
         if name in _REGISTRY_V2:
             _LOGGER.warning(f"Overriding already-registered resolver: {name}")
         _REGISTRY_V2[name] = cls
@@ -76,12 +76,12 @@ def register_v2(name: str):
     return deco
 
 
-def get_registry() -> Dict[str, Type[Any]]:
+def get_registry() -> dict[str, type[Any]]:
     """Get the resolver registry (copy)."""
     return dict(_REGISTRY_V2)
 
 
-def get_resolver_class(name: str) -> Type[Any]:
+def get_resolver_class(name: str) -> type[Any]:
     """Lookup resolver class by name."""
     registry = get_registry()
     if name not in registry:
@@ -97,10 +97,10 @@ def get_resolver_class(name: str) -> Type[Any]:
 
 def build_resolvers(
     config: ContentDownloadConfig,
-    overrides: Optional[Dict[str, Any]] = None,
-) -> List[Any]:
+    overrides: dict[str, Any] | None = None,
+) -> list[Any]:
     """Build resolver instances from config with ordering and enablement."""
-    resolvers: List[Any] = []
+    resolvers: list[Any] = []
     overrides = overrides or {}
 
     for resolver_name in config.resolvers.order:
@@ -159,11 +159,11 @@ class ResolverProtocol(Protocol):
         cls,
         resolver_cfg: Any,
         root_cfg: ContentDownloadConfig,
-        overrides: Optional[Dict[str, Any]] = None,
+        overrides: dict[str, Any] | None = None,
     ) -> ResolverProtocol:
         """Factory method to create resolver from Pydantic config."""
         ...
 
-    def resolve(self, artifact: Any) -> List[Any]:
+    def resolve(self, artifact: Any) -> list[Any]:
         """Resolve download plans for an artifact."""
         ...

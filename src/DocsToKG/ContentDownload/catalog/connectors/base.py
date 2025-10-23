@@ -66,7 +66,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Optional, Protocol, Tuple
+from typing import Any, Protocol
 
 # Exception Types
 
@@ -113,7 +113,7 @@ class HealthCheck:
     status: HealthStatus
     message: str
     latency_ms: float
-    details: Dict[str, Any]
+    details: dict[str, Any]
 
 
 # Document Record (used by all providers)
@@ -127,13 +127,13 @@ class DocumentRecord:
     artifact_id: str
     source_url: str
     resolver: str
-    content_type: Optional[str]
+    content_type: str | None
     bytes: int
-    sha256: Optional[str]
+    sha256: str | None
     storage_uri: str
     created_at: str
     updated_at: str
-    run_id: Optional[str]
+    run_id: str | None
 
 
 # Provider Protocol
@@ -154,7 +154,7 @@ class CatalogProvider(Protocol):
         """Return provider name: 'development' | 'enterprise' | 'cloud'."""
         ...
 
-    def open(self, config: Dict[str, Any]) -> None:
+    def open(self, config: dict[str, Any]) -> None:
         """
         Initialize the backend.
 
@@ -180,11 +180,11 @@ class CatalogProvider(Protocol):
         artifact_id: str,
         source_url: str,
         resolver: str,
-        content_type: Optional[str],
+        content_type: str | None,
         bytes: int,
-        sha256: Optional[str],
+        sha256: str | None,
         storage_uri: str,
-        run_id: Optional[str],
+        run_id: str | None,
     ) -> DocumentRecord:
         """
         Register a document or get existing record (idempotent).
@@ -209,7 +209,7 @@ class CatalogProvider(Protocol):
         """
         ...
 
-    def get_by_artifact(self, artifact_id: str) -> List[DocumentRecord]:
+    def get_by_artifact(self, artifact_id: str) -> list[DocumentRecord]:
         """
         Get all records for a given artifact_id.
 
@@ -224,7 +224,7 @@ class CatalogProvider(Protocol):
         """
         ...
 
-    def get_by_sha256(self, sha256: str) -> List[DocumentRecord]:
+    def get_by_sha256(self, sha256: str) -> list[DocumentRecord]:
         """
         Get all records with a given SHA-256 hash.
 
@@ -239,7 +239,7 @@ class CatalogProvider(Protocol):
         """
         ...
 
-    def find_duplicates(self) -> List[Tuple[str, int]]:
+    def find_duplicates(self) -> list[tuple[str, int]]:
         """
         Find all SHA-256 hashes with more than one record.
 
@@ -266,7 +266,7 @@ class CatalogProvider(Protocol):
         """
         ...
 
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         """
         Get catalog statistics.
 

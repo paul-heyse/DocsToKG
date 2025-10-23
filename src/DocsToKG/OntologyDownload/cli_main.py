@@ -61,7 +61,6 @@ Example:
 """
 
 from pathlib import Path
-from typing import Optional
 
 import typer
 from rich.console import Console
@@ -97,9 +96,8 @@ def _normalize_plan_args(args):
         Updated argument list with the default subcommand inserted before the
         first positional argument when no explicit subcommand is present.
     """
-    from typing import List
 
-    normalized: List[str] = list(args)
+    normalized: list[str] = list(args)
     if not normalized:
         return normalized
 
@@ -146,7 +144,7 @@ class CliContext:
 
     def __init__(
         self,
-        config: Optional[Path] = None,
+        config: Path | None = None,
         verbosity: int = 0,
         format_output: str = "table",
         dry_run: bool = False,
@@ -192,7 +190,7 @@ app = typer.Typer(
 )
 
 # Global context variable (per-invocation)
-_context: Optional[CliContext] = None
+_context: CliContext | None = None
 
 
 def get_context() -> CliContext:
@@ -211,7 +209,7 @@ def get_context() -> CliContext:
 
 @app.callback(invoke_without_command=False)
 def main(
-    config: Optional[Path] = typer.Option(
+    config: Path | None = typer.Option(
         None,
         "--config",
         "-c",

@@ -39,7 +39,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import pyarrow as pa
 import pyarrow.dataset as ds
@@ -73,7 +73,7 @@ class DatasetView:
         self.data_root = Path(data_root)
         self.dataset_type = dataset_type
         self.use_threads = use_threads
-        self._dataset: Optional[ds.Dataset] = None
+        self._dataset: ds.Dataset | None = None
 
     def _load_dataset(self) -> ds.Dataset:
         """Lazy-load the Arrow dataset."""
@@ -112,9 +112,9 @@ class DatasetView:
 
     def scan(
         self,
-        columns: Optional[List[str]] = None,
-        filters: Optional[Any] = None,
-    ) -> "ScanResult":
+        columns: list[str] | None = None,
+        filters: Any | None = None,
+    ) -> ScanResult:
         """
         Create a lazy scan with optional column projection and filters.
 
@@ -134,7 +134,7 @@ class DatasetView:
         ds_loaded = self._load_dataset()
         return ds_loaded.to_table().slice(0, n)
 
-    def to_polars(self, columns: Optional[List[str]] = None) -> Any:
+    def to_polars(self, columns: list[str] | None = None) -> Any:
         """
         Export to Polars DataFrame (lazy).
 
@@ -184,7 +184,7 @@ class ScanResult:
         """Materialize the scan result to an Arrow Table."""
         return self.scanner.to_table()
 
-    def to_batches(self, max_chunksize: Optional[int] = None) -> List[pa.RecordBatch]:
+    def to_batches(self, max_chunksize: int | None = None) -> list[pa.RecordBatch]:
         """Return results as a list of RecordBatches."""
         table = self.to_table()
         if max_chunksize:
@@ -213,7 +213,7 @@ class ScanResult:
 # ============================================================
 
 
-def inspect_dataset(data_root: str | Path, dataset_type: str) -> Dict[str, Any]:
+def inspect_dataset(data_root: str | Path, dataset_type: str) -> dict[str, Any]:
     """
     Inspect a dataset and return metadata for CLI output.
 

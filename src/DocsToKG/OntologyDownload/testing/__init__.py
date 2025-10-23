@@ -16,20 +16,17 @@ import socket
 import threading
 import time
 from collections import defaultdict, deque
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from email.utils import parsedate_to_datetime
 from importlib import import_module
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import (
-    Callable,
     Deque,
     Dict,
-    Iterable,
     List,
-    Mapping,
     Optional,
-    Sequence,
     Tuple,
     Union,
 )
@@ -65,7 +62,7 @@ __all__ = [
 
 
 @contextlib.contextmanager
-def use_mock_http_client(transport: "httpx.BaseTransport", **client_kwargs):
+def use_mock_http_client(transport: httpx.BaseTransport, **client_kwargs):
     """Temporarily install an HTTPX client backed by ``transport``."""
 
     import httpx
@@ -87,11 +84,11 @@ class ResponseSpec:
     """HTTP response definition served by the loopback test server."""
 
     status: int = 200
-    body: Union[bytes, str] = b""
+    body: bytes | str = b""
     headers: Mapping[str, str] = field(default_factory=dict)
     method: str = "GET"
-    stream: Optional[Iterable[Union[bytes, str]]] = None
-    delay_sec: Optional[float] = None
+    stream: Iterable[bytes | str] | None = None
+    delay_sec: float | None = None
 
     def serialise_body(self) -> bytes:
         if isinstance(self.body, bytes):
@@ -167,7 +164,7 @@ class _RequestHandler(http.server.BaseHTTPRequestHandler):
         self._handle()
 
 
-def _find_free_port(host: str = "127.0.0.1") -> Tuple[str, int]:
+def _find_free_port(host: str = "127.0.0.1") -> tuple[str, int]:
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.bind((host, 0))
     addr, port = sock.getsockname()
@@ -178,7 +175,7 @@ def _find_free_port(host: str = "127.0.0.1") -> Tuple[str, int]:
 class TestingEnvironment(contextlib.AbstractContextManager["TestingEnvironment"]):
     """Context manager provisioning an isolated runtime for ontology download tests."""
 
-    def __init__(self, *, logger: Optional[logging.Logger] = None) -> None:
+    def __init__(self, *, logger: logging.Logger | None = None) -> None:
         self._logger = logger or logging.getLogger("OntologyDownload.testing")
         self._tmp = TemporaryDirectory(prefix="ontofetch-test-")
         self.root = Path(self._tmp.name)
@@ -193,24 +190,22 @@ class TestingEnvironment(contextlib.AbstractContextManager["TestingEnvironment"]
             self.ontology_dir,
         ):
             directory.mkdir(parents=True, exist_ok=True)
-        self._request_log: List[RequestRecord] = []
-        self._responses: Dict[Tuple[str, str], Deque[ResponseSpec]] = defaultdict(deque)
-        self._http_thread: Optional[threading.Thread] = None
-        self._http_server: Optional[_ThreadedHTTPServer] = None
-        self._http_root: Optional[str] = None
-        self._http_host: Optional[str] = None
-        self._http_port: Optional[int] = None
-        self._original_paths: Dict[str, Dict[str, object]] = {}
-        self._storage: Optional[_StorageBackend] = None
-        self._bucket_state: Dict[
-            Tuple[Optional[str], Optional[str]], rate_mod.RateLimiterHandle
-        ] = {}
-        self._env_overrides: Dict[str, Optional[str]] = {}
+        self._request_log: list[RequestRecord] = []
+        self._responses: dict[tuple[str, str], deque[ResponseSpec]] = defaultdict(deque)
+        self._http_thread: threading.Thread | None = None
+        self._http_server: _ThreadedHTTPServer | None = None
+        self._http_root: str | None = None
+        self._http_host: str | None = None
+        self._http_port: int | None = None
+        self._original_paths: dict[str, dict[str, object]] = {}
+        self._storage: _StorageBackend | None = None
+        self._bucket_state: dict[tuple[str | None, str | None], rate_mod.RateLimiterHandle] = {}
+        self._env_overrides: dict[str, str | None] = {}
         self._registered = False
 
     # --- Context manager protocol -------------------------------------------------
 
-    def __enter__(self) -> "TestingEnvironment":
+    def __enter__(self) -> TestingEnvironment:
         self._install_runtime_paths()
         self._start_http_server()
         self._reset_network_primitives()
@@ -369,14 +364,14 @@ class TestingEnvironment(contextlib.AbstractContextManager["TestingEnvironment"]
         responses.clear()
         responses.append(response)
 
-    def _dequeue_response(self, *, method: str, path: str) -> Optional[ResponseSpec]:
+    def _dequeue_response(self, *, method: str, path: str) -> ResponseSpec | None:
         key = (method.upper(), path)
         responses = self._responses.get(key)
         if not responses:
             return None
         return responses.popleft()
 
-    def build_httpx_transport(self) -> "httpx.MockTransport":
+    def build_httpx_transport(self) -> httpx.MockTransport:
         """Return an HTTPX transport that serves responses from this environment."""
 
         import httpx
@@ -472,11 +467,11 @@ class TestingEnvironment(contextlib.AbstractContextManager["TestingEnvironment"]
     def register_fixture(
         self,
         name: str,
-        data: Union[bytes, str, Path],
+        data: bytes | str | Path,
         *,
         media_type: str = "application/octet-stream",
-        etag: Optional[str] = None,
-        last_modified: Optional[str] = None,
+        etag: str | None = None,
+        last_modified: str | None = None,
         repeats: int = 1,
     ) -> str:
         """Register a fixture served over HTTP and return its URL."""
@@ -542,7 +537,7 @@ class TestingEnvironment(contextlib.AbstractContextManager["TestingEnvironment"]
         *,
         ontology_id: str,
         version: str,
-        manifest: Optional[Mapping[str, object]] = None,
+        manifest: Mapping[str, object] | None = None,
     ) -> Path:
         """Create a manifest on disk for ``ontology_id``/``version`` and return its path."""
 
@@ -603,9 +598,9 @@ class TestingEnvironment(contextlib.AbstractContextManager["TestingEnvironment"]
 
     def _bucket_provider(
         self,
-        service: Optional[str],
+        service: str | None,
         config: DownloadConfiguration,
-        host: Optional[str],
+        host: str | None,
     ) -> rate_mod.RateLimiterHandle:
         key = (service, host)
         bucket = self._bucket_state.get(key)
@@ -641,7 +636,7 @@ class _StorageShim(_StorageBackend):
 def temporary_resolver(name: str, resolver: BaseResolver):
     """Context manager registering ``resolver`` and restoring the previous entry."""
 
-    previous: Optional[BaseResolver] = None
+    previous: BaseResolver | None = None
     existed = False
     try:
         previous = unregister_resolver(name)
@@ -661,7 +656,7 @@ def temporary_resolver(name: str, resolver: BaseResolver):
 def temporary_validator(name: str, validator: Callable[..., object]):
     """Context manager registering ``validator`` temporarily."""
 
-    previous: Optional[Callable[..., object]] = None
+    previous: Callable[..., object] | None = None
     existed = False
     try:
         previous = unregister_validator(name)

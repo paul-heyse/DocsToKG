@@ -48,11 +48,11 @@ reduces the amount of bespoke glue each provider has to maintain.
 from __future__ import annotations
 
 import math
+from collections.abc import Iterable, Sequence
 from pathlib import Path
-from typing import Iterable, List, Optional, Sequence
 
 
-def resolve_device(requested: Optional[str], *, default: str = "cpu") -> str:
+def resolve_device(requested: str | None, *, default: str = "cpu") -> str:
     """Normalise device hints emitted by configuration layers.
 
     Providers treat ``"auto"`` as a cue to pick their preferred backend, while
@@ -69,7 +69,7 @@ def resolve_device(requested: Optional[str], *, default: str = "cpu") -> str:
     return candidate
 
 
-def resolve_cache_dir(path: Optional[Path]) -> Optional[Path]:
+def resolve_cache_dir(path: Path | None) -> Path | None:
     """Return an absolute path suitable for model cache directories."""
 
     if path is None:
@@ -77,7 +77,7 @@ def resolve_cache_dir(path: Optional[Path]) -> Optional[Path]:
     return Path(path).expanduser().resolve()
 
 
-def normalise_vectors(vectors: Sequence[Sequence[float]], *, normalise: bool) -> List[List[float]]:
+def normalise_vectors(vectors: Sequence[Sequence[float]], *, normalise: bool) -> list[list[float]]:
     """Optionally L2-normalise each vector.
 
     Args:
@@ -89,7 +89,7 @@ def normalise_vectors(vectors: Sequence[Sequence[float]], *, normalise: bool) ->
         A list containing the normalised (or untouched) vectors.
     """
 
-    normalised: List[List[float]] = []
+    normalised: list[list[float]] = []
     for vector in vectors:
         values = [float(value) for value in vector]
         if not normalise:
@@ -103,14 +103,14 @@ def normalise_vectors(vectors: Sequence[Sequence[float]], *, normalise: bool) ->
     return normalised
 
 
-def bounded_batch_size(*, preferred: Optional[int], fallback: int) -> int:
+def bounded_batch_size(*, preferred: int | None, fallback: int) -> int:
     """Return a sane, positive batch size given configuration hints."""
 
     candidate = preferred or fallback
     return max(1, int(candidate))
 
 
-def coerce_telemetry_tags(tags: Optional[Iterable[tuple[str, str]]]) -> dict[str, str]:
+def coerce_telemetry_tags(tags: Iterable[tuple[str, str]] | None) -> dict[str, str]:
     """Convert tag key/value pairs into a dictionary with consistent str types."""
 
     payload: dict[str, str] = {}

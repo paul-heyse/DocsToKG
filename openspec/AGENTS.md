@@ -224,6 +224,12 @@ Keep agents aligned on the shared uv bootstrap: run CPU mode by default, opt int
 
 ---
 
+## Code Style Reference
+
+All changes must follow [docs/Formats and Standards/CODESTYLE.md](<../Formats and Standards/CODESTYLE.md>), which summarises the Python 3.12+ target, lint/type tooling (uv + ruff + mypy), and the NAVMAP/docstring patterns expected in every module.
+
+---
+
 ## Environment Activation
 
 Run the uv bootstrap before executing project commands.

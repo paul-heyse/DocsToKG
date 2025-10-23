@@ -40,7 +40,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from DocsToKG.ContentDownload.fallback.cli_commands import TelemetryAnalyzer
 from DocsToKG.ContentDownload.fallback.telemetry_storage import get_telemetry_storage
@@ -64,11 +64,11 @@ class MetricsSnapshot:
 class DashboardExporter:
     """Exports telemetry data for dashboard consumption."""
 
-    def __init__(self, storage_path: Optional[str] = None):
+    def __init__(self, storage_path: str | None = None):
         """Initialize exporter with storage path."""
         self.storage = get_telemetry_storage(storage_path)
 
-    def export_for_grafana(self, period: str = "24h") -> Dict[str, Any]:
+    def export_for_grafana(self, period: str = "24h") -> dict[str, Any]:
         """Export metrics in Grafana-compatible JSON format.
 
         Returns:
@@ -170,7 +170,7 @@ class DashboardExporter:
 
         return "\n".join(lines)
 
-    def export_timeseries(self, period: str = "24h") -> List[MetricsSnapshot]:
+    def export_timeseries(self, period: str = "24h") -> list[MetricsSnapshot]:
         """Export metrics as time-series snapshots.
 
         Returns:
@@ -226,7 +226,7 @@ class DashboardExporter:
 class RealTimeMonitor:
     """Provides real-time monitoring capabilities."""
 
-    def __init__(self, storage_path: Optional[str] = None, poll_interval_s: int = 5):
+    def __init__(self, storage_path: str | None = None, poll_interval_s: int = 5):
         """Initialize monitor.
 
         Args:
@@ -237,7 +237,7 @@ class RealTimeMonitor:
         self.poll_interval_s = poll_interval_s
         self._last_record_count = 0
 
-    def get_live_metrics(self) -> Dict[str, Any]:
+    def get_live_metrics(self) -> dict[str, Any]:
         """Get current live metrics.
 
         Returns:
@@ -256,7 +256,7 @@ class RealTimeMonitor:
         self._last_record_count = len(records)
         return metrics
 
-    def get_trend(self, period: str = "24h") -> Dict[str, Any]:
+    def get_trend(self, period: str = "24h") -> dict[str, Any]:
         """Get trend analysis over period.
 
         Returns:

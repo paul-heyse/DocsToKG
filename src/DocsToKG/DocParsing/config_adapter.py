@@ -30,7 +30,7 @@ from __future__ import annotations
 
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from .app_context import AppContext
@@ -55,7 +55,7 @@ class ConfigurationAdapter:
     """
 
     @staticmethod
-    def _normalize_mode(mode: Any) -> Optional[str]:
+    def _normalize_mode(mode: Any) -> str | None:
         """Normalize ``mode`` values from CLI overrides or settings."""
 
         if mode is None:

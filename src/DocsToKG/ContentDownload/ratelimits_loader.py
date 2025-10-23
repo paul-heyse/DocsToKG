@@ -90,8 +90,9 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any, Dict, Mapping, Optional, Sequence
+from typing import Any
 
 try:
     import yaml
@@ -114,7 +115,7 @@ def _normalize_host_key(host: str) -> str:
     return host.strip().rstrip(".").lower()
 
 
-def _load_yaml_file(yaml_path: Optional[str | Path]) -> Dict[str, Any]:
+def _load_yaml_file(yaml_path: str | Path | None) -> dict[str, Any]:
     """Load and parse a YAML configuration file."""
     if not yaml_path:
         return {}
@@ -134,7 +135,7 @@ def _load_yaml_file(yaml_path: Optional[str | Path]) -> Dict[str, Any]:
         raise
 
 
-def _merge_dicts(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
+def _merge_dicts(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
     """Deep merge override into base dictionary."""
     result = dict(base)
     for key, value in override.items():
@@ -152,7 +153,7 @@ def _parse_rate_list(rate_str: str) -> list[str]:
     return [r.strip() for r in rate_str.split(",") if r.strip()]
 
 
-def _apply_env_overlays(cfg: Dict[str, Any], env: Mapping[str, str]) -> Dict[str, Any]:
+def _apply_env_overlays(cfg: dict[str, Any], env: Mapping[str, str]) -> dict[str, Any]:
     """Apply environment variable overlays to configuration."""
     # DOCSTOKG_RLIMITS_YAML: path to additional YAML file
     # DOCSTOKG_RLIMIT_BACKEND: backend kind (memory, sqlite, redis)
@@ -182,7 +183,7 @@ def _apply_env_overlays(cfg: Dict[str, Any], env: Mapping[str, str]) -> Dict[str
         )
 
     # Per-host/role overrides (DOCSTOKG_RLIMIT__host__role format)
-    hosts_overlay: Dict[str, Any] = {}
+    hosts_overlay: dict[str, Any] = {}
     for key, value in env.items():
         if key.startswith("DOCSTOKG_RLIMIT__"):
             parts = key[len("DOCSTOKG_RLIMIT__") :].split("__")
@@ -211,12 +212,12 @@ def _apply_env_overlays(cfg: Dict[str, Any], env: Mapping[str, str]) -> Dict[str
 
 
 def _apply_cli_overrides(
-    cfg: Dict[str, Any],
-    cli_host_role_overrides: Optional[Sequence[str]] = None,
-    cli_backend: Optional[str] = None,
-    cli_global_max_inflight: Optional[int] = None,
-    cli_aimd_enabled: Optional[bool] = None,
-) -> Dict[str, Any]:
+    cfg: dict[str, Any],
+    cli_host_role_overrides: Sequence[str] | None = None,
+    cli_backend: str | None = None,
+    cli_global_max_inflight: int | None = None,
+    cli_aimd_enabled: bool | None = None,
+) -> dict[str, Any]:
     """Apply CLI argument overrides to configuration."""
     overlay = dict(cfg)
 
@@ -230,7 +231,7 @@ def _apply_cli_overrides(
         overlay.setdefault("aimd", {})["enabled"] = cli_aimd_enabled
 
     if cli_host_role_overrides:
-        hosts_overlay: Dict[str, Any] = {}
+        hosts_overlay: dict[str, Any] = {}
         for override in cli_host_role_overrides:
             # Format: "host:role=rates:10/SECOND+5000/HOUR,max_delay_ms:200"
             if ":" not in override or "=" not in override:
@@ -267,7 +268,7 @@ def _apply_cli_overrides(
     return overlay
 
 
-def _build_role_rates(role_cfg: Dict[str, Any]) -> RoleRates:
+def _build_role_rates(role_cfg: dict[str, Any]) -> RoleRates:
     """Build a RoleRates object from configuration dictionary."""
     rates_str = role_cfg.get("rates", "")
     if isinstance(rates_str, list):
@@ -283,7 +284,7 @@ def _build_role_rates(role_cfg: Dict[str, Any]) -> RoleRates:
     )
 
 
-def _build_host_policy(host_cfg: Dict[str, Any]) -> HostPolicy:
+def _build_host_policy(host_cfg: dict[str, Any]) -> HostPolicy:
     """Build a HostPolicy object from configuration dictionary."""
     return HostPolicy(
         metadata=_build_role_rates(host_cfg["metadata"]) if "metadata" in host_cfg else None,
@@ -292,7 +293,7 @@ def _build_host_policy(host_cfg: Dict[str, Any]) -> HostPolicy:
     )
 
 
-def _build_aimd_config(aimd_cfg: Dict[str, Any]) -> AIMDConfig:
+def _build_aimd_config(aimd_cfg: dict[str, Any]) -> AIMDConfig:
     """Build an AIMDConfig object from configuration dictionary."""
     return AIMDConfig(
         enabled=bool(aimd_cfg.get("enabled", False)),
@@ -305,7 +306,7 @@ def _build_aimd_config(aimd_cfg: Dict[str, Any]) -> AIMDConfig:
     )
 
 
-def _get_default_config() -> Dict[str, Any]:
+def _get_default_config() -> dict[str, Any]:
     """Return default rate limiting configuration."""
     return {
         "defaults": {
@@ -333,13 +334,13 @@ def _get_default_config() -> Dict[str, Any]:
 
 
 def load_rate_config(
-    yaml_path: Optional[str | Path] = None,
+    yaml_path: str | Path | None = None,
     *,
-    env: Optional[Mapping[str, str]] = None,
-    cli_host_role_overrides: Optional[Sequence[str]] = None,
-    cli_backend: Optional[str] = None,
-    cli_global_max_inflight: Optional[int] = None,
-    cli_aimd_enabled: Optional[bool] = None,
+    env: Mapping[str, str] | None = None,
+    cli_host_role_overrides: Sequence[str] | None = None,
+    cli_backend: str | None = None,
+    cli_global_max_inflight: int | None = None,
+    cli_aimd_enabled: bool | None = None,
 ) -> RateConfig:
     """Load rate limit configuration with hierarchical precedence.
 
@@ -385,13 +386,13 @@ def load_rate_config(
 
     # Build RateConfig from merged configuration
     defaults_cfg = cfg.get("defaults", {})
-    defaults: Dict[str, RoleRates] = {}
+    defaults: dict[str, RoleRates] = {}
     for role in ["metadata", "landing", "artifact"]:
         if role in defaults_cfg:
             defaults[role] = _build_role_rates(defaults_cfg[role])  # type: ignore[arg-type]
 
     hosts_cfg = cfg.get("hosts", {})
-    hosts: Dict[str, HostPolicy] = {}
+    hosts: dict[str, HostPolicy] = {}
     for host_str, host_cfg in hosts_cfg.items():
         host_key = _normalize_host_key(host_str)
         if isinstance(host_cfg, dict):

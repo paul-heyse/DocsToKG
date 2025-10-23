@@ -71,7 +71,6 @@ import os
 import ssl
 import threading
 from pathlib import Path
-from typing import Optional
 
 import certifi
 import hishel
@@ -104,10 +103,10 @@ logger = logging.getLogger(__name__)
 # Global Client State
 # ============================================================================
 
-_client: Optional[httpx.Client] = None
+_client: httpx.Client | None = None
 _client_lock = threading.Lock()
-_client_bind_hash: Optional[str] = None
-_client_bind_pid: Optional[int] = None
+_client_bind_hash: str | None = None
+_client_bind_pid: int | None = None
 _config_hash_mismatch_warned = False
 
 

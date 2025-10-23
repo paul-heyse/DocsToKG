@@ -95,7 +95,6 @@ if ttl is not None:
 
 import logging
 import os
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -111,7 +110,7 @@ _FEATURE_FLAGS = {
 }
 
 # Configuration parameters
-_SEMAPHORE_TTL_SECONDS: Optional[int] = (
+_SEMAPHORE_TTL_SECONDS: int | None = (
     int(os.getenv("DOCSTOKG_SEMAPHORE_TTL_SECONDS", "3600"))
     if os.getenv("DOCSTOKG_SEMAPHORE_TTL_SECONDS")
     else 3600
@@ -167,7 +166,7 @@ def enable_feature(feature: str) -> None:
     logger.info(f"Feature enabled: {feature}")
 
 
-def get_ttl(feature: str) -> Optional[int]:
+def get_ttl(feature: str) -> int | None:
     """Get TTL configuration for a feature (semaphore recycling).
 
     Args:

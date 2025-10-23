@@ -69,10 +69,10 @@ from __future__ import annotations
 import json
 import logging
 import time
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Iterable, Optional
 
 try:  # pragma: no cover
     import duckdb
@@ -100,12 +100,12 @@ class DoctorIssue:
     """A detected DB↔FS mismatch."""
 
     issue_type: str  # 'missing_db_row' | 'missing_fs_file' | 'latest_mismatch'
-    artifact_id: Optional[str]
-    file_id: Optional[str]
-    fs_path: Optional[Path]
+    artifact_id: str | None
+    file_id: str | None
+    fs_path: Path | None
     description: str
     severity: str  # 'info' | 'warning' | 'error'
-    size_bytes: Optional[int] = None
+    size_bytes: int | None = None
 
 
 @dataclass(frozen=True)
@@ -258,8 +258,8 @@ def detect_db_fs_drifts(
     artifacts_root: Path,
     extracted_root: Path,
     *,
-    fs_artifacts: Optional[Iterable[tuple[Path, int]]] = None,
-    fs_files: Optional[Iterable[tuple[Path, int]]] = None,
+    fs_artifacts: Iterable[tuple[Path, int]] | None = None,
+    fs_files: Iterable[tuple[Path, int]] | None = None,
 ) -> list[DoctorIssue]:
     """Detect mismatches between DB and filesystem.
 

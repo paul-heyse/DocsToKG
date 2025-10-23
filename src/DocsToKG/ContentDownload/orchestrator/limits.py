@@ -83,7 +83,6 @@ import logging
 import random
 import threading
 import time
-from typing import Optional
 from urllib.parse import urlsplit
 
 from . import feature_flags
@@ -152,8 +151,8 @@ class KeyedLimiter:
     def __init__(
         self,
         default_limit: int,
-        per_key: Optional[dict[str, int]] = None,
-        semaphore_ttl_sec: Optional[int] = None,
+        per_key: dict[str, int] | None = None,
+        semaphore_ttl_sec: int | None = None,
     ) -> None:
         """Initialize keyed limiter.
 
@@ -184,7 +183,7 @@ class KeyedLimiter:
             f"per_key={per_key}, ttl_sec={semaphore_ttl_sec}"
         )
 
-    def _get_semaphore(self, key: str, *, create: bool = True) -> Optional[threading.Semaphore]:
+    def _get_semaphore(self, key: str, *, create: bool = True) -> threading.Semaphore | None:
         """Get or create semaphore for key.
 
         Thread-safe creation of semaphores on first access.
@@ -265,7 +264,7 @@ class KeyedLimiter:
             raise KeyError(f"No semaphore tracked for key={key!r}")
         sem.release()
 
-    def try_acquire(self, key: str, timeout: Optional[float] = None) -> bool:
+    def try_acquire(self, key: str, timeout: float | None = None) -> bool:
         """Try to acquire slot, with optional timeout.
 
         Non-blocking or timeout-based acquisition. Useful for avoiding

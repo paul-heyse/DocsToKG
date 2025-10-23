@@ -43,7 +43,7 @@ import hashlib
 import json
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any
 
 from DocsToKG.ContentDownload.config.models import ContentDownloadConfig
 
@@ -53,14 +53,14 @@ class ConfigAuditLog:
     """Track how configuration was loaded and what overrides were applied."""
 
     loaded_from_file: bool = False
-    file_path: Optional[str] = None
-    env_overrides: Dict[str, str] = field(default_factory=dict)
-    cli_overrides: Dict[str, Any] = field(default_factory=dict)
+    file_path: str | None = None
+    env_overrides: dict[str, str] = field(default_factory=dict)
+    cli_overrides: dict[str, Any] = field(default_factory=dict)
     loaded_at: datetime = field(default_factory=datetime.now)
     schema_version: int = 1
     config_hash: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for logging/serialization."""
         return {
             "loaded_from_file": self.loaded_from_file,
@@ -90,9 +90,9 @@ class ConfigAuditLog:
 
 
 def load_config_with_audit(
-    path: Optional[str] = None,
+    path: str | None = None,
     env_prefix: str = "DTKG_",
-    cli_overrides: Optional[Dict[str, Any]] = None,
+    cli_overrides: dict[str, Any] | None = None,
 ) -> tuple[ContentDownloadConfig, ConfigAuditLog]:
     """
     Load configuration and track audit information.

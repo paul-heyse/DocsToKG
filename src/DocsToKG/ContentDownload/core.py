@@ -166,11 +166,12 @@ from __future__ import annotations
 import os
 import re
 import uuid
+from collections.abc import Callable, Iterable, Mapping
 from contextlib import suppress
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Mapping, Optional, Set, Union
+from typing import TYPE_CHECKING, Any
 from urllib.parse import unquote, urlsplit
 
 __all__ = (
@@ -227,7 +228,7 @@ def atomic_write(
     path: Path,
     chunks: Iterable[bytes],
     *,
-    hasher: Optional[Any] = None,
+    hasher: Any | None = None,
     temp_suffix: str = ".part",
     keep_partial_on_error: bool = False,
 ) -> int:
@@ -304,24 +305,24 @@ class WorkArtifact:
 
     work_id: str
     title: str
-    publication_year: Optional[int]
-    doi: Optional[str]
-    pmid: Optional[str]
-    pmcid: Optional[str]
-    arxiv_id: Optional[str]
-    landing_urls: List[str]
-    pdf_urls: List[str]
-    open_access_url: Optional[str]
-    source_display_names: List[str]
+    publication_year: int | None
+    doi: str | None
+    pmid: str | None
+    pmcid: str | None
+    arxiv_id: str | None
+    landing_urls: list[str]
+    pdf_urls: list[str]
+    open_access_url: str | None
+    source_display_names: list[str]
     base_stem: str
     pdf_dir: Path
     html_dir: Path
     xml_dir: Path
-    failed_pdf_urls: List[str] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    failed_pdf_urls: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        self.namespaces: Dict[str, Path] = {
+        self.namespaces: dict[str, Path] = {
             "pdf": self.pdf_dir,
             "html": self.html_dir,
             "xml": self.xml_dir,
@@ -332,28 +333,28 @@ class WorkArtifact:
 class DownloadContext:
     """Typed execution context shared by the CLI and resolver pipeline."""
 
-    resolver_order: List[str] = field(default_factory=list)
+    resolver_order: list[str] = field(default_factory=list)
     dry_run: bool = False
     list_only: bool = False
     extract_html_text: bool = False
-    previous: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    previous: dict[str, dict[str, Any]] = field(default_factory=dict)
     global_manifest_index: Any = field(default_factory=dict)
     sniff_bytes: int = DEFAULT_SNIFF_BYTES
     min_pdf_bytes: int = DEFAULT_MIN_PDF_BYTES
     tail_check_bytes: int = DEFAULT_TAIL_CHECK_BYTES
-    domain_content_rules: Dict[str, Dict[str, Any]] = field(default_factory=dict)
-    host_accept_overrides: Dict[str, Any] = field(default_factory=dict)
-    progress_callback: Optional[Callable[[int, Optional[int], str], None]] = None
-    robots_checker: Optional["RobotsCache"] = None
+    domain_content_rules: dict[str, dict[str, Any]] = field(default_factory=dict)
+    host_accept_overrides: dict[str, Any] = field(default_factory=dict)
+    progress_callback: Callable[[int, int | None, str], None] | None = None
+    robots_checker: RobotsCache | None = None
     skip_head_precheck: bool = False
     head_precheck_passed: bool = False
     content_addressed: bool = False
     skip_large_downloads: bool = False
-    size_warning_threshold: Optional[int] = None
-    chunk_size: Optional[int] = None
+    size_warning_threshold: int | None = None
+    chunk_size: int | None = None
     stream_retry_attempts: int = 0
-    extra: Dict[str, Any] = field(default_factory=dict)
-    provided_fields: Set[str] = field(default_factory=set, init=False, repr=False)
+    extra: dict[str, Any] = field(default_factory=dict)
+    provided_fields: set[str] = field(default_factory=set, init=False, repr=False)
     verify_cache_digest: bool = False
 
     def __post_init__(self) -> None:
@@ -386,16 +387,16 @@ class DownloadContext:
         self.provided_fields = {str(field) for field in self.provided_fields if field}
 
     @classmethod
-    def from_mapping(cls, data: Optional[Mapping[str, Any]] = None) -> "DownloadContext":
+    def from_mapping(cls, data: Mapping[str, Any] | None = None) -> DownloadContext:
         """Construct a context instance from a mapping-based payload."""
 
         if isinstance(data, cls):
             return data
 
         mapping = dict(data or {})
-        provided: Set[str] = set()
+        provided: set[str] = set()
 
-        def _pop(name: str, default: Any = None, *, canonical: Optional[str] = None) -> Any:
+        def _pop(name: str, default: Any = None, *, canonical: str | None = None) -> Any:
             key = canonical or name
             if name in mapping:
                 provided.add(key)
@@ -448,10 +449,10 @@ class DownloadContext:
 
         return field in self.provided_fields
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize the context to a mapping."""
 
-        payload: Dict[str, Any] = {
+        payload: dict[str, Any] = {
             "resolver_order": list(self.resolver_order),
             "dry_run": self.dry_run,
             "list_only": self.list_only,
@@ -478,7 +479,7 @@ class DownloadContext:
             payload.update(self.extra)
         return payload
 
-    def clone_for_download(self) -> "DownloadContext":
+    def clone_for_download(self) -> DownloadContext:
         """Return a shallow clone suitable for per-download mutation."""
 
         clone = DownloadContext.from_mapping(self.to_dict())
@@ -488,7 +489,7 @@ class DownloadContext:
         return clone
 
     @staticmethod
-    def _normalize_sequence(value: Any) -> List[str]:
+    def _normalize_sequence(value: Any) -> list[str]:
         if value is None:
             return []
         if isinstance(value, str):
@@ -501,7 +502,7 @@ class DownloadContext:
         return [str(item) for item in items if item]
 
     @staticmethod
-    def _normalize_mapping(value: Any) -> Dict[str, Any]:
+    def _normalize_mapping(value: Any) -> dict[str, Any]:
         if value is None:
             return {}
         if isinstance(value, Mapping):
@@ -512,7 +513,7 @@ class DownloadContext:
             return {}
 
     @staticmethod
-    def _coerce_optional_positive(value: Any) -> Optional[int]:
+    def _coerce_optional_positive(value: Any) -> int | None:
         if value is None:
             return None
         try:
@@ -549,7 +550,7 @@ class Classification(Enum):
     PAYLOAD_TOO_LARGE = "payload_too_large"
 
     @classmethod
-    def from_wire(cls, value: Union[str, "Classification", None]) -> "Classification":
+    def from_wire(cls, value: str | Classification | None) -> Classification:
         """Return the enum member when ``value`` matches a known code."""
 
         if isinstance(value, cls):
@@ -602,7 +603,7 @@ class ReasonCode(Enum):
     WORKER_EXCEPTION = "worker_exception"
 
     @classmethod
-    def from_wire(cls, value: Union[str, "ReasonCode", None]) -> "ReasonCode":
+    def from_wire(cls, value: str | ReasonCode | None) -> ReasonCode:
         """Return the matching enum member or ``UNKNOWN``."""
 
         if isinstance(value, cls):
@@ -618,7 +619,7 @@ class ReasonCode(Enum):
         return cls.UNKNOWN
 
 
-def normalize_classification(value: Union[str, Classification, None]) -> Union[Classification, str]:
+def normalize_classification(value: str | Classification | None) -> Classification | str:
     """Return a normalized classification token preserving unknown custom codes."""
 
     if isinstance(value, Classification):
@@ -638,7 +639,7 @@ def normalize_classification(value: Union[str, Classification, None]) -> Union[C
     return candidate
 
 
-def normalize_reason(value: Optional[Union[str, ReasonCode]]) -> Optional[Union[ReasonCode, str]]:
+def normalize_reason(value: str | ReasonCode | None) -> ReasonCode | str | None:
     """Return a normalized reason token preserving unknown custom codes."""
 
     if isinstance(value, ReasonCode):
@@ -659,7 +660,7 @@ def normalize_reason(value: Optional[Union[str, ReasonCode]]) -> Optional[Union[
 # Payload classification helpers
 
 
-def classify_payload(head_bytes: bytes, content_type: Optional[str], url: str) -> Classification:
+def classify_payload(head_bytes: bytes, content_type: str | None, url: str) -> Classification:
     """Classify a payload as ``Classification.PDF``/``Classification.HTML`` or ``Classification.UNKNOWN``."""
 
     ctype = (content_type or "").lower()
@@ -695,7 +696,7 @@ def classify_payload(head_bytes: bytes, content_type: Optional[str], url: str) -
     return Classification.UNKNOWN
 
 
-def _extract_filename_from_disposition(disposition: Optional[str]) -> Optional[str]:
+def _extract_filename_from_disposition(disposition: str | None) -> str | None:
     """Return the filename component from a Content-Disposition header."""
 
     if not disposition:
@@ -750,8 +751,8 @@ def parse_size(value: str) -> int:
 
 def _infer_suffix(
     url: str,
-    content_type: Optional[str],
-    disposition: Optional[str],
+    content_type: str | None,
+    disposition: str | None,
     classification: Classification | str,
     default_suffix: str,
 ) -> str:
@@ -824,7 +825,7 @@ def has_pdf_eof(path: Path, *, window_bytes: int = 2048) -> bool:
         return False
 
 
-def tail_contains_html(tail: Optional[bytes]) -> bool:
+def tail_contains_html(tail: bytes | None) -> bool:
     """Heuristic to detect HTML signatures in the trailing payload bytes."""
 
     if not tail:
@@ -837,7 +838,7 @@ def tail_contains_html(tail: Optional[bytes]) -> bool:
 # Identifier / string normalisation helpers
 
 
-def normalize_doi(doi: Optional[str]) -> Optional[str]:
+def normalize_doi(doi: str | None) -> str | None:
     """Normalize DOI identifiers by stripping common prefixes and whitespace."""
 
     if not doi:
@@ -860,7 +861,7 @@ def normalize_doi(doi: Optional[str]) -> Optional[str]:
     return value.strip() or None
 
 
-def normalize_pmcid(pmcid: Optional[str]) -> Optional[str]:
+def normalize_pmcid(pmcid: str | None) -> str | None:
     """Normalize PMCID values ensuring a canonical PMC prefix."""
 
     if not pmcid:
@@ -872,7 +873,7 @@ def normalize_pmcid(pmcid: Optional[str]) -> Optional[str]:
     return None
 
 
-def strip_prefix(value: Optional[str], prefix: str) -> Optional[str]:
+def strip_prefix(value: str | None, prefix: str) -> str | None:
     """Strip a case-insensitive prefix from a string when present."""
 
     if not value:
@@ -883,11 +884,11 @@ def strip_prefix(value: Optional[str], prefix: str) -> Optional[str]:
     return value
 
 
-def dedupe(items: List[str]) -> List[str]:
+def dedupe(items: list[str]) -> list[str]:
     """Remove duplicates while preserving the first occurrence order."""
 
     seen = set()
-    result: List[str] = []
+    result: list[str] = []
     for item in items:
         if item and item not in seen:
             result.append(item)
@@ -895,7 +896,7 @@ def dedupe(items: List[str]) -> List[str]:
     return result
 
 
-def normalize_pmid(pmid: Optional[str]) -> Optional[str]:
+def normalize_pmid(pmid: str | None) -> str | None:
     """Extract the numeric PubMed identifier from the supplied string."""
 
     if not pmid:
@@ -905,7 +906,7 @@ def normalize_pmid(pmid: Optional[str]) -> Optional[str]:
     return match.group(1) if match else None
 
 
-def normalize_arxiv(arxiv_id: Optional[str]) -> Optional[str]:
+def normalize_arxiv(arxiv_id: str | None) -> str | None:
     """Normalize arXiv identifiers by removing common prefixes and whitespace."""
 
     if not arxiv_id:

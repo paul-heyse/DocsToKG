@@ -51,8 +51,9 @@ from __future__ import annotations
 import email.utils
 import logging
 import time
+from collections.abc import Callable
 from datetime import datetime
-from typing import Any, Callable, Optional
+from typing import Any
 
 import httpx
 import tenacity
@@ -67,8 +68,8 @@ LOGGER = logging.getLogger(__name__)
 def is_retryable(
     *,
     method: str,
-    status: Optional[int] = None,
-    exception: Optional[BaseException] = None,
+    status: int | None = None,
+    exception: BaseException | None = None,
     offline: bool = False,
     breaker_open: bool = False,
     cfg: RetriesConfig,
@@ -261,7 +262,7 @@ def build_tenacity_retrying(
     method: str = "GET",
     offline: bool = False,
     breaker_open: bool = False,
-    before_sleep_hook: Optional[Callable[[RetryCallState], None]] = None,
+    before_sleep_hook: Callable[[RetryCallState], None] | None = None,
 ) -> tenacity.Retrying:
     """Build a Tenacity Retrying controller.
 

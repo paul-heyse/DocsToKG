@@ -47,7 +47,6 @@ Provides:
 
 import logging
 from pathlib import Path
-from typing import Optional
 
 import typer
 
@@ -137,19 +136,19 @@ def obs_tail(
         "-n",
         help="Number of recent events to show",
     ),
-    level: Optional[str] = typer.Option(
+    level: str | None = typer.Option(
         None,
         "--level",
         "-l",
         help="Filter by level (INFO, WARN, ERROR)",
     ),
-    event_type: Optional[str] = typer.Option(
+    event_type: str | None = typer.Option(
         None,
         "--type",
         "-t",
         help="Filter by event type (e.g., 'net.request')",
     ),
-    service: Optional[str] = typer.Option(
+    service: str | None = typer.Option(
         None,
         "--service",
         "-s",
@@ -210,7 +209,7 @@ def obs_tail(
 
 @app.command(name="stats")
 def obs_stats(
-    query_name: Optional[str] = typer.Argument(
+    query_name: str | None = typer.Argument(
         None,
         help="Name of stock query to run (e.g., 'net_request_p95_latency')",
     ),
@@ -287,19 +286,19 @@ def obs_export(
         ...,
         help="Path to export events to (.json, .jsonl, .parquet, .csv)",
     ),
-    level: Optional[str] = typer.Option(
+    level: str | None = typer.Option(
         None,
         "--level",
         "-l",
         help="Filter by level (INFO, WARN, ERROR)",
     ),
-    event_type: Optional[str] = typer.Option(
+    event_type: str | None = typer.Option(
         None,
         "--type",
         "-t",
         help="Filter by event type",
     ),
-    since: Optional[str] = typer.Option(
+    since: str | None = typer.Option(
         None,
         "--since",
         help="Filter events since timestamp (ISO 8601)",

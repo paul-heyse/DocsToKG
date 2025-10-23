@@ -44,9 +44,10 @@ from __future__ import annotations
 import hashlib
 import os
 import uuid
-from datetime import datetime, timezone
+from collections.abc import Iterable
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any
 
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -63,7 +64,7 @@ class WriteResult:
 
     def __init__(
         self,
-        paths: List[Path],
+        paths: list[Path],
         rows_written: int,
         row_group_count: int,
         parquet_bytes: int,
@@ -73,7 +74,7 @@ class WriteResult:
         self.row_group_count = row_group_count
         self.parquet_bytes = parquet_bytes
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "paths": [str(p) for p in self.paths],
             "rows_written": self.rows_written,
@@ -97,7 +98,7 @@ class ParquetChunksWriter:
 
     def __init__(
         self,
-        schema: Optional[pa.Schema] = None,
+        schema: pa.Schema | None = None,
         compression: str = "zstd",
         compression_level: int = 5,
         target_row_group_mb: int = 32,
@@ -120,7 +121,7 @@ class ParquetChunksWriter:
         self.batch_size = batch_size
 
     @staticmethod
-    def _validate_row(row: Dict[str, Any]) -> None:
+    def _validate_row(row: dict[str, Any]) -> None:
         """
         Validate a single chunk row invariants.
 
@@ -171,13 +172,13 @@ class ParquetChunksWriter:
 
     def write(
         self,
-        rows_iter: Iterable[Dict[str, Any]],
+        rows_iter: Iterable[dict[str, Any]],
         *,
         data_root: Path,
         rel_id: str,
         cfg_hash: str,
         created_by: str = "DocsToKG-DocParsing",
-        dt_utc: Optional[datetime] = None,
+        dt_utc: datetime | None = None,
     ) -> WriteResult:
         """
         Write chunk rows to Parquet (atomic, batched).
@@ -197,7 +198,7 @@ class ParquetChunksWriter:
             ValueError: If any row violates invariants.
         """
         if dt_utc is None:
-            dt_utc = datetime.now(timezone.utc)
+            dt_utc = datetime.now(UTC)
 
         output_path = paths.chunks_output_path(data_root, rel_id, fmt="parquet", ts=dt_utc)
         output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -214,7 +215,7 @@ class ParquetChunksWriter:
 
         tmp_path = output_path.with_name(f"{output_path.name}.tmp.{uuid.uuid4().hex}")
         rows_written = 0
-        buffer: List[Dict[str, Any]] = []
+        buffer: list[dict[str, Any]] = []
 
         try:
             with pq.ParquetWriter(
@@ -255,7 +256,7 @@ class ParquetChunksWriter:
     def _flush_buffer(
         self,
         writer: pq.ParquetWriter,
-        buffer: List[Dict[str, Any]],
+        buffer: list[dict[str, Any]],
         row_group_size: int,
     ) -> int:
         """Convert the buffered rows to a table, write, and clear the buffer."""
@@ -267,7 +268,7 @@ class ParquetChunksWriter:
         buffer.clear()
         return written
 
-    def _schema_with_footer_metadata(self, footer_meta: Dict[str, str]) -> pa.Schema:
+    def _schema_with_footer_metadata(self, footer_meta: dict[str, str]) -> pa.Schema:
         """Attach footer metadata to the writer schema."""
 
         empty_table = pa.Table.from_pylist([], schema=self.schema)

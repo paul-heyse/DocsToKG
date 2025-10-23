@@ -75,7 +75,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
 
 
 @dataclass(frozen=True)
@@ -102,7 +101,7 @@ class VersionStats:
     validation_passed: int
     validation_failed: int
     artifacts_count: int
-    last_accessed: Optional[datetime] = None
+    last_accessed: datetime | None = None
 
     @property
     def validation_passed_pct(self) -> float:
@@ -127,7 +126,7 @@ class VersionRow:
     version_id: str
     service: str
     created_at: datetime
-    plan_hash: Optional[str] = None
+    plan_hash: str | None = None
 
 
 @dataclass(frozen=True)
@@ -145,8 +144,8 @@ class FileRow:
     file_id: str
     relpath_in_version: str
     size_bytes: int
-    format: Optional[str] = None
-    mtime: Optional[datetime] = None
+    format: str | None = None
+    mtime: datetime | None = None
 
 
 @dataclass(frozen=True)
@@ -166,8 +165,8 @@ class ValidationResult:
     file_id: str
     validator: str
     passed: bool
-    details: Optional[str] = None
-    run_at: Optional[datetime] = None
+    details: str | None = None
+    run_at: datetime | None = None
 
 
 @dataclass(frozen=True)
@@ -208,7 +207,7 @@ class ArtifactInfo:
     service: str
     source_url: str
     size_bytes: int
-    etag: Optional[str] = None
+    etag: str | None = None
     status: str = "fresh"
 
 
@@ -231,7 +230,7 @@ class VersionDelta:
     files_added: list[str]
     files_removed: list[str]
     files_common: list[str]
-    format_changes: dict[str, tuple[Optional[str], Optional[str]]]
+    format_changes: dict[str, tuple[str | None, str | None]]
     size_delta_bytes: int
 
     @property

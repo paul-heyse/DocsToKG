@@ -34,8 +34,9 @@ Design:
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping, Sequence
 from types import SimpleNamespace
-from typing import Any, Mapping, Optional, Sequence
+from typing import Any
 
 from DocsToKG.ContentDownload.api import (
     DownloadOutcome,
@@ -67,11 +68,11 @@ class ResolverPipeline:
         self,
         resolvers: Sequence[Any],
         session: Any,
-        telemetry: Optional[Any] = None,
-        run_id: Optional[str] = None,
-        client_map: Optional[dict[str, Any]] = None,
-        policy_knobs: Optional[Mapping[str, Any]] = None,
-        policy_overrides: Optional[Mapping[str, Any]] = None,
+        telemetry: Any | None = None,
+        run_id: str | None = None,
+        client_map: dict[str, Any] | None = None,
+        policy_knobs: Mapping[str, Any] | None = None,
+        policy_overrides: Mapping[str, Any] | None = None,
     ):
         """
         Initialize pipeline.

@@ -76,10 +76,11 @@ ingestion or query threads.
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from threading import RLock
-from typing import Any, Dict, Literal, Mapping, Optional, Tuple
+from typing import Any, Literal
 
 # --- Globals ---
 
@@ -180,16 +181,16 @@ class DenseIndexConfig:
     ivfpq_use_precomputed: bool = True
     ivfpq_float16_lut: bool = True
     multi_gpu_mode: Literal["single", "replicate", "shard"] = "single"
-    replication_gpu_ids: Optional[Tuple[int, ...]] = None
-    gpu_temp_memory_bytes: Optional[int] = None
-    gpu_pinned_memory_bytes: Optional[int] = None
+    replication_gpu_ids: tuple[int, ...] | None = None
+    gpu_temp_memory_bytes: int | None = None
+    gpu_pinned_memory_bytes: int | None = None
     gpu_indices_32_bit: bool = True
     expected_ntotal: int = 0
     rebuild_delete_threshold: int = 10000
     force_64bit_ids: bool = False
     interleaved_layout: bool = True
     flat_use_fp16: bool = False
-    use_cuvs: Optional[bool] = None
+    use_cuvs: bool | None = None
     enable_replication: bool = True
     enable_reserve_memory: bool = True
     use_pinned_memory: bool = True
@@ -282,14 +283,14 @@ class RetrievalConfig:
     # Minimum dense similarity threshold used prior to fusion (0 disables thresholding)
     dense_score_floor: float = 0.0
     # Optional batch size for dense calibration sweeps (None disables batching)
-    dense_calibration_batch_size: Optional[int] = None
+    dense_calibration_batch_size: int | None = None
     # BM25 scoring mode (compat: legacy dot product, true: Okapi BM25)
     bm25_scoring: Literal["compat", "true"] = "compat"
     # Okapi BM25 hyperparameters (only used when bm25_scoring == "true")
     bm25_k1: float = 1.2
     bm25_b: float = 0.75
     # Optional override for HybridSearchService executor parallelism (None uses default)
-    executor_max_workers: Optional[int] = None
+    executor_max_workers: int | None = None
 
     def __post_init__(self) -> None:
         max_workers = self.executor_max_workers
@@ -332,7 +333,7 @@ class HybridSearchConfig:
     retrieval: RetrievalConfig = RetrievalConfig()
 
     @staticmethod
-    def from_dict(payload: Mapping[str, Any]) -> "HybridSearchConfig":
+    def from_dict(payload: Mapping[str, Any]) -> HybridSearchConfig:
         """Construct a config object from a dictionary payload.
 
         Args:
@@ -348,7 +349,7 @@ class HybridSearchConfig:
                 f"received {type(payload).__name__}"
             )
 
-        def coerce_section(name: str) -> Dict[str, Any]:
+        def coerce_section(name: str) -> dict[str, Any]:
             section = payload.get(name)
             if section is None:
                 return {}
@@ -462,7 +463,7 @@ class HybridSearchConfigManager:
             payload = self._load_yaml(raw)
         return HybridSearchConfig.from_dict(payload)
 
-    def _load_yaml(self, raw: str) -> Dict[str, Any]:
+    def _load_yaml(self, raw: str) -> dict[str, Any]:
         """Parse YAML configuration content into a dictionary.
 
         Args:

@@ -48,9 +48,10 @@ where multiple workers may write concurrently.
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Mapping, Optional, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from filelock import FileLock
 
@@ -73,7 +74,7 @@ class ManifestSink(Protocol):
         output_paths: Mapping[str, Path | str],
         duration_s: float,
         schema_version: str,
-        extras: Optional[Mapping[str, Any]] = None,
+        extras: Mapping[str, Any] | None = None,
     ) -> None:
         """Write a success manifest entry.
 
@@ -97,7 +98,7 @@ class ManifestSink(Protocol):
         duration_s: float,
         schema_version: str,
         reason: str = "resume-satisfied",
-        extras: Optional[Mapping[str, Any]] = None,
+        extras: Mapping[str, Any] | None = None,
     ) -> None:
         """Write a skip manifest entry.
 
@@ -122,7 +123,7 @@ class ManifestSink(Protocol):
         duration_s: float,
         schema_version: str,
         error: str,
-        extras: Optional[Mapping[str, Any]] = None,
+        extras: Mapping[str, Any] | None = None,
     ) -> None:
         """Write a failure manifest entry.
 
@@ -153,10 +154,10 @@ class ManifestEntry:
     schema_version: str
 
     # Optional fields
-    input_hash: Optional[str] = None
+    input_hash: str | None = None
     attempts: int = 1
-    reason: Optional[str] = None  # for skip
-    error: Optional[str] = None  # for failure
+    reason: str | None = None  # for skip
+    error: str | None = None  # for failure
 
     # Extra fields (stage-specific)
     extras: dict[str, Any] = field(default_factory=dict)
@@ -199,7 +200,7 @@ class JsonlManifestSink:
         output_paths: Mapping[str, Path | str],
         duration_s: float,
         schema_version: str,
-        extras: Optional[Mapping[str, Any]] = None,
+        extras: Mapping[str, Any] | None = None,
     ) -> None:
         """Write a success entry."""
         output_path_str = str(list(output_paths.values())[0]) if output_paths else ""
@@ -224,7 +225,7 @@ class JsonlManifestSink:
         duration_s: float,
         schema_version: str,
         reason: str = "resume-satisfied",
-        extras: Optional[Mapping[str, Any]] = None,
+        extras: Mapping[str, Any] | None = None,
     ) -> None:
         """Write a skip entry."""
         entry = ManifestEntry(
@@ -249,7 +250,7 @@ class JsonlManifestSink:
         duration_s: float,
         schema_version: str,
         error: str,
-        extras: Optional[Mapping[str, Any]] = None,
+        extras: Mapping[str, Any] | None = None,
     ) -> None:
         """Write a failure entry."""
         entry = ManifestEntry(

@@ -93,7 +93,6 @@ from __future__ import annotations
 import unicodedata
 from math import ceil
 from pathlib import Path, PurePosixPath
-from typing import Optional, Set
 
 from ..errors import ConfigError
 from .extraction_policy import ExtractionSettings
@@ -252,7 +251,7 @@ class CaseCollisionDetector:
             policy: Extraction policy (determines collision handling)
         """
         self.policy = policy
-        self.casefolded: Set[str] = set()
+        self.casefolded: set[str] = set()
 
     def check_collision(self, path: str) -> None:
         """Check if path collides with previously seen paths after casefolding.
@@ -312,7 +311,7 @@ def validate_entry_count(
 
 
 def validate_file_size(
-    declared_size: Optional[int],
+    declared_size: int | None,
     policy: ExtractionSettings,
     entry_path: str,
 ) -> None:
@@ -434,8 +433,8 @@ class PreScanValidator:
         is_block_dev: bool,
         is_char_dev: bool,
         is_socket: bool,
-        uncompressed_size: Optional[int] = None,
-        compressed_size: Optional[int] = None,
+        uncompressed_size: int | None = None,
+        compressed_size: int | None = None,
     ) -> None:
         """Validate a single archive entry against all Phase 2 policies.
 

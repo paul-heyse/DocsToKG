@@ -20,8 +20,6 @@ Controls HTTPX client behavior, timeouts, pooling, caching, and TLS settings.
 
 from __future__ import annotations
 
-from typing import Dict, Optional
-
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
@@ -64,14 +62,14 @@ class HttpClientConfig(BaseModel):
 
     # Security settings
     verify_tls: bool = Field(default=True, description="Verify TLS certificates")
-    proxies: Dict[str, str] = Field(default_factory=dict, description="Proxy dict (deprecated)")
-    polite_headers: Dict[str, str] = Field(
+    proxies: dict[str, str] = Field(default_factory=dict, description="Proxy dict (deprecated)")
+    polite_headers: dict[str, str] = Field(
         default_factory=lambda: {
             "User-Agent": "DocsToKG/ContentDownload (+mailto:research@example.com)"
         },
         description="Polite HTTP headers (deprecated; use user_agent instead)",
     )
-    mailto: Optional[str] = Field(default=None, description="Email for robots.txt compliance")
+    mailto: str | None = Field(default=None, description="Email for robots.txt compliance")
 
     @field_validator("timeout_connect_s", "timeout_read_s", "timeout_write_s", "timeout_pool_s")
     @classmethod

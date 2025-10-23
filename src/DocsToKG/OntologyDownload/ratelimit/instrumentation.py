@@ -73,7 +73,7 @@ positional usage continues to work.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 from DocsToKG.OntologyDownload.observability.events import emit_event
 
@@ -81,11 +81,11 @@ logger = logging.getLogger(__name__)
 
 
 def _normalise_service_host(
-    service: Optional[str],
-    host: Optional[str],
+    service: str | None,
+    host: str | None,
     *,
-    fallback_key: Optional[str] = None,
-) -> Tuple[str, str, str]:
+    fallback_key: str | None = None,
+) -> tuple[str, str, str]:
     """Return normalised ``(service, host, key)`` tuple for event payloads."""
     if fallback_key and not service:
         parts = fallback_key.split(":", 1)
@@ -103,8 +103,8 @@ def _emit_safe(
     type: str,
     *,
     level: str,
-    payload: Dict[str, Any],
-    service: Optional[str],
+    payload: dict[str, Any],
+    service: str | None,
 ) -> None:
     """Emit the event, swallowing telemetry errors."""
     try:
@@ -114,21 +114,21 @@ def _emit_safe(
 
 
 def emit_acquire_event(
-    key: Optional[str] = None,
-    allowed: Optional[bool] = None,
-    blocked_ms: Optional[float] = None,
-    tokens_requested: Optional[int] = None,
-    tokens_available: Optional[int] = None,
+    key: str | None = None,
+    allowed: bool | None = None,
+    blocked_ms: float | None = None,
+    tokens_requested: int | None = None,
+    tokens_available: int | None = None,
     *,
-    service: Optional[str] = None,
-    host: Optional[str] = None,
+    service: str | None = None,
+    host: str | None = None,
     weight: int = 1,
-    elapsed_ms: Optional[int] = None,
+    elapsed_ms: int | None = None,
 ) -> None:
     """Emit event when the rate limiter grants tokens."""
     service_norm, host_norm, key_norm = _normalise_service_host(service, host, fallback_key=key)
     allowed_flag = True if allowed is None else bool(allowed)
-    payload: Dict[str, Any] = {
+    payload: dict[str, Any] = {
         "key": key_norm,
         "service": service_norm,
         "host": host_norm,
@@ -155,15 +155,15 @@ def emit_acquire_event(
 
 def emit_blocked_event(
     *,
-    service: Optional[str],
-    host: Optional[str],
+    service: str | None,
+    host: str | None,
     weight: int,
     reason: str,
-    retry_after_seconds: Optional[float] = None,
+    retry_after_seconds: float | None = None,
 ) -> None:
     """Emit event when acquisition fails due to rate limiting."""
     service_norm, host_norm, key_norm = _normalise_service_host(service, host)
-    payload: Dict[str, Any] = {
+    payload: dict[str, Any] = {
         "key": key_norm,
         "service": service_norm,
         "host": host_norm,
@@ -183,12 +183,12 @@ def emit_blocked_event(
 
 
 def emit_cooldown_event(
-    key: Optional[str] = None,
-    status_code: Optional[int] = None,
+    key: str | None = None,
+    status_code: int | None = None,
     cooldown_sec: float = 0,
     *,
-    service: Optional[str] = None,
-    host: Optional[str] = None,
+    service: str | None = None,
+    host: str | None = None,
 ) -> None:
     """Emit event when a cooldown (Retry-After) window activates."""
     service_norm, host_norm, key_norm = _normalise_service_host(service, host, fallback_key=key)
@@ -209,11 +209,11 @@ def emit_cooldown_event(
 
 
 def emit_head_skip_event(
-    key: Optional[str] = None,
+    key: str | None = None,
     reason: str = "unknown",
     *,
-    service: Optional[str] = None,
-    host: Optional[str] = None,
+    service: str | None = None,
+    host: str | None = None,
 ) -> None:
     """Emit event when a request is skipped before acquisition."""
     service_norm, host_norm, key_norm = _normalise_service_host(service, host, fallback_key=key)
@@ -233,10 +233,10 @@ def emit_head_skip_event(
 
 def emit_rate_limit_event(
     *,
-    service: Optional[str],
-    host: Optional[str],
+    service: str | None,
+    host: str | None,
     event: str,
-    details: Optional[Dict[str, Any]] = None,
+    details: dict[str, Any] | None = None,
 ) -> None:
     """Emit a generic rate-limit lifecycle event."""
     service_norm, host_norm, key_norm = _normalise_service_host(service, host)
@@ -258,9 +258,9 @@ def emit_rate_limit_event(
 
 def emit_rate_info_event(
     *,
-    service: Optional[str],
-    host: Optional[str],
-    limits: Dict[str, Any],
+    service: str | None,
+    host: str | None,
+    limits: dict[str, Any],
 ) -> None:
     """Emit static information about the configured rate limits."""
     service_norm, host_norm, key_norm = _normalise_service_host(service, host)
@@ -278,7 +278,7 @@ def emit_rate_info_event(
     )
 
 
-def log_rate_limit_stats(stats: Dict[str, Any]) -> None:
+def log_rate_limit_stats(stats: dict[str, Any]) -> None:
     """Log the latest rate limiter stats (debug-level helper)."""
     try:
         logger.debug("rate limiter stats", extra={"stats": stats})

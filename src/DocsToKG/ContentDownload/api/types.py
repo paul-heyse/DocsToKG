@@ -62,8 +62,9 @@ Design Principles:
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Literal, Mapping, Optional, Sequence
+from typing import Any, Literal
 
 # ============================================================================
 # STABLE TOKEN VOCABULARIES (Public Contract)
@@ -128,19 +129,19 @@ class DownloadPlan:
     resolver_name: str
     """Which resolver generated this plan (e.g., 'unpaywall', 'arxiv', 'crossref')."""
 
-    referer: Optional[str] = None
+    referer: str | None = None
     """Optional Referer header value if needed by upstream."""
 
-    expected_mime: Optional[str] = None
+    expected_mime: str | None = None
     """Expected MIME type (used for content policy validation)."""
 
-    etag: Optional[str] = None
+    etag: str | None = None
     """Optional ETag for conditional GET (If-None-Match)."""
 
-    last_modified: Optional[str] = None
+    last_modified: str | None = None
     """Optional Last-Modified header value for conditional GET (If-Modified-Since)."""
 
-    max_bytes_override: Optional[int] = None
+    max_bytes_override: int | None = None
     """Optional per-plan byte cap (overrides global setting if set)."""
 
     def __post_init__(self) -> None:
@@ -172,10 +173,10 @@ class DownloadStreamResult:
     http_status: int
     """HTTP response status code (200, 304, etc.)."""
 
-    content_type: Optional[str] = None
+    content_type: str | None = None
     """HTTP Content-Type header value from the response."""
 
-    staging_path: Optional[str] = None
+    staging_path: str | None = None
     """Directory containing the temporary payload artifacts for this attempt."""
 
 
@@ -194,10 +195,10 @@ class DownloadOutcome:
     classification: OutcomeClass
     """Status category: 'success' | 'skip' | 'error'."""
 
-    path: Optional[str] = None
+    path: str | None = None
     """Final path to downloaded file (None if not successful)."""
 
-    reason: Optional[ReasonCode] = None
+    reason: ReasonCode | None = None
     """Normalized reason token for why skip/error occurred."""
 
     meta: Mapping[str, Any] = field(default_factory=dict)
@@ -265,10 +266,10 @@ class AttemptRecord:
     status: AttemptStatus
     """Outcome status token (http-head, http-200, robots-disallowed, etc.)."""
 
-    http_status: Optional[int] = None
+    http_status: int | None = None
     """HTTP response status code if applicable."""
 
-    elapsed_ms: Optional[int] = None
+    elapsed_ms: int | None = None
     """Time spent on this attempt (in milliseconds)."""
 
     meta: Mapping[str, Any] = field(default_factory=dict)

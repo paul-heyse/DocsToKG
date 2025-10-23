@@ -28,7 +28,6 @@ Future implementation will:
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -97,7 +96,7 @@ class S3Layout:
         """
         raise NotImplementedError("S3 upload not yet implemented")
 
-    def verify_object(self, key: str, expected_hash: Optional[str] = None) -> bool:
+    def verify_object(self, key: str, expected_hash: str | None = None) -> bool:
         """Verify S3 object integrity (stub).
 
         Args:

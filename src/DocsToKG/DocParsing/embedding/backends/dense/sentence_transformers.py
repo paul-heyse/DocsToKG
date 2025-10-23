@@ -23,8 +23,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import List, Optional, Sequence
 
 from ..base import DenseEmbeddingBackend, ProviderContext, ProviderError, ProviderIdentity
 from ..utils import bounded_batch_size, normalise_vectors, resolve_device
@@ -75,7 +75,7 @@ class SentenceTransformersProvider(DenseEmbeddingBackend):
         self,
         texts: Sequence[str],
         *,
-        batch_hint: Optional[int] = None,
+        batch_hint: int | None = None,
     ) -> Sequence[Sequence[float]]:
         if not texts:
             return []
@@ -96,7 +96,7 @@ class SentenceTransformersProvider(DenseEmbeddingBackend):
             convert_to_numpy=True,
             normalize_embeddings=self._cfg.normalize_l2 if self._cfg.normalize_l2 else False,
         )
-        results: List[List[float]] = [[float(x) for x in embedding] for embedding in vectors]
+        results: list[list[float]] = [[float(x) for x in embedding] for embedding in vectors]
         if self._ctx and self._ctx.normalize_l2 and not self._cfg.normalize_l2:
             results = normalise_vectors(results, normalise=True)
         if self._ctx:

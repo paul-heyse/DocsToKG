@@ -8,6 +8,11 @@ Use the uv bootstrap to stand up the project environment:
 
 The script installs uv if it is missing, respects `UV_PROJECT_ENVIRONMENT`, and installs DocsToKG in editable mode. After activation, use the tools in `.venv/bin/` (for example `pytest -q`, `ruff check`, or `python -m DocsToKG.<module>`).
 
+## Code Style & Architecture References
+
+- Review [docs/Formats and Standards/CODESTYLE.md](<../../../../docs/Formats and Standards/CODESTYLE.md>) for the Python 3.12+ baseline, lint/type tooling expectations, and NAVMAP/docstring rules.
+- Architecture briefs: [DocParsing overview](<../../../../docs/architecture/120-docparsing.updated.md>) and [Level 2 implementation notes](<../../../../docs/architecture/120-docparsing.level2.updated.md>).
+
 ## Mission & Scope
 
 - **Mission**: Convert raw documents into DocTags, chunks, and embeddings with resumable manifests and deterministic hashing so downstream search pipelines can rely on consistent outputs.

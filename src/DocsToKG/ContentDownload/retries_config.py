@@ -50,8 +50,9 @@ Provides RFC-compliant retry configuration with support for:
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Mapping, Optional
+from typing import Any
 
 LOGGER = logging.getLogger(__name__)
 
@@ -71,8 +72,8 @@ class RetriesConfig:
     max_attempts: int = 7  # total attempts (initial + retries)
     max_total_s: float = 120  # wall-clock ceiling in seconds
     backoff: BackoffConfig = field(default_factory=BackoffConfig)
-    statuses: List[int] = field(default_factory=lambda: [429, 500, 502, 503, 504])
-    methods: List[str] = field(default_factory=lambda: ["GET", "HEAD"])
+    statuses: list[int] = field(default_factory=lambda: [429, 500, 502, 503, 504])
+    methods: list[str] = field(default_factory=lambda: ["GET", "HEAD"])
     retry_408: bool = False  # optionally retry 408 (Request Timeout)
     retry_on_timeout: bool = True  # retry httpx.TimeoutException
     retry_on_remote_protocol: bool = True  # retry httpx.RemoteProtocolError
@@ -94,10 +95,10 @@ class RetriesConfig:
 
 
 def load_retries_config(
-    yaml_dict: Optional[Dict[str, Any]] = None,
+    yaml_dict: dict[str, Any] | None = None,
     *,
-    env: Optional[Mapping[str, str]] = None,
-    cli_overrides: Optional[Dict[str, Any]] = None,
+    env: Mapping[str, str] | None = None,
+    cli_overrides: dict[str, Any] | None = None,
 ) -> RetriesConfig:
     """Load retries configuration from YAML, environment, and CLI.
 
@@ -173,7 +174,7 @@ def load_retries_config(
 
 
 # Global retries configuration instance
-_GLOBAL_RETRIES_CONFIG: Optional[RetriesConfig] = None
+_GLOBAL_RETRIES_CONFIG: RetriesConfig | None = None
 
 
 def get_retries_config() -> RetriesConfig:

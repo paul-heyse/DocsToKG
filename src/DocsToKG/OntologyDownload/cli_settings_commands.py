@@ -40,7 +40,6 @@ Example:
 
 import json
 from pathlib import Path
-from typing import Optional
 
 import typer
 
@@ -176,7 +175,7 @@ def show(
 
 @settings_app.command()
 def schema(
-    out: Optional[Path] = typer.Option(
+    out: Path | None = typer.Option(
         None,
         "--out",
         "-o",

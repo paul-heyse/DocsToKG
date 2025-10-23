@@ -47,8 +47,9 @@ Type Contracts:
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any, Dict, Literal, Mapping, Optional
+from typing import Any, Literal
 
 # ============================================================================
 # OUTCOME TYPES
@@ -154,10 +155,10 @@ class FallbackPlan:
         gates: Optional health gate configuration (breaker, offline, rate limiter awareness)
     """
 
-    budgets: Dict[str, Any]
+    budgets: dict[str, Any]
     tiers: list[TierPlan]
-    policies: Dict[str, AttemptPolicy]
-    gates: Dict[str, Any] = field(default_factory=dict)
+    policies: dict[str, AttemptPolicy]
+    gates: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """Validate plan invariants."""
@@ -216,11 +217,11 @@ class AttemptResult:
     """
 
     outcome: ResolutionOutcome
-    url: Optional[str] = None
-    reason: Optional[str] = None
+    url: str | None = None
+    reason: str | None = None
     elapsed_ms: int = 0
-    status: Optional[int] = None
-    host: Optional[str] = None
+    status: int | None = None
+    host: str | None = None
     retry_count: int = 0
     meta: Mapping[str, Any] = field(default_factory=dict)
 

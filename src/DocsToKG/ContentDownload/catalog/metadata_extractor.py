@@ -41,7 +41,7 @@ import json
 import logging
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -51,15 +51,15 @@ class ContentMetadata:
     """Extracted content metadata."""
 
     content_type: str
-    title: Optional[str] = None
+    title: str | None = None
     authors: list[str] = field(default_factory=list)
-    description: Optional[str] = None
+    description: str | None = None
     keywords: list[str] = field(default_factory=list)
-    language: Optional[str] = None
-    page_count: Optional[int] = None
-    text_preview: Optional[str] = None  # First 500 chars
-    extraction_date: Optional[str] = None
-    source_hash: Optional[str] = None
+    language: str | None = None
+    page_count: int | None = None
+    text_preview: str | None = None  # First 500 chars
+    extraction_date: str | None = None
+    source_hash: str | None = None
     custom_fields: dict[str, Any] = field(default_factory=dict)
 
 
@@ -180,7 +180,7 @@ class MetadataExtractor:
         try:
             metadata = {}
 
-            with open(file_path, "r", encoding="utf-8") as f:
+            with open(file_path, encoding="utf-8") as f:
                 content = f.read()
 
             # Parse HTML
@@ -228,7 +228,7 @@ class MetadataExtractor:
     def _extract_json(self, file_path: str) -> dict:
         """Extract metadata from JSON."""
         try:
-            with open(file_path, "r", encoding="utf-8") as f:
+            with open(file_path, encoding="utf-8") as f:
                 data = json.load(f)
 
             metadata = {}
@@ -253,7 +253,7 @@ class MetadataExtractor:
     def _extract_text(self, file_path: str) -> dict:
         """Extract metadata from plain text."""
         try:
-            with open(file_path, "r", encoding="utf-8") as f:
+            with open(file_path, encoding="utf-8") as f:
                 text = f.read()
 
             metadata = {}

@@ -144,16 +144,11 @@ from __future__ import annotations
 import threading
 import time
 from collections import deque
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import (
-    Callable,
-    Dict,
-    List,
-    Mapping,
-    Optional,
     Protocol,
-    Tuple,
 )
 
 # Optional import: keep module import-safe if pybreaker is absent in some test envs.
@@ -193,9 +188,9 @@ DEFAULT_NEUTRAL_STATUSES = frozenset({401, 403, 404, 410, 451})
 class BreakerRolePolicy:
     """Overrides for a specific role (metadata|landing|artifact)."""
 
-    fail_max: Optional[int] = None
-    reset_timeout_s: Optional[int] = None
-    success_threshold: Optional[int] = None  # half-open: require N successes to close
+    fail_max: int | None = None
+    reset_timeout_s: int | None = None
+    success_threshold: int | None = None  # half-open: require N successes to close
     trial_calls: int = 1  # half-open: number of probe calls allowed
 
 
@@ -216,7 +211,7 @@ class BreakerClassification:
     failure_statuses: frozenset[int] = DEFAULT_FAILURE_STATUSES
     neutral_statuses: frozenset[int] = DEFAULT_NEUTRAL_STATUSES
     # Exceptions are provided by networking when constructing the registry (httpx exceptions, etc.)
-    failure_exceptions: Tuple[type, ...] = tuple()
+    failure_exceptions: tuple[type, ...] = tuple()
 
 
 @dataclass(frozen=True)
@@ -264,7 +259,7 @@ class CooldownStore(Protocol):
     Times are monotonic deadlines (time.monotonic()) to avoid wall clock drift.
     """
 
-    def get_until(self, host: str) -> Optional[float]: ...
+    def get_until(self, host: str) -> float | None: ...
     def set_until(self, host: str, until_monotonic: float, reason: str) -> None: ...
     def clear(self, host: str) -> None: ...
 
@@ -273,10 +268,10 @@ class CooldownStore(Protocol):
 class InMemoryCooldownStore:
     """Process-local cooldown store; safe default."""
 
-    _until: Dict[str, float] = field(default_factory=dict)
+    _until: dict[str, float] = field(default_factory=dict)
     _lock: threading.Lock = field(default_factory=threading.Lock)
 
-    def get_until(self, host: str) -> Optional[float]:
+    def get_until(self, host: str) -> float | None:
         with self._lock:
             return self._until.get(host)
 
@@ -301,7 +296,7 @@ class BreakerListenerFactory(Protocol):
     networking_breaker_listener.py to build these.
     """
 
-    def __call__(self, host: str, scope: str, resolver: Optional[str]) -> Optional[object]: ...
+    def __call__(self, host: str, scope: str, resolver: str | None) -> object | None: ...
 
 
 # ────────────────────────────────────────────────────────────────────────────────
@@ -338,8 +333,8 @@ class BreakerRegistry:
         self,
         config: BreakerConfig,
         *,
-        cooldown_store: Optional[CooldownStore] = None,
-        listener_factory: Optional[BreakerListenerFactory] = None,
+        cooldown_store: CooldownStore | None = None,
+        listener_factory: BreakerListenerFactory | None = None,
         now_monotonic: Callable[[], float] = time.monotonic,
     ) -> None:
         if pybreaker is None:  # pragma: no cover
@@ -351,15 +346,15 @@ class BreakerRegistry:
         self._now = now_monotonic
 
         # Internal storages
-        self._host_breakers: Dict[str, pybreaker.CircuitBreaker] = {}
-        self._resolver_breakers: Dict[str, pybreaker.CircuitBreaker] = {}
-        self._rolling_fails: Dict[str, deque[float]] = {}  # host -> failure timestamps (monotonic)
-        self._half_open: Dict[Tuple[str, RequestRole], _HalfOpenCounter] = {}
+        self._host_breakers: dict[str, pybreaker.CircuitBreaker] = {}
+        self._resolver_breakers: dict[str, pybreaker.CircuitBreaker] = {}
+        self._rolling_fails: dict[str, deque[float]] = {}  # host -> failure timestamps (monotonic)
+        self._half_open: dict[tuple[str, RequestRole], _HalfOpenCounter] = {}
         self._lock = threading.RLock()
 
     # ── Public API ────────────────────────────────────────────────────────────
 
-    def allow(self, host: str, *, role: RequestRole, resolver: Optional[str] = None) -> None:
+    def allow(self, host: str, *, role: RequestRole, resolver: str | None = None) -> None:
         """
         Pre-flight check: raise BreakerOpenError if host/resolver is in cooldown or breaker is open.
 
@@ -408,7 +403,7 @@ class BreakerRegistry:
             # 5) Half-open trial calls per role
             self._enforce_half_open_probe_limit(host_key, role, h_cb, now)
 
-    def on_success(self, host: str, *, role: RequestRole, resolver: Optional[str] = None) -> None:
+    def on_success(self, host: str, *, role: RequestRole, resolver: str | None = None) -> None:
         """
         Call when a request succeeded (2xx/3xx or healthy terminal path).
         Resets counters and clears cooldown overrides.
@@ -432,10 +427,10 @@ class BreakerRegistry:
         host: str,
         *,
         role: RequestRole,
-        resolver: Optional[str] = None,
-        status: Optional[int] = None,
-        exception: Optional[BaseException] = None,
-        retry_after_s: Optional[float] = None,
+        resolver: str | None = None,
+        status: int | None = None,
+        exception: BaseException | None = None,
+        retry_after_s: float | None = None,
     ) -> None:
         """
         Call when a request failed due to retryable server status or network exception.
@@ -464,7 +459,7 @@ class BreakerRegistry:
 
     # ── Query helpers (optional, useful for telemetry) ────────────────────────
 
-    def current_state(self, host: str, *, resolver: Optional[str] = None) -> str:
+    def current_state(self, host: str, *, resolver: str | None = None) -> str:
         """Return the pybreaker state for ``host`` or an optional ``resolver``."""
 
         from DocsToKG.ContentDownload.breakers_loader import (
@@ -477,7 +472,7 @@ class BreakerRegistry:
                 return self._state_name(self._get_or_create_resolver_breaker(resolver))
             return self._state_name(self._get_or_create_host_breaker(host_key))
 
-    def cooldown_remaining_ms(self, host: str, *, resolver: Optional[str] = None) -> Optional[int]:
+    def cooldown_remaining_ms(self, host: str, *, resolver: str | None = None) -> int | None:
         """Return remaining cooldown in milliseconds for host/resolver if open."""
 
         from DocsToKG.ContentDownload.breakers_loader import (
@@ -486,7 +481,7 @@ class BreakerRegistry:
 
         host_key = _normalize_host_key(host)
         now = self._now()
-        remaining: List[int] = []
+        remaining: list[int] = []
 
         with self._lock:
             until = self.cooldowns.get_until(host_key)
@@ -510,11 +505,11 @@ class BreakerRegistry:
         self,
         host: str,
         *,
-        fail_max: Optional[int] = None,
-        reset_timeout_s: Optional[int] = None,
-        success_threshold: Optional[int] = None,
-        trial_calls_metadata: Optional[int] = None,
-        trial_calls_artifact: Optional[int] = None,
+        fail_max: int | None = None,
+        reset_timeout_s: int | None = None,
+        success_threshold: int | None = None,
+        trial_calls_metadata: int | None = None,
+        trial_calls_artifact: int | None = None,
     ) -> None:
         """
         Safely update the policy for a host by rebuilding its circuit breaker.
@@ -760,8 +755,8 @@ class BreakerRegistry:
 def is_failure_for_breaker(
     classify: BreakerClassification,
     *,
-    status: Optional[int],
-    exception: Optional[BaseException],
+    status: int | None,
+    exception: BaseException | None,
 ) -> bool:
     """
     Return True if this outcome should count as a breaker failure.

@@ -81,7 +81,7 @@ from __future__ import annotations
 import logging
 import os
 import tempfile
-from typing import Iterator, Optional
+from collections.abc import Iterator
 
 __all__ = ["SizeMismatchError", "atomic_write_stream"]
 
@@ -116,7 +116,7 @@ def atomic_write_stream(
     dest_path: str,
     byte_iter: Iterator[bytes],
     *,
-    expected_len: Optional[int] = None,
+    expected_len: int | None = None,
     chunk_size: int = 1 << 20,  # 1 MiB default
 ) -> int:
     """Write response stream to destination path atomically with integrity verification.

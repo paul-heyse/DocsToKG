@@ -10,7 +10,8 @@ loader behaviour.
 from __future__ import annotations
 
 import sys
-from typing import Any, Callable, Optional
+from collections.abc import Callable
+from typing import Any
 
 from . import settings as _settings
 
@@ -37,7 +38,7 @@ def _import_module(name: str) -> Any:
     return _BASE_IMPORT(name)
 
 
-def _call_with_override(callback: Callable[[], Any], cache_key: Optional[str]) -> Any:
+def _call_with_override(callback: Callable[[], Any], cache_key: str | None) -> Any:
     original_import = _settings._import_module
     current_import = globals()["_import_module"]
 
@@ -48,8 +49,8 @@ def _call_with_override(callback: Callable[[], Any], cache_key: Optional[str]) -
             raise ModuleNotFoundError(str(exc)) from exc
 
     cache_tuple = _CACHE_ATTRS.get(cache_key or "")
-    cache_name: Optional[str]
-    module_name: Optional[str]
+    cache_name: str | None
+    module_name: str | None
     if cache_tuple:
         cache_name, module_name = cache_tuple
     else:

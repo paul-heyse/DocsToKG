@@ -41,7 +41,6 @@ Pre-built SQL queries for DuckDB that answer common operational questions:
 - Zip bomb detection (compression ratios)
 """
 
-from typing import Optional
 
 # ============================================================================
 # SLO Queries (Performance)
@@ -175,7 +174,7 @@ ORDER BY date DESC
 # ============================================================================
 
 
-def get_slo_query(metric: str = "network") -> Optional[str]:
+def get_slo_query(metric: str = "network") -> str | None:
     """Get SLO query by metric name.
 
     Args:
@@ -191,7 +190,7 @@ def get_slo_query(metric: str = "network") -> Optional[str]:
     return queries.get(metric)
 
 
-def get_rate_limit_query(metric: str = "pressure") -> Optional[str]:
+def get_rate_limit_query(metric: str = "pressure") -> str | None:
     """Get rate limiting query by metric name.
 
     Args:
@@ -207,7 +206,7 @@ def get_rate_limit_query(metric: str = "pressure") -> Optional[str]:
     return queries.get(metric)
 
 
-def get_safety_query(metric: str = "rejections") -> Optional[str]:
+def get_safety_query(metric: str = "rejections") -> str | None:
     """Get safety/policy query by metric name.
 
     Args:
@@ -223,7 +222,7 @@ def get_safety_query(metric: str = "rejections") -> Optional[str]:
     return queries.get(metric)
 
 
-def get_extraction_query(metric: str = "bombs") -> Optional[str]:
+def get_extraction_query(metric: str = "bombs") -> str | None:
     """Get extraction query by metric name.
 
     Args:

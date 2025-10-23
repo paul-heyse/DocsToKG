@@ -32,8 +32,6 @@ while allowing clean short-circuit logic.
 
 from __future__ import annotations
 
-from typing import Optional
-
 from .types import ReasonCode
 
 
@@ -56,7 +54,7 @@ class SkipDownload(Exception):
             return plan
     """
 
-    def __init__(self, reason: ReasonCode, message: Optional[str] = None) -> None:
+    def __init__(self, reason: ReasonCode, message: str | None = None) -> None:
         """
         Initialize skip signal.
 
@@ -90,7 +88,7 @@ class DownloadError(Exception):
             return result
     """
 
-    def __init__(self, reason: ReasonCode, message: Optional[str] = None) -> None:
+    def __init__(self, reason: ReasonCode, message: str | None = None) -> None:
         """
         Initialize error signal.
 

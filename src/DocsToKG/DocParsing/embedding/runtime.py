@@ -339,9 +339,10 @@ import tracemalloc
 import unicodedata
 import uuid
 from collections import Counter
+from collections.abc import Callable, Iterator, Sequence
 from dataclasses import fields
 from types import SimpleNamespace
-from typing import Any, Callable, Dict, Iterator, List, Optional, Sequence, Tuple, Union
+from typing import Any
 
 # Third-party imports
 try:
@@ -570,8 +571,8 @@ def _ensure_qwen_dependencies() -> None:
 
 
 def splade_encode(
-    cfg: SpladeCfg, texts: List[str], batch_size: Optional[int] = None
-) -> Tuple[List[List[str]], List[List[float]]]:
+    cfg: SpladeCfg, texts: list[str], batch_size: int | None = None
+) -> tuple[list[list[str]], list[list[float]]]:
     """Backward-compatible SPLADE encoder wrapper using provider abstractions."""
 
     from DocsToKG.DocParsing.embedding.backends.sparse.splade_st import (
@@ -599,8 +600,8 @@ def splade_encode(
     provider.open(context)
     try:
         encoded = provider.encode(texts)
-        token_lists: List[List[str]] = []
-        weight_lists: List[List[float]] = []
+        token_lists: list[list[str]] = []
+        weight_lists: list[list[float]] = []
         for row in encoded:
             tokens = [str(token) for token, _weight in row]
             weights = [float(weight) for _token, weight in row]
@@ -611,9 +612,7 @@ def splade_encode(
         provider.close()
 
 
-def qwen_embed(
-    cfg: QwenCfg, texts: List[str], batch_size: Optional[int] = None
-) -> List[List[float]]:
+def qwen_embed(cfg: QwenCfg, texts: list[str], batch_size: int | None = None) -> list[list[float]]:
     """Backward-compatible Qwen embedding wrapper using provider abstractions."""
 
     from DocsToKG.DocParsing.embedding.backends.dense.qwen_vllm import (
@@ -717,7 +716,7 @@ QWEN_DIR = expand_path(_resolve_qwen_dir(MODEL_ROOT))
 SPLADE_DIR = expand_path(_resolve_splade_dir(MODEL_ROOT))
 
 
-def _expand_optional(path: Optional[Path]) -> Optional[Path]:
+def _expand_optional(path: Path | None) -> Path | None:
     """Expand optional :class:`Path` values to absolutes when provided.
 
     Args:
@@ -732,7 +731,7 @@ def _expand_optional(path: Optional[Path]) -> Optional[Path]:
     return path.expanduser().resolve()
 
 
-def _resolve_cli_path(value: Optional[Path], default: Path) -> Path:
+def _resolve_cli_path(value: Path | None, default: Path) -> Path:
     """Resolve a CLI-provided path, falling back to ``default`` when omitted.
 
     Args:
@@ -769,7 +768,7 @@ def _percentile(data: Sequence[float], pct: float) -> float:
 
 MANIFEST_STAGE = "embeddings"
 
-_EMBED_WORKER_STATE: Dict[str, Any] = {}
+_EMBED_WORKER_STATE: dict[str, Any] = {}
 
 
 def _write_fingerprint(path: Path, *, input_sha256: str, cfg_hash: str) -> None:
@@ -785,7 +784,7 @@ def _write_fingerprint(path: Path, *, input_sha256: str, cfg_hash: str) -> None:
         handle.write("\n")
 
 
-def _compute_embed_cfg_hash(cfg: "EmbedCfg", vector_format: str) -> str:
+def _compute_embed_cfg_hash(cfg: EmbedCfg, vector_format: str) -> str:
     """Return a stable hash representing embedding configuration impacting resume."""
 
     payload = {
@@ -808,14 +807,14 @@ def _compute_embed_cfg_hash(cfg: "EmbedCfg", vector_format: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def _set_embed_worker_state(state: Dict[str, Any]) -> None:
+def _set_embed_worker_state(state: dict[str, Any]) -> None:
     """Install the worker state dictionary used by embedding worker processes."""
 
     global _EMBED_WORKER_STATE
     _EMBED_WORKER_STATE = state
 
 
-def _get_embed_worker_state() -> Dict[str, Any]:
+def _get_embed_worker_state() -> dict[str, Any]:
     """Return the worker state configured in :func:`_set_embed_worker_state`."""
 
     if not _EMBED_WORKER_STATE:
@@ -823,7 +822,7 @@ def _get_embed_worker_state() -> Dict[str, Any]:
     return _EMBED_WORKER_STATE
 
 
-def _extract_stub_counters(func: Callable[..., Any]) -> Optional[Dict[str, int]]:
+def _extract_stub_counters(func: Callable[..., Any]) -> dict[str, int] | None:
     """Return the patched test counters from a stubbed process_chunk function."""
 
     closure = getattr(func, "__closure__", None)
@@ -842,9 +841,9 @@ def _process_stub_vectors(
     *,
     cfg: EmbedCfg,
     vector_format: str,
-    content_hasher: Optional[StreamingContentHasher] = None,
-    counters: Optional[Dict[str, int]] = None,
-) -> Tuple[int, List[int], List[float]]:
+    content_hasher: StreamingContentHasher | None = None,
+    counters: dict[str, int] | None = None,
+) -> tuple[int, list[int], list[float]]:
     """Fallback vector writer used when tests patch out real providers."""
 
     if counters is not None:
@@ -900,7 +899,7 @@ def _process_stub_vectors(
 TOKEN_RE = re.compile(r"[A-Za-z0-9]+(?:[-_][A-Za-z0-9]+)?")
 
 
-def ensure_uuid(rows: List[dict]) -> bool:
+def ensure_uuid(rows: list[dict]) -> bool:
     """Validate or assign deterministic chunk UUIDs based on content offsets.
 
     Args:
@@ -958,7 +957,7 @@ def _legacy_chunk_uuid(doc_id: str, source_chunk_idxs: Any, text_value: str) -> 
         return str(uuid.uuid4())
 
 
-def tokens(text: str) -> List[str]:
+def tokens(text: str) -> list[str]:
     """Tokenize normalized text for sparse retrieval features.
 
     Args:
@@ -1060,7 +1059,7 @@ def print_bm25_summary(stats: BM25Stats) -> None:
 
 def bm25_vector(
     text: str, stats: BM25Stats, k1: float = 1.5, b: float = 0.75
-) -> Tuple[List[str], List[float]]:
+) -> tuple[list[str], list[float]]:
     """Generate BM25 term weights for a chunk of text.
 
     Args:
@@ -1117,8 +1116,8 @@ class SPLADEValidator:
             None
         """
         self.total_chunks = 0
-        self.zero_nnz_chunks: List[str] = []
-        self.nnz_counts: List[int] = []
+        self.zero_nnz_chunks: list[str] = []
+        self.nnz_counts: list[int] = []
         self.warn_threshold_pct = float(warn_threshold_pct)
         self.top_n = max(1, int(top_n))
         self._lock = threading.Lock()
@@ -1285,11 +1284,11 @@ def iter_rows_in_batches(
     path: Path,
     batch_size: int,
     *,
-    start: Optional[int] = None,
-    end: Optional[int] = None,
+    start: int | None = None,
+    end: int | None = None,
     skip_invalid: bool = True,
     max_errors: int = 10,
-) -> Iterator[List[dict]]:
+) -> Iterator[list[dict]]:
     """Iterate over JSONL rows in batches to reduce memory usage.
 
     Args:
@@ -1306,7 +1305,7 @@ def iter_rows_in_batches(
         Lists of row dictionaries containing at most ``batch_size`` entries.
     """
 
-    buf: List[dict] = []
+    buf: list[dict] = []
     for record in iter_jsonl(
         path,
         start=start,
@@ -1344,9 +1343,9 @@ def process_chunk_file_vectors(
     validator: SPLADEValidator,
     logger,
     *,
-    content_hasher: Optional[StreamingContentHasher] = None,
+    content_hasher: StreamingContentHasher | None = None,
     vector_format: str = "parquet",
-) -> Tuple[int, List[int], List[float]]:
+) -> tuple[int, list[int], list[float]]:
     """Generate vectors for a single chunk file and persist them to disk."""
 
     if not isinstance(out_path, Path):
@@ -1370,12 +1369,12 @@ def process_chunk_file_vectors(
     row_batch_size = bundle.context.batch_hint or max(cfg.batch_size_qwen, cfg.batch_size_splade)
 
     total_count = 0
-    nnz_all: List[int] = []
-    norms_all: List[float] = []
+    nnz_all: list[int] = []
+    norms_all: list[float] = []
 
     with create_unified_vector_writer(resolved_out_path, fmt=vector_format) as writer:
         if content_hasher is None:
-            row_batches: Iterator[List[dict]] = iter_rows_in_batches(chunk_file, row_batch_size)
+            row_batches: Iterator[list[dict]] = iter_rows_in_batches(chunk_file, row_batch_size)
         else:
             row_batches = iter_rows_in_batches(chunk_file, row_batch_size)
 
@@ -1383,8 +1382,8 @@ def process_chunk_file_vectors(
             if not rows:
                 continue
 
-            uuids: List[str] = []
-            texts: List[str] = []
+            uuids: list[str] = []
+            texts: list[str] = []
             for index, row in enumerate(rows, start=1):
                 ensure_chunk_schema(row, context=f"{chunk_file}:{index}")
                 # Update hasher if provided
@@ -1397,13 +1396,13 @@ def process_chunk_file_vectors(
                 uuids.append(str(uuid_value))
                 texts.append(str(row.get("text", "")))
 
-            lexical_vectors: List[Tuple[Sequence[str], Sequence[float]]] = []
+            lexical_vectors: list[tuple[Sequence[str], Sequence[float]]] = []
             for text in texts:
                 terms, weights = lexical_provider.vector(text, stats)
                 lexical_vectors.append((list(terms), list(weights)))
 
             sparse_encoded = sparse_provider.encode(texts)
-            sparse_vectors: List[Tuple[Sequence[str], Sequence[float]]] = []
+            sparse_vectors: list[tuple[Sequence[str], Sequence[float]]] = []
             for entry in sparse_encoded:
                 tokens = [str(token) for token, _weight in entry]
                 weights = [float(weight) for _token, weight in entry]
@@ -1455,8 +1454,8 @@ def write_vectors(
     writer: Any,  # UnifiedVectorWriter or compatible writer interface
     uuids: Sequence[str],
     texts: Sequence[str],
-    lexical_results: Sequence[Tuple[Sequence[str], Sequence[float]]],
-    splade_results: Sequence[Tuple[Sequence[str], Sequence[float]]],
+    lexical_results: Sequence[tuple[Sequence[str], Sequence[float]]],
+    splade_results: Sequence[tuple[Sequence[str], Sequence[float]]],
     dense_results: Sequence[Sequence[float]],
     stats: BM25Stats,
     cfg: EmbedCfg,
@@ -1464,10 +1463,10 @@ def write_vectors(
     rows: Sequence[dict],
     validator: SPLADEValidator,
     logger,
-    provider_identities: Dict[str, ProviderIdentity],
-    output_path: Optional[Path] = None,
+    provider_identities: dict[str, ProviderIdentity],
+    output_path: Path | None = None,
     vector_format: str = "parquet",
-) -> Tuple[int, List[int], List[float]]:
+) -> tuple[int, list[int], list[float]]:
     """Write validated vector rows to disk with schema enforcement."""
 
     if not (
@@ -1513,10 +1512,10 @@ def write_vectors(
         "b": bm25_b,
     }
 
-    splade_nnz: List[int] = []
-    dense_norms: List[float] = []
+    splade_nnz: list[int] = []
+    dense_norms: list[float] = []
     output_ref = output_path or getattr(writer, "path", None)
-    payloads: List[dict] = []
+    payloads: list[dict] = []
 
     for uuid_value, text, lexical_pair, splade_pair, dense_vector_raw, row in zip(
         uuids, texts, lexical_results, splade_results, dense_results, rows
@@ -1661,7 +1660,7 @@ def _handle_embedding_quarantine(
     input_hash: str,
     reason: str,
     logger,
-    data_root: Optional[Path] = None,
+    data_root: Path | None = None,
     vector_format: str = "parquet",
 ) -> None:
     """Quarantine a problematic chunk or vector artefact and log manifest state."""
@@ -1719,8 +1718,8 @@ def _validate_vectors_for_chunks(
     vectors_dir: Path,
     logger,
     *,
-    data_root: Optional[Path] = None,
-    expected_dimension: Optional[int] = None,
+    data_root: Path | None = None,
+    expected_dimension: int | None = None,
     vector_format: str = "parquet",
 ) -> tuple[int, int]:
     """Validate vectors associated with chunk files without recomputing models.
@@ -1731,7 +1730,7 @@ def _validate_vectors_for_chunks(
     fmt_normalised = str(vector_format or "parquet").lower()
     files_checked = 0
     rows_validated = 0
-    missing: List[tuple[str, Path]] = []
+    missing: list[tuple[str, Path]] = []
     quarantined_files = 0
 
     for chunk in _iter_chunks_or_empty(chunks_dir):
@@ -1872,13 +1871,13 @@ def _build_embedding_plan(
     hash_alg: str,
     logger,
     plan_only: bool,
-) -> Tuple[StagePlan, Dict[str, Any]]:
+) -> tuple[StagePlan, dict[str, Any]]:
     """Build a StagePlan for vector generation with resume awareness."""
 
     fmt = str(vector_format or "parquet").lower()
-    planned_ids: List[str] = []
-    skipped_ids: List[str] = []
-    work_items: List[WorkItem] = []
+    planned_ids: list[str] = []
+    skipped_ids: list[str] = []
+    work_items: list[WorkItem] = []
     resume_skipped = 0
 
     for entry in chunk_entries:
@@ -2022,11 +2021,11 @@ def _embedding_stage_worker(item: WorkItem) -> ItemOutcome:
     resolved_root: Path = state["resolved_root"]
     cfg_hash: str = state["cfg_hash"]
     stub_vectors_enabled: bool = state.get("stub_vectors", False)
-    stub_counters: Optional[Dict[str, int]] = state.get("stub_counters")
+    stub_counters: dict[str, int] | None = state.get("stub_counters")
 
     # Extract provider identities for manifest metadata
     provider_identities = bundle.identities()
-    provider_metadata_extras: Dict[str, object] = {}
+    provider_metadata_extras: dict[str, object] = {}
     if bundle.dense and "dense" in provider_identities:
         dense_id = provider_identities["dense"]
         provider_metadata_extras["dense_provider_name"] = dense_id.name
@@ -2059,20 +2058,20 @@ def _embedding_stage_worker(item: WorkItem) -> ItemOutcome:
         ),
     )
 
-    hasher: Optional[StreamingContentHasher] = None
+    hasher: StreamingContentHasher | None = None
     if not input_hash:
         hasher = StreamingContentHasher()
     start = time.perf_counter()
-    fallback_from: Optional[str] = None
-    fallback_reason: Optional[str] = None
+    fallback_from: str | None = None
+    fallback_reason: str | None = None
     effective_vector_format = vector_format
     original_vectors_path = vectors_path
-    fallback_error: Optional[VectorWriterError] = None
-    result_tuple: Optional[Tuple[int, List[int], List[float]]] = None
+    fallback_error: VectorWriterError | None = None
+    result_tuple: tuple[int, list[int], list[float]] | None = None
 
     def _execute_vector_generation(
         target_path: Path, fmt: str
-    ) -> Tuple[int, List[int], List[float]]:
+    ) -> tuple[int, list[int], list[float]]:
         if stub_vectors_enabled:
             return _process_stub_vectors(
                 chunk_path,
@@ -2258,14 +2257,14 @@ def _embedding_stage_worker(item: WorkItem) -> ItemOutcome:
         cfg_hash=cfg_hash,
     )
 
-    manifest_payload: Dict[str, Any] = {
+    manifest_payload: dict[str, Any] = {
         "vector_count": count,
         "nnz": nnz,
         "norms": norms,
         "resolved_hash": resolved_hash,
         "vector_format": effective_vector_format,
     }
-    result_payload: Dict[str, Any] = {
+    result_payload: dict[str, Any] = {
         "quarantined": False,
         "vector_format": effective_vector_format,
     }
@@ -2292,7 +2291,7 @@ def _make_embedding_stage_hooks(
     stats: BM25Stats,
     validator: SPLADEValidator,
     bundle: ProviderBundle,
-    exit_stack: Optional[ExitStack],
+    exit_stack: ExitStack | None,
     overall_start: float,
     pass_b_start: float,
     files_parallel: int,
@@ -2300,7 +2299,7 @@ def _make_embedding_stage_hooks(
     cfg_hash: str,
     vectors_dir: Path,
     stub_vectors: bool,
-    stub_counters: Optional[Dict[str, int]],
+    stub_counters: dict[str, int] | None,
 ) -> StageHooks:
     """Return stage hooks that manage shared embedding resources and summaries."""
 
@@ -2348,7 +2347,7 @@ def _make_embedding_stage_hooks(
 
     def after_item(
         item: WorkItem,
-        outcome_or_error: Union[ItemOutcome, StageError],
+        outcome_or_error: ItemOutcome | StageError,
         context: StageContext,
     ) -> None:
         state = context.metadata.get("embedding_state", {})
@@ -2429,7 +2428,7 @@ def _make_embedding_stage_hooks(
         files_parallel_effective = state.get("files_parallel", files_parallel)
         vectors_dir_state: Path = state.get("vectors_dir", vectors_dir)
         fallback_total = state.get("vector_format_fallbacks", 0)
-        bundle_summary: Dict[str, ProviderIdentity] = {}
+        bundle_summary: dict[str, ProviderIdentity] = {}
         bundle_ref = state.get("bundle")
         if bundle_ref is not None:
             try:
@@ -2975,8 +2974,8 @@ def _main_inner(args: argparse.Namespace | None = None, config_adapter=None) -> 
                 )
                 return 0
 
-        incompatible_chunks: List[Path] = []
-        validated_files: List[ChunkDiscovery] = []
+        incompatible_chunks: list[Path] = []
+        validated_files: list[ChunkDiscovery] = []
         for chunk_entry in chunk_entries:
             chunk_file = chunk_entry.resolved_path
             try:

@@ -89,7 +89,7 @@ from __future__ import annotations
 import json
 import logging
 import time
-from typing import Any, Dict, Optional
+from typing import Any
 
 LOGGER = logging.getLogger(__name__)
 
@@ -109,7 +109,7 @@ EVENT_IDEMPOTENCY_REPLAY = "idempotency_replay"
 # === TELEMETRY SINK ===
 
 
-def emit_event(event_type: str, payload: Dict[str, Any]) -> None:
+def emit_event(event_type: str, payload: dict[str, Any]) -> None:
     """Emit structured telemetry event.
 
     Parameters
@@ -193,7 +193,7 @@ def emit_job_state_changed(
     job_id: str,
     from_state: str,
     to_state: str,
-    reason: Optional[str] = None,
+    reason: str | None = None,
 ) -> None:
     """Emit job_state_changed event.
 

@@ -40,9 +40,10 @@ If lease_until < now while IN_PROGRESS → can re-lease (crash recovery).
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Mapping, Optional
+from typing import Any
 
 
 class JobState(str, Enum):
@@ -81,8 +82,8 @@ class JobResult:
     state: JobState
     outcome: str
     attempts: int
-    last_error: Optional[str] = None
-    resolver_hint: Optional[str] = None
+    last_error: str | None = None
+    resolver_hint: str | None = None
     extra: Mapping[str, Any] = field(default_factory=dict)
 
     def is_terminal(self) -> bool:

@@ -25,15 +25,16 @@ implementation while customising parameters suited to their workloads.
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Iterator, Sequence
 from itertools import islice
-from typing import Iterable, Iterator, List, Optional, Sequence, TypeVar
+from typing import TypeVar
 
 T = TypeVar("T")
 
 __all__ = ["Batcher"]
 
 
-class Batcher(Iterable[List[T]]):
+class Batcher(Iterable[list[T]]):
     """Yield fixed-size batches from an iterable with optional policies.
 
     ``Batcher`` operates in two distinct modes depending on ``policy``. When no
@@ -49,8 +50,8 @@ class Batcher(Iterable[List[T]]):
         iterable: Iterable[T],
         batch_size: int,
         *,
-        policy: Optional[str] = None,
-        lengths: Optional[Sequence[int]] = None,
+        policy: str | None = None,
+        lengths: Sequence[int] | None = None,
     ) -> None:
         """Initialise batching metadata for streaming or materialised modes."""
 
@@ -58,9 +59,9 @@ class Batcher(Iterable[List[T]]):
             raise ValueError("batch_size must be >= 1")
         self._batch_size = batch_size
         self._policy = (policy or "").lower() or None
-        self._iterable: Optional[Iterable[T]] = None
-        self._items: Optional[List[T]] = None
-        self._lengths: Optional[List[int]] = None
+        self._iterable: Iterable[T] | None = None
+        self._items: list[T] | None = None
+        self._lengths: list[int] | None = None
 
         if not self._policy:
             self._iterable = iterable
@@ -84,7 +85,7 @@ class Batcher(Iterable[List[T]]):
             return 0
         return 1 << ((length - 1).bit_length())
 
-    def _ordered_indices(self) -> List[int]:
+    def _ordered_indices(self) -> list[int]:
         """Return indices ordered by bucketed length and original position."""
 
         assert self._items is not None
@@ -94,7 +95,7 @@ class Batcher(Iterable[List[T]]):
         pairs.sort(key=lambda pair: (pair[1], pair[0]))
         return [idx for idx, _ in pairs]
 
-    def __iter__(self) -> Iterator[List[T]]:
+    def __iter__(self) -> Iterator[list[T]]:
         """Yield successive batches respecting any active policy."""
 
         if not self._policy:

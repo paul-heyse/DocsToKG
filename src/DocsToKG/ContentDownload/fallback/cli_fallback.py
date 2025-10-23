@@ -70,7 +70,7 @@ Commands:
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any
 
 from DocsToKG.ContentDownload.fallback.loader import load_fallback_plan
 from DocsToKG.ContentDownload.fallback.orchestrator import FallbackOrchestrator
@@ -145,7 +145,7 @@ def format_plan_table(plan: Any) -> str:
     return "\n".join(lines)
 
 
-def cmd_fallback_plan(args: Optional[Dict[str, Any]] = None) -> None:
+def cmd_fallback_plan(args: dict[str, Any] | None = None) -> None:
     """Display effective fallback plan configuration.
 
     Shows the configuration after merging YAML, environment, and CLI sources.
@@ -163,7 +163,7 @@ def cmd_fallback_plan(args: Optional[Dict[str, Any]] = None) -> None:
         return None
 
 
-def _mock_adapter(policy: Any, context: Dict[str, Any]) -> AttemptResult:
+def _mock_adapter(policy: Any, context: dict[str, Any]) -> AttemptResult:
     """Mock adapter for dryrun testing.
 
     Args:
@@ -219,7 +219,7 @@ def _mock_adapter(policy: Any, context: Dict[str, Any]) -> AttemptResult:
     )
 
 
-def cmd_fallback_dryrun(args: Optional[Dict[str, Any]] = None) -> None:
+def cmd_fallback_dryrun(args: dict[str, Any] | None = None) -> None:
     """Dry-run the fallback resolution strategy with mock adapters.
 
     Simulates resolution without making actual network calls.
@@ -283,7 +283,7 @@ def cmd_fallback_dryrun(args: Optional[Dict[str, Any]] = None) -> None:
         return None
 
 
-def cmd_fallback_tune(args: Optional[Dict[str, Any]] = None) -> None:
+def cmd_fallback_tune(args: dict[str, Any] | None = None) -> None:
     """Analyze telemetry and suggest configuration tuning.
 
     This is a placeholder for Phase 7 telemetry integration.

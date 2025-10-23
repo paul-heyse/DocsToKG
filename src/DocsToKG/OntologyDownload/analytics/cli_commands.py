@@ -68,7 +68,6 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import asdict
-from typing import Optional
 
 try:  # pragma: no cover
     import polars as pl
@@ -94,7 +93,7 @@ logger = logging.getLogger(__name__)
 
 def cmd_report_latest(
     files_df: pl.DataFrame | pl.LazyFrame,
-    validations_df: Optional[pl.DataFrame | pl.LazyFrame] = None,
+    validations_df: pl.DataFrame | pl.LazyFrame | None = None,
     output_format: str = "table",
 ) -> str:
     """Generate latest version report command.

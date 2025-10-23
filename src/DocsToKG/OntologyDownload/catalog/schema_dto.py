@@ -46,7 +46,6 @@ NAVMAP:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass(frozen=True)
@@ -64,7 +63,7 @@ class ColumnInfo:
     name: str
     data_type: str
     nullable: bool = True
-    default_value: Optional[str] = None
+    default_value: str | None = None
     constraints: list[str] = None  # type: ignore
 
     def __post_init__(self):

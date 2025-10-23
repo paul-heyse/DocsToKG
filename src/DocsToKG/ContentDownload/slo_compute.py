@@ -63,7 +63,6 @@ from __future__ import annotations
 
 import sqlite3
 import time
-from typing import Dict
 
 from DocsToKG.ContentDownload import slo_schema
 
@@ -110,7 +109,7 @@ def compute_job_completion_rate(
 def compute_time_to_complete_percentiles(
     conn: sqlite3.Connection,
     window_seconds: int = 86400,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """Compute time-to-completion percentiles.
 
     Parameters
@@ -194,7 +193,7 @@ def compute_crash_recovery_success_rate(
 def compute_lease_acquisition_latency(
     conn: sqlite3.Connection,
     sample_size: int = 1000,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """Compute lease acquisition latency percentiles.
 
     Measures time between job creation and first lease.
@@ -302,7 +301,7 @@ def compute_operation_replay_rate(
 
 def compute_all_slo_metrics(
     conn: sqlite3.Connection,
-) -> Dict[str, slo_schema.SLOMetric]:
+) -> dict[str, slo_schema.SLOMetric]:
     """Compute all SLO metrics.
 
     Parameters

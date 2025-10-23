@@ -74,7 +74,6 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Optional
 
 try:  # pragma: no cover
     import polars as pl
@@ -124,7 +123,7 @@ class VersionDelta:
 
 def build_latest_summary_pipeline(
     files_df: pl.LazyFrame,
-    validations_df: Optional[pl.LazyFrame] = None,
+    validations_df: pl.LazyFrame | None = None,
 ) -> pl.LazyFrame:
     """Build lazy pipeline for latest version summary.
 
@@ -151,7 +150,7 @@ def build_latest_summary_pipeline(
 
 def compute_latest_summary(
     files_df: pl.LazyFrame,
-    validations_df: Optional[pl.LazyFrame] = None,
+    validations_df: pl.LazyFrame | None = None,
     top_n: int = 10,
 ) -> LatestSummary:
     """Compute latest version summary using streaming.

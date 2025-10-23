@@ -49,7 +49,6 @@ import sqlite3
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -63,8 +62,8 @@ class BackupMetadata:
     destination_path: str
     file_size_bytes: int
     record_count: int
-    database_version: Optional[str] = None
-    checksum_sha256: Optional[str] = None
+    database_version: str | None = None
+    checksum_sha256: str | None = None
 
 
 class CatalogBackup:
@@ -173,7 +172,7 @@ class CatalogBackup:
     def backup_incremental(
         self,
         destination: Path,
-        last_backup_path: Optional[str] = None,
+        last_backup_path: str | None = None,
     ) -> BackupMetadata:
         """Create incremental backup (stub for future implementation).
 

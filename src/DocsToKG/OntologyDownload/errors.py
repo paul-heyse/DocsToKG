@@ -9,7 +9,7 @@ access to specialised subclasses when finer-grained handling is required.
 
 from __future__ import annotations
 
-from typing import Optional, Sequence
+from collections.abc import Sequence
 
 __all__ = [
     "OntologyDownloadError",
@@ -52,7 +52,7 @@ class RetryableValidationError(ValidationError):
         self,
         message: str,
         *,
-        validators: Optional[Sequence[str]] = None,
+        validators: Sequence[str] | None = None,
         retryable: bool = False,
     ) -> None:
         super().__init__(message)
@@ -79,7 +79,7 @@ class DownloadFailure(OntologyDownloadError):
         self,
         message: str,
         *,
-        status_code: Optional[int] = None,
+        status_code: int | None = None,
         retryable: bool = False,
     ) -> None:
         super().__init__(message)

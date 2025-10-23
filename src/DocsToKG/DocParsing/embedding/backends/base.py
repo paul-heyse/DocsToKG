@@ -53,9 +53,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Mapping, Optional, Protocol, Sequence, Tuple, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 ProviderTelemetryEmitter = Callable[["ProviderTelemetryEvent"], None]
 
@@ -65,7 +66,7 @@ class ProviderIdentity:
     """Metadata describing a provider implementation."""
 
     name: str
-    version: Optional[str] = None
+    version: str | None = None
     extra: Mapping[str, str] = field(default_factory=dict)
 
 
@@ -84,13 +85,13 @@ class ProviderContext:
 
     device: str = "auto"
     dtype: str = "auto"
-    batch_hint: Optional[int] = None
-    max_concurrency: Optional[int] = None
+    batch_hint: int | None = None
+    max_concurrency: int | None = None
     normalize_l2: bool = True
     offline: bool = False
-    cache_dir: Optional[Path] = None
+    cache_dir: Path | None = None
     telemetry_tags: Mapping[str, str] = field(default_factory=dict)
-    telemetry_emitter: Optional[ProviderTelemetryEmitter] = None
+    telemetry_emitter: ProviderTelemetryEmitter | None = None
 
     def emit(self, provider: ProviderIdentity, *, phase: str, data: Mapping[str, object]) -> None:
         """Emit a telemetry event if an emitter has been configured."""
@@ -120,7 +121,7 @@ class ProviderError(RuntimeError):
     category: str
     detail: str
     retryable: bool = False
-    wrapped: Optional[BaseException] = None
+    wrapped: BaseException | None = None
 
     def __str__(self) -> str:  # pragma: no cover - formatting helper
         base = f"[{self.provider}] {self.category}: {self.detail}"
@@ -143,7 +144,7 @@ class DenseEmbeddingBackend(Protocol):
         self,
         texts: Sequence[str],
         *,
-        batch_hint: Optional[int] = None,
+        batch_hint: int | None = None,
     ) -> Sequence[Sequence[float]]: ...
 
 
@@ -157,7 +158,7 @@ class SparseEmbeddingBackend(Protocol):
 
     def close(self) -> None: ...
 
-    def encode(self, texts: Sequence[str]) -> Sequence[Sequence[Tuple[str, float]]]: ...
+    def encode(self, texts: Sequence[str]) -> Sequence[Sequence[tuple[str, float]]]: ...
 
 
 @runtime_checkable
@@ -176,4 +177,4 @@ class LexicalEmbeddingBackend(Protocol):
         self,
         text: str,
         stats: object,
-    ) -> Tuple[Sequence[str], Sequence[float]]: ...
+    ) -> tuple[Sequence[str], Sequence[float]]: ...

@@ -340,21 +340,13 @@ import time
 import types
 import uuid
 from collections import deque
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from dataclasses import dataclass, fields
 from itertools import chain
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
     ClassVar,
-    Deque,
-    Dict,
-    Iterable,
-    Iterator,
-    List,
-    Mapping,
-    Optional,
-    Tuple,
     TypeVar,
 )
 
@@ -463,13 +455,13 @@ PORT_SCAN_SPAN = 32
 DEFAULT_WORKERS = max(1, min(12, (os.cpu_count() or 16) - 4))
 WAIT_TIMEOUT_S = 300
 DEFAULT_GPU_MEMORY_UTILIZATION = 0.30
-DEFAULT_SERVED_MODEL_NAMES: Tuple[str, ...] = (
+DEFAULT_SERVED_MODEL_NAMES: tuple[str, ...] = (
     "granite-docling-258M",
     "ibm-granite/granite-docling-258M",
 )
 
 
-def _compute_pdf_cfg_hash(cfg: "DoctagsCfg") -> str:
+def _compute_pdf_cfg_hash(cfg: DoctagsCfg) -> str:
     """Return a stable hash for resume fingerprinting of PDF conversions."""
 
     payload = {
@@ -485,7 +477,7 @@ def _compute_pdf_cfg_hash(cfg: "DoctagsCfg") -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def _compute_html_cfg_hash(cfg: "DoctagsCfg") -> str:
+def _compute_html_cfg_hash(cfg: DoctagsCfg) -> str:
     """Return a stable hash for resume fingerprinting of HTML conversions."""
 
     payload = {
@@ -512,7 +504,7 @@ def _build_pdf_plan(
     served_model_names: Sequence[str],
     vllm_version: str,
     vlm_prompt: str,
-    vlm_stop: Tuple[str, ...],
+    vlm_stop: tuple[str, ...],
 ) -> tuple[StagePlan, int]:
     """Create a StagePlan for DocTags PDF conversion."""
 
@@ -563,7 +555,7 @@ def _build_pdf_plan(
             vlm_prompt=vlm_prompt,
             vlm_stop=vlm_stop,
         )
-        metadata: Dict[str, Any] = {
+        metadata: dict[str, Any] = {
             "task": task,
             "doc_id": doc_id,
             "input_path": str(pdf_path),
@@ -823,25 +815,25 @@ class DoctagsCfg(StageConfigBase):
     """Structured configuration for DocTags conversion stages."""
 
     log_level: str = "INFO"
-    data_root: Optional[Path] = None
-    input: Optional[Path] = None
-    output: Optional[Path] = None
+    data_root: Path | None = None
+    input: Path | None = None
+    output: Path | None = None
     workers: int = DEFAULT_WORKERS
     port: int = PREFERRED_PORT
-    model: Optional[str] = None
-    served_model_names: Tuple[str, ...] = DEFAULT_SERVED_MODEL_NAMES
+    model: str | None = None
+    served_model_names: tuple[str, ...] = DEFAULT_SERVED_MODEL_NAMES
     gpu_memory_utilization: float = DEFAULT_GPU_MEMORY_UTILIZATION
     vlm_prompt: str = "Convert this page to docling."
-    vlm_stop: Tuple[str, ...] = ("</doctag>", "<|end_of_text|>")
+    vlm_stop: tuple[str, ...] = ("</doctag>", "<|end_of_text|>")
     vllm_wait_timeout: int = WAIT_TIMEOUT_S
-    http_timeout: Tuple[float, float] = DEFAULT_HTTP_TIMEOUT
+    http_timeout: tuple[float, float] = DEFAULT_HTTP_TIMEOUT
     resume: bool = False
     force: bool = False
     overwrite: bool = False
     mode: str = "pdf"
     html_sanitizer: str = "balanced"
 
-    ENV_VARS: ClassVar[Dict[str, str]] = {
+    ENV_VARS: ClassVar[dict[str, str]] = {
         "log_level": "DOCSTOKG_DOCTAGS_LOG_LEVEL",
         "data_root": "DOCSTOKG_DOCTAGS_DATA_ROOT",
         "input": "DOCSTOKG_DOCTAGS_INPUT",
@@ -863,7 +855,7 @@ class DoctagsCfg(StageConfigBase):
         "html_sanitizer": "DOCSTOKG_DOCTAGS_HTML_SANITIZER",
     }
 
-    FIELD_PARSERS: ClassVar[Dict[str, Callable[[Any, Optional[Path]], Any]]] = {
+    FIELD_PARSERS: ClassVar[dict[str, Callable[[Any, Path | None], Any]]] = {
         "config": StageConfigBase._coerce_optional_path,
         "log_level": StageConfigBase._coerce_str,
         "data_root": StageConfigBase._coerce_optional_path,
@@ -945,7 +937,7 @@ class DoctagsCfg(StageConfigBase):
         self.gpu_memory_utilization = utilization
 
 
-PROFILE_PRESETS: Dict[str, Dict[str, Any]] = {
+PROFILE_PRESETS: dict[str, dict[str, Any]] = {
     "cpu-small": {
         "workers": 1,
         "gpu_memory_utilization": 0.0,
@@ -967,7 +959,7 @@ PROFILE_PRESETS: Dict[str, Dict[str, Any]] = {
 }
 
 
-PDF_CLI_OPTIONS: Tuple[CLIOption, ...] = (
+PDF_CLI_OPTIONS: tuple[CLIOption, ...] = (
     CLIOption(
         ("--config",),
         {"type": Path, "default": None, "help": "Path to stage config file (JSON/YAML/TOML)."},
@@ -1192,7 +1184,7 @@ def add_resume_force_options(
 # --- vLLM Lifecycle ---
 
 
-def _normalize_served_model_names(raw: Optional[Iterable[Iterable[str] | str]]) -> Tuple[str, ...]:
+def _normalize_served_model_names(raw: Iterable[Iterable[str] | str] | None) -> tuple[str, ...]:
     """Flatten CLI-provided served model names into a deduplicated tuple.
 
     Args:
@@ -1210,7 +1202,7 @@ def _normalize_served_model_names(raw: Optional[Iterable[Iterable[str] | str]]) 
     if not raw:
         return DEFAULT_SERVED_MODEL_NAMES
 
-    flattened: List[str] = []
+    flattened: list[str] = []
     for entry in raw:
         if isinstance(entry, str):
             flattened.append(entry)
@@ -1258,7 +1250,7 @@ def detect_vllm_version() -> str:
     return version
 
 
-def validate_served_models(available: Optional[List[str]], expected: Tuple[str, ...]) -> None:
+def validate_served_models(available: list[str] | None, expected: tuple[str, ...]) -> None:
     """Ensure that at least one of the expected served model names is available.
 
     Args:
@@ -1374,10 +1366,10 @@ class PdfTask:
     input_hash: str
     doc_id: str
     output_path: Path
-    served_model_names: Tuple[str, ...]
+    served_model_names: tuple[str, ...]
     inference_model: str
     vlm_prompt: str
-    vlm_stop: Tuple[str, ...]
+    vlm_stop: tuple[str, ...]
 
 
 @dataclass
@@ -1404,7 +1396,7 @@ class PdfConversionResult:
     input_path: str
     input_hash: str
     output_path: str
-    error: Optional[str] = None
+    error: str | None = None
 
 
 def _safe_float(value: Any) -> float:
@@ -1423,7 +1415,7 @@ def _safe_float(value: Any) -> float:
         return 0.0
 
 
-def normalize_conversion_result(result: Any, task: Optional[PdfTask] = None) -> PdfConversionResult:
+def normalize_conversion_result(result: Any, task: PdfTask | None = None) -> PdfConversionResult:
     """Validate that worker results conform to :class:`PdfConversionResult`.
 
     Args:
@@ -1459,8 +1451,8 @@ def port_is_free(port: int) -> bool:
 
 
 def probe_models(
-    port: int, timeout: Optional[object] = None
-) -> Tuple[Optional[List[str]], Optional[str], Optional[int]]:
+    port: int, timeout: object | None = None
+) -> tuple[list[str] | None, str | None, int | None]:
     """Inspect the `/v1/models` endpoint exposed by a vLLM HTTP server.
 
     Args:
@@ -1495,7 +1487,7 @@ def probe_models(
         return None, str(e), None
 
 
-def probe_metrics(port: int, timeout: Optional[object] = None) -> Tuple[bool, Optional[int]]:
+def probe_metrics(port: int, timeout: object | None = None) -> tuple[bool, int | None]:
     """Check whether the vLLM `/metrics` endpoint is healthy.
 
     Args:
@@ -1515,7 +1507,7 @@ def probe_metrics(port: int, timeout: Optional[object] = None) -> Tuple[bool, Op
         return (False, None)
 
 
-def stream_logs(proc: sp.Popen, prefix: str = "[vLLM] ", tail: Optional[Deque[str]] = None):
+def stream_logs(proc: sp.Popen, prefix: str = "[vLLM] ", tail: deque[str] | None = None):
     """Continuously stream stdout lines from a child process to the console.
 
     Args:
@@ -1548,7 +1540,7 @@ def stream_logs(proc: sp.Popen, prefix: str = "[vLLM] ", tail: Optional[Deque[st
 def start_vllm(
     port: int,
     model_path: str,
-    served_model_names: Tuple[str, ...],
+    served_model_names: tuple[str, ...],
     gpu_memory_utilization: float,
 ) -> sp.Popen:
     """Launch a vLLM server process on the requested port.
@@ -1588,8 +1580,8 @@ def start_vllm(
         extra={"extra_fields": {"command": cmd, "env_log_level": env.get("VLLM_LOG_LEVEL")}},
     )
     proc = sp.Popen(cmd, env=env, stdout=sp.PIPE, stderr=sp.STDOUT, text=True, bufsize=1)
-    tail: Deque[str] = deque(maxlen=50)
-    setattr(proc, "_log_tail", tail)
+    tail: deque[str] = deque(maxlen=50)
+    proc._log_tail = tail
     # Start log thread
     t = threading.Thread(target=stream_logs, args=(proc, "[vLLM] ", tail), daemon=True)
     t.start()
@@ -1601,8 +1593,8 @@ def wait_for_vllm(
     proc: sp.Popen,
     *,
     timeout_s: int = WAIT_TIMEOUT_S,
-    http_timeout: Optional[object] = None,
-) -> List[str]:
+    http_timeout: object | None = None,
+) -> list[str]:
     """Poll the vLLM server until `/v1/models` responds with success.
 
     Args:
@@ -1675,7 +1667,7 @@ def wait_for_vllm(
             bar.update(min(interval, remaining))
 
 
-def stop_vllm(proc: Optional[sp.Popen], own: bool, grace=10):
+def stop_vllm(proc: sp.Popen | None, own: bool, grace=10):
     """Terminate a managed vLLM process if this script launched it.
 
     Args:
@@ -1706,12 +1698,12 @@ def stop_vllm(proc: Optional[sp.Popen], own: bool, grace=10):
 def ensure_vllm(
     preferred: int,
     model_path: str,
-    served_model_names: Tuple[str, ...],
+    served_model_names: tuple[str, ...],
     gpu_memory_utilization: float,
     *,
     wait_timeout_s: int = WAIT_TIMEOUT_S,
-    http_timeout: Optional[object] = None,
-) -> Tuple[int, Optional[sp.Popen], bool]:
+    http_timeout: object | None = None,
+) -> tuple[int, sp.Popen | None, bool]:
     """Ensure a vLLM server is available, launching one when necessary.
 
     Args:
@@ -1814,7 +1806,7 @@ def _iter_directory_files(
             yield candidate
         return
 
-    heap: List[Tuple[str, Path]] = []
+    heap: list[tuple[str, Path]] = []
 
     def _enqueue_directory(directory: Path) -> None:
         """Push directory entries onto the traversal heap in lexicographic order."""
@@ -1856,7 +1848,7 @@ def iter_pdfs(root: Path) -> Iterator[Path]:
     yield from _iter_directory_files(root, {".pdf"})
 
 
-def _peek_iterable(iterable: Iterable[_T]) -> tuple[Iterator[_T], Optional[_T]]:
+def _peek_iterable(iterable: Iterable[_T]) -> tuple[Iterator[_T], _T | None]:
     """Return an iterator that includes the first element and the first element itself."""
 
     iterator = iter(iterable)
@@ -2266,7 +2258,7 @@ def pdf_main(args: argparse.Namespace | None = None, config_adapter=None) -> int
 
             workers = max(1, int(cfg.workers))
 
-            tasks: List[PdfTask] = []
+            tasks: list[PdfTask] = []
             ok = fail = skip = 0
             total_inputs = 0
             for pdf_path in pdf_iter:
@@ -2384,9 +2376,9 @@ def pdf_main(args: argparse.Namespace | None = None, config_adapter=None) -> int
 
 HTML_MANIFEST_STAGE = "doctags-html"
 HTML_DEFAULT_WORKERS = max(1, (os.cpu_count() or 8) - 1)
-HTML_SANITIZER_CHOICES: Tuple[str, ...] = ("strict", "balanced", "permissive")
+HTML_SANITIZER_CHOICES: tuple[str, ...] = ("strict", "balanced", "permissive")
 
-HTML_CLI_OPTIONS: Tuple[CLIOption, ...] = (
+HTML_CLI_OPTIONS: tuple[CLIOption, ...] = (
     CLIOption(
         ("--config",),
         {"type": Path, "default": None, "help": "Path to stage config file (JSON/YAML/TOML)."},
@@ -2577,7 +2569,7 @@ def _make_html_stage_hooks(
     return StageHooks(before_stage=before_stage, after_item=after_item)
 
 
-_CONVERTER: "DocumentConverter | None" = None
+_CONVERTER: DocumentConverter | None = None
 
 
 def html_build_parser() -> argparse.ArgumentParser:
@@ -2673,10 +2665,10 @@ class HtmlConversionResult:
     input_hash: str
     output_path: str
     error: str | None = None
-    sanitizer_profile: Optional[str] = None
+    sanitizer_profile: str | None = None
 
 
-def _get_converter() -> "DocumentConverter":
+def _get_converter() -> DocumentConverter:
     """Instantiate and cache a Docling HTML converter per worker process."""
 
     from docling.document_converter import DocumentConverter
@@ -2703,7 +2695,7 @@ def list_htmls(root: Path) -> Iterator[Path]:
     yield from _iter_sorted_paths(root, _is_html_candidate)
 
 
-def _sanitize_html_file(path: Path, profile: str) -> Tuple[Path, Optional[Path]]:
+def _sanitize_html_file(path: Path, profile: str) -> tuple[Path, Path | None]:
     """Apply sanitizer profile to ``path``, returning the path to convert."""
 
     profile = (profile or "balanced").lower()
@@ -3027,7 +3019,7 @@ def html_main(args: argparse.Namespace | None = None, config_adapter=None) -> in
         )
         resume_controller = ResumeController(cfg.resume, cfg.force, manifest_index)
 
-        tasks: List[HtmlTask] = []
+        tasks: list[HtmlTask] = []
         ok = fail = skip = 0
         for path in files_iter:
             rel_path = path.relative_to(input_dir)
@@ -3037,7 +3029,7 @@ def html_main(args: argparse.Namespace | None = None, config_adapter=None) -> in
             should_hash_for_resume = bool(
                 cfg.resume and not cfg.force and manifest_entry and not cfg.overwrite
             )
-            input_hash: Optional[str] = None
+            input_hash: str | None = None
             skip_doc = False
             if should_hash_for_resume:
                 input_hash = compute_content_hash(path)

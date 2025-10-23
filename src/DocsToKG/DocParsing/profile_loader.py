@@ -55,7 +55,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any
 
 try:
     import tomllib  # Python 3.11+
@@ -73,7 +73,7 @@ except ImportError:
 from .config_loaders import ConfigLoadError, load_toml_markers, load_yaml_markers
 
 
-def load_profile_file(path: Path) -> Dict[str, Any]:
+def load_profile_file(path: Path) -> dict[str, Any]:
     """
     Load a profile file (TOML or YAML) into a dict.
 
@@ -104,9 +104,9 @@ def load_profile_file(path: Path) -> Dict[str, Any]:
 
 
 def merge_dicts(
-    base: Dict[str, Any],
-    override: Dict[str, Any],
-) -> Dict[str, Any]:
+    base: dict[str, Any],
+    override: dict[str, Any],
+) -> dict[str, Any]:
     """
     Deep merge override dict into base dict (override wins on conflicts).
 
@@ -127,10 +127,10 @@ def merge_dicts(
 
 
 def apply_dot_path_override(
-    config: Dict[str, Any],
+    config: dict[str, Any],
     dot_path: str,
     value: Any,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Apply a dot-path override (e.g., 'embed.dense.backend=tei') to config.
 
@@ -180,8 +180,8 @@ def _env_var_to_dot_path(
     env_name: str,
     *,
     prefix: str,
-    root_keys: Set[str],
-) -> Optional[str]:
+    root_keys: set[str],
+) -> str | None:
     """
     Convert an environment variable name into a dot-path understood by SettingsBuilder.
 
@@ -203,12 +203,12 @@ def _env_var_to_dot_path(
         return None
 
     # Normalise to lowercase while preserving embedded underscores for field names.
-    segments: List[str] = [segment.lower() for segment in raw_segments]
-    path_parts: List[str] = []
+    segments: list[str] = [segment.lower() for segment in raw_segments]
+    path_parts: list[str] = []
 
     # Split legacy single-underscore prefixes like "chunk_min_tokens".
     first = segments[0]
-    remainder: List[str] = segments[1:]
+    remainder: list[str] = segments[1:]
     if "_" in first:
         candidate_root, candidate_tail = first.split("_", 1)
         candidate_root = candidate_root.strip("_")
@@ -242,21 +242,21 @@ class SettingsBuilder:
 
     def __init__(self) -> None:
         """Initialize the builder."""
-        self.defaults: Dict[str, Any] = {}
-        self.profile_data: Dict[str, Any] = {}
-        self.env_overrides: Dict[str, Any] = {}
-        self.cli_overrides: Dict[str, Any] = {}
-        self.sources: Dict[str, str] = {}  # Track source of each key
+        self.defaults: dict[str, Any] = {}
+        self.profile_data: dict[str, Any] = {}
+        self.env_overrides: dict[str, Any] = {}
+        self.cli_overrides: dict[str, Any] = {}
+        self.sources: dict[str, str] = {}  # Track source of each key
 
-    def add_defaults(self, defaults: Dict[str, Any]) -> SettingsBuilder:
+    def add_defaults(self, defaults: dict[str, Any]) -> SettingsBuilder:
         """Add default configuration."""
         self.defaults = defaults
         return self
 
     def add_profile(
         self,
-        profile_name: Optional[str] = None,
-        profile_file: Optional[Path] = None,
+        profile_name: str | None = None,
+        profile_file: Path | None = None,
     ) -> SettingsBuilder:
         """
         Load and add profile configuration.
@@ -305,7 +305,7 @@ class SettingsBuilder:
             Self for chaining
         """
         self.env_overrides = {}
-        root_keys: Set[str] = {key.lower() for key in self.defaults.keys()}
+        root_keys: set[str] = {key.lower() for key in self.defaults.keys()}
         if not root_keys:
             root_keys = {"app", "runner", "doctags", "chunk", "embed"}
         for key, value in os.environ.items():
@@ -328,7 +328,7 @@ class SettingsBuilder:
             apply_dot_path_override(self.env_overrides, dot_path, val)
         return self
 
-    def add_cli_overrides(self, overrides: Dict[str, Any]) -> SettingsBuilder:
+    def add_cli_overrides(self, overrides: dict[str, Any]) -> SettingsBuilder:
         """
         Add CLI argument overrides.
 
@@ -341,7 +341,7 @@ class SettingsBuilder:
         self.cli_overrides = overrides
         return self
 
-    def build(self, track_sources: bool = False) -> Tuple[Dict[str, Any], Dict[str, str]]:
+    def build(self, track_sources: bool = False) -> tuple[dict[str, Any], dict[str, str]]:
         """
         Build the effective configuration with proper precedence.
 
@@ -374,7 +374,7 @@ class SettingsBuilder:
         else:
             return result, {}
 
-    def _compute_sources(self, final_config: Dict[str, Any]) -> Dict[str, str]:
+    def _compute_sources(self, final_config: dict[str, Any]) -> dict[str, str]:
         """
         Compute source tracking (which layer each key came from).
 
@@ -384,9 +384,9 @@ class SettingsBuilder:
         Returns:
             Dict mapping dot-paths to source layer
         """
-        sources: Dict[str, str] = {}
+        sources: dict[str, str] = {}
 
-        def track_layer(path: str, layer: Dict[str, Any], layer_name: str) -> None:
+        def track_layer(path: str, layer: dict[str, Any], layer_name: str) -> None:
             for key, value in layer.items():
                 dot_key = f"{path}.{key}" if path else key
                 if isinstance(value, dict):

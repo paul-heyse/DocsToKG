@@ -70,9 +70,9 @@ Key Concepts:
 from __future__ import annotations
 
 import unicodedata
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Literal, Optional, Tuple
+from typing import Literal
 
 
 def normalize_rel_id(source_path: str | Path, max_length: int = 512) -> str:
@@ -126,7 +126,7 @@ def normalize_rel_id(source_path: str | Path, max_length: int = 512) -> str:
     return normalized
 
 
-def _timestamp_to_partition(ts: Optional[datetime] = None) -> Tuple[str, str]:
+def _timestamp_to_partition(ts: datetime | None = None) -> tuple[str, str]:
     """
     Convert datetime to (yyyy, mm) partition strings.
 
@@ -137,7 +137,7 @@ def _timestamp_to_partition(ts: Optional[datetime] = None) -> Tuple[str, str]:
         Tuple of (yyyy, mm) strings.
     """
     if ts is None:
-        ts = datetime.now(timezone.utc)
+        ts = datetime.now(UTC)
     return ts.strftime("%Y"), ts.strftime("%m")
 
 
@@ -145,7 +145,7 @@ def chunks_output_path(
     data_root: str | Path,
     rel_id: str,
     fmt: Literal["parquet", "jsonl"] = "parquet",
-    ts: Optional[datetime] = None,
+    ts: datetime | None = None,
 ) -> Path:
     """
     Build the output path for a Chunks artifact.
@@ -170,7 +170,7 @@ def chunks_output_path(
 def doctags_output_path(
     data_root: str | Path,
     rel_id: str,
-    ts: Optional[datetime] = None,
+    ts: datetime | None = None,
 ) -> Path:
     """
     Build the output path for DocTags (always JSONL).
@@ -195,7 +195,7 @@ def vectors_output_path(
     family: Literal["dense", "sparse", "lexical"],
     rel_id: str,
     fmt: Literal["parquet", "jsonl"] = "parquet",
-    ts: Optional[datetime] = None,
+    ts: datetime | None = None,
 ) -> Path:
     """
     Build the output path for a Vectors artifact.
@@ -225,7 +225,7 @@ def vectors_output_path(
     return root / "Vectors" / f"family={family}" / f"fmt={fmt}" / yyyy / mm / f"{rel_id}.{ext}"
 
 
-def chunk_file_glob_pattern(data_root: str | Path, family: Optional[str] = None) -> str:
+def chunk_file_glob_pattern(data_root: str | Path, family: str | None = None) -> str:
     """
     Return a glob pattern to discover Chunks or Vectors Parquet files.
 
@@ -251,7 +251,7 @@ def chunk_file_glob_pattern(data_root: str | Path, family: Optional[str] = None)
         raise ValueError(f"Invalid family: {family}")
 
 
-def extract_partition_keys(file_path: str | Path) -> Optional[dict]:
+def extract_partition_keys(file_path: str | Path) -> dict | None:
     """
     Parse partition keys (family, fmt, yyyy, mm) from a file path.
 

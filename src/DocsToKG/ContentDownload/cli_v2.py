@@ -66,7 +66,7 @@
 import json
 import logging
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import typer
 from rich.console import Console
@@ -132,19 +132,19 @@ def _setup_logging(verbose: bool) -> None:
 
 @app.command()
 def run(
-    config: Optional[str] = typer.Option(
+    config: str | None = typer.Option(
         None,
         "--config",
         "-c",
         help="Path to config file",
         envvar="DTKG_CONFIG",
     ),
-    resolver_order: Optional[str] = typer.Option(
+    resolver_order: str | None = typer.Option(
         None,
         "--resolver-order",
         help="Comma-separated resolver order",
     ),
-    max_workers: Optional[int] = typer.Option(None, "--workers", help="Number of parallel workers"),
+    max_workers: int | None = typer.Option(None, "--workers", help="Number of parallel workers"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Dry run"),
     verbose: bool = typer.Option(False, "-v", "--verbose", help="Verbose"),
 ) -> None:
@@ -201,7 +201,7 @@ def run(
 
 @app.command()
 def print_config(
-    config: Optional[str] = typer.Option(
+    config: str | None = typer.Option(
         None,
         "--config",
         "-c",
@@ -243,7 +243,7 @@ def validate_config(
 
 @app.command()
 def explain(
-    config: Optional[str] = typer.Option(
+    config: str | None = typer.Option(
         None,
         "--config",
         "-c",
@@ -291,7 +291,7 @@ def explain(
 
 @app.command()
 def schema(
-    output: Optional[Path] = typer.Option(None, "--output", "-o", help="Save schema to file"),
+    output: Path | None = typer.Option(None, "--output", "-o", help="Save schema to file"),
 ) -> None:
     """Export JSON Schema for ContentDownloadConfig."""
     try:

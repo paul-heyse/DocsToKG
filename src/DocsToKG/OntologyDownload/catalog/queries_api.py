@@ -34,7 +34,6 @@ NAVMAP:
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 
 from .queries_dto import (
     ArtifactInfo,
@@ -66,7 +65,7 @@ class CatalogQueries:
         """
         self.repo = repo
 
-    def get_version_stats(self, version_id: str) -> Optional[VersionStats]:
+    def get_version_stats(self, version_id: str) -> VersionStats | None:
         """Get comprehensive metrics for a version.
 
         Args:
@@ -133,7 +132,7 @@ class CatalogQueries:
     def list_versions(
         self,
         *,
-        service: Optional[str] = None,
+        service: str | None = None,
         limit: int = 100,
         offset: int = 0,
     ) -> list[VersionRow]:
@@ -173,10 +172,10 @@ class CatalogQueries:
 
     def list_files(
         self,
-        version_id: Optional[str] = None,
+        version_id: str | None = None,
         *,
-        format_filter: Optional[str] = None,
-        prefix: Optional[str] = None,
+        format_filter: str | None = None,
+        prefix: str | None = None,
         limit: int = 1000,
         offset: int = 0,
     ) -> list[FileRow]:
@@ -231,9 +230,9 @@ class CatalogQueries:
 
     def list_validations(
         self,
-        file_id: Optional[str] = None,
+        file_id: str | None = None,
         *,
-        validator: Optional[str] = None,
+        validator: str | None = None,
         passed_only: bool = False,
         limit: int = 1000,
         offset: int = 0,
@@ -287,7 +286,7 @@ class CatalogQueries:
             for row in rows
         ]
 
-    def get_validation_summary(self, version_id: Optional[str] = None) -> ValidationSummary:
+    def get_validation_summary(self, version_id: str | None = None) -> ValidationSummary:
         """Get aggregated validation metrics.
 
         Args:
@@ -354,7 +353,7 @@ class CatalogQueries:
             pass_rate_pct=pass_rate_pct,
         )
 
-    def find_by_artifact_id(self, artifact_id: str) -> Optional[ArtifactInfo]:
+    def find_by_artifact_id(self, artifact_id: str) -> ArtifactInfo | None:
         """Find artifact by ID.
 
         Args:
@@ -468,7 +467,7 @@ class CatalogQueries:
             size_delta_bytes=size_delta,
         )
 
-    def get_storage_usage(self, version_id: Optional[str] = None) -> StorageUsage:
+    def get_storage_usage(self, version_id: str | None = None) -> StorageUsage:
         """Get disk usage metrics.
 
         Args:

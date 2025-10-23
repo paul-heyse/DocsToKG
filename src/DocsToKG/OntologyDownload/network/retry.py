@@ -83,8 +83,7 @@ Example:
 
 import email.utils
 import logging
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 import httpx
 from tenacity import (
@@ -108,7 +107,7 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 
 
-def _parse_retry_after_value(value: Optional[str]) -> Optional[float]:
+def _parse_retry_after_value(value: str | None) -> float | None:
     """Convert a Retry-After header value into a delay in seconds."""
     if not value:
         return None
@@ -121,13 +120,13 @@ def _parse_retry_after_value(value: Optional[str]) -> Optional[float]:
         except (TypeError, ValueError):
             return None
         if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        delay = (dt - datetime.now(timezone.utc)).total_seconds()
+            dt = dt.replace(tzinfo=UTC)
+        delay = (dt - datetime.now(UTC)).total_seconds()
 
     return max(0.0, delay)
 
 
-def _extract_retry_after_seconds(candidate: object) -> Optional[float]:
+def _extract_retry_after_seconds(candidate: object) -> float | None:
     """Extract Retry-After guidance from an HTTPX response-like object."""
     if candidate is None:
         return None
@@ -150,7 +149,7 @@ class _RetryAfterOrBackoff(wait_base):
             return min(delay, float(self._max_delay_seconds))
         return float(self._fallback_wait(retry_state))
 
-    def _retry_after_delay(self, retry_state: RetryCallState) -> Optional[float]:
+    def _retry_after_delay(self, retry_state: RetryCallState) -> float | None:
         outcome = retry_state.outcome
         if outcome is None:
             return None
@@ -241,7 +240,7 @@ def create_http_retry_policy(
 def create_idempotent_retry_policy(
     max_attempts: int = 6,
     max_delay_seconds: int = 60,
-    methods: Optional[list] = None,
+    methods: list | None = None,
 ) -> Retrying:
     """Create retry policy with idempotency enforcement.
 

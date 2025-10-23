@@ -40,7 +40,6 @@ all integration points with the main download pipeline.
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 from DocsToKG.ContentDownload.catalog.s3_layout import S3Layout
 from DocsToKG.ContentDownload.catalog.store import CatalogStore, SQLiteCatalog
@@ -78,7 +77,7 @@ def build_catalog_store(config: CatalogConfig) -> CatalogStore:
         raise ValueError(f"Unknown catalog backend: {config.backend}")
 
 
-def build_storage_layout(config: StorageConfig) -> Optional[S3Layout]:
+def build_storage_layout(config: StorageConfig) -> S3Layout | None:
     """Build S3 storage layout if configured.
 
     Args:
@@ -134,8 +133,8 @@ class CatalogBootstrap:
         """
         self.catalog_config = catalog_config
         self.storage_config = storage_config
-        self._catalog: Optional[CatalogStore] = None
-        self._s3_layout: Optional[S3Layout] = None
+        self._catalog: CatalogStore | None = None
+        self._s3_layout: S3Layout | None = None
 
     def initialize(self) -> CatalogBootstrap:
         """Initialize all catalog components.
@@ -165,7 +164,7 @@ class CatalogBootstrap:
         return self._catalog
 
     @property
-    def s3_layout(self) -> Optional[S3Layout]:
+    def s3_layout(self) -> S3Layout | None:
         """Get S3 layout if configured."""
         return self._s3_layout
 

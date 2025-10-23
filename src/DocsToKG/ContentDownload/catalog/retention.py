@@ -41,7 +41,6 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
 
 from DocsToKG.ContentDownload.catalog.models import DocumentRecord
 
@@ -148,7 +147,7 @@ class RetentionEvaluator:
     def __init__(
         self,
         catalog_catalog,
-        policy: Optional[RetentionPolicy] = None,
+        policy: RetentionPolicy | None = None,
     ):
         """Initialize evaluator.
 
@@ -162,8 +161,8 @@ class RetentionEvaluator:
     def evaluate_record(
         self,
         record: DocumentRecord,
-        now: Optional[datetime] = None,
-        replica_count: Optional[int] = None,
+        now: datetime | None = None,
+        replica_count: int | None = None,
     ) -> RetentionDecision:
         """Evaluate whether to retain a record.
 
@@ -224,7 +223,7 @@ class RetentionEvaluator:
             score=score,
         )
 
-    def _count_replicas(self, sha256: Optional[str]) -> int:
+    def _count_replicas(self, sha256: str | None) -> int:
         """Count replicas of a file (records with same sha256).
 
         Args:
@@ -245,7 +244,7 @@ class RetentionEvaluator:
     def evaluate_batch(
         self,
         records: list[DocumentRecord],
-        now: Optional[datetime] = None,
+        now: datetime | None = None,
     ) -> list[RetentionDecision]:
         """Evaluate batch of records.
 
@@ -266,7 +265,7 @@ class RetentionEvaluator:
     def candidates_for_deletion(
         self,
         records: list[DocumentRecord],
-        now: Optional[datetime] = None,
+        now: datetime | None = None,
     ) -> list[RetentionDecision]:
         """Find records eligible for deletion.
 
@@ -283,7 +282,7 @@ class RetentionEvaluator:
     def retention_stats(
         self,
         records: list[DocumentRecord],
-        now: Optional[datetime] = None,
+        now: datetime | None = None,
     ) -> dict:
         """Generate retention statistics.
 

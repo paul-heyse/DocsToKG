@@ -157,7 +157,6 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Dict, List, Optional
 
 try:  # pragma: no cover
     import duckdb
@@ -202,7 +201,7 @@ class ArtifactRow:
     version_id: str
     fs_relpath: str
     size: int
-    etag: Optional[str]
+    etag: str | None
     status: str
     downloaded_at: datetime
 
@@ -230,9 +229,9 @@ class FileRow:
     artifact_id: str
     relpath: str
     size: int
-    format: Optional[str]
-    sha256: Optional[str]
-    mtime: Optional[datetime]
+    format: str | None
+    sha256: str | None
+    mtime: datetime | None
     extracted_at: datetime
 
     @classmethod
@@ -266,7 +265,7 @@ class ValidationRow:
     file_id: str
     validator: str
     status: str
-    details: Optional[str]
+    details: str | None
     validated_at: datetime
 
     @classmethod
@@ -289,7 +288,7 @@ class ValidationRow:
 # ============================================================================
 
 
-def list_versions(conn: duckdb.DuckDBPyConnection) -> List[VersionRow]:
+def list_versions(conn: duckdb.DuckDBPyConnection) -> list[VersionRow]:
     """List all versions, sorted by timestamp descending.
 
     Args:
@@ -309,9 +308,7 @@ def list_versions(conn: duckdb.DuckDBPyConnection) -> List[VersionRow]:
     return [VersionRow.from_tuple(row) for row in result]
 
 
-def get_latest(
-    conn: duckdb.DuckDBPyConnection, service: Optional[str] = None
-) -> Optional[VersionRow]:
+def get_latest(conn: duckdb.DuckDBPyConnection, service: str | None = None) -> VersionRow | None:
     """Get latest version, optionally filtered by service.
 
     Args:
@@ -346,7 +343,7 @@ def get_latest(
     return VersionRow.from_tuple(result) if result else None
 
 
-def get_version(conn: duckdb.DuckDBPyConnection, version_id: str) -> Optional[VersionRow]:
+def get_version(conn: duckdb.DuckDBPyConnection, version_id: str) -> VersionRow | None:
     """Get specific version by ID.
 
     Args:
@@ -373,7 +370,7 @@ def get_version(conn: duckdb.DuckDBPyConnection, version_id: str) -> Optional[Ve
 # ============================================================================
 
 
-def list_artifacts(conn: duckdb.DuckDBPyConnection, version_id: str) -> List[ArtifactRow]:
+def list_artifacts(conn: duckdb.DuckDBPyConnection, version_id: str) -> list[ArtifactRow]:
     """List all artifacts for a version.
 
     Args:
@@ -396,7 +393,7 @@ def list_artifacts(conn: duckdb.DuckDBPyConnection, version_id: str) -> List[Art
     return [ArtifactRow.from_tuple(row) for row in result]
 
 
-def get_artifact(conn: duckdb.DuckDBPyConnection, artifact_id: str) -> Optional[ArtifactRow]:
+def get_artifact(conn: duckdb.DuckDBPyConnection, artifact_id: str) -> ArtifactRow | None:
     """Get specific artifact by ID.
 
     Args:
@@ -423,7 +420,7 @@ def get_artifact(conn: duckdb.DuckDBPyConnection, artifact_id: str) -> Optional[
 # ============================================================================
 
 
-def list_files(conn: duckdb.DuckDBPyConnection, version_id: str) -> List[FileRow]:
+def list_files(conn: duckdb.DuckDBPyConnection, version_id: str) -> list[FileRow]:
     """List all extracted files for a version.
 
     Args:
@@ -449,7 +446,7 @@ def list_files(conn: duckdb.DuckDBPyConnection, version_id: str) -> List[FileRow
 
 def list_files_by_format(
     conn: duckdb.DuckDBPyConnection, version_id: str, format: str
-) -> List[FileRow]:
+) -> list[FileRow]:
     """List files of specific format for a version.
 
     Args:
@@ -474,7 +471,7 @@ def list_files_by_format(
     return [FileRow.from_tuple(row) for row in result]
 
 
-def get_file(conn: duckdb.DuckDBPyConnection, file_id: str) -> Optional[FileRow]:
+def get_file(conn: duckdb.DuckDBPyConnection, file_id: str) -> FileRow | None:
     """Get specific file by ID.
 
     Args:
@@ -501,7 +498,7 @@ def get_file(conn: duckdb.DuckDBPyConnection, file_id: str) -> Optional[FileRow]
 # ============================================================================
 
 
-def list_validations(conn: duckdb.DuckDBPyConnection, version_id: str) -> List[ValidationRow]:
+def list_validations(conn: duckdb.DuckDBPyConnection, version_id: str) -> list[ValidationRow]:
     """List all validations for a version.
 
     Args:
@@ -528,7 +525,7 @@ def list_validations(conn: duckdb.DuckDBPyConnection, version_id: str) -> List[V
 
 def list_validations_by_status(
     conn: duckdb.DuckDBPyConnection, version_id: str, status: str
-) -> List[ValidationRow]:
+) -> list[ValidationRow]:
     """List validations with specific status for a version.
 
     Args:
@@ -554,7 +551,7 @@ def list_validations_by_status(
     return [ValidationRow.from_tuple(row) for row in result]
 
 
-def get_validation(conn: duckdb.DuckDBPyConnection, validation_id: str) -> Optional[ValidationRow]:
+def get_validation(conn: duckdb.DuckDBPyConnection, validation_id: str) -> ValidationRow | None:
     """Get specific validation by ID.
 
     Args:
@@ -581,7 +578,7 @@ def get_validation(conn: duckdb.DuckDBPyConnection, validation_id: str) -> Optio
 # ============================================================================
 
 
-def get_artifact_stats(conn: duckdb.DuckDBPyConnection, version_id: str) -> Dict[str, int]:
+def get_artifact_stats(conn: duckdb.DuckDBPyConnection, version_id: str) -> dict[str, int]:
     """Get statistics for artifacts in a version.
 
     Args:
@@ -609,7 +606,7 @@ def get_artifact_stats(conn: duckdb.DuckDBPyConnection, version_id: str) -> Dict
     return {"total_artifacts": 0, "total_size": 0, "avg_size": 0}
 
 
-def get_file_stats(conn: duckdb.DuckDBPyConnection, version_id: str) -> Dict[str, int]:
+def get_file_stats(conn: duckdb.DuckDBPyConnection, version_id: str) -> dict[str, int]:
     """Get statistics for files in a version.
 
     Args:
@@ -638,7 +635,7 @@ def get_file_stats(conn: duckdb.DuckDBPyConnection, version_id: str) -> Dict[str
     return {"total_files": 0, "total_size": 0, "avg_size": 0}
 
 
-def get_validation_stats(conn: duckdb.DuckDBPyConnection, version_id: str) -> Dict[str, int]:
+def get_validation_stats(conn: duckdb.DuckDBPyConnection, version_id: str) -> dict[str, int]:
     """Get validation statistics for a version.
 
     Args:
@@ -678,7 +675,7 @@ def get_validation_stats(conn: duckdb.DuckDBPyConnection, version_id: str) -> Di
 # ============================================================================
 
 
-def detect_orphans(conn: duckdb.DuckDBPyConnection, fs_entries: List[tuple]) -> List[tuple]:
+def detect_orphans(conn: duckdb.DuckDBPyConnection, fs_entries: list[tuple]) -> list[tuple]:
     """Detect files on disk not referenced in the database.
 
     Scans filesystem entries (relpath, size, mtime) and compares against
@@ -779,11 +776,11 @@ class CachedPlanRow:
     resolver: str
     url: str
     version_id: str
-    checksum: Optional[str]
+    checksum: str | None
     cached_at: datetime
 
     @classmethod
-    def from_tuple(cls, row: tuple) -> "CachedPlanRow":
+    def from_tuple(cls, row: tuple) -> CachedPlanRow:
         """Create from database tuple."""
         return cls(
             plan_id=row[0],
@@ -805,7 +802,7 @@ def cache_plan(
     resolver: str,
     url: str,
     version_id: str,
-    checksum: Optional[str] = None,
+    checksum: str | None = None,
 ) -> None:
     """Cache a planning decision for later replay.
 
@@ -844,7 +841,7 @@ def cache_plan(
     )
 
 
-def get_cached_plan(conn: duckdb.DuckDBPyConnection, plan_id: str) -> Optional[CachedPlanRow]:
+def get_cached_plan(conn: duckdb.DuckDBPyConnection, plan_id: str) -> CachedPlanRow | None:
     """Retrieve a cached plan by ID.
 
     Args:
@@ -876,7 +873,7 @@ def get_cached_plan(conn: duckdb.DuckDBPyConnection, plan_id: str) -> Optional[C
 
 def get_cached_plan_by_service(
     conn: duckdb.DuckDBPyConnection, service: str
-) -> Optional[CachedPlanRow]:
+) -> CachedPlanRow | None:
     """Retrieve most recent cached plan for a service.
 
     Args:

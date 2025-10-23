@@ -158,9 +158,9 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Dict, Mapping, Optional, Tuple
+from datetime import UTC, datetime
 
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -323,7 +323,7 @@ FOOTER_REQ_LEXICAL = (
 
 
 def _utc_now_iso() -> str:
-    return datetime.now(timezone.utc).strftime(ISO_UTC)
+    return datetime.now(UTC).strftime(ISO_UTC)
 
 
 def _to_bytes_meta(meta: Mapping[str, str]) -> Mapping[str, bytes]:
@@ -335,9 +335,9 @@ def build_footer_common(
     schema_version: str,
     cfg_hash: str,
     created_by: str,
-    created_at: Optional[str] = None,
-    extra: Optional[Mapping[str, str]] = None,
-) -> Dict[str, str]:
+    created_at: str | None = None,
+    extra: Mapping[str, str] | None = None,
+) -> dict[str, str]:
     created_at = created_at or _utc_now_iso()
     base = {
         "docparse.schema_version": schema_version,
@@ -356,11 +356,11 @@ def build_footer_dense(
     dim: int,
     cfg_hash: str,
     dtype: str = "float32",
-    device: Optional[str] = None,
+    device: str | None = None,
     created_by: str = "DocsToKG-DocParsing",
-    created_at: Optional[str] = None,
-    extra: Optional[Mapping[str, str]] = None,
-) -> Dict[str, str]:
+    created_at: str | None = None,
+    extra: Mapping[str, str] | None = None,
+) -> dict[str, str]:
     meta = build_footer_common(SCHEMA_VERSION_DENSE, cfg_hash, created_by, created_at, extra)
     meta.update(
         {
@@ -380,13 +380,13 @@ def build_footer_sparse(
     provider: str,
     model_id: str,
     cfg_hash: str,
-    vocab_id: Optional[str] = None,
-    hash_scheme: Optional[str] = None,
+    vocab_id: str | None = None,
+    hash_scheme: str | None = None,
     dtype: str = "float32",
     created_by: str = "DocsToKG-DocParsing",
-    created_at: Optional[str] = None,
-    extra: Optional[Mapping[str, str]] = None,
-) -> Dict[str, str]:
+    created_at: str | None = None,
+    extra: Mapping[str, str] | None = None,
+) -> dict[str, str]:
     meta = build_footer_common(SCHEMA_VERSION_SPARSE, cfg_hash, created_by, created_at, extra)
     meta.update(
         {
@@ -416,9 +416,9 @@ def build_footer_lexical(
     model_id: str = "bm25",
     dtype: str = "float32",
     created_by: str = "DocsToKG-DocParsing",
-    created_at: Optional[str] = None,
-    extra: Optional[Mapping[str, str]] = None,
-) -> Dict[str, str]:
+    created_at: str | None = None,
+    extra: Mapping[str, str] | None = None,
+) -> dict[str, str]:
     meta = build_footer_common(SCHEMA_VERSION_LEXICAL, cfg_hash, created_by, created_at, extra)
     meta.update(
         {
@@ -446,11 +446,11 @@ def build_footer_lexical(
 @dataclass(frozen=True)
 class FooterValidationResult:
     ok: bool
-    errors: Tuple[str, ...] = ()
-    warnings: Tuple[str, ...] = ()
+    errors: tuple[str, ...] = ()
+    warnings: tuple[str, ...] = ()
 
 
-def _decode_file_metadata(md: Optional[Mapping[bytes, bytes]]) -> Dict[str, str]:
+def _decode_file_metadata(md: Mapping[bytes, bytes] | None) -> dict[str, str]:
     if not md:
         return {}
     return {k.decode("utf-8", "replace"): v.decode("utf-8", "replace") for k, v in md.items()}
@@ -589,7 +589,7 @@ def attach_footer_metadata(table: pa.Table, meta: Mapping[str, str]) -> pa.Table
     return table.replace_schema_metadata(merged)
 
 
-def read_parquet_footer(path: str) -> Dict[str, str]:
+def read_parquet_footer(path: str) -> dict[str, str]:
     """
     Read a Parquet file's key_value_metadata as str->str.
     """
@@ -597,7 +597,7 @@ def read_parquet_footer(path: str) -> Dict[str, str]:
     return _decode_file_metadata(pf.metadata.metadata)
 
 
-def validate_parquet_file(path: str, family: Optional[str] = None) -> FooterValidationResult:
+def validate_parquet_file(path: str, family: str | None = None) -> FooterValidationResult:
     """
     Validate a Parquet file against the footer contract.
     If family is None, infer from footer key 'docparse.family' when present.
@@ -661,7 +661,7 @@ def assert_table_matches_schema(table: pa.Table, expected: pa.Schema) -> None:
 # ============================================================
 
 
-def recommended_parquet_writer_options(dataset: str) -> Dict[str, object]:
+def recommended_parquet_writer_options(dataset: str) -> dict[str, object]:
     """
     Returns a dictionary of recommended write options per dataset type.
     You can map these into your actual writer (e.g., pyarrow.parquet.write_table).
@@ -674,14 +674,7 @@ def recommended_parquet_writer_options(dataset: str) -> Dict[str, object]:
             "use_dictionary": {"section": True, "text": False},
             "write_statistics": True,
         }
-    elif dataset == "dense":
-        return {
-            "compression": "zstd",
-            "compression_level": 5,
-            "use_dictionary": {},
-            "write_statistics": True,
-        }
-    elif dataset in ("sparse", "lexical"):
+    elif dataset == "dense" or dataset in ("sparse", "lexical"):
         return {
             "compression": "zstd",
             "compression_level": 5,

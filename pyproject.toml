@@ -213,3 +213,8 @@ show_error_codes = true
 
 [tool.uv.pip]
 find-links = ["./.wheelhouse"]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.14.1",
+]

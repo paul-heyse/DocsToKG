@@ -43,7 +43,7 @@ import logging
 import os
 import tempfile
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 
@@ -69,10 +69,10 @@ def stream_download_to_file(
     url: str,
     dest: Path,
     *,
-    service: Optional[str] = None,
-    role: Optional[str] = None,
+    service: str | None = None,
+    role: str | None = None,
     chunk_size: int = 1024 * 1024,
-    expected_length: Optional[int] = None,
+    expected_length: int | None = None,
 ) -> Path:
     """
     Download URL to file with streaming, atomic promotion, and telemetry.
@@ -110,8 +110,8 @@ def stream_download_to_file(
     dest.parent.mkdir(parents=True, exist_ok=True)
 
     # Temporary file in same directory (atomic rename)
-    temp_path: Optional[Path] = None
-    resp: Optional[httpx.Response] = None
+    temp_path: Path | None = None
+    resp: httpx.Response | None = None
     cache_status = CacheStatus.MISS
     bytes_written = 0
 
@@ -226,8 +226,8 @@ def head_request(
     config: Any,
     url: str,
     *,
-    service: Optional[str] = None,
-    role: Optional[str] = None,
+    service: str | None = None,
+    role: str | None = None,
 ) -> httpx.Response:
     """
     Send HEAD request with audited redirects and telemetry.

@@ -63,7 +63,7 @@ from __future__ import annotations
 import hashlib
 import re
 from collections import Counter
-from typing import Dict, Iterator, List, Sequence, Tuple
+from collections.abc import Iterator, Sequence
 
 import numpy as np
 from numpy.typing import NDArray
@@ -75,17 +75,17 @@ __all__ = ("FeatureGenerator", "sliding_window", "tokenize", "tokenize_with_span
 _TOKEN_PATTERN = re.compile(r"[\w']+")
 
 
-def tokenize(text: str) -> List[str]:
+def tokenize(text: str) -> list[str]:
     """Tokenize ``text`` into lower-cased alphanumeric tokens."""
 
     return [match.group(0).lower() for match in _TOKEN_PATTERN.finditer(text)]
 
 
-def tokenize_with_spans(text: str) -> Tuple[List[str], List[Tuple[int, int]]]:
+def tokenize_with_spans(text: str) -> tuple[list[str], list[tuple[int, int]]]:
     """Tokenize ``text`` and return token spans for highlight generation."""
 
-    tokens: List[str] = []
-    spans: List[Tuple[int, int]] = []
+    tokens: list[str] = []
+    spans: list[tuple[int, int]] = []
     for match in _TOKEN_PATTERN.finditer(text):
         tokens.append(match.group(0).lower())
         spans.append((match.start(), match.end()))
@@ -96,7 +96,7 @@ def sliding_window(
     tokens: Sequence[str],
     window: int,
     overlap: int,
-) -> Iterator[List[str]]:
+) -> Iterator[list[str]]:
     """Yield sliding windows across ``tokens`` with ``overlap`` between chunks."""
 
     if window <= 0:
@@ -137,16 +137,16 @@ class FeatureGenerator:
             embedding=self._compute_dense_embedding(tokens),
         )
 
-    def _compute_bm25(self, tokens: Sequence[str]) -> Dict[str, float]:
+    def _compute_bm25(self, tokens: Sequence[str]) -> dict[str, float]:
         counter = Counter(tokens)
         return {token: float(1.0 + np.log1p(freq)) for token, freq in counter.items()}
 
-    def _compute_splade(self, tokens: Sequence[str]) -> Dict[str, float]:
+    def _compute_splade(self, tokens: Sequence[str]) -> dict[str, float]:
         counter = Counter(tokens)
         if not counter:
             return {}
         max_tf = max(counter.values())
-        output: Dict[str, float] = {}
+        output: dict[str, float] = {}
         for token, tf in counter.items():
             output[token] = float(np.log1p(tf) * (0.5 + tf / max_tf))
         return output

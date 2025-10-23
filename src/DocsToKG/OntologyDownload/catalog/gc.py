@@ -77,7 +77,6 @@ import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional
 
 try:  # pragma: no cover
     import duckdb
@@ -104,7 +103,7 @@ class OrphanedItem:
 
     item_type: str  # 'artifact' | 'file'
     item_id: str
-    fs_path: Optional[Path]
+    fs_path: Path | None
     size_bytes: int
     orphaned_at: datetime
 
@@ -358,7 +357,7 @@ def prune_by_retention_days(
 def prune_keep_latest_n(
     conn: duckdb.DuckDBPyConnection,
     keep_count: int = 5,
-    service: Optional[str] = None,
+    service: str | None = None,
     dry_run: bool = True,
 ) -> PruneResult:
     """Prune old versions, keeping only N latest.

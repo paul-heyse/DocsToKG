@@ -49,8 +49,9 @@ from __future__ import annotations
 import json
 import os
 import uuid
+from collections.abc import Iterator, Sequence
 from pathlib import Path
-from typing import Any, Iterator, List, Optional, Sequence
+from typing import Any
 
 from . import parquet_schemas
 
@@ -72,7 +73,7 @@ class UnifiedVectorWriter:
         self,
         output_path: Path,
         fmt: str = "parquet",
-        vector_format_override: Optional[str] = None,
+        vector_format_override: str | None = None,
         **writer_kwargs: Any,
     ) -> None:
         """Initialise the writer with atomic write semantics."""
@@ -89,9 +90,9 @@ class UnifiedVectorWriter:
         }
         defaults.update(writer_kwargs)
         self.writer_kwargs = defaults
-        self._rows_buffer: List[dict] = []
-        self._jsonl_handle: Optional[Any] = None
-        self._tmp_path: Optional[Path] = None
+        self._rows_buffer: list[dict] = []
+        self._jsonl_handle: Any | None = None
+        self._tmp_path: Path | None = None
 
     def __enter__(self) -> UnifiedVectorWriter:
         """Prepare temporary resources prior to writing."""
@@ -209,7 +210,7 @@ class UnifiedVectorWriter:
 def create_unified_vector_writer(
     output_path: Path,
     fmt: str = "parquet",
-    vector_format_override: Optional[str] = None,
+    vector_format_override: str | None = None,
     **kwargs: Any,
 ) -> UnifiedVectorWriter:
     """
@@ -242,7 +243,7 @@ def iter_vector_rows(
     fmt: str,
     *,
     batch_size: int = 4096,
-) -> Iterator[List[dict]]:
+) -> Iterator[list[dict]]:
     """
     Iterate over vector rows from a Parquet file in batches.
 
@@ -274,7 +275,7 @@ def iter_vector_rows(
         parquet_file = pq.ParquetFile(path)
         for record_batch in parquet_file.iter_batches(batch_size=batch_size):
             rows = record_batch.to_pylist()
-            normalized: List[dict] = []
+            normalized: list[dict] = []
             for entry in rows:
                 # Normalize model_metadata if it's a JSON string
                 metadata = entry.get("model_metadata")

@@ -67,9 +67,9 @@ __all__ = [
 def initialize_events(
     enable_stdout: bool = True,
     enable_duckdb: bool = False,
-    db_path: Optional[Path] = None,
+    db_path: Path | None = None,
     enable_file: bool = False,
-    file_path: Optional[Path] = None,
+    file_path: Path | None = None,
 ) -> None:
     """Initialize event sinks for production deployment.
 

@@ -57,11 +57,11 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Optional
 
 try:
+    from typing import Literal
+
     import typer
-    from typing_extensions import Literal
 except ImportError:
     typer = None  # type: ignore
     Literal = None  # type: ignore
@@ -74,7 +74,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 def cmd_config_print_merged(
-    config_file: Optional[str] = typer.Option(
+    config_file: str | None = typer.Option(
         None,
         "--config",
         "-c",
@@ -100,7 +100,7 @@ def cmd_config_print_merged(
 
 
 def cmd_config_validate(
-    config_file: Optional[str] = typer.Option(
+    config_file: str | None = typer.Option(
         None,
         "--config",
         "-c",
@@ -128,7 +128,7 @@ def cmd_config_validate(
 
 
 def cmd_config_export_schema(
-    output_file: Optional[str] = typer.Option(
+    output_file: str | None = typer.Option(
         "config-schema.json",
         "--output",
         "-o",

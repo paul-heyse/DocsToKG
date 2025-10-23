@@ -91,7 +91,7 @@ import logging
 import os
 import time
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 from urllib.parse import urljoin
 
 import httpx
@@ -108,9 +108,9 @@ logger = logging.getLogger(__name__)
 # Singleton State (PID-aware for fork safety)
 # ============================================================================
 
-_CLIENT: Optional[httpx.Client] = None
-_BIND_HASH: Optional[str] = None
-_BIND_PID: Optional[int] = None
+_CLIENT: httpx.Client | None = None
+_BIND_HASH: str | None = None
+_BIND_PID: int | None = None
 
 
 # ============================================================================
@@ -137,14 +137,14 @@ def get_http_client(config: Any) -> httpx.Client:
     pid = os.getpid()
 
     # PID changed → fork detected, rebuild
-    if _CLIENT is None or _BIND_PID != pid:
+    if _CLIENT is None or pid != _BIND_PID:
         logger.debug(f"Creating new HTTPX client (pid={pid}, existing_pid={_BIND_PID})")
         _CLIENT = _build_http_client(config)
         _BIND_PID = pid
         _BIND_HASH = config.config_hash()
 
     # Settings changed mid-process → warn once but keep current client
-    elif _BIND_HASH != config.config_hash():
+    elif config.config_hash() != _BIND_HASH:
         logger.warning(
             "HTTP client settings changed after binding. No hot reload; existing client unchanged."
         )
@@ -294,7 +294,7 @@ def request_with_redirect_audit(
     url: str,
     *,
     max_hops: int = 5,
-    headers: Optional[dict] = None,
+    headers: dict | None = None,
     **kw: Any,
 ) -> httpx.Response:
     """

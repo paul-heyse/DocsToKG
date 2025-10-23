@@ -229,21 +229,14 @@ import os
 import shutil
 import threading
 import time
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from enum import Enum
 from functools import lru_cache
 from pathlib import Path
 from typing import (
     Any,
-    Callable,
-    Dict,
-    Iterable,
-    List,
-    Mapping,
-    Optional,
     Protocol,
-    Tuple,
-    Union,
 )
 from urllib.parse import urlparse, urlsplit
 from urllib.robotparser import RobotFileParser
@@ -356,9 +349,9 @@ class ValidationResult:
 
     is_valid: bool
     classification: Classification
-    expected: Optional[Classification] = None
-    reason: Optional[ReasonCode | str] = None
-    detail: Optional[str] = None
+    expected: Classification | None = None
+    reason: ReasonCode | str | None = None
+    detail: str | None = None
 
 
 @dataclass
@@ -366,12 +359,12 @@ class ResumeDecision:
     """Decision container describing resume handling for a work artifact."""
 
     should_skip: bool
-    previous_map: Dict[str, Dict[str, Any]]
-    outcome: Optional[DownloadOutcome] = None
-    resolver: Optional[str] = None
-    reason: Optional[ReasonCode | str] = None
-    reason_detail: Optional[str] = None
-    html_paths: List[str] = field(default_factory=list)
+    previous_map: dict[str, dict[str, Any]]
+    outcome: DownloadOutcome | None = None
+    resolver: str | None = None
+    reason: ReasonCode | str | None = None
+    reason_detail: str | None = None
+    html_paths: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -379,27 +372,27 @@ class DownloadStrategyContext:
     """Mutable state shared between strategy phases for a single download."""
 
     download_context: DownloadContext
-    dest_path: Optional[Path] = None
-    content_type: Optional[str] = None
-    disposition: Optional[str] = None
+    dest_path: Path | None = None
+    content_type: str | None = None
+    disposition: str | None = None
     elapsed_ms: float = 0.0
     flagged_unknown: bool = False
-    sha256: Optional[str] = None
-    content_length: Optional[int] = None
-    etag: Optional[str] = None
-    last_modified: Optional[str] = None
-    extracted_text_path: Optional[str] = None
-    tail_bytes: Optional[bytes] = None
+    sha256: str | None = None
+    content_length: int | None = None
+    etag: str | None = None
+    last_modified: str | None = None
+    extracted_text_path: str | None = None
+    tail_bytes: bytes | None = None
     head_precheck_passed: bool = False
     min_pdf_bytes: int = DEFAULT_MIN_PDF_BYTES
     tail_check_bytes: int = DEFAULT_TAIL_CHECK_BYTES
-    retry_after: Optional[float] = None
-    classification_hint: Optional[Classification] = None
-    response: Optional[httpx.Response] = None
-    canonical_url: Optional[str] = None
-    canonical_index: Optional[str] = None
-    original_url: Optional[str] = None
-    skip_outcome: Optional[DownloadOutcome] = None
+    retry_after: float | None = None
+    classification_hint: Classification | None = None
+    response: httpx.Response | None = None
+    canonical_url: str | None = None
+    canonical_index: str | None = None
+    original_url: str | None = None
+    skip_outcome: DownloadOutcome | None = None
 
 
 @dataclass
@@ -411,12 +404,12 @@ class DownloadPreflightPlan:
     url: str
     timeout: float
     context: DownloadContext
-    base_headers: Dict[str, str]
-    content_policy: Optional[Dict[str, Any]]
+    base_headers: dict[str, str]
+    content_policy: dict[str, Any] | None
     canonical_url: str
     canonical_index: str
-    original_url: Optional[str]
-    origin_host: Optional[str]
+    original_url: str | None
+    origin_host: str | None
     cond_helper: ConditionalRequestHelper
     attempt_conditional: bool = True
     head_precheck_passed: bool = False
@@ -424,40 +417,40 @@ class DownloadPreflightPlan:
     sniff_limit: int = DEFAULT_SNIFF_BYTES
     min_pdf_bytes: int = DEFAULT_MIN_PDF_BYTES
     tail_window_bytes: int = DEFAULT_TAIL_CHECK_BYTES
-    progress_callback: Optional[Callable[[int, Optional[int], str], None]] = None
+    progress_callback: Callable[[int, int | None, str], None] | None = None
     progress_update_interval: int = 128 * 1024
     content_type_hint: str = ""
-    skip_outcome: Optional[DownloadOutcome] = None
-    telemetry: Optional[Any] = None
-    run_id: Optional[str] = None
+    skip_outcome: DownloadOutcome | None = None
+    telemetry: Any | None = None
+    run_id: str | None = None
 
 
 @dataclass
 class DownloadStreamResult:
     """Structured payload returned by :func:`stream_candidate_payload`."""
 
-    outcome: Optional[DownloadOutcome] = None
-    response: Optional[httpx.Response] = None
-    classification: Optional[Classification] = None
-    strategy: Optional[DownloadStrategy] = None
-    strategy_context: Optional[DownloadStrategyContext] = None
+    outcome: DownloadOutcome | None = None
+    response: httpx.Response | None = None
+    classification: Classification | None = None
+    strategy: DownloadStrategy | None = None
+    strategy_context: DownloadStrategyContext | None = None
     elapsed_ms: float = 0.0
-    retry_after: Optional[float] = None
+    retry_after: float | None = None
 
 
 def prepare_candidate_download(
-    client: Optional[httpx.Client],
+    client: httpx.Client | None,
     artifact: WorkArtifact,
     url: str,
-    referer: Optional[str],
+    referer: str | None,
     timeout: float,
     ctx: DownloadContext,
     *,
     head_precheck_passed: bool = False,
-    original_url: Optional[str] = None,
-    origin_host: Optional[str] = None,
-    telemetry: Optional[Any] = None,
-    run_id: Optional[str] = None,
+    original_url: str | None = None,
+    origin_host: str | None = None,
+    telemetry: Any | None = None,
+    run_id: str | None = None,
 ) -> DownloadPreflightPlan:
     """Prepare request metadata prior to streaming the download."""
 
@@ -474,20 +467,20 @@ def prepare_candidate_download(
     url = request_url
 
     parsed_url = urlsplit(url)
-    domain_policies: Dict[str, Dict[str, Any]] = ctx.domain_content_rules
+    domain_policies: dict[str, dict[str, Any]] = ctx.domain_content_rules
     host_key = (parsed_url.hostname or parsed_url.netloc or "").lower()
-    content_policy: Optional[Dict[str, Any]] = None
+    content_policy: dict[str, Any] | None = None
     if domain_policies and host_key:
         content_policy = domain_policies.get(host_key)
         if content_policy is None and host_key.startswith("www."):
             content_policy = domain_policies.get(host_key[4:])
 
-    headers: Dict[str, str] = {}
+    headers: dict[str, str] = {}
     if referer:
         headers["Referer"] = referer
 
     accept_overrides = ctx.host_accept_overrides
-    accept_value: Optional[str] = None
+    accept_value: str | None = None
     if isinstance(accept_overrides, dict):
         host_for_accept = (parsed_url.netloc or "").lower()
         if host_for_accept:
@@ -499,8 +492,8 @@ def prepare_candidate_download(
 
     http_client = client or get_http_client()
 
-    robots_checker: Optional[RobotsCache] = ctx.robots_checker
-    skip_outcome: Optional[DownloadOutcome] = None
+    robots_checker: RobotsCache | None = ctx.robots_checker
+    skip_outcome: DownloadOutcome | None = None
     if robots_checker is not None:
         robots_allowed = robots_checker.is_allowed(http_client, url, timeout)
         if not robots_allowed:
@@ -624,7 +617,7 @@ def stream_candidate_payload(plan: DownloadPreflightPlan) -> DownloadStreamResul
 
     try:
         while True:
-            retry_after_hint: Optional[float] = None
+            retry_after_hint: float | None = None
             headers = dict(base_headers)
             if attempt_conditional:
                 headers.update(cond_helper.build_headers())
@@ -656,7 +649,7 @@ def stream_candidate_payload(plan: DownloadPreflightPlan) -> DownloadStreamResul
             except BreakerOpenError as exc:
                 elapsed_ms = (time.monotonic() - start_request) * 1000.0
                 breaker_meta = getattr(exc, "breaker_meta", None)
-                metadata: Dict[str, Any] = {}
+                metadata: dict[str, Any] = {}
                 if isinstance(breaker_meta, Mapping):
                     metadata["breaker"] = dict(breaker_meta)
                 return DownloadStreamResult(
@@ -912,7 +905,7 @@ def stream_candidate_payload(plan: DownloadPreflightPlan) -> DownloadStreamResul
                 content_type = response.headers.get("Content-Type") or content_type_hint
                 disposition = response.headers.get("Content-Disposition")
                 content_length_header = response.headers.get("Content-Length")
-                content_length_hint: Optional[int] = None
+                content_length_hint: int | None = None
                 if content_length_header:
                     try:
                         content_length_hint = int(content_length_header.strip())
@@ -985,7 +978,7 @@ def stream_candidate_payload(plan: DownloadPreflightPlan) -> DownloadStreamResul
                         else:
                             content_iter = iter(body or [])
                 sniff_buffer = bytearray()
-                prefetched: List[bytes] = []
+                prefetched: list[bytes] = []
                 detected: Classification = Classification.UNKNOWN
                 flagged_unknown = False
                 last_classification_size = 0
@@ -1172,10 +1165,10 @@ def stream_candidate_payload(plan: DownloadPreflightPlan) -> DownloadStreamResul
                         except Exception as exc:
                             LOGGER.debug("Final progress callback failed: %s", exc)
 
-                sha256: Optional[str] = None
-                content_length: Optional[int] = None
-                tail_snapshot: Optional[bytes] = None
-                extracted_text_path: Optional[str] = None
+                sha256: str | None = None
+                content_length: int | None = None
+                tail_snapshot: bytes | None = None
+                extracted_text_path: str | None = None
                 artifact_lock_cm: contextlib.AbstractContextManager[None]
                 if dest_path and not dry_run:
                     artifact_lock_cm = locks.artifact_lock(dest_path)
@@ -1304,7 +1297,7 @@ def stream_candidate_payload(plan: DownloadPreflightPlan) -> DownloadStreamResul
             exception=exc,
         )
 
-        limiter_metadata: Dict[str, Any] = {
+        limiter_metadata: dict[str, Any] = {
             "backend": exc.backend,
             "mode": exc.mode,
             "wait_ms": exc.waited_ms,
@@ -1317,7 +1310,7 @@ def stream_candidate_payload(plan: DownloadPreflightPlan) -> DownloadStreamResul
             limiter_metadata["next_allowed_at"] = exc.next_allowed_at.isoformat()
         if exc.retry_after is not None:
             limiter_metadata["retry_after"] = exc.retry_after
-        outcome_metadata: Dict[str, Any] = {
+        outcome_metadata: dict[str, Any] = {
             "rate_limiter": limiter_metadata,
         }
         if exc.details:
@@ -1612,7 +1605,7 @@ _DIGEST_CACHE_MAXSIZE = 256
 
 
 @lru_cache(maxsize=_DIGEST_CACHE_MAXSIZE)
-def _cached_sha256(signature: Tuple[str, int, int]) -> Optional[str]:
+def _cached_sha256(signature: tuple[str, int, int]) -> str | None:
     """Compute and cache SHA-256 digests keyed by path, size, and mtime."""
 
     path_str, _, _ = signature
@@ -1631,7 +1624,7 @@ def _validate_cached_artifact(
     result: CachedResult,
     *,
     verify_digest: bool = False,
-) -> Tuple[bool, str]:
+) -> tuple[bool, str]:
     """Return validation success flag and mode (``fast_path`` or ``digest``)."""
 
     validation_mode = "fast_path"
@@ -1737,8 +1730,8 @@ class RobotsCache:
 
     def __init__(self, user_agent: str, *, ttl_seconds: int = 3600) -> None:
         self._user_agent = user_agent
-        self._parsers: Dict[str, RobotFileParser] = {}
-        self._fetched_at: Dict[str, float] = {}
+        self._parsers: dict[str, RobotFileParser] = {}
+        self._fetched_at: dict[str, float] = {}
         self._ttl = float(ttl_seconds)
         self._lock = threading.Lock()
 
@@ -1858,11 +1851,11 @@ def _streaming_finalization_enabled() -> bool:
 
 
 def _try_streaming_finalization(
-    strategy: "DownloadStrategy",
-    artifact: "WorkArtifact",
-    classification: "Classification",
-    context: "DownloadStrategyContext",
-) -> Optional["DownloadOutcome"]:
+    strategy: DownloadStrategy,
+    artifact: WorkArtifact,
+    classification: Classification,
+    context: DownloadStrategyContext,
+) -> DownloadOutcome | None:
     """Try finalization using streaming module for atomic operations."""
     try:
         from DocsToKG.ContentDownload.streaming_integration import use_streaming_for_finalization
@@ -1889,14 +1882,14 @@ def _try_streaming_finalization(
 
 
 def validate_classification(
-    classification: Union[Classification, str, None],
+    classification: Classification | str | None,
     artifact: WorkArtifact,
-    options: Union[DownloadOptions, DownloadContext],
+    options: DownloadOptions | DownloadContext,
 ) -> ValidationResult:
     """Validate resolver classification against configured expectations."""
 
     normalized = Classification.from_wire(classification)
-    expected: Optional[Classification] = Classification.PDF
+    expected: Classification | None = Classification.PDF
     html_allowed = getattr(options, "extract_html_text", False)
     xml_dir = getattr(artifact, "xml_dir", None)
 
@@ -1932,12 +1925,12 @@ def validate_classification(
 
 def handle_resume_logic(
     artifact: WorkArtifact,
-    previous_index: Mapping[str, Dict[str, Any]],
+    previous_index: Mapping[str, dict[str, Any]],
     options: DownloadContext,
 ) -> ResumeDecision:
     """Normalise previous attempts and detect early skip conditions."""
 
-    previous_map: Dict[str, Dict[str, Any]] = {}
+    previous_map: dict[str, dict[str, Any]] = {}
     for previous_url, entry in previous_index.items():
         if not isinstance(entry, dict):
             continue
@@ -1947,7 +1940,7 @@ def handle_resume_logic(
         path = entry.get("path")
         sha256 = entry.get("sha256")
         content_length = entry.get("content_length")
-        content_length_value: Optional[int]
+        content_length_value: int | None
         if isinstance(content_length, str):
             try:
                 content_length_value = int(content_length)
@@ -2034,7 +2027,7 @@ def handle_resume_logic(
 def cleanup_sidecar_files(
     artifact: WorkArtifact,
     classification: Classification,
-    options: Union[DownloadOptions, DownloadContext],
+    options: DownloadOptions | DownloadContext,
 ) -> None:
     """Remove temporary sidecar files for the given artifact classification."""
 
@@ -2061,36 +2054,36 @@ def cleanup_sidecar_files(
 def build_download_outcome(
     *,
     artifact: WorkArtifact,
-    classification: Optional[Classification | str],
-    dest_path: Optional[Path],
-    response: Optional[httpx.Response],
+    classification: Classification | str | None,
+    dest_path: Path | None,
+    response: httpx.Response | None,
     elapsed_ms: float,
     flagged_unknown: bool,
-    sha256: Optional[str],
-    content_length: Optional[int],
-    etag: Optional[str],
-    last_modified: Optional[str],
-    extracted_text_path: Optional[str],
+    sha256: str | None,
+    content_length: int | None,
+    etag: str | None,
+    last_modified: str | None,
+    extracted_text_path: str | None,
     dry_run: bool,
-    tail_bytes: Optional[bytes],
+    tail_bytes: bytes | None,
     head_precheck_passed: bool,
     min_pdf_bytes: int,
     tail_check_bytes: int,
-    retry_after: Optional[float],
-    options: Optional[Union[DownloadOptions, DownloadContext]] = None,
-    canonical_url: Optional[str] = None,
-    canonical_index: Optional[str] = None,
-    original_url: Optional[str] = None,
+    retry_after: float | None,
+    options: DownloadOptions | DownloadContext | None = None,
+    canonical_url: str | None = None,
+    canonical_index: str | None = None,
+    original_url: str | None = None,
 ) -> DownloadOutcome:
     """Compose a :class:`DownloadOutcome` with shared validation logic."""
 
     status_code = response.status_code if response is not None else None
     headers = response.headers if response is not None else httpx.Headers()
 
-    breaker_host_state: Optional[str] = None
-    breaker_resolver_state: Optional[str] = None
-    breaker_open_remaining_ms: Optional[int] = None
-    breaker_recorded: Optional[str] = None
+    breaker_host_state: str | None = None
+    breaker_resolver_state: str | None = None
+    breaker_open_remaining_ms: int | None = None
+    breaker_recorded: str | None = None
     if response is not None:
         extensions = getattr(response, "extensions", None)
         if isinstance(extensions, Mapping):
@@ -2270,8 +2263,8 @@ def build_download_outcome(
 
     conditional_hit = normalized_status == 304 or classification_code is Classification.CACHED
 
-    reason_code: Optional[ReasonCode] = None
-    reason_detail: Optional[str] = None
+    reason_code: ReasonCode | None = None
+    reason_detail: str | None = None
     if flagged_unknown and classification_code is Classification.PDF:
         reason_code = ReasonCode.PDF_SNIFF_UNKNOWN
         reason_detail = "pdf-sniff-unknown"
@@ -2285,7 +2278,7 @@ def build_download_outcome(
         normalize_manifest_path(extracted_text_path) if extracted_text_path else None
     )
 
-    metadata: Dict[str, Any] = {}
+    metadata: dict[str, Any] = {}
     if response is not None:
         req_meta = response.request.extensions.get("docs_network_meta")
         if isinstance(req_meta, Mapping):
@@ -2303,10 +2296,10 @@ def build_download_outcome(
             if isinstance(breaker_snapshot, Mapping):
                 metadata["breaker"] = dict(breaker_snapshot)
 
-    breaker_host_state: Optional[str] = None
-    breaker_resolver_state: Optional[str] = None
-    breaker_recorded: Optional[str] = None
-    breaker_remaining_ms: Optional[int] = None
+    breaker_host_state: str | None = None
+    breaker_resolver_state: str | None = None
+    breaker_recorded: str | None = None
+    breaker_remaining_ms: int | None = None
     breaker_snapshot = metadata.get("breaker")
     if isinstance(breaker_snapshot, Mapping):
         host_state_value = breaker_snapshot.get("host_state") or breaker_snapshot.get("host")
@@ -2356,7 +2349,7 @@ def build_download_outcome(
     )
 
 
-def _collect_location_urls(work: Dict[str, Any]) -> Dict[str, List[str]]:
+def _collect_location_urls(work: dict[str, Any]) -> dict[str, list[str]]:
     """Return landing/PDF/source URL collections derived from OpenAlex metadata.
 
     Args:
@@ -2366,11 +2359,11 @@ def _collect_location_urls(work: Dict[str, Any]) -> Dict[str, List[str]]:
         Dictionary containing ``landing``, ``pdf``, and ``sources`` URL lists.
     """
 
-    landing_urls: List[str] = []
-    pdf_urls: List[str] = []
-    sources: List[str] = []
+    landing_urls: list[str] = []
+    pdf_urls: list[str] = []
+    sources: list[str] = []
 
-    def _append_location(loc: Optional[Dict[str, Any]]) -> None:
+    def _append_location(loc: dict[str, Any] | None) -> None:
         """Accumulate location URLs from a single OpenAlex location record.
 
         Args:
@@ -2405,7 +2398,7 @@ def _collect_location_urls(work: Dict[str, Any]) -> Dict[str, List[str]]:
     }
 
 
-def _cohort_order_for(artifact: WorkArtifact) -> List[str]:
+def _cohort_order_for(artifact: WorkArtifact) -> list[str]:
     """Return a resolver order tailored to the artifact's identifiers."""
 
     sources = {s.strip() for s in (artifact.source_display_names or []) if s}
@@ -2461,7 +2454,7 @@ def _cohort_order_for(artifact: WorkArtifact) -> List[str]:
 
 
 def create_artifact(
-    work: Dict[str, Any],
+    work: dict[str, Any],
     pdf_dir: Path,
     html_dir: Path,
     xml_dir: Path,
@@ -2519,18 +2512,18 @@ def create_artifact(
 
 
 def download_candidate(
-    client: Optional[httpx.Client],
+    client: httpx.Client | None,
     artifact: WorkArtifact,
     url: str,
-    referer: Optional[str],
+    referer: str | None,
     timeout: float,
-    context: Optional[Union[DownloadContext, Mapping[str, Any]]] = None,
+    context: DownloadContext | Mapping[str, Any] | None = None,
     *,
-    original_url: Optional[str] = None,
-    origin_host: Optional[str] = None,
+    original_url: str | None = None,
+    origin_host: str | None = None,
     head_precheck_passed: bool = False,
-    telemetry: Optional[Any] = None,
-    run_id: Optional[str] = None,
+    telemetry: Any | None = None,
+    run_id: str | None = None,
 ) -> DownloadOutcome:
     """Download a single candidate URL and classify the payload.
 
@@ -2571,8 +2564,8 @@ def download_candidate(
 
 
 def process_one_work(
-    work: Union[WorkArtifact, Dict[str, Any]],
-    client: Optional[httpx.Client],
+    work: WorkArtifact | dict[str, Any],
+    client: httpx.Client | None,
     pdf_dir: Path,
     html_dir: Path,
     xml_dir: Path,
@@ -2584,7 +2577,7 @@ def process_one_work(
     strategy_selector: Callable[
         [Classification], DownloadStrategy
     ] = get_strategy_for_classification,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Process a single work artifact through the resolver pipeline.
 
     Args:
@@ -2627,8 +2620,8 @@ def process_one_work(
     }
 
     # Plan job for idempotency tracking if enabled
-    job_id: Optional[str] = None
-    idempotency_conn: Optional[Any] = None
+    job_id: str | None = None
+    idempotency_conn: Any | None = None
     if ENABLE_IDEMPOTENCY:
         try:
             # Attempt to get telemetry database connection from logger

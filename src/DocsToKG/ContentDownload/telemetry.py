@@ -227,6 +227,7 @@ import sqlite3
 import tempfile
 import threading
 from collections import OrderedDict, defaultdict
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -234,16 +235,7 @@ from types import TracebackType
 from typing import (
     TYPE_CHECKING,
     Any,
-    Dict,
-    FrozenSet,
-    Iterable,
-    Iterator,
-    List,
-    Mapping,
-    Optional,
     Protocol,
-    Set,
-    Tuple,
     runtime_checkable,
 )
 from urllib.parse import urlsplit
@@ -323,17 +315,17 @@ class SimplifiedAttemptRecord:
     """
 
     ts: datetime
-    run_id: Optional[str]
-    resolver: Optional[str]
+    run_id: str | None
+    resolver: str | None
     url: str
     verb: str
     status: str
-    http_status: Optional[int] = None
-    content_type: Optional[str] = None
-    reason: Optional[str] = None
-    elapsed_ms: Optional[int] = None
-    bytes_written: Optional[int] = None
-    content_length_hdr: Optional[int] = None
+    http_status: int | None = None
+    content_type: str | None = None
+    reason: str | None = None
+    elapsed_ms: int | None = None
+    bytes_written: int | None = None
+    content_length_hdr: int | None = None
     extra: Mapping[str, Any] = field(default_factory=dict)
 
 
@@ -341,10 +333,10 @@ logger = logging.getLogger(__name__)
 
 
 def normalize_manifest_path(
-    path: Optional[str | Path],
+    path: str | Path | None,
     *,
-    base: Optional[Path] = None,
-) -> Optional[str]:
+    base: Path | None = None,
+) -> str | None:
     """Return an absolute filesystem path suitable for manifest storage.
 
     Older manifests stored artifact paths relative to the working directory in
@@ -425,25 +417,25 @@ class ManifestEntry:
     timestamp: str
     work_id: str
     title: str
-    publication_year: Optional[int]
-    resolver: Optional[str]
-    url: Optional[str]
-    path: Optional[str]
+    publication_year: int | None
+    resolver: str | None
+    url: str | None
+    path: str | None
     classification: str
-    content_type: Optional[str]
-    reason: Optional[str]
-    canonical_url: Optional[str] = None
-    original_url: Optional[str] = None
-    reason_detail: Optional[str] = None
-    html_paths: List[str] = field(default_factory=list)
-    sha256: Optional[str] = None
-    content_length: Optional[int] = None
-    etag: Optional[str] = None
-    last_modified: Optional[str] = None
-    extracted_text_path: Optional[str] = None
+    content_type: str | None
+    reason: str | None
+    canonical_url: str | None = None
+    original_url: str | None = None
+    reason_detail: str | None = None
+    html_paths: list[str] = field(default_factory=list)
+    sha256: str | None = None
+    content_length: int | None = None
+    etag: str | None = None
+    last_modified: str | None = None
+    extracted_text_path: str | None = None
     dry_run: bool = False
-    path_mtime_ns: Optional[int] = None
-    run_id: Optional[str] = None
+    path_mtime_ns: int | None = None
+    run_id: str | None = None
 
     def __post_init__(self) -> None:
         classification_token = normalize_classification(self.classification)
@@ -503,7 +495,7 @@ class ManifestEntry:
         object.__setattr__(self, "original_url", base_original)
 
 
-def _canonical_key_or_fallback(value: Optional[str]) -> Optional[str]:
+def _canonical_key_or_fallback(value: str | None) -> str | None:
     """Return canonical manifest key for ``value``, falling back to trimmed text."""
 
     if value is None:
@@ -520,14 +512,14 @@ def _canonical_key_or_fallback(value: Optional[str]) -> Optional[str]:
 class ManifestUrlIndex:
     """Lazy lookup helper for manifest metadata stored in SQLite."""
 
-    def __init__(self, sqlite_path: Optional[Path], *, eager: bool = False) -> None:
+    def __init__(self, sqlite_path: Path | None, *, eager: bool = False) -> None:
         self._path = sqlite_path
-        self._cache: Dict[str, Dict[str, Any]] = {}
+        self._cache: dict[str, dict[str, Any]] = {}
         self._loaded_all = False
         if eager:
             self._ensure_loaded()
 
-    def get(self, url: str, default: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+    def get(self, url: str, default: dict[str, Any] | None = None) -> dict[str, Any] | None:
         """Return manifest metadata for ``url`` if present in the SQLite cache.
 
         Args:
@@ -564,7 +556,7 @@ class ManifestUrlIndex:
         self._cache[canonical] = record
         return True
 
-    def items(self) -> Iterable[Tuple[str, Dict[str, Any]]]:
+    def items(self) -> Iterable[tuple[str, dict[str, Any]]]:
         """Iterate over cached manifest entries keyed by canonical URL.
 
         Returns:
@@ -573,7 +565,7 @@ class ManifestUrlIndex:
         self._ensure_loaded()
         return self._cache.items()
 
-    def iter_existing_paths(self) -> Iterator[Tuple[str, Dict[str, Any]]]:
+    def iter_existing_paths(self) -> Iterator[tuple[str, dict[str, Any]]]:
         """Stream manifest entries whose artifact paths still exist on disk."""
 
         if self._loaded_all or not self._path or not self._path.exists():
@@ -593,7 +585,7 @@ class ManifestUrlIndex:
             except sqlite3.OperationalError:
                 return
 
-            seen: Set[str] = set()
+            seen: set[str] = set()
             for (
                 url,
                 stored_canonical,
@@ -643,12 +635,12 @@ class ManifestUrlIndex:
         finally:
             conn.close()
 
-    def iter_existing(self) -> Iterator[Tuple[str, Dict[str, Any]]]:
+    def iter_existing(self) -> Iterator[tuple[str, dict[str, Any]]]:
         """Yield manifest entries whose artifact paths still exist on disk."""
 
         yield from self.iter_existing_paths()
 
-    def as_dict(self) -> Dict[str, Dict[str, Any]]:
+    def as_dict(self) -> dict[str, dict[str, Any]]:
         """Return a defensive copy of the manifest cache keyed by canonical URL."""
         self._ensure_loaded()
         return dict(self._cache)
@@ -663,7 +655,7 @@ class ManifestUrlIndex:
         self._cache.update(dataset)
         self._loaded_all = True
 
-    def _fetch_one(self, canonical: str) -> Optional[Dict[str, Any]]:
+    def _fetch_one(self, canonical: str) -> dict[str, Any] | None:
         if not self._path or not self._path.exists():
             return None
         conn = sqlite3.connect(self._path)
@@ -746,7 +738,7 @@ class AttemptSink(Protocol):
         True
     """
 
-    def log_attempt(self, record: "AttemptRecord", *, timestamp: Optional[str] = None) -> None:
+    def log_attempt(self, record: AttemptRecord, *, timestamp: str | None = None) -> None:
         """Record a resolver attempt.
 
         Args:
@@ -760,7 +752,7 @@ class AttemptSink(Protocol):
             Exception: Implementations may propagate write failures.
         """
 
-    def log_io_attempt(self, record: "SimplifiedAttemptRecord") -> None:
+    def log_io_attempt(self, record: SimplifiedAttemptRecord) -> None:
         """Record a low-level HTTP/IO attempt (P1 Observability & Integrity).
 
         Called for HEAD requests, GET requests, robots.txt fetches, retries,
@@ -790,7 +782,7 @@ class AttemptSink(Protocol):
             Exception: Implementations may propagate write failures.
         """
 
-    def log_summary(self, summary: Dict[str, Any]) -> None:
+    def log_summary(self, summary: dict[str, Any]) -> None:
         """Store aggregated run metrics.
 
         Args:
@@ -819,7 +811,7 @@ class AttemptSink(Protocol):
             Exception: Implementations may propagate shutdown failures.
         """
 
-    def __enter__(self) -> "AttemptSink":  # pragma: no cover - structural typing helper
+    def __enter__(self) -> AttemptSink:  # pragma: no cover - structural typing helper
         """Enter the runtime context for the sink."""
 
     def __exit__(self, exc_type, exc, tb) -> None:  # pragma: no cover - structural typing helper
@@ -870,7 +862,7 @@ class RunTelemetry(AttemptSink):
     def __init__(self, sink: AttemptSink) -> None:
         self._sink = sink
         self._metrics_lock = threading.Lock()
-        self._rate_limiter_metrics: Dict[str, Dict[str, Dict[str, Any]]] = defaultdict(
+        self._rate_limiter_metrics: dict[str, dict[str, dict[str, Any]]] = defaultdict(
             lambda: defaultdict(
                 lambda: {
                     "acquire_total": 0,
@@ -882,7 +874,7 @@ class RunTelemetry(AttemptSink):
             )
         )
 
-    def _update_rate_metrics(self, record: "AttemptRecord") -> None:
+    def _update_rate_metrics(self, record: AttemptRecord) -> None:
         if not record.rate_limiter_backend and record.rate_limiter_wait_ms is None:
             return
 
@@ -912,11 +904,11 @@ class RunTelemetry(AttemptSink):
                 if isinstance(rate_info, Mapping) and rate_info.get("blocked"):
                     entry["blocked_total"] += 1
 
-    def _rate_metrics_snapshot(self) -> Dict[str, Dict[str, Dict[str, Any]]]:
+    def _rate_metrics_snapshot(self) -> dict[str, dict[str, dict[str, Any]]]:
         with self._metrics_lock:
-            snapshot: Dict[str, Dict[str, Dict[str, Any]]] = {}
+            snapshot: dict[str, dict[str, dict[str, Any]]] = {}
             for host, roles in self._rate_limiter_metrics.items():
-                host_view: Dict[str, Dict[str, Any]] = {}
+                host_view: dict[str, dict[str, Any]] = {}
                 for role, stats in roles.items():
                     host_view[role] = {
                         "acquire_total": stats["acquire_total"],
@@ -928,12 +920,12 @@ class RunTelemetry(AttemptSink):
                 snapshot[host] = host_view
             return snapshot
 
-    def rate_limiter_metrics_snapshot(self) -> Dict[str, Dict[str, Dict[str, Any]]]:
+    def rate_limiter_metrics_snapshot(self) -> dict[str, dict[str, dict[str, Any]]]:
         """Return a thread-safe snapshot of rate limiter metrics."""
 
         return self._rate_metrics_snapshot()
 
-    def log_attempt(self, record: "AttemptRecord", *, timestamp: Optional[str] = None) -> None:
+    def log_attempt(self, record: AttemptRecord, *, timestamp: str | None = None) -> None:
         """Proxy attempt logging to the underlying sink.
 
         Args:
@@ -943,7 +935,7 @@ class RunTelemetry(AttemptSink):
         self._update_rate_metrics(record)
         self._sink.log_attempt(record, timestamp=timestamp)
 
-    def log_io_attempt(self, record: "SimplifiedAttemptRecord") -> None:
+    def log_io_attempt(self, record: SimplifiedAttemptRecord) -> None:
         """Proxy low-level attempt logging to the underlying sink.
 
         Args:
@@ -955,7 +947,7 @@ class RunTelemetry(AttemptSink):
         """Forward manifest entries to the configured sink."""
         self._sink.log_manifest(entry)
 
-    def log_summary(self, summary: Dict[str, Any]) -> None:
+    def log_summary(self, summary: dict[str, Any]) -> None:
         """Publish the final run summary to downstream sinks."""
         rate_snapshot = self._rate_metrics_snapshot()
         if rate_snapshot and "rate_limiter_attempts" not in summary:
@@ -1022,7 +1014,7 @@ class RunTelemetry(AttemptSink):
 
         self.log_breaker_event(event)
 
-    def __enter__(self) -> "RunTelemetry":
+    def __enter__(self) -> RunTelemetry:
         """Enter the context manager, delegating to the underlying sink if present."""
 
         enter = getattr(self._sink, "__enter__", None)
@@ -1032,10 +1024,10 @@ class RunTelemetry(AttemptSink):
 
     def __exit__(
         self,
-        exc_type: Optional[type[BaseException]],
-        exc: Optional[BaseException],
-        tb: Optional[TracebackType],
-    ) -> Optional[bool]:
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: TracebackType | None,
+    ) -> bool | None:
         """Exit the context manager, closing the sink when appropriate."""
 
         exit_method = getattr(self._sink, "__exit__", None)
@@ -1050,18 +1042,18 @@ class RunTelemetry(AttemptSink):
 
     def record_manifest(
         self,
-        artifact: "WorkArtifact",
+        artifact: WorkArtifact,
         *,
-        resolver: Optional[str],
-        url: Optional[str],
-        outcome: Optional["DownloadOutcome"],
+        resolver: str | None,
+        url: str | None,
+        outcome: DownloadOutcome | None,
         html_paths: Iterable[str],
         dry_run: bool,
-        run_id: Optional[str],
-        reason: Optional[ReasonCode | str] = None,
-        reason_detail: Optional[str] = None,
-        canonical_url: Optional[str] = None,
-        original_url: Optional[str] = None,
+        run_id: str | None,
+        reason: ReasonCode | str | None = None,
+        reason_detail: str | None = None,
+        canonical_url: str | None = None,
+        original_url: str | None = None,
     ) -> ManifestEntry:
         """Construct and emit a manifest entry for ``artifact``.
 
@@ -1107,11 +1099,11 @@ class RunTelemetry(AttemptSink):
 
     def record_pipeline_result(
         self,
-        artifact: "WorkArtifact",
-        result: "PipelineResult",
+        artifact: WorkArtifact,
+        result: PipelineResult,
         *,
         dry_run: bool,
-        run_id: Optional[str],
+        run_id: str | None,
     ) -> ManifestEntry:
         """Record pipeline output, normalising reason metadata on the way out.
 
@@ -1164,15 +1156,14 @@ class JsonlSink:
         self._file = path.open("a", encoding="utf-8")
         self._lock = threading.Lock()
 
-    def _write(self, payload: Dict[str, Any]) -> None:
+    def _write(self, payload: dict[str, Any]) -> None:
         payload.setdefault("timestamp", _utc_timestamp())
         line = json.dumps(payload, sort_keys=True) + "\n"
-        with locks.manifest_lock(self._path):
-            with self._lock:
-                self._file.write(line)
-                self._file.flush()
+        with locks.manifest_lock(self._path), self._lock:
+            self._file.write(line)
+            self._file.flush()
 
-    def log_attempt(self, record: "AttemptRecord", *, timestamp: Optional[str] = None) -> None:
+    def log_attempt(self, record: AttemptRecord, *, timestamp: str | None = None) -> None:
         """Append an attempt record to the JSONL log.
 
         Args:
@@ -1222,7 +1213,7 @@ class JsonlSink:
             }
         )
 
-    def log_io_attempt(self, record: "SimplifiedAttemptRecord") -> None:
+    def log_io_attempt(self, record: SimplifiedAttemptRecord) -> None:
         """Append a low-level HTTP/IO attempt to the JSONL log."""
 
         payload = {
@@ -1277,7 +1268,7 @@ class JsonlSink:
             }
         )
 
-    def log_summary(self, summary: Dict[str, Any]) -> None:
+    def log_summary(self, summary: dict[str, Any]) -> None:
         """Append a run-level summary describing aggregate metrics.
 
         Args:
@@ -1314,7 +1305,7 @@ class JsonlSink:
             if not self._file.closed:
                 self._file.close()
 
-    def __enter__(self) -> "JsonlSink":
+    def __enter__(self) -> JsonlSink:
         return self
 
     def __exit__(self, exc_type, exc, tb) -> None:
@@ -1365,21 +1356,20 @@ class RotatingJsonlSink(JsonlSink):
                 current_size = 0
         return current_size + pending_bytes > self._max_bytes
 
-    def _write(self, payload: Dict[str, Any]) -> None:
+    def _write(self, payload: dict[str, Any]) -> None:
         payload.setdefault("timestamp", _utc_timestamp())
         line = json.dumps(payload, sort_keys=True) + "\n"
         encoded = line.encode("utf-8")
-        with locks.manifest_lock(self._path):
-            with self._lock:
-                try:
-                    if self._path.exists() and self._path.stat().st_size >= self._max_bytes:
-                        self._rotate()
-                except OSError:  # pragma: no cover - defensive
-                    pass
-                if self._should_rotate(len(encoded)):
+        with locks.manifest_lock(self._path), self._lock:
+            try:
+                if self._path.exists() and self._path.stat().st_size >= self._max_bytes:
                     self._rotate()
-                self._file.write(line)
-                self._file.flush()
+            except OSError:  # pragma: no cover - defensive
+                pass
+            if self._should_rotate(len(encoded)):
+                self._rotate()
+            self._file.write(line)
+            self._file.flush()
 
 
 class CsvSink:
@@ -1423,7 +1413,7 @@ class CsvSink:
         if not exists:
             self._writer.writeheader()
 
-    def log_attempt(self, record: "AttemptRecord", *, timestamp: Optional[str] = None) -> None:
+    def log_attempt(self, record: AttemptRecord, *, timestamp: str | None = None) -> None:
         """Append an attempt record to the CSV log.
 
         Args:
@@ -1466,12 +1456,11 @@ class CsvSink:
             "from_cache": record.from_cache,
             "metadata": json.dumps(record.metadata, sort_keys=True) if record.metadata else "",
         }
-        with locks.telemetry_lock(self._path):
-            with self._lock:
-                self._writer.writerow(row)
-                self._file.flush()
+        with locks.telemetry_lock(self._path), self._lock:
+            self._writer.writerow(row)
+            self._file.flush()
 
-    def log_io_attempt(self, record: "SimplifiedAttemptRecord") -> None:  # pragma: no cover - no-op
+    def log_io_attempt(self, record: SimplifiedAttemptRecord) -> None:  # pragma: no cover - no-op
         """No-op for IO attempts; CSV sink tracks resolver-level attempts only."""
 
         return None
@@ -1481,7 +1470,7 @@ class CsvSink:
 
         return None
 
-    def log_summary(self, summary: Dict[str, Any]) -> None:  # pragma: no cover
+    def log_summary(self, summary: dict[str, Any]) -> None:  # pragma: no cover
         """Ignore summary writes for CSV sinks (interface compatibility)."""
 
         return None
@@ -1504,12 +1493,11 @@ class CsvSink:
     def close(self) -> None:
         """Flush buffered data and close the CSV file handle."""
 
-        with locks.telemetry_lock(self._path):
-            with self._lock:
-                if not self._file.closed:
-                    self._file.close()
+        with locks.telemetry_lock(self._path), self._lock:
+            if not self._file.closed:
+                self._file.close()
 
-    def __enter__(self) -> "CsvSink":
+    def __enter__(self) -> CsvSink:
         return self
 
     def __exit__(self, exc_type, exc, tb) -> None:
@@ -1522,14 +1510,14 @@ class MultiSink:
     def __init__(self, sinks: Iterable[AttemptSink]):
         self._sinks = list(sinks)
 
-    def log_attempt(self, record: "AttemptRecord", *, timestamp: Optional[str] = None) -> None:
+    def log_attempt(self, record: AttemptRecord, *, timestamp: str | None = None) -> None:
         """Fan out an attempt record to each sink in the composite."""
 
         ts = timestamp or _utc_timestamp()
         for sink in self._sinks:
             sink.log_attempt(record, timestamp=ts)
 
-    def log_io_attempt(self, record: "SimplifiedAttemptRecord") -> None:
+    def log_io_attempt(self, record: SimplifiedAttemptRecord) -> None:
         """Fan out low-level IO attempts to each sink."""
 
         for sink in self._sinks:
@@ -1541,7 +1529,7 @@ class MultiSink:
         for sink in self._sinks:
             sink.log_manifest(entry)
 
-    def log_summary(self, summary: Dict[str, Any]) -> None:
+    def log_summary(self, summary: dict[str, Any]) -> None:
         """Fan out summary payloads to every sink in the collection."""
 
         for sink in self._sinks:
@@ -1570,7 +1558,7 @@ class MultiSink:
     def close(self) -> None:
         """Close sinks while capturing the first raised exception."""
 
-        errors: List[BaseException] = []
+        errors: list[BaseException] = []
         for sink in self._sinks:
             try:
                 sink.close()
@@ -1579,7 +1567,7 @@ class MultiSink:
         if errors:
             raise errors[0]
 
-    def __enter__(self) -> "MultiSink":
+    def __enter__(self) -> MultiSink:
         return self
 
     def __exit__(self, exc_type, exc, tb) -> None:
@@ -1594,23 +1582,23 @@ class ManifestIndexSink:
 
     def __init__(self, path: Path) -> None:
         self._path = path
-        self._index: Dict[str, Dict[str, Optional[str]]] = {}
+        self._index: dict[str, dict[str, str | None]] = {}
         self._lock = threading.Lock()
         self._closed = False
 
     def log_attempt(
-        self, record: "AttemptRecord", *, timestamp: Optional[str] = None
+        self, record: AttemptRecord, *, timestamp: str | None = None
     ) -> None:  # pragma: no cover - intentional no-op
         """No-op to satisfy the telemetry sink interface."""
 
         return None
 
-    def log_io_attempt(self, record: "SimplifiedAttemptRecord") -> None:  # pragma: no cover - no-op
+    def log_io_attempt(self, record: SimplifiedAttemptRecord) -> None:  # pragma: no cover - no-op
         """Ignore low-level IO attempts for manifest indexing."""
 
         return None
 
-    def log_summary(self, summary: Dict[str, Any]) -> None:  # pragma: no cover - no-op
+    def log_summary(self, summary: dict[str, Any]) -> None:  # pragma: no cover - no-op
         """No-op because the manifest index only reacts to manifests."""
 
         return None
@@ -1626,8 +1614,8 @@ class ManifestIndexSink:
         classification = Classification.from_wire(entry.classification)
         path_value = entry.path
         path_str = str(path_value) if path_value else None
-        pdf_path: Optional[str] = None
-        sha256: Optional[str] = None
+        pdf_path: str | None = None
+        sha256: str | None = None
         if classification in PDF_LIKE and path_str:
             pdf_path = path_str
             sha256 = entry.sha256
@@ -1652,7 +1640,7 @@ class ManifestIndexSink:
         with locks.summary_lock(self._path):
             atomic_write_text(self._path, json.dumps(ordered, indent=2))
 
-    def __enter__(self) -> "ManifestIndexSink":
+    def __enter__(self) -> ManifestIndexSink:
         return self
 
     def __exit__(self, exc_type, exc, tb) -> None:
@@ -1691,23 +1679,23 @@ class LastAttemptCsvSink:
 
     def __init__(self, path: Path) -> None:
         self._path = path
-        self._records: "OrderedDict[str, Dict[str, str]]" = OrderedDict()
+        self._records: OrderedDict[str, dict[str, str]] = OrderedDict()
         self._lock = threading.Lock()
         self._closed = False
 
     def log_attempt(
-        self, record: "AttemptRecord", *, timestamp: Optional[str] = None
+        self, record: AttemptRecord, *, timestamp: str | None = None
     ) -> None:  # pragma: no cover - intentional no-op
         """No-op to satisfy the telemetry sink interface."""
 
         return None
 
-    def log_io_attempt(self, record: "SimplifiedAttemptRecord") -> None:  # pragma: no cover - no-op
+    def log_io_attempt(self, record: SimplifiedAttemptRecord) -> None:  # pragma: no cover - no-op
         """Ignore IO attempts; this sink only processes manifest entries."""
 
         return None
 
-    def log_summary(self, summary: Dict[str, Any]) -> None:  # pragma: no cover - no-op
+    def log_summary(self, summary: dict[str, Any]) -> None:  # pragma: no cover - no-op
         """No-op because the CSV sink only records manifest events."""
 
         return None
@@ -1774,7 +1762,7 @@ class LastAttemptCsvSink:
         with locks.summary_lock(self._path):
             atomic_write_text(self._path, buffer.getvalue())
 
-    def __enter__(self) -> "LastAttemptCsvSink":
+    def __enter__(self) -> LastAttemptCsvSink:
         return self
 
     def __exit__(self, exc_type, exc, tb) -> None:
@@ -1786,12 +1774,12 @@ class SummarySink:
 
     def __init__(self, path: Path) -> None:
         self._path = path
-        self._summary: Optional[Dict[str, Any]] = None
+        self._summary: dict[str, Any] | None = None
         self._lock = threading.Lock()
         self._closed = False
 
     def log_attempt(
-        self, record: "AttemptRecord", *, timestamp: Optional[str] = None
+        self, record: AttemptRecord, *, timestamp: str | None = None
     ) -> None:  # pragma: no cover - no-op
         """Accept attempt telemetry for interface parity without persisting it.
 
@@ -1804,7 +1792,7 @@ class SummarySink:
         """
         return None
 
-    def log_io_attempt(self, record: "SimplifiedAttemptRecord") -> None:  # pragma: no cover - no-op
+    def log_io_attempt(self, record: SimplifiedAttemptRecord) -> None:  # pragma: no cover - no-op
         """Ignore IO attempts; summary sink only stores aggregated metrics."""
 
         return None
@@ -1820,7 +1808,7 @@ class SummarySink:
         """
         return None
 
-    def log_summary(self, summary: Dict[str, Any]) -> None:
+    def log_summary(self, summary: dict[str, Any]) -> None:
         """Capture the latest run summary prior to shutdown."""
 
         with self._lock:
@@ -1852,7 +1840,7 @@ class SummarySink:
         with locks.summary_lock(self._path):
             atomic_write_text(self._path, json.dumps(payload, indent=2, sort_keys=True))
 
-    def __enter__(self) -> "SummarySink":
+    def __enter__(self) -> SummarySink:
         return self
 
     def __exit__(self, exc_type, exc, tb) -> None:
@@ -1885,7 +1873,7 @@ class SqliteSink:
                 current_version = 0
             self._initialise_schema(current_version)
 
-    def log_attempt(self, record: "AttemptRecord", *, timestamp: Optional[str] = None) -> None:
+    def log_attempt(self, record: AttemptRecord, *, timestamp: str | None = None) -> None:
         """Persist a resolver attempt event for downstream document analytics.
 
         Args:
@@ -1897,76 +1885,75 @@ class SqliteSink:
         """
         ts = timestamp or _utc_timestamp()
         metadata_json = json.dumps(record.metadata, sort_keys=True) if record.metadata else None
-        with locks.sqlite_lock(self._path):
-            with self._lock:
-                columns = (
-                    "timestamp",
-                    "run_id",
-                    "work_id",
-                    "resolver_name",
-                    "resolver_order",
-                    "url",
-                    "canonical_url",
-                    "original_url",
-                    "status",
-                    "http_status",
-                    "content_type",
-                    "elapsed_ms",
-                    "resolver_wall_time_ms",
-                    "reason",
-                    "reason_detail",
-                    "metadata",
-                    "sha256",
-                    "content_length",
-                    "dry_run",
-                    "retry_after",
-                    "breaker_host_state",
-                    "breaker_resolver_state",
-                    "breaker_open_remaining_ms",
-                    "breaker_recorded",
-                )
-                values = (
-                    ts,
-                    record.run_id,
-                    record.work_id,
-                    record.resolver_name,
-                    record.resolver_order,
-                    record.url,
-                    getattr(record, "canonical_url", None) or record.url,
-                    getattr(record, "original_url", None) or record.url,
-                    (
-                        record.status.value
-                        if isinstance(record.status, Classification)
-                        else str(record.status)
-                    ),
-                    record.http_status,
-                    record.content_type,
-                    record.elapsed_ms,
-                    record.resolver_wall_time_ms,
-                    (
-                        record.reason.value
-                        if isinstance(record.reason, ReasonCode)
-                        else record.reason if record.reason is not None else None
-                    ),
-                    getattr(record, "reason_detail", None),
-                    metadata_json,
-                    record.sha256,
-                    record.content_length,
-                    1 if record.dry_run else 0,
-                    record.retry_after,
-                    getattr(record, "breaker_host_state", None),
-                    getattr(record, "breaker_resolver_state", None),
-                    getattr(record, "breaker_open_remaining_ms", None),
-                    getattr(record, "breaker_recorded", None),
-                )
-                placeholders = ", ".join(["?"] * len(columns))
-                self._conn.execute(
-                    f"INSERT INTO attempts ({', '.join(columns)}) VALUES ({placeholders})",
-                    values,
-                )
-                self._conn.commit()
+        with locks.sqlite_lock(self._path), self._lock:
+            columns = (
+                "timestamp",
+                "run_id",
+                "work_id",
+                "resolver_name",
+                "resolver_order",
+                "url",
+                "canonical_url",
+                "original_url",
+                "status",
+                "http_status",
+                "content_type",
+                "elapsed_ms",
+                "resolver_wall_time_ms",
+                "reason",
+                "reason_detail",
+                "metadata",
+                "sha256",
+                "content_length",
+                "dry_run",
+                "retry_after",
+                "breaker_host_state",
+                "breaker_resolver_state",
+                "breaker_open_remaining_ms",
+                "breaker_recorded",
+            )
+            values = (
+                ts,
+                record.run_id,
+                record.work_id,
+                record.resolver_name,
+                record.resolver_order,
+                record.url,
+                getattr(record, "canonical_url", None) or record.url,
+                getattr(record, "original_url", None) or record.url,
+                (
+                    record.status.value
+                    if isinstance(record.status, Classification)
+                    else str(record.status)
+                ),
+                record.http_status,
+                record.content_type,
+                record.elapsed_ms,
+                record.resolver_wall_time_ms,
+                (
+                    record.reason.value
+                    if isinstance(record.reason, ReasonCode)
+                    else record.reason if record.reason is not None else None
+                ),
+                getattr(record, "reason_detail", None),
+                metadata_json,
+                record.sha256,
+                record.content_length,
+                1 if record.dry_run else 0,
+                record.retry_after,
+                getattr(record, "breaker_host_state", None),
+                getattr(record, "breaker_resolver_state", None),
+                getattr(record, "breaker_open_remaining_ms", None),
+                getattr(record, "breaker_recorded", None),
+            )
+            placeholders = ", ".join(["?"] * len(columns))
+            self._conn.execute(
+                f"INSERT INTO attempts ({', '.join(columns)}) VALUES ({placeholders})",
+                values,
+            )
+            self._conn.commit()
 
-    def log_io_attempt(self, record: "SimplifiedAttemptRecord") -> None:  # pragma: no cover - no-op
+    def log_io_attempt(self, record: SimplifiedAttemptRecord) -> None:  # pragma: no cover - no-op
         """Placeholder for IO attempts until the SQLite schema is extended."""
 
         return None
@@ -1981,66 +1968,65 @@ class SqliteSink:
             None
         """
         html_paths_json = json.dumps(entry.html_paths, sort_keys=True) if entry.html_paths else None
-        with locks.sqlite_lock(self._path):
-            with self._lock:
-                columns = (
-                    "timestamp",
-                    "run_id",
-                    "schema_version",
-                    "work_id",
-                    "title",
-                    "publication_year",
-                    "resolver",
-                    "url",
-                    "canonical_url",
-                    "original_url",
-                    "path",
-                    "path_mtime_ns",
-                    "classification",
-                    "content_type",
-                    "reason",
-                    "reason_detail",
-                    "html_paths",
-                    "sha256",
-                    "content_length",
-                    "etag",
-                    "last_modified",
-                    "extracted_text_path",
-                    "dry_run",
-                )
-                values = (
-                    entry.timestamp,
-                    entry.run_id,
-                    entry.schema_version,
-                    entry.work_id,
-                    entry.title,
-                    entry.publication_year,
-                    entry.resolver,
-                    entry.url,
-                    entry.canonical_url,
-                    entry.original_url or entry.url,
-                    entry.path,
-                    entry.path_mtime_ns,
-                    entry.classification,
-                    entry.content_type,
-                    entry.reason,
-                    entry.reason_detail,
-                    html_paths_json,
-                    entry.sha256,
-                    entry.content_length,
-                    entry.etag,
-                    entry.last_modified,
-                    entry.extracted_text_path,
-                    1 if entry.dry_run else 0,
-                )
-                placeholders = ", ".join(["?"] * len(columns))
-                self._conn.execute(
-                    f"INSERT INTO manifests ({', '.join(columns)}) VALUES ({placeholders})",
-                    values,
-                )
-                self._conn.commit()
+        with locks.sqlite_lock(self._path), self._lock:
+            columns = (
+                "timestamp",
+                "run_id",
+                "schema_version",
+                "work_id",
+                "title",
+                "publication_year",
+                "resolver",
+                "url",
+                "canonical_url",
+                "original_url",
+                "path",
+                "path_mtime_ns",
+                "classification",
+                "content_type",
+                "reason",
+                "reason_detail",
+                "html_paths",
+                "sha256",
+                "content_length",
+                "etag",
+                "last_modified",
+                "extracted_text_path",
+                "dry_run",
+            )
+            values = (
+                entry.timestamp,
+                entry.run_id,
+                entry.schema_version,
+                entry.work_id,
+                entry.title,
+                entry.publication_year,
+                entry.resolver,
+                entry.url,
+                entry.canonical_url,
+                entry.original_url or entry.url,
+                entry.path,
+                entry.path_mtime_ns,
+                entry.classification,
+                entry.content_type,
+                entry.reason,
+                entry.reason_detail,
+                html_paths_json,
+                entry.sha256,
+                entry.content_length,
+                entry.etag,
+                entry.last_modified,
+                entry.extracted_text_path,
+                1 if entry.dry_run else 0,
+            )
+            placeholders = ", ".join(["?"] * len(columns))
+            self._conn.execute(
+                f"INSERT INTO manifests ({', '.join(columns)}) VALUES ({placeholders})",
+                values,
+            )
+            self._conn.commit()
 
-    def log_summary(self, summary: Dict[str, Any]) -> None:
+    def log_summary(self, summary: dict[str, Any]) -> None:
         """Store the aggregated run summary in the summaries table.
 
         Args:
@@ -2147,36 +2133,34 @@ class SqliteSink:
         artifact_id = event.get("artifact_id")
         payload = json.dumps(dict(event), sort_keys=True)
 
-        with locks.sqlite_lock(self._path):
-            with self._lock:
-                self._conn.execute(
-                    """
+        with locks.sqlite_lock(self._path), self._lock:
+            self._conn.execute(
+                """
                     INSERT INTO fallback_events
                     (timestamp, run_id, work_id, artifact_id, outcome, payload)
                     VALUES (?, ?, ?, ?, ?, ?)
                     """,
-                    (
-                        timestamp,
-                        run_id,
-                        work_id,
-                        artifact_id,
-                        "summary",
-                        payload,
-                    ),
-                )
-                self._conn.commit()
+                (
+                    timestamp,
+                    run_id,
+                    work_id,
+                    artifact_id,
+                    "summary",
+                    payload,
+                ),
+            )
+            self._conn.commit()
 
     def close(self) -> None:
         """Commit outstanding changes and dispose of the SQLite connection."""
-        with locks.sqlite_lock(self._path):
-            with self._lock:
-                if self._closed:
-                    return
-                self._closed = True
-                self._conn.commit()
-                self._conn.close()
+        with locks.sqlite_lock(self._path), self._lock:
+            if self._closed:
+                return
+            self._closed = True
+            self._conn.commit()
+            self._conn.close()
 
-    def __enter__(self) -> "SqliteSink":
+    def __enter__(self) -> SqliteSink:
         return self
 
     def __exit__(self, exc_type, exc, tb) -> None:
@@ -2502,37 +2486,36 @@ class SqliteSink:
         elapsed_ms = event.get("elapsed_ms")
         error = event.get("error")
 
-        with locks.sqlite_lock(self._path):
-            with self._lock:
-                self._conn.execute(
-                    """
+        with locks.sqlite_lock(self._path), self._lock:
+            self._conn.execute(
+                """
                     INSERT INTO http_events
                     (timestamp, run_id, host, role, method, status, url_hash, from_cache,
                      revalidated, stale, retry_count, retry_after_s, rate_delay_ms,
                      breaker_state, breaker_recorded, elapsed_ms, error)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (
-                        timestamp,
-                        run_id,
-                        host,
-                        role,
-                        method,
-                        status,
-                        url_hash,
-                        from_cache,
-                        revalidated,
-                        stale,
-                        retry_count,
-                        retry_after_s,
-                        rate_delay_ms,
-                        breaker_state,
-                        breaker_recorded,
-                        elapsed_ms,
-                        error,
-                    ),
-                )
-                self._conn.commit()
+                (
+                    timestamp,
+                    run_id,
+                    host,
+                    role,
+                    method,
+                    status,
+                    url_hash,
+                    from_cache,
+                    revalidated,
+                    stale,
+                    retry_count,
+                    retry_after_s,
+                    rate_delay_ms,
+                    breaker_state,
+                    breaker_recorded,
+                    elapsed_ms,
+                    error,
+                ),
+            )
+            self._conn.commit()
 
     def log_rate_event(self, event: Mapping[str, Any]) -> None:
         """Persist rate limiter telemetry events to rate_events table."""
@@ -2575,25 +2558,24 @@ class SqliteSink:
         new_state = event.get("new_state")
         reset_timeout_s = event.get("reset_timeout_s")
 
-        with locks.sqlite_lock(self._path):
-            with self._lock:
-                self._conn.execute(
-                    """
+        with locks.sqlite_lock(self._path), self._lock:
+            self._conn.execute(
+                """
                     INSERT INTO breaker_transitions
                     (timestamp, run_id, host, scope, old_state, new_state, reset_timeout_s)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (
-                        timestamp,
-                        run_id,
-                        host,
-                        scope,
-                        old_state,
-                        new_state,
-                        reset_timeout_s,
-                    ),
-                )
-                self._conn.commit()
+                (
+                    timestamp,
+                    run_id,
+                    host,
+                    scope,
+                    old_state,
+                    new_state,
+                    reset_timeout_s,
+                ),
+            )
+            self._conn.commit()
 
 
 def _manifest_entry_from_sqlite_row(
@@ -2612,7 +2594,7 @@ def _manifest_entry_from_sqlite_row(
     content_length: Any,
     etag: Any,
     last_modified: Any,
-) -> Optional[Tuple[str, str, Dict[str, Any], bool]]:
+) -> tuple[str, str, dict[str, Any], bool] | None:
     """Convert a SQLite manifest row into resume metadata."""
 
     if not work_id or not url:
@@ -2628,8 +2610,8 @@ def _manifest_entry_from_sqlite_row(
     except (TypeError, ValueError):
         schema_version_int = MANIFEST_SCHEMA_VERSION
 
-    classification_enum: Optional[Classification]
-    classification_value: Optional[str] = None
+    classification_enum: Classification | None
+    classification_value: str | None = None
     completed = False
     try:
         classification_enum = Classification.from_wire(classification)
@@ -2640,7 +2622,7 @@ def _manifest_entry_from_sqlite_row(
         if classification_enum in PDF_LIKE:
             completed = True
 
-    reason_value: Optional[str]
+    reason_value: str | None
     try:
         reason_enum = ReasonCode.from_wire(reason) if reason is not None else None
     except ValueError:
@@ -2652,7 +2634,7 @@ def _manifest_entry_from_sqlite_row(
     except (TypeError, ValueError):
         content_length_value = None
 
-    path_mtime_value: Optional[int] = None
+    path_mtime_value: int | None = None
     if path_mtime_ns is not None:
         try:
             path_mtime_value = int(path_mtime_ns)
@@ -2684,7 +2666,7 @@ def _manifest_entry_from_sqlite_row(
 
 def _iter_resume_rows_from_sqlite(
     sqlite_path: Path,
-) -> Iterator[Tuple[str, str, Dict[str, Any], bool]]:
+) -> Iterator[tuple[str, str, dict[str, Any], bool]]:
     """Yield manifest resume rows from ``sqlite_path`` lazily."""
 
     if not sqlite_path.exists():
@@ -2698,12 +2680,10 @@ def _iter_resume_rows_from_sqlite(
     try:
         try:
             cursor = conn.execute(
-                (
-                    "SELECT run_id, work_id, url, canonical_url, original_url, schema_version, "
-                    "classification, reason, reason_detail, path, path_mtime_ns, sha256, "
-                    "content_length, etag, last_modified "
-                    "FROM manifests ORDER BY work_id, canonical_url"
-                )
+                "SELECT run_id, work_id, url, canonical_url, original_url, schema_version, "
+                "classification, reason, reason_detail, path, path_mtime_ns, sha256, "
+                "content_length, etag, last_modified "
+                "FROM manifests ORDER BY work_id, canonical_url"
             )
         except sqlite3.OperationalError:
             return
@@ -2717,11 +2697,11 @@ def _iter_resume_rows_from_sqlite(
         conn.close()
 
 
-def _load_resume_from_sqlite(sqlite_path: Path) -> Tuple[Dict[str, Dict[str, Any]], Set[str]]:
+def _load_resume_from_sqlite(sqlite_path: Path) -> tuple[dict[str, dict[str, Any]], set[str]]:
     """Return resume metadata reconstructed from the SQLite manifest cache."""
 
-    lookup: Dict[str, Dict[str, Any]] = {}
-    completed: Set[str] = set()
+    lookup: dict[str, dict[str, Any]] = {}
+    completed: set[str] = set()
     for work_id, canonical, entry, is_pdf_like in _iter_resume_rows_from_sqlite(sqlite_path):
         lookup.setdefault(work_id, {})[canonical] = entry
         if is_pdf_like:
@@ -2776,12 +2756,12 @@ def looks_like_sqlite_resume_target(path: Path) -> bool:
 
 
 def iter_previous_manifest_entries(
-    path: Optional[Path],
+    path: Path | None,
     *,
-    sqlite_path: Optional[Path] = None,
+    sqlite_path: Path | None = None,
     allow_sqlite_fallback: bool = False,
     buffer_entries: bool = True,
-) -> Iterator[Tuple[str, str, Dict[str, Any], bool]]:
+) -> Iterator[tuple[str, str, dict[str, Any], bool]]:
     """Yield resume manifest entries lazily, preferring SQLite when available."""
 
     if (
@@ -2800,10 +2780,8 @@ def iter_previous_manifest_entries(
     if looks_like_sqlite_resume_target(path):
         if not path.exists() or not path.is_file():
             raise ValueError(
-                "Resume SQLite cache '{path}' does not exist or is not a file. Provide the matching "
-                "manifest.sqlite or manifest.sqlite3 file, or omit --resume-from to start a new run.".format(
-                    path=path
-                )
+                f"Resume SQLite cache '{path}' does not exist or is not a file. Provide the matching "
+                "manifest.sqlite or manifest.sqlite3 file, or omit --resume-from to start a new run."
             )
         yield from _iter_resume_rows_from_sqlite(path)
         return
@@ -2813,14 +2791,12 @@ def iter_previous_manifest_entries(
             yield from _iter_resume_rows_from_sqlite(sqlite_path)
             return
         raise ValueError(
-            "Resume manifest '{path}' appears to be a CSV attempts log but no SQLite cache was found. "
-            "Provide the matching manifest.sqlite or manifest.sqlite3 file, or resume from a JSONL manifest.".format(
-                path=path
-            )
+            f"Resume manifest '{path}' appears to be a CSV attempts log but no SQLite cache was found. "
+            "Provide the matching manifest.sqlite or manifest.sqlite3 file, or resume from a JSONL manifest."
         )
 
     prefix = f"{path.name}."
-    rotated: List[Tuple[int, Path]] = []
+    rotated: list[tuple[int, Path]] = []
     for candidate in path.parent.glob(f"{path.name}.*"):
         if not candidate.is_file():
             continue
@@ -2838,15 +2814,15 @@ def iter_previous_manifest_entries(
             return
         file_error = FileNotFoundError(f"No manifest files found for resume path {path!s}")
         raise ValueError(
-            "Resume manifest '{path}' does not exist and no rotated segments were found. "
-            "Double-check the --resume-from path or omit it to start a fresh run.".format(path=path)
+            f"Resume manifest '{path}' does not exist and no rotated segments were found. "
+            "Double-check the --resume-from path or omit it to start a fresh run."
         ) from file_error
 
     yielded_any = False
 
     for file_path in ordered_files:
-        line_number: Optional[int] = None
-        buffered: Optional[List[Tuple[str, str, Dict[str, Any], bool]]] = (
+        line_number: int | None = None
+        buffered: list[tuple[str, str, dict[str, Any], bool]] | None = (
             [] if buffer_entries else None
         )
         try:
@@ -2887,12 +2863,8 @@ def iter_previous_manifest_entries(
                             else "older" if schema_version < MANIFEST_SCHEMA_VERSION else "unknown"
                         )
                         raise ValueError(
-                            "Unsupported manifest schema_version {observed} ({qualifier}); expected version {expected}. "
-                            "Regenerate the manifest using a compatible DocsToKG downloader release.".format(
-                                observed=schema_version,
-                                qualifier=qualifier,
-                                expected=MANIFEST_SCHEMA_VERSION,
-                            )
+                            f"Unsupported manifest schema_version {schema_version} ({qualifier}); expected version {MANIFEST_SCHEMA_VERSION}. "
+                            "Regenerate the manifest using a compatible DocsToKG downloader release."
                         )
                     data["schema_version"] = schema_version
 
@@ -2986,15 +2958,15 @@ def iter_previous_manifest_entries(
 
 
 def load_previous_manifest(
-    path: Optional[Path],
+    path: Path | None,
     *,
-    sqlite_path: Optional[Path] = None,
+    sqlite_path: Path | None = None,
     allow_sqlite_fallback: bool = False,
-) -> Tuple[Dict[str, Dict[str, Any]], Set[str]]:
+) -> tuple[dict[str, dict[str, Any]], set[str]]:
     """Load manifest entries indexed by work ID and canonical URL."""
 
-    per_work: Dict[str, Dict[str, Any]] = {}
-    completed: Set[str] = set()
+    per_work: dict[str, dict[str, Any]] = {}
+    completed: set[str] = set()
 
     for work_id, canonical, entry, is_pdf_like in iter_previous_manifest_entries(
         path,
@@ -3008,22 +2980,22 @@ def load_previous_manifest(
     return per_work, completed
 
 
-class JsonlResumeLookup(Mapping[str, Dict[str, Any]]):
+class JsonlResumeLookup(Mapping[str, dict[str, Any]]):
     """Lazy resume mapping backed by a temporary SQLite index built from JSONL."""
 
     def __init__(self, path: Path) -> None:
         if not path:
             raise ValueError("Resume manifest path is required for JsonlResumeLookup")
         self._path = path
-        self._cache: Dict[str, Dict[str, Any]] = {}
-        self._missing: Set[str] = set()
+        self._cache: dict[str, dict[str, Any]] = {}
+        self._missing: set[str] = set()
         self._lock = threading.Lock()
         self._closed = False
         self._tempdir = Path(tempfile.mkdtemp(prefix="docs_resume_jsonl_"))
         self._db_path = self._tempdir / "resume.sqlite3"
         self._conn = sqlite3.connect(self._db_path, check_same_thread=False)
         self._initialise_schema()
-        self._completed_ids: FrozenSet[str] = frozenset()
+        self._completed_ids: frozenset[str] = frozenset()
         self._preload_on_close = False
         try:
             self._populate_from_jsonl()
@@ -3049,7 +3021,7 @@ class JsonlResumeLookup(Mapping[str, Dict[str, Any]]):
             )
 
     def _populate_from_jsonl(self) -> None:
-        completed: Set[str] = set()
+        completed: set[str] = set()
         cursor = self._conn.cursor()
         for work_id, canonical, entry, is_pdf_like in iter_previous_manifest_entries(
             self._path,
@@ -3067,7 +3039,7 @@ class JsonlResumeLookup(Mapping[str, Dict[str, Any]]):
         self._completed_ids = frozenset(completed)
 
     @property
-    def completed_work_ids(self) -> FrozenSet[str]:
+    def completed_work_ids(self) -> frozenset[str]:
         """Return work identifiers that completed successfully in the manifest."""
 
         return self._completed_ids
@@ -3087,13 +3059,13 @@ class JsonlResumeLookup(Mapping[str, Dict[str, Any]]):
         with contextlib.suppress(Exception):
             shutil.rmtree(self._tempdir)
 
-    def __getitem__(self, key: str) -> Dict[str, Any]:
+    def __getitem__(self, key: str) -> dict[str, Any]:
         lookup_key = str(key)
         if lookup_key in self._cache:
             return self._cache[lookup_key]
         if lookup_key in self._missing:
             raise KeyError(lookup_key)
-        rows: Tuple[Tuple[Any, Any], ...]
+        rows: tuple[tuple[Any, Any], ...]
         with self._lock:
             if self._closed:
                 rows = tuple()
@@ -3110,7 +3082,7 @@ class JsonlResumeLookup(Mapping[str, Dict[str, Any]]):
         if not rows:
             self._missing.add(lookup_key)
             raise KeyError(lookup_key)
-        entries: Dict[str, Dict[str, Any]] = {}
+        entries: dict[str, dict[str, Any]] = {}
         for canonical_url, entry_json in rows:
             if not canonical_url:
                 continue
@@ -3126,10 +3098,10 @@ class JsonlResumeLookup(Mapping[str, Dict[str, Any]]):
         return entries
 
     def __iter__(self) -> Iterator[str]:
-        seen: Set[str] = set(self._cache.keys())
+        seen: set[str] = set(self._cache.keys())
         for key in seen:
             yield key
-        rows: Tuple[str, ...]
+        rows: tuple[str, ...]
         with self._lock:
             if self._closed:
                 rows = tuple()
@@ -3164,7 +3136,7 @@ class JsonlResumeLookup(Mapping[str, Dict[str, Any]]):
             return True
         if lookup_key in self._missing:
             return False
-        rows: Tuple[Tuple[Any, Any], ...]
+        rows: tuple[tuple[Any, Any], ...]
         with self._lock:
             if self._closed:
                 rows = tuple()
@@ -3183,7 +3155,7 @@ class JsonlResumeLookup(Mapping[str, Dict[str, Any]]):
             return False
         return True
 
-    def get(self, key: str, default: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+    def get(self, key: str, default: dict[str, Any] | None = None) -> dict[str, Any] | None:
         try:
             return self[key]
         except KeyError:
@@ -3226,7 +3198,7 @@ class JsonlResumeLookup(Mapping[str, Dict[str, Any]]):
             self.close()
 
 
-class SqliteResumeLookup(Mapping[str, Dict[str, Any]]):
+class SqliteResumeLookup(Mapping[str, dict[str, Any]]):
     """Lazy resume mapping that fetches manifest entries directly from SQLite."""
 
     def __init__(self, path: Path) -> None:
@@ -3236,8 +3208,8 @@ class SqliteResumeLookup(Mapping[str, Dict[str, Any]]):
         self._conn = sqlite3.connect(path, check_same_thread=False)
         self._lock = threading.Lock()
         self._closed = False
-        self._cache: Dict[str, Dict[str, Any]] = {}
-        self._missing: Set[str] = set()
+        self._cache: dict[str, dict[str, Any]] = {}
+        self._missing: set[str] = set()
         self._preload_on_close = False
 
     def close(self) -> None:
@@ -3252,7 +3224,7 @@ class SqliteResumeLookup(Mapping[str, Dict[str, Any]]):
             self._closed = True
             self._conn.close()
 
-    def __getitem__(self, key: str) -> Dict[str, Any]:
+    def __getitem__(self, key: str) -> dict[str, Any]:
         lookup_key = str(key)
         if lookup_key in self._cache:
             return self._cache[lookup_key]
@@ -3269,13 +3241,13 @@ class SqliteResumeLookup(Mapping[str, Dict[str, Any]]):
         return entries
 
     def __iter__(self) -> Iterator[str]:
-        seen: Set[str] = set()
+        seen: set[str] = set()
         seen.update(self._cache.keys())
         for key in seen:
             yield key
         with self._lock:
             if self._closed:
-                remaining: Tuple[str, ...] = tuple()
+                remaining: tuple[str, ...] = tuple()
             else:
                 try:
                     cursor = self._conn.execute("SELECT DISTINCT work_id FROM manifests")
@@ -3319,13 +3291,13 @@ class SqliteResumeLookup(Mapping[str, Dict[str, Any]]):
         self._cache[lookup_key] = entries
         return True
 
-    def get(self, key: str, default: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+    def get(self, key: str, default: dict[str, Any] | None = None) -> dict[str, Any] | None:
         try:
             return self[key]
         except KeyError:
             return default
 
-    def _fetch_work_entries(self, work_id: str) -> Optional[Dict[str, Any]]:
+    def _fetch_work_entries(self, work_id: str) -> dict[str, Any] | None:
         with self._lock:
             if self._closed:
                 raise RuntimeError("SqliteResumeLookup has been closed")
@@ -3339,14 +3311,14 @@ class SqliteResumeLookup(Mapping[str, Dict[str, Any]]):
                     (work_id,),
                 )
             except sqlite3.OperationalError:
-                rows: Tuple[Tuple[Any, ...], ...] = tuple()
+                rows: tuple[tuple[Any, ...], ...] = tuple()
             else:
                 rows = tuple(cursor)
 
         if not rows:
             return None
 
-        entries: Dict[str, Dict[str, Any]] = {}
+        entries: dict[str, dict[str, Any]] = {}
         for row in rows:
             parsed = _manifest_entry_from_sqlite_row(*row)
             if parsed is None:
@@ -3355,7 +3327,7 @@ class SqliteResumeLookup(Mapping[str, Dict[str, Any]]):
             entries[canonical_key] = entry
         return entries if entries else None
 
-    def _fetch_work_entries_unlocked(self, work_id: str) -> Optional[Dict[str, Any]]:
+    def _fetch_work_entries_unlocked(self, work_id: str) -> dict[str, Any] | None:
         """Fetch work entries without acquiring lock (must be called with lock held)."""
         if self._closed:
             raise RuntimeError("SqliteResumeLookup has been closed")
@@ -3369,14 +3341,14 @@ class SqliteResumeLookup(Mapping[str, Dict[str, Any]]):
                 (work_id,),
             )
         except sqlite3.OperationalError:
-            rows: Tuple[Tuple[Any, ...], ...] = tuple()
+            rows: tuple[tuple[Any, ...], ...] = tuple()
         else:
             rows = tuple(cursor)
 
         if not rows:
             return None
 
-        entries: Dict[str, Dict[str, Any]] = {}
+        entries: dict[str, dict[str, Any]] = {}
         for row in rows:
             parsed = _manifest_entry_from_sqlite_row(*row)
             if parsed is None:
@@ -3418,7 +3390,7 @@ class SqliteResumeLookup(Mapping[str, Dict[str, Any]]):
             self._preload_all_entries_unlocked()
 
 
-def load_resume_completed_from_sqlite(sqlite_path: Path) -> Set[str]:
+def load_resume_completed_from_sqlite(sqlite_path: Path) -> set[str]:
     """Return work identifiers completed according to the SQLite manifest cache."""
 
     if not sqlite_path.exists():
@@ -3445,7 +3417,7 @@ def load_resume_completed_from_sqlite(sqlite_path: Path) -> Set[str]:
         conn.close()
 
 
-def load_manifest_url_index(path: Optional[Path]) -> Dict[str, Dict[str, Any]]:
+def load_manifest_url_index(path: Path | None) -> dict[str, dict[str, Any]]:
     """Return a mapping of canonical URLs to manifest metadata from SQLite."""
 
     if not path or not path.exists():
@@ -3459,7 +3431,7 @@ def load_manifest_url_index(path: Optional[Path]) -> Dict[str, Dict[str, Any]]:
             )
         except sqlite3.OperationalError:
             return {}
-        mapping: Dict[str, Dict[str, Any]] = {}
+        mapping: dict[str, dict[str, Any]] = {}
         base_dir = path.parent
         for (
             url,
@@ -3503,24 +3475,24 @@ def load_manifest_url_index(path: Optional[Path]) -> Dict[str, Dict[str, Any]]:
 
 
 def build_manifest_entry(
-    artifact: "WorkArtifact",
-    resolver: Optional[str],
-    url: Optional[str],
-    outcome: Optional["DownloadOutcome"],
-    html_paths: List[str],
+    artifact: WorkArtifact,
+    resolver: str | None,
+    url: str | None,
+    outcome: DownloadOutcome | None,
+    html_paths: list[str],
     *,
     dry_run: bool,
-    run_id: Optional[str] = None,
-    reason: Optional[ReasonCode | str] = None,
-    reason_detail: Optional[str] = None,
-    canonical_url: Optional[str] = None,
-    original_url: Optional[str] = None,
+    run_id: str | None = None,
+    reason: ReasonCode | str | None = None,
+    reason_detail: str | None = None,
+    canonical_url: str | None = None,
+    original_url: str | None = None,
 ) -> ManifestEntry:
     """Create a manifest entry summarising a download attempt."""
 
     timestamp = _utc_timestamp()
-    outcome_reason: Optional[ReasonCode | str] = None
-    outcome_detail: Optional[str] = None
+    outcome_reason: ReasonCode | str | None = None
+    outcome_detail: str | None = None
     if outcome:
         classification = outcome.classification.value
         path = outcome.path
@@ -3544,7 +3516,7 @@ def build_manifest_entry(
 
     normalized_path = normalize_manifest_path(path)
 
-    path_mtime_ns: Optional[int] = None
+    path_mtime_ns: int | None = None
     if normalized_path:
         try:
             path_mtime_ns = Path(normalized_path).stat().st_mtime_ns
@@ -3560,7 +3532,7 @@ def build_manifest_entry(
     detail_token = normalize_reason(detail_source)
     detail_value = detail_token.value if isinstance(detail_token, ReasonCode) else detail_token
 
-    normalized_html_paths: List[str] = []
+    normalized_html_paths: list[str] = []
     for html_path in html_paths:
         normalized = normalize_manifest_path(html_path)
         if normalized is not None:
@@ -3583,9 +3555,9 @@ def build_manifest_entry(
         schema_version=MANIFEST_SCHEMA_VERSION,
         timestamp=timestamp,
         run_id=run_id,
-        work_id=getattr(artifact, "work_id"),
-        title=getattr(artifact, "title"),
-        publication_year=getattr(artifact, "publication_year"),
+        work_id=artifact.work_id,
+        title=artifact.title,
+        publication_year=artifact.publication_year,
         resolver=resolver,
         url=url,
         canonical_url=canonical_hint,

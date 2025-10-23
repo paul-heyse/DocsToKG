@@ -50,7 +50,6 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import List, Set
 
 from DocsToKG.ContentDownload.catalog.models import DocumentRecord
 
@@ -59,9 +58,9 @@ logger = logging.getLogger(__name__)
 
 def find_orphans(
     root_dir: str,
-    referenced_paths: Set[str],
+    referenced_paths: set[str],
     follow_symlinks: bool = False,
-) -> List[str]:
+) -> list[str]:
     """Find orphaned files in storage root not referenced by catalog.
 
     Walks the entire root_dir and identifies files that are not in the
@@ -75,7 +74,7 @@ def find_orphans(
     Returns:
         List of absolute paths to orphaned files
     """
-    orphans: List[str] = []
+    orphans: list[str] = []
     root = Path(root_dir)
 
     if not root.exists():
@@ -95,9 +94,9 @@ def find_orphans(
 
 
 def retention_filter(
-    records: List[DocumentRecord],
+    records: list[DocumentRecord],
     retention_days: int,
-) -> List[DocumentRecord]:
+) -> list[DocumentRecord]:
     """Filter records older than retention policy.
 
     Args:
@@ -118,8 +117,8 @@ def retention_filter(
 
 
 def collect_referenced_paths(
-    records: List[DocumentRecord],
-) -> Set[str]:
+    records: list[DocumentRecord],
+) -> set[str]:
     """Extract all referenced storage URIs from catalog records.
 
     Args:
@@ -151,7 +150,7 @@ def collect_referenced_paths(
 
 
 def delete_orphan_files(
-    orphan_paths: List[str],
+    orphan_paths: list[str],
     dry_run: bool = True,
 ) -> int:
     """Delete orphaned files with optional dry-run mode.

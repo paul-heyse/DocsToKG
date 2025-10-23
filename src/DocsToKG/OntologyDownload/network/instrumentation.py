@@ -50,7 +50,7 @@ capturing method, URL, status, timings, and cache state.
 """
 
 import time
-from typing import Any, Optional
+from typing import Any
 
 from DocsToKG.OntologyDownload.observability.events import emit_event
 
@@ -156,7 +156,7 @@ def _get_cache_state(response: Any) -> str:
         return "unknown"
 
 
-def _get_ttfb_ms(response: Any) -> Optional[float]:
+def _get_ttfb_ms(response: Any) -> float | None:
     """Get time-to-first-byte if available."""
     # HTTPX doesn't track TTFB by default
     return None

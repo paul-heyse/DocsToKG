@@ -58,7 +58,6 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 from DocsToKG.ContentDownload.catalog.gc import collect_referenced_paths, find_orphans
 from DocsToKG.ContentDownload.catalog.store import CatalogStore
@@ -93,7 +92,7 @@ class HashMismatch:
     record_id: int
     artifact_id: str
     expected_hash: str
-    computed_hash: Optional[str]
+    computed_hash: str | None
     reason: str = "Hash mismatch"
 
 
@@ -126,7 +125,7 @@ class ConsistencyChecker:
         self,
         catalog: CatalogStore,
         root_dir: str,
-        verifier: Optional[StreamingVerifier] = None,
+        verifier: StreamingVerifier | None = None,
     ):
         """Initialize consistency checker.
 

@@ -59,7 +59,7 @@ Features:
 
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 from pydantic import TypeAdapter
 from pydantic.json_schema import GenerateJsonSchema, JsonSchemaMode
@@ -79,7 +79,7 @@ class CanonicalJsonSchema(GenerateJsonSchema):
     - Documentation generation (consistent output)
     """
 
-    def generate(self, schema: Any, mode: JsonSchemaMode = "validation") -> Dict[str, Any]:
+    def generate(self, schema: Any, mode: JsonSchemaMode = "validation") -> dict[str, Any]:
         """Generate schema with reproducible key ordering.
 
         Args:
@@ -109,7 +109,7 @@ class CanonicalJsonSchema(GenerateJsonSchema):
         return obj
 
 
-def generate_settings_schema() -> Dict[str, Any]:
+def generate_settings_schema() -> dict[str, Any]:
     """Generate top-level OntologyDownloadSettings JSON Schema.
 
     Returns:
@@ -130,7 +130,7 @@ def generate_settings_schema() -> Dict[str, Any]:
     return schema
 
 
-def generate_submodel_schemas() -> Dict[str, Dict[str, Any]]:
+def generate_submodel_schemas() -> dict[str, dict[str, Any]]:
     """Generate JSON schemas for each domain model.
 
     Each domain model gets its own schema file for:
@@ -172,7 +172,7 @@ def generate_submodel_schemas() -> Dict[str, Dict[str, Any]]:
         "duckdb": DuckDBSettings,
     }
 
-    result: Dict[str, Dict[str, Any]] = {}
+    result: dict[str, dict[str, Any]] = {}
     for name, model_class in submodels.items():
         adapter = TypeAdapter(model_class)
         result[name] = adapter.json_schema(schema_generator=CanonicalJsonSchema)
@@ -180,7 +180,7 @@ def generate_submodel_schemas() -> Dict[str, Dict[str, Any]]:
     return result
 
 
-def write_schemas_to_disk(output_dir: Path | None = None) -> Tuple[Path, int]:
+def write_schemas_to_disk(output_dir: Path | None = None) -> tuple[Path, int]:
     """Write all schemas to docs/schemas/ directory.
 
     Generates and writes:
@@ -227,7 +227,7 @@ def write_schemas_to_disk(output_dir: Path | None = None) -> Tuple[Path, int]:
     return output_dir, files_written
 
 
-def validate_config_file(config_path: Path) -> Tuple[bool, List[str]]:
+def validate_config_file(config_path: Path) -> tuple[bool, list[str]]:
     """Validate external configuration file against generated schema.
 
     Loads a config file (YAML/JSON) and validates it against the
@@ -284,7 +284,7 @@ def validate_config_file(config_path: Path) -> Tuple[bool, List[str]]:
         return False, [f"Validation error: {e}"]
 
 
-def get_schema_summary() -> Dict[str, Any]:
+def get_schema_summary() -> dict[str, Any]:
     """Get summary statistics about the settings schema.
 
     Returns information like:

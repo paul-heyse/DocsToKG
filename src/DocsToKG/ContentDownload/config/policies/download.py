@@ -20,8 +20,6 @@ Controls how downloads are performed and verified.
 
 from __future__ import annotations
 
-from typing import Optional
-
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -43,7 +41,7 @@ class DownloadPolicy(BaseModel):
         ge=4096,
         description="Read chunk size in bytes",
     )
-    max_bytes: Optional[int] = Field(
+    max_bytes: int | None = Field(
         default=None,
         ge=0,
         description="Maximum allowed download size (None = unlimited)",

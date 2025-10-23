@@ -115,7 +115,6 @@ from __future__ import annotations
 import logging
 import time
 from contextvars import ContextVar
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -141,7 +140,7 @@ def emit_boundary_begin(
     artifact_id: str,
     version_id: str,
     service: str,
-    extra_payload: Optional[dict] = None,
+    extra_payload: dict | None = None,
 ) -> None:
     """Emit boundary operation begin event.
 
@@ -175,7 +174,7 @@ def emit_boundary_success(
     artifact_id: str,
     version_id: str,
     duration_ms: float,
-    extra_payload: Optional[dict] = None,
+    extra_payload: dict | None = None,
 ) -> None:
     """Emit boundary operation success event.
 
@@ -210,7 +209,7 @@ def emit_boundary_error(
     version_id: str,
     error: Exception,
     duration_ms: float,
-    extra_payload: Optional[dict] = None,
+    extra_payload: dict | None = None,
 ) -> None:
     """Emit boundary operation error event.
 
@@ -262,7 +261,7 @@ def emit_doctor_issue_found(
     description: str,
     *,
     affected_records: int = 1,
-    extra: Optional[dict] = None,
+    extra: dict | None = None,
 ) -> None:
     """Emit doctor issue found event."""
 
@@ -356,10 +355,10 @@ def emit_prune_begin(dry_run: bool = False) -> None:
 def emit_prune_orphan_found(
     *,
     item_type: str = "file",
-    item_id: Optional[str] = None,
-    path: Optional[str] = None,
+    item_id: str | None = None,
+    path: str | None = None,
     size_bytes: int = 0,
-    age_days: Optional[int] = None,
+    age_days: int | None = None,
 ) -> None:
     """Emit prune orphan found event.
 
@@ -395,7 +394,7 @@ def emit_prune_deleted(
     *,
     deleted_count: int,
     freed_bytes: int,
-    duration_ms: Optional[float] = None,
+    duration_ms: float | None = None,
     dry_run: bool = False,
 ) -> None:
     """Emit prune completion event.
@@ -427,7 +426,7 @@ def emit_prune_deleted(
 # ============================================================================
 
 
-def emit_cli_command_begin(command: str, args: Optional[dict] = None) -> float:
+def emit_cli_command_begin(command: str, args: dict | None = None) -> float:
     """Emit CLI command begin event.
 
     Args:
@@ -458,7 +457,7 @@ def emit_cli_command_begin(command: str, args: Optional[dict] = None) -> float:
 def emit_cli_command_success(
     command: str,
     duration_ms: float,
-    result_summary: Optional[dict] = None,
+    result_summary: dict | None = None,
 ) -> None:
     """Emit CLI command success event.
 
@@ -517,7 +516,7 @@ def emit_slow_operation(
     operation: str,
     duration_ms: float,
     threshold_ms: float = 1000,
-    details: Optional[dict] = None,
+    details: dict | None = None,
 ) -> None:
     """Emit slow operation warning event.
 
@@ -594,7 +593,7 @@ class TimedOperation:
         self.operation_name = operation_name
         self.start_time = 0.0
 
-    def __enter__(self) -> "TimedOperation":
+    def __enter__(self) -> TimedOperation:
         """Enter context and start timer."""
         self.start_time = time.time()
         return self

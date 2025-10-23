@@ -64,7 +64,6 @@ import sqlite3
 import sys
 import time
 from pathlib import Path
-from typing import Optional
 
 __all__ = ["install_telemetry_cli"]
 
@@ -128,7 +127,7 @@ def install_telemetry_cli(subparsers: argparse._SubParsersAction) -> None:
     pq.set_defaults(func=_cmd_query)
 
 
-def _fetch_one(cx: sqlite3.Connection, sql: str, params: tuple = ()) -> Optional[float]:
+def _fetch_one(cx: sqlite3.Connection, sql: str, params: tuple = ()) -> float | None:
     """Fetch single value from query result."""
     row = cx.execute(sql, params).fetchone()
     return row[0] if row and row[0] is not None else None

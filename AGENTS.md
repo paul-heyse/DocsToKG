@@ -14,6 +14,9 @@ The script installs uv if it is missing, respects `UV_PROJECT_ENVIRONMENT`, and 
 
 Please read AGENTS.md at the root directory
 
+### Code Style Primer
+
+Before modifying code, review the shared standards in [docs/Formats and Standards/CODESTYLE.md](<docs/Formats and Standards/CODESTYLE.md>). It covers the Python 3.12+ baseline, uv/ruff/mypy expectations, and the Google-style docstring + NAVMAP conventions that every module must follow.
 ## Project Structure & Module Organization
 
 - `src/DocsToKG/` hosts production code; extend existing domains (`ContentDownload`, `DocParsing`, `HybridSearch`, `OntologyDownload`) before creating new roots.

@@ -41,7 +41,6 @@ import json
 import sqlite3
 import sys
 import time
-from typing import Optional
 
 # SLO targets (tune to your environment)
 SLO = {
@@ -55,7 +54,7 @@ SLO = {
 }
 
 
-def load_one(conn: sqlite3.Connection, sql: str, params: tuple) -> Optional[float]:
+def load_one(conn: sqlite3.Connection, sql: str, params: tuple) -> float | None:
     """Load single value from query result."""
     cur = conn.execute(sql, params)
     row = cur.fetchone()

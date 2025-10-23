@@ -251,9 +251,10 @@ import statistics
 import time
 import unicodedata
 import uuid
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, fields
 from types import SimpleNamespace
-from typing import Any, Dict, Iterable, Iterator, List, Mapping, Optional, Sequence, Tuple, Union
+from typing import Any
 
 import pyarrow.parquet as pq
 
@@ -366,15 +367,15 @@ class Rec:
 
     text: str
     n_tok: int
-    src_idxs: List[int]
-    refs: List[str]
-    pages: List[int]
-    start_offset: Optional[int] = None
+    src_idxs: list[int]
+    refs: list[str]
+    pages: list[int]
+    start_offset: int | None = None
     has_image_captions: bool = False
     has_image_classification: bool = False
     num_images: int = 0
-    image_confidence: Optional[float] = None
-    picture_meta: Optional[List[Dict[str, Any]]] = None
+    image_confidence: float | None = None
+    picture_meta: list[dict[str, Any]] | None = None
 
 
 def read_utf8(path: Path) -> str:
@@ -402,11 +403,11 @@ def build_doc(doc_name: str, doctags_text: str) -> DoclingDocument:
     return DoclingDocument.load_from_doctags(tags, document_name=doc_name)
 
 
-def extract_refs_and_pages(chunk: BaseChunk) -> Tuple[List[str], List[int]]:
+def extract_refs_and_pages(chunk: BaseChunk) -> tuple[list[str], list[int]]:
     """Extract inline references and page numbers from a Docling chunk."""
 
-    refs: List[str] = []
-    pages: List[int] = []
+    refs: list[str] = []
+    pages: list[int] = []
     doc_id = getattr(getattr(chunk, "meta", None), "document_id", "__unknown__")
 
     for item in getattr(getattr(chunk, "meta", None), "doc_items", []) or []:
@@ -438,8 +439,8 @@ def extract_refs_and_pages(chunk: BaseChunk) -> Tuple[List[str], List[int]]:
 
 def is_structural_boundary(
     record: Rec,
-    heading_markers: Tuple[str, ...] = DEFAULT_HEADING_MARKERS,
-    caption_markers: Tuple[str, ...] = DEFAULT_CAPTION_MARKERS,
+    heading_markers: tuple[str, ...] = DEFAULT_HEADING_MARKERS,
+    caption_markers: tuple[str, ...] = DEFAULT_CAPTION_MARKERS,
 ) -> bool:
     """Return True when ``record`` begins with a structural marker."""
 
@@ -455,7 +456,7 @@ def is_structural_boundary(
 
 def summarize_image_metadata(
     chunk: BaseChunk, text: str
-) -> Tuple[bool, bool, int, Optional[float], List[Dict[str, Any]]]:
+) -> tuple[bool, bool, int, float | None, list[dict[str, Any]]]:
     """Summarise image annotations associated with ``chunk``."""
 
     has_caption = any(
@@ -464,8 +465,8 @@ def summarize_image_metadata(
     ) or text.strip().startswith("<!-- image -->")
     has_classification = False
     num_images = 0
-    confidence: Optional[float] = None
-    extras: List[Dict[str, Any]] = []
+    confidence: float | None = None
+    extras: list[dict[str, Any]] = []
     doc_id = getattr(getattr(chunk, "meta", None), "document_id", "__unknown__")
 
     for entry in getattr(getattr(chunk, "meta", None), "doc_items", []) or []:
@@ -527,7 +528,7 @@ def summarize_image_metadata(
     return has_caption, has_classification, num_images, confidence, extras
 
 
-def _extract_chunk_start(chunk: BaseChunk) -> Optional[int]:
+def _extract_chunk_start(chunk: BaseChunk) -> int | None:
     """Attempt to extract the starting character offset for ``chunk``."""
 
     try:
@@ -564,7 +565,7 @@ def merge_rec(a: Rec, b: Rec, tokenizer: Any) -> Rec:
     ]
     start_offset = min(start_offset_candidates) if start_offset_candidates else None
 
-    picture_meta: List[Dict[str, Any]] = []
+    picture_meta: list[dict[str, Any]] = []
     if a.picture_meta:
         picture_meta.extend(a.picture_meta)
     if b.picture_meta:
@@ -593,15 +594,15 @@ def merge_rec(a: Rec, b: Rec, tokenizer: Any) -> Rec:
 
 
 def coalesce_small_runs(
-    records: List[Rec],
+    records: list[Rec],
     tokenizer: Any,
     *,
     min_tokens: int,
     max_tokens: int | None = None,
     soft_barrier_margin: int = 64,
-    heading_markers: Tuple[str, ...] = DEFAULT_HEADING_MARKERS,
-    caption_markers: Tuple[str, ...] = DEFAULT_CAPTION_MARKERS,
-) -> List[Rec]:
+    heading_markers: tuple[str, ...] = DEFAULT_HEADING_MARKERS,
+    caption_markers: tuple[str, ...] = DEFAULT_CAPTION_MARKERS,
+) -> list[Rec]:
     """Merge contiguous undersized chunks while respecting structural boundaries."""
 
     if not records:
@@ -609,7 +610,7 @@ def coalesce_small_runs(
 
     max_threshold = max_tokens if max_tokens is not None else 512
 
-    output: List[Rec] = []
+    output: list[Rec] = []
     i = 0
     total = len(records)
     while i < total:
@@ -643,7 +644,7 @@ def coalesce_small_runs(
     return output
 
 
-_WORKER_STATE: Dict[str, Any] = {}
+_WORKER_STATE: dict[str, Any] = {}
 
 
 def _chunk_worker_initializer(cfg: ChunkWorkerConfig) -> None:
@@ -683,8 +684,8 @@ def _process_chunk_task(task: ChunkTask) -> ChunkResult:
     cfg: ChunkWorkerConfig = _WORKER_STATE["config"]
     tokenizer: HuggingFaceTokenizer = _WORKER_STATE["tokenizer"]
     chunker: HybridChunker = _WORKER_STATE["chunker"]
-    heading_markers: Tuple[str, ...] = _WORKER_STATE["heading_markers"]
-    caption_markers: Tuple[str, ...] = _WORKER_STATE["caption_markers"]
+    heading_markers: tuple[str, ...] = _WORKER_STATE["heading_markers"]
+    caption_markers: tuple[str, ...] = _WORKER_STATE["caption_markers"]
 
     start_time = time.perf_counter()
     chunk_count = 0
@@ -695,7 +696,7 @@ def _process_chunk_task(task: ChunkTask) -> ChunkResult:
         doc = build_doc(task.doc_stem, text)
         raw_chunks = list(chunker.chunk(dl_doc=doc))
 
-        records: List[Rec] = []
+        records: list[Rec] = []
         for idx, chunk in enumerate(raw_chunks):
             chunk_text = chunker.contextualize(chunk)
             token_count = tokenizer.count_tokens(text=chunk_text)
@@ -735,10 +736,10 @@ def _process_chunk_task(task: ChunkTask) -> ChunkResult:
         chunk_count = len(merged)
         total_tokens = sum(rec.n_tok for rec in merged)
 
-        artifact_paths: List[Path] = []
-        parquet_bytes: Optional[int] = None
-        row_group_count: Optional[int] = None
-        rows_written: Optional[int] = None
+        artifact_paths: list[Path] = []
+        parquet_bytes: int | None = None
+        row_group_count: int | None = None
+        rows_written: int | None = None
 
         # Collect chunk rows (shared for both formats)
         chunk_rows = []
@@ -866,17 +867,17 @@ def _process_chunk_task(task: ChunkTask) -> ChunkResult:
         )
 
 
-def _process_indexed_chunk_task(payload: Tuple[int, ChunkTask]) -> Tuple[int, ChunkResult]:
+def _process_indexed_chunk_task(payload: tuple[int, ChunkTask]) -> tuple[int, ChunkResult]:
     """Execute ``_process_chunk_task`` and preserve submission ordering."""
 
     index, task = payload
     return index, _process_chunk_task(task)
 
 
-def _ordered_results(results: Iterable[Tuple[int, ChunkResult]]) -> Iterator[ChunkResult]:
+def _ordered_results(results: Iterable[tuple[int, ChunkResult]]) -> Iterator[ChunkResult]:
     """Yield chunk results in their original submission order."""
 
-    pending: Dict[int, ChunkResult] = {}
+    pending: dict[int, ChunkResult] = {}
     next_index = 0
     for index, result in results:
         pending[index] = result
@@ -911,7 +912,7 @@ def _resolve_serializer_provider(spec: str) -> type[ChunkingSerializerProvider]:
     return provider_cls  # type: ignore[return-value]
 
 
-def _inspect_parquet_chunk_file(path: Path) -> Tuple[int, int, Tuple[str, ...]]:
+def _inspect_parquet_chunk_file(path: Path) -> tuple[int, int, tuple[str, ...]]:
     """Return metadata for a Parquet chunk artifact or raise ``ValueError``."""
 
     try:
@@ -940,11 +941,11 @@ def _inspect_parquet_chunk_file(path: Path) -> Tuple[int, int, Tuple[str, ...]]:
 
 
 def _normalise_validation_targets(
-    targets: Sequence[Union[Path, Tuple[str, Path]]],
-) -> List[Tuple[str, Path]]:
+    targets: Sequence[Path | tuple[str, Path]],
+) -> list[tuple[str, Path]]:
     """Coerce validation targets into ``(doc_id, Path)`` tuples."""
 
-    normalised: List[Tuple[str, Path]] = []
+    normalised: list[tuple[str, Path]] = []
     for entry in targets:
         if isinstance(entry, tuple):
             doc_id, path = entry
@@ -956,13 +957,13 @@ def _normalise_validation_targets(
 
 
 def _validate_chunk_files(
-    targets: Sequence[Union[Path, Tuple[str, Path]]],
+    targets: Sequence[Path | tuple[str, Path]],
     logger,
     *,
-    data_root: Optional[Path] = None,
-    telemetry: Optional[StageTelemetry] = None,
+    data_root: Path | None = None,
+    telemetry: StageTelemetry | None = None,
     format: str = "jsonl",
-) -> Dict[str, int]:
+) -> dict[str, int]:
     """Validate chunk artifacts and return aggregate statistics."""
 
     chunk_format = str(format or "jsonl").lower()
@@ -1055,7 +1056,7 @@ def _validate_chunk_files(
             continue
 
         file_rows = 0
-        file_errors: List[str] = []
+        file_errors: list[str] = []
         with path.open("r", encoding="utf-8", errors="replace") as handle:
             for line_no, line in enumerate(handle, start=1):
                 line = line.strip()
@@ -1146,7 +1147,7 @@ def _validate_chunk_files(
 
 
 def _resolve_parquet_chunk_artifact(
-    *, expected_jsonl_path: Path, out_dir: Path, data_root: Optional[Path]
+    *, expected_jsonl_path: Path, out_dir: Path, data_root: Path | None
 ) -> Path:
     """Best-effort resolution of a Parquet chunk artifact for validation."""
 
@@ -1154,7 +1155,7 @@ def _resolve_parquet_chunk_artifact(
         return expected_jsonl_path
 
     dataset_root = Path(data_root) / "Chunks" / "fmt=parquet"
-    candidates: List[str] = []
+    candidates: list[str] = []
     try:
         relative = expected_jsonl_path.relative_to(out_dir)
         candidates.append(storage_paths.normalize_rel_id(relative))
@@ -1185,13 +1186,13 @@ def _collect_chunk_artifacts(
     *,
     in_dir: Path,
     out_dir: Path,
-    data_root: Optional[Path],
+    data_root: Path | None,
     format: str,
-) -> List[Tuple[str, Path]]:
+) -> list[tuple[str, Path]]:
     """Return ``(doc_id, chunk_path)`` tuples for downstream validation."""
 
     chunk_format = str(format or "jsonl").lower()
-    artifacts: List[Tuple[str, Path]] = []
+    artifacts: list[tuple[str, Path]] = []
     for doc_path in doctag_files:
         doc_id, chunk_jsonl = derive_doc_id_and_chunks_path(doc_path, in_dir, out_dir)
         if chunk_format == "parquet":
@@ -1209,7 +1210,7 @@ def _collect_chunk_artifacts(
 # --- Defaults ---
 
 MANIFEST_STAGE = "chunks"
-_ACTIVE_CONFIG_HASH: Optional[str] = None
+_ACTIVE_CONFIG_HASH: str | None = None
 
 
 def _compute_worker_cfg_hash(config: ChunkWorkerConfig) -> str:
@@ -1249,7 +1250,7 @@ def _ensure_worker_initialised(config: ChunkWorkerConfig, cfg_hash: str) -> None
     """Initialise worker state lazily per process."""
 
     global _ACTIVE_CONFIG_HASH, _WORKER_STATE
-    if _WORKER_STATE and _ACTIVE_CONFIG_HASH == cfg_hash:
+    if _WORKER_STATE and cfg_hash == _ACTIVE_CONFIG_HASH:
         return
     _chunk_worker_initializer(config)
     _WORKER_STATE["config_hash"] = cfg_hash
@@ -1270,7 +1271,7 @@ def _build_chunk_plan(
 ) -> StagePlan:
     """Construct a StagePlan covering every DocTags file slated for chunking."""
 
-    plan_items: List[WorkItem] = []
+    plan_items: list[WorkItem] = []
     for doc_path in files:
         doc_id, planned_output_path = derive_doc_id_and_chunks_path(doc_path, in_dir, out_dir)
         planned_output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1283,7 +1284,7 @@ def _build_chunk_plan(
             Path(str(manifest_output_path_str)) if manifest_output_path_str else planned_output_path
         )
         fingerprint_path = manifest_output_path.with_name(f"{manifest_output_path.name}.fp.json")
-        metadata: Dict[str, Any] = {
+        metadata: dict[str, Any] = {
             "doc_id": doc_id,
             "input_path": str(doc_path),
             "output_path": str(planned_output_path),
@@ -1468,7 +1469,7 @@ def _make_chunk_stage_hooks(
 
     def after_item(
         item: WorkItem,
-        outcome_or_error: Union[ItemOutcome, StageError],
+        outcome_or_error: ItemOutcome | StageError,
         context: StageContext,
     ) -> None:
         stage_logger = context.metadata.get("logger", logger)
@@ -1873,10 +1874,10 @@ def _main_inner(
     if base_extra:
         context.merge_extra(base_extra)
 
-    heading_markers: Tuple[str, ...] = DEFAULT_HEADING_MARKERS
-    caption_markers: Tuple[str, ...] = DEFAULT_CAPTION_MARKERS
-    custom_heading_markers: List[str] = []
-    custom_caption_markers: List[str] = []
+    heading_markers: tuple[str, ...] = DEFAULT_HEADING_MARKERS
+    caption_markers: tuple[str, ...] = DEFAULT_CAPTION_MARKERS
+    custom_heading_markers: list[str] = []
+    custom_caption_markers: list[str] = []
     markers_override = getattr(args, "structural_markers", None)
     if markers_override is not None:
         markers_path = markers_override.expanduser().resolve()
@@ -2064,7 +2065,7 @@ def _main_inner(
         set_spawn_or_warn(logger)
 
         hash_alg = resolve_hash_algorithm()
-        manifest_lookup: Dict[str, Mapping[str, Any]] = dict(html_manifest_index)
+        manifest_lookup: dict[str, Mapping[str, Any]] = dict(html_manifest_index)
         manifest_lookup.update(pdf_manifest_index)
         plan = _build_chunk_plan(
             files=files,
@@ -2096,14 +2097,14 @@ def _main_inner(
 def _run_validate_only(
     *,
     doctag_files: Sequence[Path],
-    chunk_artifacts: Sequence[Tuple[str, Path]],
+    chunk_artifacts: Sequence[tuple[str, Path]],
     expected_artifacts: int,
     logger,
     cfg: ChunkerCfg,
     tokenizer_model: str,
-    heading_markers: Tuple[str, ...],
-    caption_markers: Tuple[str, ...],
-    data_root: Optional[Path],
+    heading_markers: tuple[str, ...],
+    caption_markers: tuple[str, ...],
+    data_root: Path | None,
     in_dir: Path,
     out_dir: Path,
     telemetry: StageTelemetry,
@@ -2167,7 +2168,7 @@ def _run_validate_only(
 
     total_chunks = 0
     total_records = 0
-    token_counts: List[int] = []
+    token_counts: list[int] = []
     boundary_violations = 0
     heading_hits = 0
     caption_hits = 0
@@ -2179,7 +2180,7 @@ def _run_validate_only(
         doc = build_doc(doc_name=path.stem, doctags_text=doctags_text)
         chunks = list(chunker.chunk(dl_doc=doc))
         total_chunks += len(chunks)
-        recs: List[Rec] = []
+        recs: list[Rec] = []
         for idx, ch in enumerate(chunks):
             text = chunker.contextualize(ch)
             n_tok = tokenizer.count_tokens(text=text)
@@ -2256,10 +2257,10 @@ def _run_validate_only(
 
 def _write_chunks_atomic(
     output_path: Path,
-    chunk_rows: List[Dict[str, Any]],
+    chunk_rows: list[dict[str, Any]],
     format: str,
     doc_id: str,
-    data_root: Optional[Path],
+    data_root: Path | None,
     cfg_hash: str,
 ) -> None:
     """

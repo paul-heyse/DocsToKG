@@ -30,7 +30,6 @@ from __future__ import annotations
 import hashlib
 import logging
 from pathlib import Path
-from typing import Optional
 
 from DocsToKG.ContentDownload.catalog.fs_layout import (
     choose_final_path,
@@ -70,15 +69,15 @@ def finalize_artifact(
     artifact_id: str,
     source_url: str,
     resolver: str,
-    content_type: Optional[str],
+    content_type: str | None,
     *,
-    catalog: Optional[CatalogStore] = None,
+    catalog: CatalogStore | None = None,
     root_dir: str = "data/docs",
     layout: str = "policy_path",
     hardlink_dedup: bool = True,
     compute_sha256: bool = True,
     verify_on_register: bool = False,
-    run_id: Optional[str] = None,
+    run_id: str | None = None,
 ) -> dict:
     """Finalize a downloaded artifact: compute hash, choose path, register.
 

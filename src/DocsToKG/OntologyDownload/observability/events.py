@@ -86,8 +86,8 @@ import platform
 import sys
 import uuid
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -95,13 +95,11 @@ logger = logging.getLogger(__name__)
 # Context Variables (for correlation)
 # ============================================================================
 
-_run_id_var: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar("run_id", default=None)
-_config_hash_var: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
+_run_id_var: contextvars.ContextVar[str | None] = contextvars.ContextVar("run_id", default=None)
+_config_hash_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "config_hash", default=None
 )
-_service_var: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
-    "service", default=None
-)
+_service_var: contextvars.ContextVar[str | None] = contextvars.ContextVar("service", default=None)
 
 
 # ============================================================================
@@ -113,10 +111,10 @@ _service_var: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
 class EventIds:
     """IDs for correlating events across subsystems."""
 
-    version_id: Optional[str] = None
-    artifact_id: Optional[str] = None
-    file_id: Optional[str] = None
-    request_id: Optional[str] = None
+    version_id: str | None = None
+    artifact_id: str | None = None
+    file_id: str | None = None
+    request_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -126,9 +124,9 @@ class EventContext:
     app_version: str
     os_name: str
     python_version: str
-    libarchive_version: Optional[str] = None
-    hostname: Optional[str] = None
-    pid: Optional[int] = None
+    libarchive_version: str | None = None
+    hostname: str | None = None
+    pid: int | None = None
 
 
 @dataclass(frozen=True)
@@ -156,9 +154,9 @@ class Event:
     ids: EventIds
 
     # Event-specific payload
-    payload: Dict[str, Any]
+    payload: dict[str, Any]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dict for JSON serialization."""
         return {
             "ts": self.ts,
@@ -183,9 +181,9 @@ class Event:
 
 
 def set_context(
-    run_id: Optional[str] = None,
-    config_hash: Optional[str] = None,
-    service: Optional[str] = None,
+    run_id: str | None = None,
+    config_hash: str | None = None,
+    service: str | None = None,
 ) -> None:
     """Set correlation context for emitted events.
 
@@ -205,7 +203,7 @@ def set_context(
         _service_var.set(service)
 
 
-def get_context() -> Dict[str, Optional[str]]:
+def get_context() -> dict[str, str | None]:
     """Get current correlation context.
 
     Returns:
@@ -255,14 +253,14 @@ def register_sink(sink) -> None:
 def emit_event(
     type: str,
     level: str = "INFO",
-    payload: Optional[Dict[str, Any]] = None,
-    run_id: Optional[str] = None,
-    config_hash: Optional[str] = None,
-    service: Optional[str] = None,
-    version_id: Optional[str] = None,
-    artifact_id: Optional[str] = None,
-    file_id: Optional[str] = None,
-    request_id: Optional[str] = None,
+    payload: dict[str, Any] | None = None,
+    run_id: str | None = None,
+    config_hash: str | None = None,
+    service: str | None = None,
+    version_id: str | None = None,
+    artifact_id: str | None = None,
+    file_id: str | None = None,
+    request_id: str | None = None,
 ) -> Event:
     """Emit a structured event to all registered sinks.
 
@@ -298,7 +296,7 @@ def emit_event(
 
     # Build event
     event = Event(
-        ts=datetime.now(timezone.utc).isoformat(),
+        ts=datetime.now(UTC).isoformat(),
         type=type,
         level=level,
         run_id=run_id,

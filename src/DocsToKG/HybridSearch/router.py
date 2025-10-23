@@ -50,8 +50,8 @@ from __future__ import annotations
 import inspect
 import logging
 import time
+from collections.abc import Callable, Mapping, Sequence
 from threading import RLock
-from typing import Callable, Dict, Mapping, Optional, Sequence, Tuple
 
 from .interfaces import DenseVectorStore
 
@@ -75,21 +75,21 @@ class FaissRouter:
         *,
         per_namespace: bool,
         default_store: DenseVectorStore,
-        factory: Optional[Callable[[str], DenseVectorStore]] = None,
+        factory: Callable[[str], DenseVectorStore] | None = None,
     ) -> None:
         if per_namespace and factory is None:
             raise ValueError("factory is required when per_namespace=True")
         self._per_namespace = per_namespace
         self._default_store = default_store
         self._factory = factory
-        self._stores: Dict[str, DenseVectorStore] = _StoreMap()
+        self._stores: dict[str, DenseVectorStore] = _StoreMap()
         if per_namespace:
             self._stores[DEFAULT_NAMESPACE] = default_store
         self._lock = RLock()
-        self._resolver: Optional[Callable[[int], Optional[str]]] = None
+        self._resolver: Callable[[int], str | None] | None = None
         now = time.time()
-        self._last_used: Dict[str, float] = {DEFAULT_NAMESPACE: now}
-        self._snapshots: Dict[str, Tuple[bytes, Optional[Mapping[str, object]]]] = {}
+        self._last_used: dict[str, float] = {DEFAULT_NAMESPACE: now}
+        self._snapshots: dict[str, tuple[bytes, Mapping[str, object] | None]] = {}
 
     @property
     def per_namespace(self) -> bool:
@@ -103,7 +103,7 @@ class FaissRouter:
 
         return self._default_store
 
-    def get(self, namespace: Optional[str]) -> DenseVectorStore:
+    def get(self, namespace: str | None) -> DenseVectorStore:
         """Return the store serving ``namespace`` (creating one if necessary)."""
 
         if not self._per_namespace:
@@ -130,7 +130,7 @@ class FaissRouter:
             self._last_used[key] = time.time()
             return store
 
-    def stats(self) -> Dict[str, object]:
+    def stats(self) -> dict[str, object]:
         """Return stats for all managed stores (namespaced and aggregate).
 
         The aggregate payload now summarises numeric gauges while preserving
@@ -166,9 +166,9 @@ class FaissRouter:
         return {"namespaces": snapshots, "aggregate": aggregate}
 
     @staticmethod
-    def _aggregate_stats(namespaced: Mapping[str, Mapping[str, object]]) -> Dict[str, object]:
-        totals: Dict[str, float] = {}
-        booleans: Dict[str, Dict[str, int]] = {}
+    def _aggregate_stats(namespaced: Mapping[str, Mapping[str, object]]) -> dict[str, object]:
+        totals: dict[str, float] = {}
+        booleans: dict[str, dict[str, int]] = {}
         timestamp_suffixes = ("_ts", "_timestamp")
         for stats in namespaced.values():
             if not isinstance(stats, Mapping):
@@ -186,7 +186,7 @@ class FaissRouter:
                         totals[key] = numeric if current is None else max(current, numeric)
                     else:
                         totals[key] = totals.get(key, 0.0) + numeric
-        aggregate: Dict[str, object] = dict(totals)
+        aggregate: dict[str, object] = dict(totals)
         if booleans:
             aggregate["boolean_fields"] = {
                 key: {"true": counts["true"], "false": counts["false"]}
@@ -194,7 +194,7 @@ class FaissRouter:
             }
         return aggregate
 
-    def serialize_all(self) -> Dict[str, Dict[str, object]]:
+    def serialize_all(self) -> dict[str, dict[str, object]]:
         """Serialize every managed store including snapshot metadata."""
 
         class SnapshotEntry(dict):
@@ -210,7 +210,7 @@ class FaissRouter:
                     return super().get("payload", default)
                 return super().get(key, default)
 
-        def build_entry(payload: bytes, meta: Optional[Mapping[str, object]]) -> Dict[str, object]:
+        def build_entry(payload: bytes, meta: Mapping[str, object] | None) -> dict[str, object]:
             """Package FAISS payload bytes and optional metadata for persistence."""
 
             entry = SnapshotEntry()
@@ -218,7 +218,7 @@ class FaissRouter:
             entry["meta"] = dict(meta) if isinstance(meta, Mapping) else None
             return entry
 
-        def collect(store: DenseVectorStore) -> Tuple[bytes, Optional[Mapping[str, object]]]:
+        def collect(store: DenseVectorStore) -> tuple[bytes, Mapping[str, object] | None]:
             """Extract serialized payload and snapshot metadata from ``store``.
 
             Args:
@@ -229,14 +229,14 @@ class FaissRouter:
             """
             payload = store.serialize()
             meta_getter = getattr(store, "snapshot_meta", None)
-            meta: Optional[Mapping[str, object]] = None
+            meta: Mapping[str, object] | None = None
             if callable(meta_getter):
                 raw_meta = meta_getter()
                 if isinstance(raw_meta, Mapping):
                     meta = dict(raw_meta)
             return payload, meta
 
-        payloads: Dict[str, Dict[str, object]] = {}
+        payloads: dict[str, dict[str, object]] = {}
         if not self._per_namespace:
             payload, meta = collect(self._default_store)
             payloads[DEFAULT_NAMESPACE] = build_entry(payload, meta)
@@ -251,13 +251,13 @@ class FaissRouter:
         return payloads
 
     @staticmethod
-    def _serialize_with_meta(store: DenseVectorStore) -> Dict[str, object]:
+    def _serialize_with_meta(store: DenseVectorStore) -> dict[str, object]:
         payload = store.serialize()
         meta_getter = getattr(store, "snapshot_meta", None)
         meta = meta_getter() if callable(meta_getter) else None
         return {"payload": payload, "meta": meta}
 
-    def iter_stores(self) -> Sequence[Tuple[str, DenseVectorStore]]:
+    def iter_stores(self) -> Sequence[tuple[str, DenseVectorStore]]:
         """Return a snapshot of managed stores keyed by namespace."""
 
         if not self._per_namespace:
@@ -271,7 +271,7 @@ class FaissRouter:
 
         def coerce_entry(
             entry: object,
-        ) -> Tuple[Optional[bytes], Optional[Mapping[str, object]]]:
+        ) -> tuple[bytes | None, Mapping[str, object] | None]:
             """Normalise stored payloads into raw bytes and metadata mapping.
 
             Args:
@@ -295,7 +295,7 @@ class FaissRouter:
         def restore_store(
             store: DenseVectorStore,
             blob: bytes,
-            meta: Optional[Mapping[str, object]],
+            meta: Mapping[str, object] | None,
         ) -> None:
             """Restore a store from serialized payload and optional metadata.
 
@@ -304,7 +304,7 @@ class FaissRouter:
                 blob: Serialized FAISS bytes.
                 meta: Supplemental metadata to pass to ``restore`` when supported.
             """
-            restore_fn = getattr(store, "restore")
+            restore_fn = store.restore
             if meta is None:
                 restore_fn(blob)
                 return
@@ -365,7 +365,7 @@ class FaissRouter:
                 rebuilt = store.rebuild_if_needed() or rebuilt
         return rebuilt
 
-    def set_resolver(self, resolver: Callable[[int], Optional[str]]) -> None:
+    def set_resolver(self, resolver: Callable[[int], str | None]) -> None:
         """Register a resolver applied to existing and future stores."""
 
         self._resolver = resolver
@@ -376,7 +376,7 @@ class FaissRouter:
             for store in self._stores.values():
                 store.set_id_resolver(resolver)
 
-    def set_id_resolver(self, resolver: Callable[[int], Optional[str]]) -> None:
+    def set_id_resolver(self, resolver: Callable[[int], str | None]) -> None:
         """Alias for :meth:`set_resolver` to improve readability."""
 
         self.set_resolver(resolver)
@@ -425,8 +425,8 @@ class FaissRouter:
     def run_maintenance(
         self,
         *,
-        training_sampler: Optional[Callable[[str, DenseVectorStore], Sequence]] = None,
-    ) -> Dict[str, Dict[str, bool]]:
+        training_sampler: Callable[[str, DenseVectorStore], Sequence] | None = None,
+    ) -> dict[str, dict[str, bool]]:
         """Run optional training and rebuild checks across managed stores.
 
         Args:
@@ -438,7 +438,7 @@ class FaissRouter:
             Mapping of namespace to maintenance actions performed.
         """
 
-        results: Dict[str, Dict[str, bool]] = {}
+        results: dict[str, dict[str, bool]] = {}
         if not self._per_namespace:
             namespace = DEFAULT_NAMESPACE
             store = self._default_store
@@ -454,8 +454,8 @@ class FaissRouter:
         self,
         namespace: str,
         store: DenseVectorStore,
-        training_sampler: Optional[Callable[[str, DenseVectorStore], Sequence]],
-    ) -> Dict[str, bool]:
+        training_sampler: Callable[[str, DenseVectorStore], Sequence] | None,
+    ) -> dict[str, bool]:
         actions = {"trained": False, "rebuilt": False}
         if training_sampler is not None and store.needs_training():
             vectors = training_sampler(namespace, store)

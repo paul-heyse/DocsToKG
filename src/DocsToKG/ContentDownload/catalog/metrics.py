@@ -36,7 +36,6 @@ Provides observability into catalog usage with 3 key metrics:
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -139,7 +138,7 @@ class CatalogMetrics:
 
 
 # Global metrics instance
-_metrics_instance: Optional[CatalogMetrics] = None
+_metrics_instance: CatalogMetrics | None = None
 
 
 def get_catalog_metrics() -> CatalogMetrics:

@@ -30,9 +30,9 @@ and manual overrides.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Mapping, Optional, Tuple
 
 __all__ = [
     "ResumeController",
@@ -42,7 +42,7 @@ __all__ = [
 
 def should_skip_output(
     output_path: Path,
-    manifest_entry: Optional[Mapping[str, object]],
+    manifest_entry: Mapping[str, object] | None,
     input_hash: str,
     resume: bool,
     force: bool,
@@ -75,9 +75,9 @@ class ResumeController:
 
     resume: bool
     force: bool
-    manifest_index: Optional[Mapping[str, Mapping[str, object]]] = None
+    manifest_index: Mapping[str, Mapping[str, object]] | None = None
 
-    def entry(self, doc_id: str) -> Optional[Mapping[str, object]]:
+    def entry(self, doc_id: str) -> Mapping[str, object] | None:
         """Return the manifest entry associated with ``doc_id`` when available."""
 
         if not self.manifest_index:
@@ -86,7 +86,7 @@ class ResumeController:
 
     def can_skip_without_hash(
         self, doc_id: str, output_path: Path
-    ) -> Tuple[bool, Optional[Mapping[str, object]]]:
+    ) -> tuple[bool, Mapping[str, object] | None]:
         """Return ``True`` when manifest metadata alone justifies skipping.
 
         The predicate implements a fast path for planners and other tooling that
@@ -117,7 +117,7 @@ class ResumeController:
 
     def should_skip(
         self, doc_id: str, output_path: Path, input_hash: str
-    ) -> Tuple[bool, Optional[Mapping[str, object]]]:
+    ) -> tuple[bool, Mapping[str, object] | None]:
         """Return ``True`` when work for ``doc_id`` can be safely skipped."""
 
         entry = self.entry(doc_id)
@@ -126,7 +126,7 @@ class ResumeController:
 
     def should_process(
         self, doc_id: str, output_path: Path, input_hash: str
-    ) -> Tuple[bool, Optional[Mapping[str, object]]]:
+    ) -> tuple[bool, Mapping[str, object] | None]:
         """Return ``True`` when ``doc_id`` requires processing."""
 
         skip, entry = self.should_skip(doc_id, output_path, input_hash)

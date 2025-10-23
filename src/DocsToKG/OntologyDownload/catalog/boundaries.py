@@ -71,10 +71,10 @@ import contextlib
 import json
 import logging
 import time
+from collections.abc import Generator
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Generator, Optional
 from uuid import uuid4
 
 try:  # pragma: no cover
@@ -109,7 +109,7 @@ class DownloadBoundaryResult:
     version_id: str
     fs_relpath: str
     size: int
-    etag: Optional[str]
+    etag: str | None
     inserted: bool
 
 
@@ -156,7 +156,7 @@ def download_boundary(
     version_id: str,
     fs_relpath: str,
     size: int,
-    etag: Optional[str] = None,
+    etag: str | None = None,
 ) -> Generator[DownloadBoundaryResult, None, None]:
     """Transactional boundary for download operations.
 
@@ -426,7 +426,7 @@ def validation_boundary(
     file_id: str,
     validator: str,
     status: str,
-    details: Optional[dict] = None,
+    details: dict | None = None,
 ) -> Generator[ValidationBoundaryResult, None, None]:
     """Transactional boundary for validation operations.
 

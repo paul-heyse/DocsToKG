@@ -8,6 +8,11 @@ Use the uv bootstrap to stand up the project environment:
 
 The script installs uv if it is missing, respects `UV_PROJECT_ENVIRONMENT`, and installs DocsToKG in editable mode. After activation, use the tools in `.venv/bin/` (for example `pytest -q`, `ruff check`, or `python -m DocsToKG.<module>`).
 
+## Code Style & Architecture References
+
+- Follow [docs/Formats and Standards/CODESTYLE.md](<../../../../docs/Formats and Standards/CODESTYLE.md>) for Python 3.12+ compatibility, uv-based tooling, and the NAVMAP/docstring requirements.
+- Architecture context: [OntologyDownload overview](<../../../../docs/architecture/110-ontology-download.updated.md>) and [Level 2 planning/execution details](<../../../../docs/architecture/110-ontology-download.level2.updated.md>).
+
 ## Mission & Scope
 
 - **Mission**: Plan, download, and validate third-party ontologies with deterministic manifests so downstream DocsToKG ingestion can trust provenance and integrity.

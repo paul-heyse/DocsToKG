@@ -57,7 +57,6 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Optional, Tuple
 
 __all__ = [
     "BM25Stats",
@@ -82,7 +81,7 @@ class BM25Stats:
 
     N: int
     avgdl: float
-    df: Dict[str, int]
+    df: dict[str, int]
 
 
 @dataclass(slots=True)
@@ -92,9 +91,9 @@ class SpladeCfg:
     model_dir: Path
     device: str = "cuda"
     batch_size: int = 32
-    cache_folder: Optional[Path] = None
-    max_active_dims: Optional[int] = None
-    attn_impl: Optional[str] = None
+    cache_folder: Path | None = None
+    max_active_dims: int | None = None
+    attn_impl: str | None = None
     local_files_only: bool = True
 
 
@@ -107,7 +106,7 @@ class QwenCfg:
     tp: int = 1
     gpu_mem_util: float = 0.60
     batch_size: int = 32
-    quantization: Optional[str] = None
+    quantization: str | None = None
     dim: int = 2560
     cache_enabled: bool = True
 
@@ -120,12 +119,12 @@ class ChunkWorkerConfig:
     min_tokens: int
     max_tokens: int
     soft_barrier_margin: int
-    heading_markers: Tuple[str, ...]
-    caption_markers: Tuple[str, ...]
+    heading_markers: tuple[str, ...]
+    caption_markers: tuple[str, ...]
     docling_version: str
     serializer_provider_spec: str = DEFAULT_SERIALIZER_PROVIDER
     inject_anchors: bool = False
-    data_root: Optional[Path] = None
+    data_root: Path | None = None
     format: str = "parquet"
 
 
@@ -139,7 +138,7 @@ class ChunkTask:
     doc_stem: str
     input_hash: str
     parse_engine: str
-    sanitizer_profile: Optional[str] = None
+    sanitizer_profile: str | None = None
 
 
 @dataclass(slots=True)
@@ -156,10 +155,10 @@ class ChunkResult:
     chunk_count: int
     total_tokens: int
     parse_engine: str
-    sanitizer_profile: Optional[str] = None
+    sanitizer_profile: str | None = None
     anchors_injected: bool = False
-    error: Optional[str] = None
-    artifact_paths: Tuple[Path, ...] = ()
-    parquet_bytes: Optional[int] = None
-    row_group_count: Optional[int] = None
-    rows_written: Optional[int] = None
+    error: str | None = None
+    artifact_paths: tuple[Path, ...] = ()
+    parquet_bytes: int | None = None
+    row_group_count: int | None = None
+    rows_written: int | None = None

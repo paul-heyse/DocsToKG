@@ -91,7 +91,7 @@ NAVMAP:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated
 
 import typer
 
@@ -139,16 +139,16 @@ app.add_typer(inspect_app, name="inspect", help="Inspect datasets (chunks|vector
 def root_callback(
     ctx: typer.Context,
     profile: Annotated[
-        Optional[str], typer.Option("--profile", help="Profile name to load from docstokg.toml")
+        str | None, typer.Option("--profile", help="Profile name to load from docstokg.toml")
     ] = None,
     data_root: Annotated[
-        Optional[Path], typer.Option("--data-root", help="Override base data directory")
+        Path | None, typer.Option("--data-root", help="Override base data directory")
     ] = None,
     log_level: Annotated[
-        Optional[str], typer.Option("--log-level", help="Logging level (DEBUG|INFO|WARNING|ERROR)")
+        str | None, typer.Option("--log-level", help="Logging level (DEBUG|INFO|WARNING|ERROR)")
     ] = None,
     log_format: Annotated[
-        Optional[str], typer.Option("--log-format", help="Logging format (console|json)")
+        str | None, typer.Option("--log-format", help="Logging format (console|json)")
     ] = None,
     verbose: Annotated[
         int,
@@ -193,9 +193,7 @@ def root_callback(
     """
     try:
         # Map verbose count to log level
-        if verbose >= 2:
-            effective_log_level = "DEBUG"
-        elif verbose == 1:
+        if verbose >= 2 or verbose == 1:
             effective_log_level = "DEBUG"
         else:
             effective_log_level = log_level or "INFO"
@@ -356,42 +354,40 @@ def config_diff(
 def doctags(
     ctx: typer.Context,
     input_dir: Annotated[
-        Optional[Path], typer.Option("--input-dir", help="Input directory for PDF/HTML files")
+        Path | None, typer.Option("--input-dir", help="Input directory for PDF/HTML files")
     ] = None,
     output_dir: Annotated[
-        Optional[Path], typer.Option("--output-dir", help="Output directory for DocTags")
+        Path | None, typer.Option("--output-dir", help="Output directory for DocTags")
     ] = None,
     mode: Annotated[
-        Optional[str], typer.Option("--mode", help="Conversion mode (auto|pdf|html)")
+        str | None, typer.Option("--mode", help="Conversion mode (auto|pdf|html)")
     ] = None,
-    model_id: Annotated[Optional[str], typer.Option("--model-id", help="DocTags model ID")] = None,
+    model_id: Annotated[str | None, typer.Option("--model-id", help="DocTags model ID")] = None,
     resume: Annotated[
         bool, typer.Option("--resume/--no-resume", help="Resume from manifest")
     ] = True,
     force: Annotated[bool, typer.Option("--force/--no-force", help="Force recomputation")] = False,
     # Runner options
-    workers: Annotated[
-        Optional[int], typer.Option("--workers", help="Max parallel workers")
-    ] = None,
+    workers: Annotated[int | None, typer.Option("--workers", help="Max parallel workers")] = None,
     policy: Annotated[
-        Optional[str], typer.Option("--policy", help="Execution policy (io|cpu|gpu)")
+        str | None, typer.Option("--policy", help="Execution policy (io|cpu|gpu)")
     ] = None,
     retries: Annotated[
-        Optional[int], typer.Option("--retries", help="Max retries per failed item")
+        int | None, typer.Option("--retries", help="Max retries per failed item")
     ] = None,
     retry_backoff_s: Annotated[
-        Optional[float],
+        float | None,
         typer.Option("--retry-backoff-s", help="Retry backoff in seconds (exponential)"),
     ] = None,
     timeout_s: Annotated[
-        Optional[float],
+        float | None,
         typer.Option("--timeout-s", help="Per-item timeout in seconds (0=unlimited)"),
     ] = None,
     error_budget: Annotated[
-        Optional[int], typer.Option("--error-budget", help="Max errors before stop (0=unlimited)")
+        int | None, typer.Option("--error-budget", help="Max errors before stop (0=unlimited)")
     ] = None,
     max_queue: Annotated[
-        Optional[int],
+        int | None,
         typer.Option("--max-queue", help="Max queued items for backpressure (0=unlimited)"),
     ] = None,
 ) -> None:
@@ -490,50 +486,46 @@ def doctags(
 def chunk(
     ctx: typer.Context,
     input_dir: Annotated[
-        Optional[Path], typer.Option("--in-dir", help="DocTags input directory")
+        Path | None, typer.Option("--in-dir", help="DocTags input directory")
     ] = None,
     output_dir: Annotated[
-        Optional[Path], typer.Option("--out-dir", help="Chunks output directory")
+        Path | None, typer.Option("--out-dir", help="Chunks output directory")
     ] = None,
     fmt: Annotated[
-        Optional[str], typer.Option("--format", help="Output format (parquet|jsonl)")
+        str | None, typer.Option("--format", help="Output format (parquet|jsonl)")
     ] = None,
     min_tokens: Annotated[
-        Optional[int], typer.Option("--min-tokens", help="Minimum tokens per chunk")
+        int | None, typer.Option("--min-tokens", help="Minimum tokens per chunk")
     ] = None,
     max_tokens: Annotated[
-        Optional[int], typer.Option("--max-tokens", help="Maximum tokens per chunk")
+        int | None, typer.Option("--max-tokens", help="Maximum tokens per chunk")
     ] = None,
-    tokenizer: Annotated[
-        Optional[str], typer.Option("--tokenizer", help="Tokenizer model ID")
-    ] = None,
+    tokenizer: Annotated[str | None, typer.Option("--tokenizer", help="Tokenizer model ID")] = None,
     resume: Annotated[
         bool, typer.Option("--resume/--no-resume", help="Resume from manifest")
     ] = True,
     force: Annotated[bool, typer.Option("--force/--no-force", help="Force recomputation")] = False,
     # Runner options
-    workers: Annotated[
-        Optional[int], typer.Option("--workers", help="Max parallel workers")
-    ] = None,
+    workers: Annotated[int | None, typer.Option("--workers", help="Max parallel workers")] = None,
     policy: Annotated[
-        Optional[str], typer.Option("--policy", help="Execution policy (io|cpu|gpu)")
+        str | None, typer.Option("--policy", help="Execution policy (io|cpu|gpu)")
     ] = None,
     retries: Annotated[
-        Optional[int], typer.Option("--retries", help="Max retries per failed item")
+        int | None, typer.Option("--retries", help="Max retries per failed item")
     ] = None,
     retry_backoff_s: Annotated[
-        Optional[float],
+        float | None,
         typer.Option("--retry-backoff-s", help="Retry backoff in seconds (exponential)"),
     ] = None,
     timeout_s: Annotated[
-        Optional[float],
+        float | None,
         typer.Option("--timeout-s", help="Per-item timeout in seconds (0=unlimited)"),
     ] = None,
     error_budget: Annotated[
-        Optional[int], typer.Option("--error-budget", help="Max errors before stop (0=unlimited)")
+        int | None, typer.Option("--error-budget", help="Max errors before stop (0=unlimited)")
     ] = None,
     max_queue: Annotated[
-        Optional[int],
+        int | None,
         typer.Option("--max-queue", help="Max queued items for backpressure (0=unlimited)"),
     ] = None,
 ) -> None:
@@ -613,16 +605,16 @@ def chunk(
 def embed(
     ctx: typer.Context,
     chunks_dir: Annotated[
-        Optional[Path], typer.Option("--chunks-dir", help="Chunks input directory")
+        Path | None, typer.Option("--chunks-dir", help="Chunks input directory")
     ] = None,
     output_dir: Annotated[
-        Optional[Path], typer.Option("--out-dir", help="Vectors output directory")
+        Path | None, typer.Option("--out-dir", help="Vectors output directory")
     ] = None,
     vector_format: Annotated[
-        Optional[str], typer.Option("--format", help="Vector format (parquet|jsonl)")
+        str | None, typer.Option("--format", help="Vector format (parquet|jsonl)")
     ] = None,
     dense_backend: Annotated[
-        Optional[str],
+        str | None,
         typer.Option("--dense-backend", help="Dense backend (qwen_vllm|tei|sentence_transformers)"),
     ] = None,
     resume: Annotated[
@@ -630,28 +622,26 @@ def embed(
     ] = True,
     force: Annotated[bool, typer.Option("--force/--no-force", help="Force recomputation")] = False,
     # Runner options
-    workers: Annotated[
-        Optional[int], typer.Option("--workers", help="Max parallel workers")
-    ] = None,
+    workers: Annotated[int | None, typer.Option("--workers", help="Max parallel workers")] = None,
     policy: Annotated[
-        Optional[str], typer.Option("--policy", help="Execution policy (io|cpu|gpu)")
+        str | None, typer.Option("--policy", help="Execution policy (io|cpu|gpu)")
     ] = None,
     retries: Annotated[
-        Optional[int], typer.Option("--retries", help="Max retries per failed item")
+        int | None, typer.Option("--retries", help="Max retries per failed item")
     ] = None,
     retry_backoff_s: Annotated[
-        Optional[float],
+        float | None,
         typer.Option("--retry-backoff-s", help="Retry backoff in seconds (exponential)"),
     ] = None,
     timeout_s: Annotated[
-        Optional[float],
+        float | None,
         typer.Option("--timeout-s", help="Per-item timeout in seconds (0=unlimited)"),
     ] = None,
     error_budget: Annotated[
-        Optional[int], typer.Option("--error-budget", help="Max errors before stop (0=unlimited)")
+        int | None, typer.Option("--error-budget", help="Max errors before stop (0=unlimited)")
     ] = None,
     max_queue: Annotated[
-        Optional[int],
+        int | None,
         typer.Option("--max-queue", help="Max queued items for backpressure (0=unlimited)"),
     ] = None,
 ) -> None:
@@ -804,7 +794,7 @@ def all(
 def _inspect_dataset(
     ctx: typer.Context,
     dataset: str,
-    root: Optional[Path],
+    root: Path | None,
     limit: int,
 ) -> None:
     from DocsToKG.DocParsing.storage.dataset_view import open_chunks, open_vectors, summarize
@@ -871,7 +861,7 @@ def inspect_root(
             help="Dataset to inspect (chunks|vectors-dense|vectors-sparse|vectors-lexical)",
         ),
     ] = "chunks",
-    root: Annotated[Optional[Path], typer.Option("--root", help="Dataset base directory")] = None,
+    root: Annotated[Path | None, typer.Option("--root", help="Dataset base directory")] = None,
     limit: Annotated[int, typer.Option("--limit", help="Max rows to show (0=all)")] = 0,
 ) -> None:
     """
@@ -895,7 +885,7 @@ def inspect_dataset(
             help="Dataset to inspect (chunks|vectors-dense|vectors-sparse|vectors-lexical)",
         ),
     ] = "chunks",
-    root: Annotated[Optional[Path], typer.Option("--root", help="Dataset base directory")] = None,
+    root: Annotated[Path | None, typer.Option("--root", help="Dataset base directory")] = None,
     limit: Annotated[int, typer.Option("--limit", help="Max rows to show (0=all)")] = 0,
 ) -> None:
     """Inspect dataset schema and statistics."""

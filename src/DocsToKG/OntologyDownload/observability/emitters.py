@@ -64,9 +64,8 @@ All emitters implement the simple `emit(event: Event)` interface.
 import logging
 import threading
 from abc import ABC, abstractmethod
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Optional
 
 from DocsToKG.OntologyDownload.observability.events import Event
 
@@ -149,8 +148,8 @@ class FileJsonlEmitter(EventEmitter):
     def __init__(
         self,
         filepath: str,
-        max_size_bytes: Optional[int] = None,
-        max_lines: Optional[int] = None,
+        max_size_bytes: int | None = None,
+        max_lines: int | None = None,
     ):
         """Initialize file emitter.
 
@@ -171,7 +170,7 @@ class FileJsonlEmitter(EventEmitter):
         # Count existing lines if file exists
         if self.filepath.exists():
             try:
-                with open(self.filepath, "r") as f:
+                with open(self.filepath) as f:
                     self.line_count = sum(1 for _ in f)
             except Exception as e:
                 logger.warning(f"Could not count existing lines: {e}")
@@ -208,7 +207,7 @@ class FileJsonlEmitter(EventEmitter):
             return
 
         # Rename current file with timestamp
-        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+        timestamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
         backup_path = self.filepath.parent / f"{self.filepath.stem}.{timestamp}.jsonl"
 
         try:

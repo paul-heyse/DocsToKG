@@ -42,9 +42,9 @@
 from __future__ import annotations
 
 import threading
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence, Tuple
 
 from DocsToKG.DocParsing.core.models import SpladeCfg
 from DocsToKG.DocParsing.env import ensure_splade_dependencies, ensure_splade_environment
@@ -57,14 +57,14 @@ class SpladeSTConfig:
     model_dir: Path
     device: str = "auto"
     batch_size: int = 32
-    cache_folder: Optional[Path] = None
-    max_active_dims: Optional[int] = None
-    attn_impl: Optional[str] = None
+    cache_folder: Path | None = None
+    max_active_dims: int | None = None
+    attn_impl: str | None = None
     local_files_only: bool = True
 
 
-_SPLADE_ENCODER_CACHE: Dict[Tuple[str, str, Optional[str], Optional[int]], object] = {}
-_SPLADE_ENCODER_BACKENDS: Dict[Tuple[str, str, Optional[str], Optional[int]], str] = {}
+_SPLADE_ENCODER_CACHE: dict[tuple[str, str, str | None, int | None], object] = {}
+_SPLADE_ENCODER_BACKENDS: dict[tuple[str, str, str | None, int | None], str] = {}
 _SPLADE_LOCK = threading.Lock()
 
 
@@ -83,7 +83,7 @@ def _get_sparse_encoder_cls():
     return cls
 
 
-def _detect_splade_backend(encoder, requested: Optional[str]) -> str:
+def _detect_splade_backend(encoder, requested: str | None) -> str:
     candidates = (
         ("model", "model", "config", "attn_implementation"),
         ("model", "config", "attn_implementation"),
@@ -114,13 +114,13 @@ def _get_encoder(cfg: SpladeCfg):
             return _SPLADE_ENCODER_CACHE[key]
 
         encoder_cls = _get_sparse_encoder_cls()
-        model_kwargs: Dict[str, object] = {}
+        model_kwargs: dict[str, object] = {}
         if cfg.attn_impl:
             model_kwargs["attn_implementation"] = cfg.attn_impl
         if cfg.max_active_dims is not None:
             model_kwargs["max_active_dims"] = cfg.max_active_dims
 
-        backend_used: Optional[str] = cfg.attn_impl
+        backend_used: str | None = cfg.attn_impl
         try:
             encoder = encoder_cls(
                 str(cfg.model_dir),
@@ -194,7 +194,7 @@ class SpladeSTProvider(SparseEmbeddingBackend):
         self._ctx = None
         self._splade_cfg = None
 
-    def encode(self, texts: Sequence[str]) -> Sequence[Sequence[Tuple[str, float]]]:
+    def encode(self, texts: Sequence[str]) -> Sequence[Sequence[tuple[str, float]]]:
         if not texts:
             return []
         if self._splade_cfg is None:
@@ -205,7 +205,7 @@ class SpladeSTProvider(SparseEmbeddingBackend):
                 retryable=False,
             )
         encoder = _get_encoder(self._splade_cfg)
-        token_lists: List[List[Tuple[str, float]]] = []
+        token_lists: list[list[tuple[str, float]]] = []
         batch_size = self._splade_cfg.batch_size
         with self._lock:
             for i in range(0, len(texts), batch_size):

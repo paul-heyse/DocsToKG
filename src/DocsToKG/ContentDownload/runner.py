@@ -47,9 +47,10 @@ Design Principles
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable, Optional
+from typing import Any
 
 from DocsToKG.ContentDownload.bootstrap import (
     BootstrapConfig,
@@ -72,7 +73,7 @@ _LOGGER = logging.getLogger(__name__)
 class RunResult:
     """Result of a download run."""
 
-    run_id: Optional[str]
+    run_id: str | None
     total_processed: int
     successful: int
     failed: int
@@ -98,9 +99,9 @@ class DownloadRun:
             config: Pydantic v2 configuration model
         """
         self.config = config
-        self.pipeline: Optional[ResolverPipeline] = None
-        self._result: Optional[BootstrapRunResult] = None
-        self._bootstrap_config: Optional[BootstrapConfig] = None
+        self.pipeline: ResolverPipeline | None = None
+        self._result: BootstrapRunResult | None = None
+        self._bootstrap_config: BootstrapConfig | None = None
 
     def __enter__(self) -> DownloadRun:
         """Set up the pipeline and telemetry on context entry."""
@@ -267,9 +268,9 @@ class DownloadRun:
 
 
 def run(
-    config_path: Optional[str] = None,
-    artifacts: Optional[Iterable[Any]] = None,
-    cli_overrides: Optional[dict[str, Any]] = None,
+    config_path: str | None = None,
+    artifacts: Iterable[Any] | None = None,
+    cli_overrides: dict[str, Any] | None = None,
 ) -> RunResult:
     """Run download pipeline using canonical bootstrap orchestrator.
 

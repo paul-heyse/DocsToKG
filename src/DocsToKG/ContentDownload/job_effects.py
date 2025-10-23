@@ -80,10 +80,11 @@ from __future__ import annotations
 import json
 import sqlite3
 import time
-from typing import Any, Callable, Optional
+from collections.abc import Callable
+from typing import Any
 
 
-def _extract_result_json(row: Any) -> Optional[str]:
+def _extract_result_json(row: Any) -> str | None:
     """Return the ``result_json`` column from a SQLite row.
 
     The helper accepts rows returned both as ``sqlite3.Row`` mappings and as
@@ -191,7 +192,7 @@ def get_effect_result(
     cx: sqlite3.Connection,
     *,
     opkey: str,
-) -> Optional[dict[str, Any]]:
+) -> dict[str, Any] | None:
     """Retrieve a previously recorded operation result.
 
     Parameters

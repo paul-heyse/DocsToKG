@@ -50,7 +50,6 @@ predictable for both humans and automation.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 __all__ = [
     "CLIValidationError",
@@ -67,7 +66,7 @@ class CLIValidationError(ValueError):
 
     option: str
     message: str
-    hint: Optional[str] = None
+    hint: str | None = None
     stage: str = "cli"
 
     def __post_init__(self) -> None:  # pragma: no cover - simple wiring

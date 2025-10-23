@@ -70,9 +70,9 @@ from __future__ import annotations
 import hashlib as _hashlib
 import sys
 from collections import OrderedDict
+from collections.abc import Sequence
 from importlib import metadata as importlib_metadata
 from pathlib import Path
-from typing import Dict, Optional, Sequence
 
 from . import plugins as plugin_mod
 from .errors import (
@@ -153,7 +153,7 @@ def validator_worker_main() -> None:
     validation_main()
 
 
-def validate_url_security(url: str, http_config: Optional[DownloadConfiguration] = None) -> str:
+def validate_url_security(url: str, http_config: DownloadConfiguration | None = None) -> str:
     """Wrapper that normalizes PolicyError into ConfigError for the public API."""
 
     try:
@@ -183,7 +183,7 @@ fetch_one = _fetch_one
 fetch_all = _fetch_all
 
 
-def list_plugins(kind: str) -> Dict[str, str]:
+def list_plugins(kind: str) -> dict[str, str]:
     """Return a deterministic mapping of registered plugins for ``kind``.
 
     Args:
@@ -199,14 +199,14 @@ def list_plugins(kind: str) -> Dict[str, str]:
         raise ValueError(f"Unknown plugin kind: {kind}") from exc
 
 
-def _collect_plugin_details(kind: str) -> "OrderedDict[str, Dict[str, str]]":
+def _collect_plugin_details(kind: str) -> OrderedDict[str, dict[str, str]]:
     """Return plugin metadata including qualified path and version."""
 
     if kind not in {"resolver", "validator"}:
         raise ValueError(f"Unknown plugin kind: {kind}")
 
     discovered_meta = plugin_mod.get_registered_plugin_meta(kind)
-    details: Dict[str, Dict[str, str]] = {}
+    details: dict[str, dict[str, str]] = {}
     for name, qualified in list_plugins(kind).items():
         meta = discovered_meta.get(name, {})
         resolved_qualified = meta.get("qualified", qualified)
@@ -227,7 +227,7 @@ def _collect_plugin_details(kind: str) -> "OrderedDict[str, Dict[str, str]]":
     return OrderedDict(sorted(details.items()))
 
 
-def about() -> Dict[str, object]:
+def about() -> dict[str, object]:
     """Return metadata describing the ontology download subsystem."""
     config = get_default_config()
     defaults = config.defaults
@@ -264,7 +264,7 @@ def about() -> Dict[str, object]:
     }
 
     storage_backend = STORAGE
-    storage_info: Dict[str, object] = {
+    storage_info: dict[str, object] = {
         "backend": type(storage_backend).__name__,
     }
     local_root = getattr(storage_backend, "root", None)
@@ -297,7 +297,7 @@ def about() -> Dict[str, object]:
 ONTOLOGY_DIR = LOCAL_ONTOLOGY_DIR
 
 
-def cli_main(argv: Optional[Sequence[str]] = None) -> int:
+def cli_main(argv: Sequence[str] | None = None) -> int:
     """Entry point for the ontology downloader CLI."""
 
     from .cli import cli_main as _cli_main

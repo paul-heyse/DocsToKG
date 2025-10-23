@@ -67,13 +67,13 @@ from __future__ import annotations
 import logging
 import os
 import threading
-from typing import Any, Dict, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 # Thread-safe metrics storage
 _stats_lock = threading.Lock()
-_url_normalization_stats: Dict[str, Any] = {
+_url_normalization_stats: dict[str, Any] = {
     "normalized_total": 0,
     "changed_total": 0,
     "hosts_seen": set(),
@@ -85,7 +85,7 @@ _url_normalization_stats: Dict[str, Any] = {
 _strict_mode = os.getenv("DOCSTOKG_URL_STRICT", "0").lower() in {"1", "true", "yes", "on"}
 
 # Role-based Accept header defaults
-ROLE_HEADERS: Dict[str, Dict[str, str]] = {
+ROLE_HEADERS: dict[str, dict[str, str]] = {
     "metadata": {
         "Accept": "application/json, text/javascript;q=0.9, */*;q=0.1",
     },
@@ -155,7 +155,7 @@ def record_url_normalization(
 def log_url_change_once(
     original_url: str,
     canonical_url: str,
-    host: Optional[str] = None,
+    host: str | None = None,
 ) -> None:
     """Log URL changes once per host to avoid spam.
 
@@ -189,9 +189,9 @@ def log_url_change_once(
 
 
 def apply_role_headers(
-    headers: Optional[Dict[str, str]],
+    headers: dict[str, str] | None,
     role: str,
-) -> Dict[str, str]:
+) -> dict[str, str]:
     """Apply role-based headers to request.
 
     Adds default Accept header per role unless already specified by caller.
@@ -216,7 +216,7 @@ def apply_role_headers(
     return headers
 
 
-def get_url_normalization_stats() -> Dict[str, Any]:
+def get_url_normalization_stats() -> dict[str, Any]:
     """Return current normalization metrics.
 
     Returns a snapshot suitable for metrics/logging.

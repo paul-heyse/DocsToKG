@@ -67,7 +67,7 @@ import threading
 import time
 import uuid
 from queue import Empty, Queue
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 from . import feature_flags
 
@@ -88,7 +88,7 @@ class OrchestratorConfig:
     def __init__(
         self,
         max_workers: int = 8,
-        max_per_resolver: Optional[dict[str, int]] = None,
+        max_per_resolver: dict[str, int] | None = None,
         max_per_host: int = 4,
         lease_ttl_seconds: int = 600,
         heartbeat_seconds: int = 30,
@@ -137,9 +137,9 @@ class Orchestrator:
     def __init__(
         self,
         config: OrchestratorConfig,
-        queue: "WorkQueue",
-        pipeline: "ResolverPipeline",
-        telemetry: Optional["RunTelemetry"] = None,
+        queue: WorkQueue,
+        pipeline: ResolverPipeline,
+        telemetry: RunTelemetry | None = None,
     ) -> None:
         """Initialize orchestrator.
 
@@ -318,7 +318,7 @@ class Orchestrator:
 
         logger.debug("Heartbeat loop stopped")
 
-    def _worker_loop(self, worker: "Worker") -> None:
+    def _worker_loop(self, worker: Worker) -> None:
         """Worker thread execution loop."""
         logger.debug(f"Worker loop started: {worker.worker_id}")
 

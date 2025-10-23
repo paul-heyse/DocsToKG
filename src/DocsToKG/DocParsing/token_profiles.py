@@ -86,9 +86,10 @@ from __future__ import annotations
 
 import argparse
 import re
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, ClassVar, Dict, List, Optional, Sequence, Tuple
+from typing import Any, ClassVar
 
 from transformers import AutoTokenizer
 
@@ -127,16 +128,16 @@ class TokenProfilesCfg(StageConfigBase):
     """Structured configuration for tokenizer ratio profiling."""
 
     log_level: str = "INFO"
-    data_root: Optional[Path] = None
+    data_root: Path | None = None
     doctags_dir: Path = DEFAULT_DOCTAGS_DIR
     sample_size: int = 20
     max_chars: int = 4000
     baseline: str = DEFAULT_TOKENIZER
-    tokenizers: Tuple[str, ...] = ()
+    tokenizers: tuple[str, ...] = ()
     window_min: int = 256
     window_max: int = 512
 
-    ENV_VARS: ClassVar[Dict[str, str]] = {
+    ENV_VARS: ClassVar[dict[str, str]] = {
         "log_level": "DOCSTOKG_TOKPROF_LOG_LEVEL",
         "data_root": "DOCSTOKG_TOKPROF_DATA_ROOT",
         "doctags_dir": "DOCSTOKG_TOKPROF_DOCTAGS_DIR",
@@ -149,7 +150,7 @@ class TokenProfilesCfg(StageConfigBase):
         "config": "DOCSTOKG_TOKPROF_CONFIG",
     }
 
-    FIELD_PARSERS: ClassVar[Dict[str, Callable[[Any, Optional[Path]], Any]]] = {
+    FIELD_PARSERS: ClassVar[dict[str, Callable[[Any, Path | None], Any]]] = {
         "config": StageConfigBase._coerce_optional_path,
         "log_level": StageConfigBase._coerce_str,
         "data_root": StageConfigBase._coerce_optional_path,
@@ -187,10 +188,10 @@ class TokenProfilesCfg(StageConfigBase):
         if self.window_max < 0:
             self.window_max = 0
 
-    def tokenizer_ids(self) -> List[str]:
+    def tokenizer_ids(self) -> list[str]:
         """Return the ordered tokenizer identifiers to profile."""
 
-        ordered: List[str] = []
+        ordered: list[str] = []
         for name in (self.baseline, *self.tokenizers):
             if not name:
                 continue
@@ -199,7 +200,7 @@ class TokenProfilesCfg(StageConfigBase):
         return ordered
 
 
-TOKEN_PROFILE_CLI_OPTIONS: Tuple[CLIOption, ...] = (
+TOKEN_PROFILE_CLI_OPTIONS: tuple[CLIOption, ...] = (
     CLIOption(
         ("--config",),
         {"type": Path, "default": None, "help": "Optional path to JSON/YAML/TOML config."},
@@ -262,7 +263,7 @@ TOKEN_PROFILE_CLI_OPTIONS: Tuple[CLIOption, ...] = (
 )
 
 
-def _clean_text(text: str, max_chars: Optional[int]) -> str:
+def _clean_text(text: str, max_chars: int | None) -> str:
     """Strip DocTags markup and collapse whitespace."""
 
     stripped = TAG_RE.sub(" ", text)
@@ -272,10 +273,10 @@ def _clean_text(text: str, max_chars: Optional[int]) -> str:
     return collapsed
 
 
-def _load_samples(root: Path, sample_size: int, max_chars: int) -> List[str]:
+def _load_samples(root: Path, sample_size: int, max_chars: int) -> list[str]:
     """Read DocTags files from ``root`` and return cleaned text samples."""
 
-    samples: List[str] = []
+    samples: list[str] = []
     limit = sample_size if sample_size > 0 else None
     max_len = max_chars if max_chars > 0 else None
     for path in iter_doctags(root):
@@ -289,7 +290,7 @@ def _load_samples(root: Path, sample_size: int, max_chars: int) -> List[str]:
     return samples
 
 
-def _count_tokens(name: str, texts: Sequence[str]) -> List[int]:
+def _count_tokens(name: str, texts: Sequence[str]) -> list[int]:
     """Return token counts for ``texts`` using the HuggingFace tokenizer ``name``."""
 
     tokenizer = AutoTokenizer.from_pretrained(name, use_fast=True)
@@ -302,7 +303,7 @@ def _mean(values: Sequence[int]) -> float:
     return sum(values) / len(values) if values else 0.0
 
 
-def _mean_ratio(candidate: Sequence[int], baseline: Sequence[int]) -> Optional[float]:
+def _mean_ratio(candidate: Sequence[int], baseline: Sequence[int]) -> float | None:
     """Compute the average ratio between token counts for two tokenizers."""
 
     ratios = [cand / base for cand, base in zip(candidate, baseline) if base]
@@ -311,7 +312,7 @@ def _mean_ratio(candidate: Sequence[int], baseline: Sequence[int]) -> Optional[f
     return sum(ratios) / len(ratios)
 
 
-def _scale(window: int, ratio: Optional[float]) -> str:
+def _scale(window: int, ratio: float | None) -> str:
     """Return the scaled token window as a string or ``'n/a'`` when absent."""
 
     return "n/a" if ratio is None else str(int(round(window * ratio)))
@@ -319,7 +320,7 @@ def _scale(window: int, ratio: Optional[float]) -> str:
 
 def _render_table(
     tokenizer_ids: Sequence[str],
-    counts: Dict[str, Sequence[int]],
+    counts: dict[str, Sequence[int]],
     baseline_name: str,
     baseline_counts: Sequence[int],
     window_min: int,
@@ -420,7 +421,7 @@ def main(args: argparse.Namespace | Sequence[str] | None = None) -> int:
         },
     )
 
-    counts: Dict[str, List[int]] = {name: _count_tokens(name, samples) for name in tokenizer_ids}
+    counts: dict[str, list[int]] = {name: _count_tokens(name, samples) for name in tokenizer_ids}
     baseline_counts = counts.get(cfg.baseline)
     if baseline_counts is None:
         log_event(

@@ -37,7 +37,6 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Optional
 from urllib.parse import urlparse, urlunparse
 
 logger = logging.getLogger(__name__)
@@ -49,7 +48,7 @@ class PolicyError(RuntimeError):
     pass
 
 
-def validate_url_security(url: str, http_config: Optional[object] = None) -> str:
+def validate_url_security(url: str, http_config: object | None = None) -> str:
     """
     Validate URL against security policy.
 

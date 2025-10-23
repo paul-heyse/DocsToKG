@@ -21,8 +21,8 @@ import ast
 import json
 import re
 import sys
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable, List
 
 NAVMAP_START = "# === NAVMAP v1 ==="
 NAVMAP_END = "# === /NAVMAP ==="
@@ -35,7 +35,7 @@ def slugify(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
 
 
-def extract_navmap(lines: List[str]) -> tuple[int, int, str] | None:
+def extract_navmap(lines: list[str]) -> tuple[int, int, str] | None:
     """Locate the NAVMAP block within ``lines``.
 
     Returns ``(start_index, end_index, json_payload)`` where the indices
@@ -76,7 +76,7 @@ def parse_navmap_json(payload: str, path: Path) -> dict:
 
     try:
         return json.loads(payload)
-    except json.JSONDecodeError as exc:
+    except json.JSONDecodeError:
         cleaned_lines = []
         for line in payload.splitlines():
             if "#" in line:
@@ -90,23 +90,12 @@ def parse_navmap_json(payload: str, path: Path) -> dict:
             raise RuntimeError(f"Failed to parse NAVMAP JSON in {path}: {inner_exc}") from inner_exc
 
 
-def build_sections(module_ast: ast.Module) -> List[dict]:
+def build_sections(module_ast: ast.Module) -> list[dict]:
     """Generate NAVMAP section entries for top-level classes and functions."""
 
-    sections: List[dict] = []
+    sections: list[dict] = []
     for node in module_ast.body:
-        if isinstance(node, ast.FunctionDef):
-            name = node.name
-            slug = slugify(name)
-            sections.append(
-                {
-                    "id": slug,
-                    "name": name,
-                    "anchor": f"function-{slug}",
-                    "kind": "function",
-                }
-            )
-        elif isinstance(node, ast.AsyncFunctionDef):
+        if isinstance(node, ast.FunctionDef) or isinstance(node, ast.AsyncFunctionDef):
             name = node.name
             slug = slugify(name)
             sections.append(
@@ -155,7 +144,7 @@ def derive_purpose(module_ast: ast.Module) -> str:
     return first_line
 
 
-def render_navmap_block(navmap: dict, include_trailing_blank: bool = False) -> List[str]:
+def render_navmap_block(navmap: dict, include_trailing_blank: bool = False) -> list[str]:
     """Serialise a NAVMAP dictionary into a list of commented lines."""
 
     serialized = json.dumps(navmap, indent=2)
@@ -198,7 +187,7 @@ def update_file(path: Path) -> bool:
         }
         navmap_lines = render_navmap_block(navmap, include_trailing_blank=True)
 
-        leading: List[str] = []
+        leading: list[str] = []
         start_idx = 0
         if lines and lines[0].startswith("#!"):
             leading.append(lines[0])
@@ -229,7 +218,7 @@ def iter_targets(args: Iterable[str]) -> Iterable[Path]:
         yield from root.rglob("*.py")
 
 
-def main(argv: List[str]) -> int:
+def main(argv: list[str]) -> int:
     changed = 0
     for path in iter_targets(argv):
         if update_file(path):

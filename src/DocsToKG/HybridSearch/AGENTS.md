@@ -9,6 +9,10 @@ Use the uv bootstrap to stand up the project environment:
 
 The script installs uv if it is missing, respects `UV_PROJECT_ENVIRONMENT`, and installs DocsToKG in editable mode. After activation, use the tools in `.venv/bin/` (for example `pytest -q`, `ruff check`, or `python -m DocsToKG.<module>`).
 
+## Code Style & Architecture References
+
+- Consult [docs/Formats and Standards/CODESTYLE.md](<../../../../docs/Formats and Standards/CODESTYLE.md>) for the Python 3.12+ baseline, uv-powered tooling, and required Google-style docstrings/NAVMAP metadata.
+- Architecture primers: [HybridSearch overview](<../../../../docs/architecture/130-hybrid-search.cuvs.updated.md>) and [Level 2 CUDA/FAISS details](<../../../../docs/architecture/130-hybrid-search.level2.cuvs.updated.md>).
 
 
 ## 1) Verify the environment exists (no install)

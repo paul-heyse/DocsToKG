@@ -45,7 +45,7 @@ import time
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 LOGGER = logging.getLogger(__name__)
 
@@ -67,13 +67,13 @@ class DeploymentSnapshot:
     deployment_id: str
     timestamp: float
     version: str
-    config: Dict[str, Any]
+    config: dict[str, Any]
     status: DeploymentStatus
-    error_message: Optional[str] = None
-    metrics_before: Optional[Dict[str, Any]] = None
-    metrics_after: Optional[Dict[str, Any]] = None
+    error_message: str | None = None
+    metrics_before: dict[str, Any] | None = None
+    metrics_after: dict[str, Any] | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "deployment_id": self.deployment_id,
@@ -98,8 +98,8 @@ class RollbackManager:
         """
         self.snapshot_dir = Path(snapshot_dir)
         self.snapshot_dir.mkdir(parents=True, exist_ok=True)
-        self._current_deployment: Optional[DeploymentSnapshot] = None
-        self._deployment_history: List[DeploymentSnapshot] = []
+        self._current_deployment: DeploymentSnapshot | None = None
+        self._deployment_history: list[DeploymentSnapshot] = []
         self._load_history()
 
     def _load_history(self) -> None:
@@ -138,8 +138,8 @@ class RollbackManager:
     def create_snapshot(
         self,
         version: str,
-        config: Dict[str, Any],
-        metrics_before: Optional[Dict[str, Any]] = None,
+        config: dict[str, Any],
+        metrics_before: dict[str, Any] | None = None,
     ) -> DeploymentSnapshot:
         """Create deployment snapshot.
 
@@ -169,7 +169,7 @@ class RollbackManager:
         LOGGER.info(f"Created deployment snapshot: {deployment_id}")
         return snapshot
 
-    def mark_deployment_complete(self, metrics_after: Optional[Dict[str, Any]] = None) -> None:
+    def mark_deployment_complete(self, metrics_after: dict[str, Any] | None = None) -> None:
         """Mark current deployment as complete.
 
         Args:
@@ -227,7 +227,7 @@ class RollbackManager:
         self._save_history()
         LOGGER.error(f"Deployment {updated.deployment_id} failed: {error_message}")
 
-    def get_previous_successful_deployment(self) -> Optional[DeploymentSnapshot]:
+    def get_previous_successful_deployment(self) -> DeploymentSnapshot | None:
         """Get most recent successful deployment.
 
         Returns:
@@ -238,7 +238,7 @@ class RollbackManager:
                 return deployment
         return None
 
-    def perform_rollback(self, deployment_id: Optional[str] = None) -> bool:
+    def perform_rollback(self, deployment_id: str | None = None) -> bool:
         """Perform rollback to specified deployment.
 
         Args:
@@ -304,7 +304,7 @@ class RollbackManager:
             LOGGER.error(f"Rollback failed: {e}")
             return False
 
-    def get_deployment_history(self, limit: int = 10) -> List[DeploymentSnapshot]:
+    def get_deployment_history(self, limit: int = 10) -> list[DeploymentSnapshot]:
         """Get recent deployment history.
 
         Args:
@@ -343,7 +343,7 @@ class RollbackManager:
 
 
 # Global rollback manager instance
-_GLOBAL_ROLLBACK_MANAGER: Optional[RollbackManager] = None
+_GLOBAL_ROLLBACK_MANAGER: RollbackManager | None = None
 
 
 def get_rollback_manager(

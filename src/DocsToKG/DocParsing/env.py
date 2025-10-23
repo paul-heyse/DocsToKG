@@ -170,8 +170,8 @@ from __future__ import annotations
 
 import importlib
 import os
+from collections.abc import Callable, Sequence
 from pathlib import Path
-from typing import Callable, Dict, Optional, Sequence, Tuple
 
 PDF_MODEL_SUBDIR = Path("granite-docling-258M")
 EXPECTED_DATA_SUBDIRS: Sequence[str] = (
@@ -268,7 +268,7 @@ def resolve_pdf_model_path(cli_value: str | None = None) -> str:
 def init_hf_env(
     hf_home: Path | str | None = None,
     model_root: Path | str | None = None,
-) -> Tuple[Path, Path]:
+) -> tuple[Path, Path]:
     """Initialise Hugging Face and transformer cache environment variables."""
 
     resolved_hf = expand_path(hf_home) if hf_home is not None else resolve_hf_home()
@@ -285,7 +285,7 @@ def init_hf_env(
     return resolved_hf, resolved_model_root
 
 
-_MODEL_ENV: Tuple[Path, Path] | None = None
+_MODEL_ENV: tuple[Path, Path] | None = None
 
 
 def _detect_cuda_device() -> str:
@@ -303,7 +303,7 @@ def _detect_cuda_device() -> str:
 
 def ensure_model_environment(
     hf_home: Path | str | None = None, model_root: Path | str | None = None
-) -> Tuple[Path, Path]:
+) -> tuple[Path, Path]:
     """Initialise and cache the HuggingFace/model-root environment settings."""
 
     global _MODEL_ENV
@@ -339,8 +339,8 @@ def ensure_qwen_dependencies(import_error: Exception | None = None) -> None:
 
 
 def ensure_splade_environment(
-    *, device: Optional[str] = None, cache_dir: Optional[Path] = None
-) -> Dict[str, str]:
+    *, device: str | None = None, cache_dir: Path | None = None
+) -> dict[str, str]:
     """Bootstrap SPLADE defaults and persist the resolved environment settings.
 
     When ``cache_dir`` is supplied the resolved path eagerly overrides both
@@ -359,7 +359,7 @@ def ensure_splade_environment(
     os.environ["DOCSTOKG_SPLADE_DEVICE"] = resolved_device
     os.environ["SPLADE_DEVICE"] = resolved_device
 
-    env_info: Dict[str, str] = {"device": resolved_device}
+    env_info: dict[str, str] = {"device": resolved_device}
 
     cache_path: Path | None = None
     if cache_dir is not None:
@@ -387,8 +387,8 @@ def ensure_splade_environment(
 
 
 def ensure_qwen_environment(
-    *, device: Optional[str] = None, dtype: Optional[str] = None, model_dir: Optional[Path] = None
-) -> Dict[str, str]:
+    *, device: str | None = None, dtype: str | None = None, model_dir: Path | None = None
+) -> dict[str, str]:
     """Bootstrap Qwen/vLLM environment defaults and return resolved settings.
 
     Explicit ``device`` and ``dtype`` arguments take precedence over any existing
@@ -416,7 +416,7 @@ def ensure_qwen_environment(
             resolved_dtype_str = "bfloat16"
     os.environ["DOCSTOKG_QWEN_DTYPE"] = resolved_dtype_str
 
-    env_info: Dict[str, str] = {"device": resolved_device, "dtype": resolved_dtype_str}
+    env_info: dict[str, str] = {"device": resolved_device, "dtype": resolved_dtype_str}
 
     model_path: Path | None = None
     if model_dir is not None:
@@ -447,7 +447,7 @@ def _looks_like_data_root(candidate: Path, expected_dirs: Sequence[str]) -> bool
     return any((candidate / directory).is_dir() for directory in expected_dirs)
 
 
-def detect_data_root(start: Optional[Path] = None) -> Path:
+def detect_data_root(start: Path | None = None) -> Path:
     """Locate the DocsToKG Data directory via env var or ancestor scan."""
 
     env_root = os.getenv("DOCSTOKG_DATA_ROOT")
@@ -477,7 +477,7 @@ def _ensure_dir(path: Path) -> Path:
     return path.resolve()
 
 
-def _resolve_data_path(root: Optional[Path], name: str) -> Path:
+def _resolve_data_path(root: Path | None, name: str) -> Path:
     """Resolve ``name`` relative to the DocsToKG data root without creating it."""
 
     if root is not None:
@@ -487,7 +487,7 @@ def _resolve_data_path(root: Optional[Path], name: str) -> Path:
     return (base / name).resolve()
 
 
-def data_doctags(root: Optional[Path] = None, *, ensure: bool = True) -> Path:
+def data_doctags(root: Path | None = None, *, ensure: bool = True) -> Path:
     """Return the DocTags directory path relative to the data root.
 
     Args:
@@ -499,28 +499,28 @@ def data_doctags(root: Optional[Path] = None, *, ensure: bool = True) -> Path:
     return _ensure_dir(path) if ensure else path
 
 
-def data_chunks(root: Optional[Path] = None, *, ensure: bool = True) -> Path:
+def data_chunks(root: Path | None = None, *, ensure: bool = True) -> Path:
     """Return the chunk directory path relative to the data root."""
 
     path = _resolve_data_path(root, "ChunkedDocTagFiles")
     return _ensure_dir(path) if ensure else path
 
 
-def data_vectors(root: Optional[Path] = None, *, ensure: bool = True) -> Path:
+def data_vectors(root: Path | None = None, *, ensure: bool = True) -> Path:
     """Return the vector directory path relative to the data root."""
 
     path = _resolve_data_path(root, "Embeddings")
     return _ensure_dir(path) if ensure else path
 
 
-def data_manifests(root: Optional[Path] = None, *, ensure: bool = True) -> Path:
+def data_manifests(root: Path | None = None, *, ensure: bool = True) -> Path:
     """Return the manifest directory path relative to the data root."""
 
     path = _resolve_data_path(root, "Manifests")
     return _ensure_dir(path) if ensure else path
 
 
-def prepare_data_root(data_root_arg: Optional[Path], default_root: Path) -> Path:
+def prepare_data_root(data_root_arg: Path | None, default_root: Path) -> Path:
     """Resolve and prepare the DocsToKG data root for a pipeline invocation."""
 
     if data_root_arg is not None:
@@ -534,7 +534,7 @@ def prepare_data_root(data_root_arg: Optional[Path], default_root: Path) -> Path
 
 def resolve_pipeline_path(
     *,
-    cli_value: Optional[Path],
+    cli_value: Path | None,
     default_path: Path,
     resolved_data_root: Path,
     data_root_overridden: bool,
@@ -549,14 +549,14 @@ def resolve_pipeline_path(
     return cli_value
 
 
-def data_pdfs(root: Optional[Path] = None, *, ensure: bool = True) -> Path:
+def data_pdfs(root: Path | None = None, *, ensure: bool = True) -> Path:
     """Return the PDFs directory path relative to the data root."""
 
     path = _resolve_data_path(root, "PDFs")
     return _ensure_dir(path) if ensure else path
 
 
-def data_html(root: Optional[Path] = None, *, ensure: bool = True) -> Path:
+def data_html(root: Path | None = None, *, ensure: bool = True) -> Path:
     """Return the HTML directory path relative to the data root."""
 
     path = _resolve_data_path(root, "HTML")

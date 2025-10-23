@@ -60,7 +60,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 try:  # pragma: no cover
     import polars as pl
@@ -116,7 +115,7 @@ class ValidationReport:
 
 def generate_latest_report(
     files_df: pl.DataFrame | pl.LazyFrame,
-    validations_df: Optional[pl.DataFrame | pl.LazyFrame] = None,
+    validations_df: pl.DataFrame | pl.LazyFrame | None = None,
 ) -> LatestVersionReport:
     """Generate comprehensive latest version report.
 

@@ -61,12 +61,12 @@ from __future__ import annotations
 
 import importlib
 import sys
-from typing import Any, Optional
+from typing import Any
 
 __all__ = ["apply_mailto", "ConfigProxy", "get_config"]
 
 
-def _load_pyalex_module() -> Optional[Any]:
+def _load_pyalex_module() -> Any | None:
     """Return the currently registered ``pyalex`` module if available."""
 
     module = sys.modules.get("pyalex")
@@ -78,7 +78,7 @@ def _load_pyalex_module() -> Optional[Any]:
         return None
 
 
-def get_config() -> Optional[Any]:
+def get_config() -> Any | None:
     """Return the live ``pyalex`` config object, handling late module swaps."""
 
     module = _load_pyalex_module()

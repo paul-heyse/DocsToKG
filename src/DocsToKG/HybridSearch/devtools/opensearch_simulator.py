@@ -67,8 +67,8 @@ metadata layouts, and scoring curves expected in production.
 from __future__ import annotations
 
 import math
+from collections.abc import Callable, Mapping, MutableMapping, Sequence
 from dataclasses import dataclass
-from typing import Callable, Dict, List, Mapping, MutableMapping, Optional, Sequence, Tuple
 
 from ..config import ChunkingConfig
 from ..interfaces import LexicalIndex
@@ -108,7 +108,7 @@ class OpenSearchIndexTemplate:
     body: Mapping[str, object]
     chunking: ChunkingConfig
 
-    def asdict(self) -> Dict[str, object]:
+    def asdict(self) -> dict[str, object]:
         """Return a dictionary representation of the template.
 
         Args:
@@ -151,7 +151,7 @@ class OpenSearchSchemaManager:
     def bootstrap_template(
         self,
         namespace: str,
-        chunking: Optional[ChunkingConfig] = None,
+        chunking: ChunkingConfig | None = None,
     ) -> OpenSearchIndexTemplate:
         """Create and cache a template for ``namespace``.
 
@@ -209,7 +209,7 @@ class OpenSearchSchemaManager:
         self.validate_namespace_schema(namespace)
         return template
 
-    def get_template(self, namespace: str) -> Optional[OpenSearchIndexTemplate]:
+    def get_template(self, namespace: str) -> OpenSearchIndexTemplate | None:
         """Return the template registered for ``namespace`` if it exists.
 
         Args:
@@ -328,10 +328,10 @@ class OpenSearchSimulator(LexicalIndex):
     """
 
     def __init__(self) -> None:
-        self._chunks: Dict[str, _StoredChunk] = {}
+        self._chunks: dict[str, _StoredChunk] = {}
         self._avg_length: float = 0.0
-        self._templates: Dict[str, OpenSearchIndexTemplate] = {}
-        self._df: Dict[str, int] = {}
+        self._templates: dict[str, OpenSearchIndexTemplate] = {}
+        self._df: dict[str, int] = {}
 
     def bulk_upsert(self, chunks: Sequence[ChunkPayload]) -> None:
         """Insert or update ``chunks`` within the simulator.
@@ -383,7 +383,7 @@ class OpenSearchSimulator(LexicalIndex):
             else:
                 self._df[token] = current - 1
 
-    def fetch(self, vector_ids: Sequence[str]) -> List[ChunkPayload]:
+    def fetch(self, vector_ids: Sequence[str]) -> list[ChunkPayload]:
         """Return the stored payloads matching ``vector_ids``.
 
         Args:
@@ -394,7 +394,7 @@ class OpenSearchSimulator(LexicalIndex):
         """
         return [self._chunks[vid].payload for vid in vector_ids if vid in self._chunks]
 
-    def vector_ids(self) -> List[str]:
+    def vector_ids(self) -> list[str]:
         """Return all vector identifiers currently stored.
 
         Args:
@@ -416,7 +416,7 @@ class OpenSearchSimulator(LexicalIndex):
         """
         self._templates[template.namespace] = template
 
-    def template_for(self, namespace: str) -> Optional[OpenSearchIndexTemplate]:
+    def template_for(self, namespace: str) -> OpenSearchIndexTemplate | None:
         """Return the registered template for ``namespace`` if present.
 
         Args:
@@ -432,8 +432,8 @@ class OpenSearchSimulator(LexicalIndex):
         query_weights: Mapping[str, float],
         filters: Mapping[str, object],
         top_k: int,
-        cursor: Optional[int] = None,
-    ) -> Tuple[List[Tuple[ChunkPayload, float]], Optional[int]]:
+        cursor: int | None = None,
+    ) -> tuple[list[tuple[ChunkPayload, float]], int | None]:
         """Execute a BM25-like search using ``query_weights``.
 
         Args:
@@ -457,8 +457,8 @@ class OpenSearchSimulator(LexicalIndex):
         query_weights: Mapping[str, float],
         filters: Mapping[str, object],
         top_k: int,
-        cursor: Optional[int] = None,
-    ) -> Tuple[List[Tuple[ChunkPayload, float]], Optional[int]]:
+        cursor: int | None = None,
+    ) -> tuple[list[tuple[ChunkPayload, float]], int | None]:
         """Execute a SPLADE-style sparse search using ``query_weights``.
 
         Args:
@@ -480,7 +480,7 @@ class OpenSearchSimulator(LexicalIndex):
             cursor,
         )
 
-    def highlight(self, chunk: ChunkPayload, query_tokens: Sequence[str]) -> List[str]:
+    def highlight(self, chunk: ChunkPayload, query_tokens: Sequence[str]) -> list[str]:
         """Return naive highlight tokens that appear in ``chunk``.
 
         Args:
@@ -491,7 +491,7 @@ class OpenSearchSimulator(LexicalIndex):
             List of tokens present in both ``chunk`` and ``query_tokens``.
         """
         lowered = chunk.text.lower()
-        highlights: List[str] = []
+        highlights: list[str] = []
         for token in query_tokens:
             token_lower = token.lower()
             if token_lower in lowered:
@@ -512,7 +512,7 @@ class OpenSearchSimulator(LexicalIndex):
             "avg_token_length": float(self._avg_length),
         }
 
-    def _filtered_chunks(self, filters: Mapping[str, object]) -> List[_StoredChunk]:
+    def _filtered_chunks(self, filters: Mapping[str, object]) -> list[_StoredChunk]:
         """Return stored chunks that satisfy ``filters``.
 
         Args:
@@ -547,10 +547,10 @@ class OpenSearchSimulator(LexicalIndex):
 
     def _paginate(
         self,
-        results: List[Tuple[ChunkPayload, float]],
+        results: list[tuple[ChunkPayload, float]],
         top_k: int,
-        cursor: Optional[int],
-    ) -> Tuple[List[Tuple[ChunkPayload, float]], Optional[int]]:
+        cursor: int | None,
+    ) -> tuple[list[tuple[ChunkPayload, float]], int | None]:
         """Paginate ``results`` according to ``top_k`` and ``cursor``.
 
         Args:
@@ -572,8 +572,8 @@ class OpenSearchSimulator(LexicalIndex):
         scoring_fn: Callable[[_StoredChunk], float],
         filters: Mapping[str, object],
         top_k: int,
-        cursor: Optional[int],
-    ) -> Tuple[List[Tuple[ChunkPayload, float]], Optional[int]]:
+        cursor: int | None,
+    ) -> tuple[list[tuple[ChunkPayload, float]], int | None]:
         """Shared sparse search implementation used by BM25 and SPLADE search.
 
         Args:
@@ -586,7 +586,7 @@ class OpenSearchSimulator(LexicalIndex):
             Tuple containing search hits and a possible pagination cursor.
         """
         candidates = self._filtered_chunks(filters)
-        scored: List[Tuple[ChunkPayload, float]] = []
+        scored: list[tuple[ChunkPayload, float]] = []
         for stored in candidates:
             score = scoring_fn(stored)
             if score > 0.0:
@@ -600,11 +600,11 @@ class OpenSearchSimulator(LexicalIndex):
         query_weights: Mapping[str, float],
         filters: Mapping[str, object],
         top_k: int,
-        cursor: Optional[int] = None,
+        cursor: int | None = None,
         *,
         k1: float = 1.2,
         b: float = 0.75,
-    ) -> Tuple[List[Tuple[ChunkPayload, float]], Optional[int]]:
+    ) -> tuple[list[tuple[ChunkPayload, float]], int | None]:
         """Execute Okapi BM25 using stored DF statistics."""
 
         candidates = self._filtered_chunks(filters)
@@ -658,7 +658,7 @@ class OpenSearchSimulator(LexicalIndex):
 def matches_filters(chunk: ChunkPayload, filters: Mapping[str, object]) -> bool:
     """Return ``True`` when ``chunk`` satisfies the provided ``filters``."""
 
-    def _stringify_for_match(value: object) -> Optional[str]:
+    def _stringify_for_match(value: object) -> str | None:
         if isinstance(value, str):
             return value
         if isinstance(value, bytes):
@@ -672,7 +672,7 @@ def matches_filters(chunk: ChunkPayload, filters: Mapping[str, object]) -> bool:
             return str(value)
         return None
 
-    def _numeric_for_match(value: object) -> Optional[float]:
+    def _numeric_for_match(value: object) -> float | None:
         if isinstance(value, bool):
             return 1.0 if value else 0.0
         if isinstance(value, (int, float)):
@@ -707,7 +707,7 @@ def matches_filters(chunk: ChunkPayload, filters: Mapping[str, object]) -> bool:
                     return True
         return False
 
-    def _sequence_values(value: object) -> Optional[Sequence[object]]:
+    def _sequence_values(value: object) -> Sequence[object] | None:
         if isinstance(value, Sequence) and not isinstance(value, (str, bytes, Mapping)):
             return value
         return None

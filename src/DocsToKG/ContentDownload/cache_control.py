@@ -60,8 +60,8 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Mapping, Optional
 
 LOGGER = logging.getLogger(__name__)
 
@@ -94,8 +94,8 @@ class CacheControlDirective:
     no_store: bool = False
     public: bool = False
     private: bool = False
-    max_age: Optional[int] = None
-    s_maxage: Optional[int] = None
+    max_age: int | None = None
+    s_maxage: int | None = None
     must_revalidate: bool = False
     proxy_revalidate: bool = False
     stale_while_revalidate: int = 0

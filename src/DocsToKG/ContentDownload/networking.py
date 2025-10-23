@@ -227,19 +227,14 @@ import logging
 import math
 import threading
 import time
+from collections.abc import Mapping, MutableMapping
 from dataclasses import dataclass, replace
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
-    Dict,
-    Mapping,
-    MutableMapping,
-    Optional,
-    Set,
-    Union,
     cast,
 )
 from urllib.parse import urlparse
@@ -311,23 +306,23 @@ __all__ = (
 
 LOGGER = logging.getLogger("DocsToKG.ContentDownload.network")
 
-DEFAULT_RETRYABLE_STATUSES: Set[int] = {429, 500, 502, 503, 504}
+DEFAULT_RETRYABLE_STATUSES: set[int] = {429, 500, 502, 503, 504}
 _TENACITY_BEFORE_SLEEP_LOG = before_sleep_log(LOGGER, logging.DEBUG)
 
 # Global breaker registry (singleton managed here)
 _BREAKER_LOCK = threading.RLock()
-_breaker_registry: Optional["BreakerRegistry"] = None
+_breaker_registry: BreakerRegistry | None = None
 
 # Exceptions considered breaker failures by default
 # (REMOVED DEFAULT_BREAKER_FAILURE_EXCEPTIONS - use BreakerClassification().failure_statuses instead)
 
 
 def configure_breaker_registry(
-    config: "BreakerConfig",
+    config: BreakerConfig,
     *,
-    cooldown_store: Optional["CooldownStore"] = None,
-    listener_factory: Optional["BreakerListenerFactory"] = None,
-) -> "BreakerRegistry":
+    cooldown_store: CooldownStore | None = None,
+    listener_factory: BreakerListenerFactory | None = None,
+) -> BreakerRegistry:
     """Create and register the process-wide breaker registry."""
 
     from DocsToKG.ContentDownload.breakers import BreakerRegistry  # Local import to avoid cycles
@@ -347,7 +342,7 @@ def configure_breaker_registry(
     return registry
 
 
-def set_breaker_registry(registry: Optional["BreakerRegistry"]) -> None:
+def set_breaker_registry(registry: BreakerRegistry | None) -> None:
     """Inject an already-created breaker registry (primarily for tests)."""
 
     global _breaker_registry
@@ -361,14 +356,14 @@ def reset_breaker_registry() -> None:
     set_breaker_registry(None)
 
 
-def get_breaker_registry() -> Optional["BreakerRegistry"]:
+def get_breaker_registry() -> BreakerRegistry | None:
     """Return the currently configured breaker registry, if any."""
 
     with _BREAKER_LOCK:
         return _breaker_registry
 
 
-def parse_retry_after_header(response: httpx.Response) -> Optional[float]:
+def parse_retry_after_header(response: httpx.Response) -> float | None:
     """Parse ``Retry-After`` header and return wait time in seconds.
 
     Args:
@@ -413,9 +408,9 @@ def parse_retry_after_header(response: httpx.Response) -> Optional[float]:
     if target_time is None:
         return None
     if target_time.tzinfo is None:
-        target_time = target_time.replace(tzinfo=timezone.utc)
+        target_time = target_time.replace(tzinfo=UTC)
 
-    delta = (target_time - datetime.now(timezone.utc)).total_seconds()
+    delta = (target_time - datetime.now(UTC)).total_seconds()
     if delta > 0.0 and math.isfinite(delta):
         return delta
     return None
@@ -429,10 +424,10 @@ class ContentPolicyViolation(httpx.HTTPError):
         message: str,
         *,
         violation: str,
-        policy: Optional[Mapping[str, Any]] = None,
-        detail: Optional[str] = None,
-        content_type: Optional[str] = None,
-        content_length: Optional[int] = None,
+        policy: Mapping[str, Any] | None = None,
+        detail: str | None = None,
+        content_type: str | None = None,
+        content_length: int | None = None,
     ) -> None:
         super().__init__(message)
         self.violation = violation
@@ -452,7 +447,7 @@ def _normalise_content_type(value: str) -> str:
 
 def _enforce_content_policy(
     response: httpx.Response,
-    content_policy: Optional[Mapping[str, Any]],
+    content_policy: Mapping[str, Any] | None,
     *,
     method: str,
     url: str,
@@ -488,21 +483,21 @@ class RetryAfterJitterWait(wait_base):
         self,
         *,
         respect_retry_after: bool,
-        retry_after_cap: Optional[float],
-        backoff_max: Optional[float],
-        retry_statuses: Set[int],
+        retry_after_cap: float | None,
+        backoff_max: float | None,
+        retry_statuses: set[int],
         fallback_wait: wait_base,
     ) -> None:
         self._respect_retry_after = respect_retry_after
         self._retry_after_cap = retry_after_cap
         if backoff_max is None:
-            self._backoff_max: Optional[float] = None
+            self._backoff_max: float | None = None
         else:
             self._backoff_max = float(max(backoff_max, 0.0))
         self._retry_statuses = set(retry_statuses)
         self._fallback_wait = fallback_wait
 
-    def _compute_retry_after(self, response: httpx.Response) -> Optional[float]:
+    def _compute_retry_after(self, response: httpx.Response) -> float | None:
         if not self._respect_retry_after:
             return None
 
@@ -529,7 +524,7 @@ class RetryAfterJitterWait(wait_base):
         if outcome is None:
             return max(0.0, fallback_delay)
 
-        response: Optional[httpx.Response]
+        response: httpx.Response | None
         if outcome.failed:
             exc = outcome.exception()
             response = getattr(exc, "response", None) if exc is not None else None
@@ -555,7 +550,7 @@ class RetryAfterJitterWait(wait_base):
         return max(0.0, retry_after_delay)
 
 
-def _close_response_safely(response: Optional[httpx.Response]) -> None:
+def _close_response_safely(response: httpx.Response | None) -> None:
     if response is None:
         return
     with contextlib.suppress(Exception):
@@ -575,7 +570,7 @@ def _before_sleep_close_response(retry_state: RetryCallState) -> None:
         delay = float(retry_state.next_action.sleep)
 
     sleep_accumulator = getattr(retry_state.retry_object, "_docs_retry_sleep", 0.0)
-    setattr(retry_state.retry_object, "_docs_retry_sleep", sleep_accumulator + max(delay, 0.0))
+    retry_state.retry_object._docs_retry_sleep = sleep_accumulator + max(delay, 0.0)
 
     outcome = retry_state.outcome
     if outcome is None:
@@ -621,7 +616,7 @@ def _before_sleep_handler(retry_state: RetryCallState) -> None:
     _TENACITY_BEFORE_SLEEP_LOG(retry_state)
 
 
-def _is_retryable_response(response: Any, retry_statuses: Set[int]) -> bool:
+def _is_retryable_response(response: Any, retry_statuses: set[int]) -> bool:
     if not isinstance(response, httpx.Response):
         return False
     status_code = getattr(response, "status_code", None)
@@ -633,12 +628,12 @@ def _build_retrying_controller(
     method: str,
     url: str,
     max_retries: int,
-    retry_statuses: Set[int],
+    retry_statuses: set[int],
     backoff_factor: float,
-    backoff_max: Optional[float],
+    backoff_max: float | None,
     respect_retry_after: bool,
-    retry_after_cap: Optional[float],
-    max_retry_duration: Optional[float],
+    retry_after_cap: float | None,
+    max_retry_duration: float | None,
 ) -> Retrying:
     fallback_wait = wait_random_exponential(multiplier=backoff_factor, max=backoff_max)
     wait_strategy = RetryAfterJitterWait(
@@ -738,7 +733,7 @@ def _compute_url_hash(url: str) -> str:
         return "unknown"
 
 
-def _extract_from_cache(response: httpx.Response) -> Optional[int]:
+def _extract_from_cache(response: httpx.Response) -> int | None:
     """Extract cache hit status from response extensions."""
     try:
         if not hasattr(response, "extensions"):
@@ -757,7 +752,7 @@ def _extract_from_cache(response: httpx.Response) -> Optional[int]:
     return None
 
 
-def _extract_revalidated(response: httpx.Response) -> Optional[int]:
+def _extract_revalidated(response: httpx.Response) -> int | None:
     """Return 1 if response was a 304 revalidation, else 0 or None."""
     try:
         return 1 if response.status_code == 304 else 0
@@ -766,7 +761,7 @@ def _extract_revalidated(response: httpx.Response) -> Optional[int]:
     return None
 
 
-def _extract_stale(response: httpx.Response) -> Optional[int]:
+def _extract_stale(response: httpx.Response) -> int | None:
     """Extract stale flag (SWrV) from response extensions."""
     try:
         if not hasattr(response, "extensions"):
@@ -778,7 +773,7 @@ def _extract_stale(response: httpx.Response) -> Optional[int]:
     return None
 
 
-def _extract_retry_after(response: httpx.Response) -> Optional[int]:
+def _extract_retry_after(response: httpx.Response) -> int | None:
     """Extract Retry-After header value in seconds."""
     try:
         retry_after_str = response.headers.get("Retry-After")
@@ -789,7 +784,7 @@ def _extract_retry_after(response: httpx.Response) -> Optional[int]:
     return None
 
 
-def _extract_rate_delay(network_meta: Dict[str, Any]) -> Optional[int]:
+def _extract_rate_delay(network_meta: dict[str, Any]) -> int | None:
     """Extract rate limiter wait time from docs_network_meta."""
     try:
         if isinstance(network_meta, dict):
@@ -803,7 +798,7 @@ def _extract_rate_delay(network_meta: Dict[str, Any]) -> Optional[int]:
     return None
 
 
-def _extract_breaker_state(breaker_state_info: Dict[str, Any]) -> Optional[str]:
+def _extract_breaker_state(breaker_state_info: dict[str, Any]) -> str | None:
     """Extract circuit breaker state: closed/half_open/open."""
     try:
         if isinstance(breaker_state_info, dict):
@@ -821,7 +816,7 @@ def _extract_breaker_state(breaker_state_info: Dict[str, Any]) -> Optional[str]:
     return None
 
 
-def _extract_breaker_recorded(breaker_state_info: Dict[str, Any]) -> Optional[str]:
+def _extract_breaker_recorded(breaker_state_info: dict[str, Any]) -> str | None:
     """Extract breaker recorded outcome: success/failure/none."""
     try:
         if isinstance(breaker_state_info, dict):
@@ -834,24 +829,24 @@ def _extract_breaker_recorded(breaker_state_info: Dict[str, Any]) -> Optional[st
 
 
 def request_with_retries(
-    client: Optional[httpx.Client],
+    client: httpx.Client | None,
     method: str,
     url: str,
     *,
     role: str = DEFAULT_ROLE,
-    origin_host: Optional[str] = None,
-    original_url: Optional[str] = None,
+    origin_host: str | None = None,
+    original_url: str | None = None,
     max_retries: int = 3,
-    retry_statuses: Optional[Set[int]] = None,
+    retry_statuses: set[int] | None = None,
     backoff_factor: float = 0.75,
     respect_retry_after: bool = True,
-    retry_after_cap: Optional[float] = None,
-    content_policy: Optional[Mapping[str, Any]] = None,
-    max_retry_duration: Optional[float] = None,
-    backoff_max: Optional[float] = 60.0,
-    resolver: Optional[str] = None,
-    telemetry: Optional[Any] = None,
-    run_id: Optional[str] = None,
+    retry_after_cap: float | None = None,
+    content_policy: Mapping[str, Any] | None = None,
+    max_retry_duration: float | None = None,
+    backoff_max: float | None = 60.0,
+    resolver: str | None = None,
+    telemetry: Any | None = None,
+    run_id: str | None = None,
     **kwargs: Any,
 ) -> httpx.Response:
     """Execute an HTTP request using a Tenacity-backed retry controller."""
@@ -903,7 +898,7 @@ def request_with_retries(
         canonical_index = request_url
 
     breaker_registry = get_breaker_registry()
-    breaker_meta: Dict[str, Any] = {}
+    breaker_meta: dict[str, Any] = {}
     breaker_enabled = (
         breaker_registry is not None
         and RequestRole is not None
@@ -914,7 +909,7 @@ def request_with_retries(
     parsed_request = urlparse(request_url)
     request_host = (parsed_request.hostname or parsed_request.netloc or "").lower()
 
-    role_enum: Optional[RequestRole] = None
+    role_enum: RequestRole | None = None
     if breaker_enabled:
         assert RequestRole is not None  # for type checkers
         role_enum = RequestRole.METADATA
@@ -1022,7 +1017,7 @@ def request_with_retries(
             network_meta["breaker"] = dict(breaker_meta)
 
     def _snapshot_breaker_state(
-        *, recorded: Optional[str] = None, retry_after: Optional[float] = None
+        *, recorded: str | None = None, retry_after: float | None = None
     ) -> None:
         if recorded is not None:
             breaker_meta["recorded"] = recorded
@@ -1038,13 +1033,13 @@ def request_with_retries(
         except Exception:  # pragma: no cover - defensive
             host_state_snapshot = None
 
-        host_state_value: Optional[str]
-        resolver_state_value: Optional[str]
+        host_state_value: str | None
+        resolver_state_value: str | None
         if isinstance(host_state_snapshot, Mapping):
-            host_state_value = cast(Optional[str], host_state_snapshot.get("host"))
-            resolver_state_value = cast(Optional[str], host_state_snapshot.get("resolver"))
+            host_state_value = cast(str | None, host_state_snapshot.get("host"))
+            resolver_state_value = cast(str | None, host_state_snapshot.get("resolver"))
         else:
-            host_state_value = cast(Optional[str], host_state_snapshot)
+            host_state_value = cast(str | None, host_state_snapshot)
             resolver_state_value = None
 
         if host_state_value:
@@ -1061,9 +1056,9 @@ def request_with_retries(
                 except Exception:  # pragma: no cover - defensive
                     resolver_snapshot = None
                 if isinstance(resolver_snapshot, Mapping):
-                    resolver_value = cast(Optional[str], resolver_snapshot.get("resolver"))
+                    resolver_value = cast(str | None, resolver_snapshot.get("resolver"))
                 else:
-                    resolver_value = cast(Optional[str], resolver_snapshot)
+                    resolver_value = cast(str | None, resolver_snapshot)
                 if resolver_value:
                     breaker_meta["resolver_state"] = resolver_value
 
@@ -1083,7 +1078,7 @@ def request_with_retries(
                     breaker_meta["error"] = str(exc)
                     _snapshot_breaker_state(recorded="blocked")
                     if not hasattr(exc, "breaker_meta"):
-                        setattr(exc, "breaker_meta", dict(breaker_meta))
+                        exc.breaker_meta = dict(breaker_meta)
                 raise
 
         try:
@@ -1207,15 +1202,15 @@ def request_with_retries(
         )
 
     # Update breaker based on response and collect state for telemetry
-    breaker_state_info: Dict[str, Any] = {}
+    breaker_state_info: dict[str, Any] = {}
     if breaker_registry is not None and request_host:
         from DocsToKG.ContentDownload.breakers import RequestRole, is_failure_for_breaker
 
-        recorded: Optional[str] = None
+        recorded: str | None = None
 
         if isinstance(response, httpx.Response):
             status = response.status_code
-            retry_after_s: Optional[float] = None
+            retry_after_s: float | None = None
             if status in (429, 503):
                 retry_after_s = parse_retry_after_header(response)
 
@@ -1296,11 +1291,11 @@ def request_with_retries(
 
 
 def head_precheck(
-    client: Optional[httpx.Client],
+    client: httpx.Client | None,
     url: str,
     timeout: float,
     *,
-    content_policy: Optional[Mapping[str, Any]] = None,
+    content_policy: Mapping[str, Any] | None = None,
 ) -> bool:
     """Issue a lightweight request to determine whether ``url`` returns a PDF.
 
@@ -1371,11 +1366,11 @@ def _looks_like_pdf(headers: Mapping[str, str]) -> bool:
 
 
 def _head_precheck_via_get(
-    client: Optional[httpx.Client],
+    client: httpx.Client | None,
     url: str,
     timeout: float,
     *,
-    content_policy: Optional[Mapping[str, Any]] = None,
+    content_policy: Mapping[str, Any] | None = None,
 ) -> bool:
     """Fallback GET probe for providers that reject HEAD requests."""
 
@@ -1434,9 +1429,9 @@ class CachedResult:
     path: str
     sha256: str
     content_length: int
-    etag: Optional[str]
-    last_modified: Optional[str]
-    recorded_mtime_ns: Optional[int] = None
+    etag: str | None
+    last_modified: str | None
+    recorded_mtime_ns: int | None = None
 
 
 @dataclass
@@ -1453,8 +1448,8 @@ class ModifiedResult:
         ModifiedResult(etag='abc', last_modified='Tue, 15 Nov 1994 12:45:26 GMT')
     """
 
-    etag: Optional[str]
-    last_modified: Optional[str]
+    etag: str | None
+    last_modified: str | None
 
 
 class ConditionalRequestHelper:
@@ -1479,12 +1474,12 @@ class ConditionalRequestHelper:
 
     def __init__(
         self,
-        prior_etag: Optional[str] = None,
-        prior_last_modified: Optional[str] = None,
-        prior_sha256: Optional[str] = None,
-        prior_content_length: Optional[int] = None,
-        prior_path: Optional[str] = None,
-        prior_mtime_ns: Optional[int] = None,
+        prior_etag: str | None = None,
+        prior_last_modified: str | None = None,
+        prior_sha256: str | None = None,
+        prior_content_length: int | None = None,
+        prior_path: str | None = None,
+        prior_mtime_ns: int | None = None,
     ) -> None:
         """Initialise cached metadata for conditional requests.
 
@@ -1554,7 +1549,7 @@ class ConditionalRequestHelper:
     def interpret_response(
         self,
         response: httpx.Response,
-    ) -> Union[CachedResult, ModifiedResult]:
+    ) -> CachedResult | ModifiedResult:
         """Classify origin responses as cached or modified results.
 
         Args:

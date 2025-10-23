@@ -32,7 +32,7 @@ import threading
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from .base import (
     DocumentRecord,
@@ -48,18 +48,18 @@ logger = logging.getLogger(__name__)
 class DevelopmentProvider:
     """Development provider - SQLite + local filesystem."""
 
-    def __init__(self, config: Dict[str, Any]) -> None:
+    def __init__(self, config: dict[str, Any]) -> None:
         """Initialize development provider."""
         self.config = config
         self.db_path = config.get("db_path", ":memory:")
         self.cache_size = config.get("cache_size", 1000)
         self.enable_wal = config.get("enable_wal", True)
-        self.conn: Optional[sqlite3.Connection] = None
+        self.conn: sqlite3.Connection | None = None
         self._lock = threading.RLock()
-        self._cache: Dict[str, Any] = {}
+        self._cache: dict[str, Any] = {}
         self._initialized = False
 
-    def open(self, config: Dict[str, Any]) -> None:
+    def open(self, config: dict[str, Any]) -> None:
         """Initialize SQLite database."""
         with self._lock:
             if self._initialized:
@@ -184,11 +184,11 @@ class DevelopmentProvider:
         artifact_id: str,
         source_url: str,
         resolver: str,
-        content_type: Optional[str] = None,
+        content_type: str | None = None,
         bytes: int = 0,
-        sha256: Optional[str] = None,
+        sha256: str | None = None,
         storage_uri: str = "",
-        run_id: Optional[str] = None,
+        run_id: str | None = None,
     ) -> DocumentRecord:
         """Register a document or get existing record (idempotent)."""
         if not self.conn:
@@ -261,7 +261,7 @@ class DevelopmentProvider:
             except Exception as e:
                 raise ProviderOperationError(f"Register or get failed: {e}") from e
 
-    def get_by_artifact(self, artifact_id: str) -> List[DocumentRecord]:
+    def get_by_artifact(self, artifact_id: str) -> list[DocumentRecord]:
         """Get all records for a given artifact_id."""
         if not self.conn:
             raise ProviderOperationError("Database not initialized")
@@ -278,7 +278,7 @@ class DevelopmentProvider:
             except Exception as e:
                 raise ProviderOperationError(f"Query failed: {e}") from e
 
-    def get_by_sha256(self, sha256: str) -> List[DocumentRecord]:
+    def get_by_sha256(self, sha256: str) -> list[DocumentRecord]:
         """Get all records with a given SHA-256 hash."""
         if not self.conn:
             raise ProviderOperationError("Database not initialized")
@@ -295,7 +295,7 @@ class DevelopmentProvider:
             except Exception as e:
                 raise ProviderOperationError(f"Query failed: {e}") from e
 
-    def find_duplicates(self) -> List[Tuple[str, int]]:
+    def find_duplicates(self) -> list[tuple[str, int]]:
         """Find all SHA-256 hashes with more than one record."""
         if not self.conn:
             raise ProviderOperationError("Database not initialized")
@@ -351,7 +351,7 @@ class DevelopmentProvider:
             except Exception as e:
                 raise ProviderOperationError(f"Verification failed: {e}") from e
 
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         """Get catalog statistics."""
         if not self.conn:
             raise ProviderOperationError("Database not initialized")

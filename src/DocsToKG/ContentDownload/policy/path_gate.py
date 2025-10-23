@@ -37,7 +37,6 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +49,7 @@ class PathPolicyError(ValueError):
 
 def validate_path_safety(
     final_path: str,
-    artifact_root: Optional[str] = None,
+    artifact_root: str | None = None,
 ) -> str:
     """
     Validate that final_path is safe to write to.

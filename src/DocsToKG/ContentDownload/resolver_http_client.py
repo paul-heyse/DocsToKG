@@ -56,8 +56,9 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any, Optional, Sequence
+from typing import Any
 
 import httpx
 import tenacity
@@ -97,7 +98,7 @@ class RetryConfig:
     rate_burst: float = 2.0
     """Burst tolerance (allow surge up to capacity + burst)."""
 
-    timeout_read_s: Optional[float] = None
+    timeout_read_s: float | None = None
     """Per-resolver read timeout override (seconds)."""
 
 
@@ -212,7 +213,7 @@ class PerResolverHttpClient:
         self,
         session: httpx.Client,
         resolver_name: str,
-        retry_config: Optional[RetryConfig] = None,
+        retry_config: RetryConfig | None = None,
         telemetry: Any = None,
     ):
         """Initialize per-resolver client.
@@ -289,7 +290,7 @@ class PerResolverHttpClient:
         self,
         url: str,
         *,
-        timeout: Optional[float] = None,
+        timeout: float | None = None,
         **kwargs: Any,
     ) -> httpx.Response:
         """Perform HEAD request with rate limit and retry."""
@@ -299,7 +300,7 @@ class PerResolverHttpClient:
         self,
         url: str,
         *,
-        timeout: Optional[float] = None,
+        timeout: float | None = None,
         **kwargs: Any,
     ) -> httpx.Response:
         """Perform GET request with rate limit and retry."""
@@ -310,7 +311,7 @@ class PerResolverHttpClient:
         method: str,
         url: str,
         *,
-        timeout: Optional[float] = None,
+        timeout: float | None = None,
         **kwargs: Any,
     ) -> httpx.Response:
         """Internal request handler with rate limit and retry."""

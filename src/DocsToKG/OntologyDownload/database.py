@@ -90,10 +90,11 @@ import json
 import logging
 import os
 import threading
+from collections.abc import Generator
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Generator, List, Optional, Tuple
+from typing import Any
 
 try:  # pragma: no cover - optional dependency
     import duckdb
@@ -121,7 +122,7 @@ class VersionRow:
     version_id: str  # e.g., "2025-10-20T01:23:45Z"
     service: str  # OLS, BioPortal, etc.
     created_at: datetime
-    plan_hash: Optional[str] = None
+    plan_hash: str | None = None
 
 
 @dataclass
@@ -135,9 +136,9 @@ class ArtifactRow:
     size_bytes: int
     fs_relpath: str  # Path under ontologies/ root (POSIX)
     status: str  # 'fresh', 'cached', 'failed'
-    etag: Optional[str] = None
-    last_modified: Optional[datetime] = None
-    content_type: Optional[str] = None
+    etag: str | None = None
+    last_modified: datetime | None = None
+    content_type: str | None = None
 
 
 @dataclass
@@ -150,8 +151,8 @@ class FileRow:
     relpath_in_version: str
     format: str  # rdf, ttl, owl, obo, other
     size_bytes: int
-    mtime: Optional[datetime] = None
-    cas_relpath: Optional[str] = None
+    mtime: datetime | None = None
+    cas_relpath: str | None = None
 
 
 @dataclass
@@ -163,7 +164,7 @@ class ValidationRow:
     validator: str  # 'rdflib', 'ROBOT', 'Arelle', 'Custom:<name>', ...
     passed: bool
     run_at: datetime
-    details_json: Optional[Dict[str, Any]] = None
+    details_json: dict[str, Any] | None = None
 
 
 @dataclass
@@ -173,14 +174,14 @@ class PlanRow:
     plan_id: str  # sha256(ontology_id + resolver + timestamp)
     ontology_id: str
     resolver: str
-    version: Optional[str]
+    version: str | None
     url: str
-    service: Optional[str]
-    license: Optional[str]
-    media_type: Optional[str]
-    content_length: Optional[int]
+    service: str | None
+    license: str | None
+    media_type: str | None
+    content_length: int | None
     cached_at: datetime
-    plan_json: Dict[str, Any]  # Full serialized PlannedFetch
+    plan_json: dict[str, Any]  # Full serialized PlannedFetch
     is_current: bool = False  # Mark as current for plan-diff
 
 
@@ -196,7 +197,7 @@ class PlanDiffRow:
     added_count: int
     removed_count: int
     modified_count: int
-    diff_json: Dict[str, Any]  # Full diff payload
+    diff_json: dict[str, Any]  # Full diff payload
 
 
 @dataclass
@@ -217,7 +218,7 @@ class VersionStats:
 # ============================================================================
 
 
-_MIGRATIONS: List[Tuple[str, str]] = [
+_MIGRATIONS: list[tuple[str, str]] = [
     (
         "0001_init",
         """
@@ -415,14 +416,14 @@ class Database:
             db.close()
     """
 
-    def __init__(self, config: Optional[DatabaseConfiguration] = None):
+    def __init__(self, config: DatabaseConfiguration | None = None):
         """Initialize database configuration."""
 
         self.config = config or DatabaseConfiguration()
         self._db_path = self._resolve_db_path()
         self._lock_path = Path(str(self._db_path) + ".lock")
-        self._connection: Optional[duckdb.DuckDBPyConnection] = None
-        self._lock_file: Optional[Any] = None
+        self._connection: duckdb.DuckDBPyConnection | None = None
+        self._lock_file: Any | None = None
         self._local = threading.local()
 
     def _resolve_db_path(self) -> Path:
@@ -554,9 +555,7 @@ class Database:
     # Query Facades — Versions
     # ========================================================================
 
-    def upsert_version(
-        self, version_id: str, service: str, plan_hash: Optional[str] = None
-    ) -> None:
+    def upsert_version(self, version_id: str, service: str, plan_hash: str | None = None) -> None:
         """Insert or update a version record."""
 
         assert self._connection is not None
@@ -568,7 +567,7 @@ class Database:
             [version_id, service, plan_hash],
         )
 
-    def get_latest_version(self, service: Optional[str] = None) -> Optional[VersionRow]:
+    def get_latest_version(self, service: str | None = None) -> VersionRow | None:
         """Get the latest version, optionally filtered by service."""
 
         assert self._connection is not None
@@ -595,7 +594,7 @@ class Database:
             version_id=result[0], service=result[1], created_at=result[2], plan_hash=result[3]
         )
 
-    def set_latest_version(self, version_id: str, by: Optional[str] = None) -> None:
+    def set_latest_version(self, version_id: str, by: str | None = None) -> None:
         """Set or update the latest version pointer."""
 
         assert self._connection is not None
@@ -607,7 +606,7 @@ class Database:
             [version_id, by],
         )
 
-    def list_versions(self, service: Optional[str] = None, limit: int = 50) -> List[VersionRow]:
+    def list_versions(self, service: str | None = None, limit: int = 50) -> list[VersionRow]:
         """List versions, optionally filtered by service."""
 
         assert self._connection is not None
@@ -643,9 +642,9 @@ class Database:
         size_bytes: int,
         fs_relpath: str,
         status: str,
-        etag: Optional[str] = None,
-        last_modified: Optional[datetime] = None,
-        content_type: Optional[str] = None,
+        etag: str | None = None,
+        last_modified: datetime | None = None,
+        content_type: str | None = None,
     ) -> None:
         """Insert or update an artifact record."""
 
@@ -676,7 +675,7 @@ class Database:
             ],
         )
 
-    def list_artifacts(self, version_id: str, status: Optional[str] = None) -> List[ArtifactRow]:
+    def list_artifacts(self, version_id: str, status: str | None = None) -> list[ArtifactRow]:
         """List artifacts for a version, optionally filtered by status."""
 
         assert self._connection is not None
@@ -715,7 +714,7 @@ class Database:
     # Query Facades — Extracted Files
     # ========================================================================
 
-    def insert_extracted_files(self, files: List[FileRow]) -> None:
+    def insert_extracted_files(self, files: list[FileRow]) -> None:
         """Batch insert extracted file records."""
 
         assert self._connection is not None
@@ -744,8 +743,8 @@ class Database:
             )
 
     def list_extracted_files(
-        self, version_id: str, format_filter: Optional[str] = None
-    ) -> List[FileRow]:
+        self, version_id: str, format_filter: str | None = None
+    ) -> list[FileRow]:
         """List extracted files for a version, optionally filtered by format."""
 
         assert self._connection is not None
@@ -780,7 +779,7 @@ class Database:
     # Query Facades — Validations
     # ========================================================================
 
-    def insert_validations(self, validations: List[ValidationRow]) -> None:
+    def insert_validations(self, validations: list[ValidationRow]) -> None:
         """Batch insert validation records."""
 
         assert self._connection is not None
@@ -795,7 +794,7 @@ class Database:
                 [v.validation_id, v.file_id, v.validator, v.passed, details_json, v.run_at],
             )
 
-    def get_validation_failures(self, version_id: str) -> List[ValidationRow]:
+    def get_validation_failures(self, version_id: str) -> list[ValidationRow]:
         """Get all validation failures for a version."""
 
         assert self._connection is not None
@@ -824,7 +823,7 @@ class Database:
     # Query Facades — Statistics & Reporting
     # ========================================================================
 
-    def get_version_stats(self, version_id: str) -> Optional[VersionStats]:
+    def get_version_stats(self, version_id: str) -> VersionStats | None:
         """Get summary statistics for a version."""
 
         assert self._connection is not None
@@ -867,7 +866,7 @@ class Database:
     # ========================================================================
 
     def stage_filesystem_listing(
-        self, scope: str, entries: List[Tuple[str, int, Optional[datetime]]]
+        self, scope: str, entries: list[tuple[str, int, datetime | None]]
     ) -> None:
         """Stage filesystem entries for orphan detection.
 
@@ -888,7 +887,7 @@ class Database:
                 [scope, relpath, size_bytes, mtime],
             )
 
-    def get_orphaned_files(self, scope: str) -> List[Tuple[str, int]]:
+    def get_orphaned_files(self, scope: str) -> list[tuple[str, int]]:
         """Get orphaned files (present in FS but not in catalog).
 
         Returns:
@@ -931,7 +930,7 @@ class Database:
         plan_id: str,
         ontology_id: str,
         resolver: str,
-        plan_json: Dict[str, Any],
+        plan_json: dict[str, Any],
         is_current: bool = False,
     ) -> None:
         """Store or update a cached plan.
@@ -983,7 +982,7 @@ class Database:
             ],
         )
 
-    def get_current_plan(self, ontology_id: str) -> Optional[PlanRow]:
+    def get_current_plan(self, ontology_id: str) -> PlanRow | None:
         """Retrieve the current/latest plan for an ontology.
 
         Args:
@@ -1024,7 +1023,7 @@ class Database:
             is_current=result[11],
         )
 
-    def list_plans(self, ontology_id: Optional[str] = None, limit: int = 100) -> List[PlanRow]:
+    def list_plans(self, ontology_id: str | None = None, limit: int = 100) -> list[PlanRow]:
         """List cached plans, optionally filtered by ontology.
 
         Args:
@@ -1081,7 +1080,7 @@ class Database:
         older_plan_id: str,
         newer_plan_id: str,
         ontology_id: str,
-        diff_result: Dict[str, Any],
+        diff_result: dict[str, Any],
     ) -> None:
         """Store the result of a plan comparison.
 
@@ -1117,7 +1116,7 @@ class Database:
             ],
         )
 
-    def get_plan_diff_history(self, ontology_id: str, limit: int = 10) -> List[PlanDiffRow]:
+    def get_plan_diff_history(self, ontology_id: str, limit: int = 10) -> list[PlanDiffRow]:
         """Retrieve historical plan diffs for an ontology.
 
         Args:
@@ -1162,11 +1161,11 @@ class Database:
 # ============================================================================
 
 
-_db_singleton: Optional[Database] = None
+_db_singleton: Database | None = None
 _db_lock = threading.Lock()
 
 
-def get_database(config: Optional[DatabaseConfiguration] = None) -> Database:
+def get_database(config: DatabaseConfiguration | None = None) -> Database:
     """Get or create a global database instance.
 
     Thread-safe singleton pattern.

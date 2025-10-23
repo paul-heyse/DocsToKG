@@ -75,8 +75,9 @@ from __future__ import annotations
 import json
 import logging
 import os
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Dict, Mapping, Optional
+from typing import Any
 
 try:
     import yaml  # type: ignore[import-untyped]
@@ -92,7 +93,7 @@ _LOGGER = logging.getLogger(__name__)
 # ============================================================================
 
 
-def _read_file(path: str) -> Dict[str, Any]:
+def _read_file(path: str) -> dict[str, Any]:
     """
     Read YAML or JSON config file.
 
@@ -136,7 +137,7 @@ def _read_file(path: str) -> Dict[str, Any]:
     raise ValueError(f"Unsupported file format: {suffix}. Use .yaml or .json")
 
 
-def _assign_nested(data: Dict[str, Any], dotted_key: str, value: Any) -> None:
+def _assign_nested(data: dict[str, Any], dotted_key: str, value: Any) -> None:
     """
     Assign value to nested dict using dot notation.
 
@@ -197,7 +198,7 @@ def _coerce_env_value(value: str) -> Any:
     return value
 
 
-def _merge_env_overrides(data: Dict[str, Any], env_prefix: str = "DTKG_") -> Dict[str, Any]:
+def _merge_env_overrides(data: dict[str, Any], env_prefix: str = "DTKG_") -> dict[str, Any]:
     """
     Overlay environment variables onto config dict.
 
@@ -230,8 +231,8 @@ def _merge_env_overrides(data: Dict[str, Any], env_prefix: str = "DTKG_") -> Dic
 
 
 def _merge_cli_overrides(
-    data: Dict[str, Any], cli_overrides: Optional[Mapping[str, Any]]
-) -> Dict[str, Any]:
+    data: dict[str, Any], cli_overrides: Mapping[str, Any] | None
+) -> dict[str, Any]:
     """
     Recursively merge CLI overrides into base config dict.
 
@@ -264,9 +265,9 @@ def _merge_cli_overrides(
 
 
 def load_config(
-    path: Optional[str] = None,
+    path: str | None = None,
     env_prefix: str = "DTKG_",
-    cli_overrides: Optional[Mapping[str, Any]] = None,
+    cli_overrides: Mapping[str, Any] | None = None,
 ) -> ContentDownloadConfig:
     """
     Load ContentDownloadConfig from file, environment, and CLI with proper precedence.
@@ -285,7 +286,7 @@ def load_config(
         ValueError: If config is invalid or file cannot be read
         RuntimeError: If required dependencies missing
     """
-    data: Dict[str, Any] = {}
+    data: dict[str, Any] = {}
 
     # Step 1: Load file
     if path:
@@ -335,7 +336,7 @@ def validate_config_file(path: str) -> bool:
         raise
 
 
-def export_config_schema() -> Dict[str, Any]:
+def export_config_schema() -> dict[str, Any]:
     """
     Export JSON Schema for ContentDownloadConfig.
 

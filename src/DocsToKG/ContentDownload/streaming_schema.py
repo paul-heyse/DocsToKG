@@ -103,7 +103,7 @@ import logging
 import os
 import sqlite3
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 LOGGER = logging.getLogger(__name__)
 
@@ -291,7 +291,7 @@ def run_migrations(conn: sqlite3.Connection, target_version: int = SCHEMA_VERSIO
 # ============================================================================
 
 
-def ensure_schema(db_path: Optional[str | Path] = None) -> sqlite3.Connection:
+def ensure_schema(db_path: str | Path | None = None) -> sqlite3.Connection:
     """Ensure database schema is initialized.
 
     Args:
@@ -408,7 +408,7 @@ def repair_schema(conn: sqlite3.Connection) -> None:
 
 
 def get_or_create_connection(
-    db_path: Optional[str | Path] = None,
+    db_path: str | Path | None = None,
 ) -> sqlite3.Connection:
     """Get or create database connection with schema initialized.
 
@@ -456,14 +456,14 @@ class StreamingDatabase:
             pass
     """
 
-    def __init__(self, db_path: Optional[str | Path] = None) -> None:
+    def __init__(self, db_path: str | Path | None = None) -> None:
         """Initialize database context manager.
 
         Args:
             db_path: Path to database file
         """
         self.db_path = db_path
-        self.conn: Optional[sqlite3.Connection] = None
+        self.conn: sqlite3.Connection | None = None
 
     def __enter__(self) -> sqlite3.Connection:
         """Enter context (acquire connection)."""
@@ -487,7 +487,7 @@ class StreamingDatabase:
 # ============================================================================
 
 
-def health_check(db_path: Optional[str | Path] = None) -> dict[str, Any]:
+def health_check(db_path: str | Path | None = None) -> dict[str, Any]:
     """Perform comprehensive database health check.
 
     Args:

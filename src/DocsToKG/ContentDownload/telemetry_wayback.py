@@ -48,12 +48,13 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Mapping
 from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import Any, List, Mapping, Optional
+from typing import Any
 
 
-def _ensure_event_buffer(ctx: Any) -> Optional[List[dict[str, Any]]]:
+def _ensure_event_buffer(ctx: Any) -> list[dict[str, Any]] | None:
     """Return an event buffer stored on ``ctx`` if telemetry is enabled."""
 
     if ctx is None:
@@ -63,7 +64,7 @@ def _ensure_event_buffer(ctx: Any) -> Optional[List[dict[str, Any]]]:
     if buffer is None:
         buffer = []
         try:
-            setattr(ctx, "telemetry_wayback_events", buffer)
+            ctx.telemetry_wayback_events = buffer
         except Exception:  # pragma: no cover - defensive guard
             return None
     return buffer
@@ -73,14 +74,14 @@ def _ensure_event_buffer(ctx: Any) -> Optional[List[dict[str, Any]]]:
 class TelemetryWaybackAttempt:
     """State container for a single Wayback attempt."""
 
-    _telemetry: "TelemetryWayback" = field(repr=False)
+    _telemetry: TelemetryWayback = field(repr=False)
     _ctx: Any = field(repr=False)
     attempt_id: str
     original_url: str
     canonical_url: str
     status: str = "pending"
-    candidate_url: Optional[str] = None
-    events: List[dict[str, Any]] = field(default_factory=list)
+    candidate_url: str | None = None
+    events: list[dict[str, Any]] = field(default_factory=list)
     extra: dict[str, Any] = field(default_factory=dict)
     _completed: bool = field(default=False, init=False, repr=False)
 
@@ -93,7 +94,7 @@ class TelemetryWaybackAttempt:
         self,
         outcome: str,
         *,
-        candidate_url: Optional[str],
+        candidate_url: str | None,
         metadata: Mapping[str, Any],
     ) -> None:
         """Record a candidate emission event."""
@@ -110,8 +111,8 @@ class TelemetryWaybackAttempt:
         self,
         *,
         error: str,
-        error_type: Optional[str] = None,
-        metadata: Optional[Mapping[str, Any]] = None,
+        error_type: str | None = None,
+        metadata: Mapping[str, Any] | None = None,
     ) -> None:
         """Record an error event for the attempt."""
 
@@ -122,7 +123,7 @@ class TelemetryWaybackAttempt:
             payload["metadata"] = dict(metadata)
         self._append_event("error", **payload)
 
-    def complete(self, status: str, metadata: Optional[Mapping[str, Any]] = None) -> None:
+    def complete(self, status: str, metadata: Mapping[str, Any] | None = None) -> None:
         """Mark the attempt as completed with ``status``."""
 
         if self._completed:
@@ -186,7 +187,7 @@ class TelemetryWayback:
         *,
         original_url: str,
         canonical_url: str,
-    ) -> "_TelemetryAttemptCtx":
+    ) -> _TelemetryAttemptCtx:
         """Return context manager for telemetry-wrapped attempts."""
 
         return _TelemetryAttemptCtx(self, ctx, original_url, canonical_url)
@@ -206,7 +207,7 @@ class _TelemetryAttemptCtx:
         self._ctx = ctx
         self._original_url = original_url
         self._canonical_url = canonical_url
-        self._attempt: Optional[TelemetryWaybackAttempt] = None
+        self._attempt: TelemetryWaybackAttempt | None = None
 
     def __enter__(self) -> TelemetryWaybackAttempt:
         attempt = TelemetryWaybackAttempt(
@@ -254,7 +255,6 @@ behaviour is scoped to a single attempt.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict
 
 
 @dataclass
@@ -274,9 +274,9 @@ class AttemptContext:
         through extra attributes without worrying about additional state.
     """
 
-    attempt_id: Optional[str]
-    cdx_sample_budget: Optional[int]
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    attempt_id: str | None
+    cdx_sample_budget: int | None
+    metadata: dict[str, Any] = field(default_factory=dict)
     candidate_count: int = 0
     discovery_count: int = 0
     _cdx_sample_used: int = 0
@@ -298,7 +298,7 @@ class AttemptContext:
 
         return False
 
-    def next_candidate(self) -> Dict[str, Any]:
+    def next_candidate(self) -> dict[str, Any]:
         """Return telemetry payload for the next candidate emission."""
 
         self.candidate_count += 1
@@ -310,7 +310,7 @@ class AttemptContext:
             **self.metadata,
         }
 
-    def next_discovery(self) -> Dict[str, Any]:
+    def next_discovery(self) -> dict[str, Any]:
         """Return telemetry payload for the next discovery emission."""
 
         self.discovery_count += 1
@@ -326,14 +326,14 @@ class AttemptContext:
 class WaybackTelemetry:
     """Tiny façade mirroring the behaviour exercised by the tests."""
 
-    def __init__(self, *, cdx_sample_budget: Optional[int] = None) -> None:
+    def __init__(self, *, cdx_sample_budget: int | None = None) -> None:
         self._cdx_sample_budget = cdx_sample_budget
 
     def start_attempt(
         self,
-        attempt_id: Optional[str] = None,
+        attempt_id: str | None = None,
         *,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> AttemptContext:
         """Start a new telemetry attempt.
 
@@ -348,7 +348,7 @@ class WaybackTelemetry:
             metadata=dict(metadata or {}),
         )
 
-    def emit_candidate(self, context: AttemptContext, **extra: Any) -> Dict[str, Any]:
+    def emit_candidate(self, context: AttemptContext, **extra: Any) -> dict[str, Any]:
         """Emit a candidate event derived from ``context``.
 
         The payload merges the automatically managed counters with any caller
@@ -360,7 +360,7 @@ class WaybackTelemetry:
             payload.update(extra)
         return payload
 
-    def emit_discovery(self, context: AttemptContext, **extra: Any) -> Dict[str, Any]:
+    def emit_discovery(self, context: AttemptContext, **extra: Any) -> dict[str, Any]:
         """Emit a discovery event derived from ``context``."""
 
         payload = context.next_discovery()

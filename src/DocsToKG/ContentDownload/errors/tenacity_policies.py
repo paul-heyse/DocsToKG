@@ -73,8 +73,9 @@ Integration:
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from enum import Enum, auto
-from typing import Any, Callable
+from typing import Any
 
 import httpx
 from tenacity import (

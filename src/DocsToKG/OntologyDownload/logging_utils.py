@@ -47,10 +47,9 @@ import json
 import logging
 import os
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from typing import List, Optional
 
 from .io import mask_sensitive_data, sanitize_filename
 from .settings import LOG_DIR
@@ -67,11 +66,11 @@ class JSONFormatter(logging.Formatter):
         created = getattr(record, "created", None)
         if isinstance(created, (int, float)):
             try:
-                timestamp = datetime.fromtimestamp(created, tz=timezone.utc)
+                timestamp = datetime.fromtimestamp(created, tz=UTC)
             except (OverflowError, OSError, ValueError):
-                timestamp = datetime.now(timezone.utc)
+                timestamp = datetime.now(UTC)
         else:
-            timestamp = datetime.now(timezone.utc)
+            timestamp = datetime.now(UTC)
         payload = {
             "timestamp": timestamp.isoformat().replace("+00:00", "Z"),
             "level": record.levelname,
@@ -96,20 +95,20 @@ def _compress_old_log(path: Path) -> None:
     path.unlink(missing_ok=True)
 
 
-def _cleanup_logs(log_dir: Path, retention_days: int) -> List[str]:
+def _cleanup_logs(log_dir: Path, retention_days: int) -> list[str]:
     """Rotate or purge log files in ``log_dir`` based on retention policy."""
 
-    actions: List[str] = []
-    now = datetime.now(timezone.utc)
+    actions: list[str] = []
+    now = datetime.now(UTC)
     retention_delta = timedelta(days=retention_days)
     for file in log_dir.glob("*.jsonl"):
-        mtime = datetime.fromtimestamp(file.stat().st_mtime, tz=timezone.utc)
+        mtime = datetime.fromtimestamp(file.stat().st_mtime, tz=UTC)
         if now - mtime > retention_delta:
             target = file.with_suffix(file.suffix + ".gz")
             _compress_old_log(file)
             actions.append(f"Compressed {file.name} -> {target.name}")
     for file in log_dir.glob("*.jsonl.gz"):
-        mtime = datetime.fromtimestamp(file.stat().st_mtime, tz=timezone.utc)
+        mtime = datetime.fromtimestamp(file.stat().st_mtime, tz=UTC)
         if now - mtime > retention_delta:
             file.unlink(missing_ok=True)
             actions.append(f"Deleted expired archive {file.name}")
@@ -121,7 +120,7 @@ def setup_logging(
     level: str = "INFO",
     retention_days: int = 30,
     max_log_size_mb: int = 100,
-    log_dir: Optional[Path] = None,
+    log_dir: Path | None = None,
     propagate: bool = False,
 ) -> logging.Logger:
     """Configure ontology downloader logging with rotation and JSON sidecars."""
@@ -130,7 +129,7 @@ def setup_logging(
         resolved_dir = Path(log_dir).expanduser().resolve(strict=False)
     else:
         env_value = os.environ.get("ONTOFETCH_LOG_DIR")
-        env_path: Optional[Path] = None
+        env_path: Path | None = None
         if env_value is not None:
             stripped = env_value.strip()
             if stripped:
@@ -158,7 +157,7 @@ def setup_logging(
     stream_handler._ontofetch_managed = True  # type: ignore[attr-defined]
     logger.addHandler(stream_handler)
 
-    today = datetime.now(timezone.utc).strftime("%Y%m%d")
+    today = datetime.now(UTC).strftime("%Y%m%d")
     file_name = sanitize_filename(f"ontofetch-{today}.jsonl")
     file_handler = RotatingFileHandler(
         resolved_dir / file_name,

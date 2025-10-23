@@ -43,7 +43,6 @@ Emits db.tx.*, db.migrate.*, and db.boundary.* events for observability
 into database operations and transactional boundaries.
 """
 
-from typing import Optional
 
 from DocsToKG.OntologyDownload.observability.events import emit_event
 
@@ -77,7 +76,7 @@ def emit_tx_commit_event(
 
 def emit_tx_rollback_event(
     reason: str,
-    tables_involved: Optional[list[str]] = None,
+    tables_involved: list[str] | None = None,
     duration_ms: float = 0,
 ) -> None:
     """Emit event when database transaction rolls back.
@@ -134,7 +133,7 @@ def emit_migration_applied_event(
 def emit_boundary_check_event(
     check_type: str,
     passed: bool,
-    details: Optional[dict] = None,
+    details: dict | None = None,
 ) -> None:
     """Emit event for database boundary validation.
 

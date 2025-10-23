@@ -39,9 +39,10 @@ from __future__ import annotations
 import json
 import logging
 import sqlite3
+from collections.abc import Generator
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, Generator, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -49,18 +50,18 @@ logger = logging.getLogger(__name__)
 class TelemetryStorage:
     """Unified interface for telemetry record storage and retrieval."""
 
-    def __init__(self, storage_path: Optional[str] = None):
+    def __init__(self, storage_path: str | None = None):
         """Initialize storage with optional path."""
         self.storage_path = storage_path or "Data/Manifests/manifest.sqlite3"
-        self._cache: List[Dict[str, Any]] = []
+        self._cache: list[dict[str, Any]] = []
         self._cache_valid = False
 
     def load_records(
         self,
         period: str = "24h",
-        tier_filter: Optional[str] = None,
-        source_filter: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        tier_filter: str | None = None,
+        source_filter: str | None = None,
+    ) -> list[dict[str, Any]]:
         """Load telemetry records with optional filters.
 
         Args:
@@ -93,7 +94,7 @@ class TelemetryStorage:
         self,
         path: Path,
         period: str,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Load records from SQLite database."""
         if not path.exists():
             logger.warning(f"SQLite file not found: {path}")
@@ -139,7 +140,7 @@ class TelemetryStorage:
         self,
         path: Path,
         period: str,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Load records from JSONL file."""
         if not path.exists():
             logger.warning(f"JSONL file not found: {path}")
@@ -150,7 +151,7 @@ class TelemetryStorage:
             cutoff_time = datetime.utcnow() - timedelta(seconds=time_limit)
 
             records = []
-            with open(path, "r") as f:
+            with open(path) as f:
                 for line in f:
                     if not line.strip():
                         continue
@@ -177,10 +178,10 @@ class TelemetryStorage:
     def stream_records(
         self,
         period: str = "24h",
-        tier_filter: Optional[str] = None,
-        source_filter: Optional[str] = None,
+        tier_filter: str | None = None,
+        source_filter: str | None = None,
         batch_size: int = 100,
-    ) -> Generator[List[Dict[str, Any]], None, None]:
+    ) -> Generator[list[dict[str, Any]], None, None]:
         """Stream telemetry records in batches for memory efficiency.
 
         Yields:
@@ -192,7 +193,7 @@ class TelemetryStorage:
             batch = all_records[i : i + batch_size]
             yield batch
 
-    def write_record(self, record: Dict[str, Any], format: str = "sqlite") -> bool:
+    def write_record(self, record: dict[str, Any], format: str = "sqlite") -> bool:
         """Write a single telemetry record.
 
         Args:
@@ -216,7 +217,7 @@ class TelemetryStorage:
             logger.error(f"Error writing record: {e}")
             return False
 
-    def _write_to_sqlite(self, record: Dict[str, Any]) -> bool:
+    def _write_to_sqlite(self, record: dict[str, Any]) -> bool:
         """Write record to SQLite database."""
         try:
             path = Path(self.storage_path)
@@ -269,7 +270,7 @@ class TelemetryStorage:
             logger.error(f"Error writing to SQLite: {e}")
             return False
 
-    def _write_to_jsonl(self, record: Dict[str, Any]) -> bool:
+    def _write_to_jsonl(self, record: dict[str, Any]) -> bool:
         """Write record to JSONL file."""
         try:
             path = Path(self.storage_path)
@@ -310,10 +311,10 @@ class TelemetryStorage:
 
 
 # Singleton instance
-_storage_instance: Optional[TelemetryStorage] = None
+_storage_instance: TelemetryStorage | None = None
 
 
-def get_telemetry_storage(path: Optional[str] = None) -> TelemetryStorage:
+def get_telemetry_storage(path: str | None = None) -> TelemetryStorage:
     """Get or create telemetry storage singleton.
 
     Args:

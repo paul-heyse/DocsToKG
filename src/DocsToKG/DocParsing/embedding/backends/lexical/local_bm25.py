@@ -38,8 +38,8 @@ from __future__ import annotations
 import math
 import unicodedata
 from collections import Counter
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Sequence, Tuple
 
 from DocsToKG.DocParsing.core.models import BM25Stats
 
@@ -113,7 +113,7 @@ class LocalBM25Provider(LexicalEmbeddingBackend):
             )
         return stats
 
-    def vector(self, text: str, stats: object) -> Tuple[Sequence[str], Sequence[float]]:
+    def vector(self, text: str, stats: object) -> tuple[Sequence[str], Sequence[float]]:
         if not isinstance(stats, BM25Stats):
             raise ProviderError(
                 provider=self.identity.name,

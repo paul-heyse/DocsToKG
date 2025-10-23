@@ -119,9 +119,7 @@ def _install_stubbed_docling_modules() -> None:
     sys.modules.setdefault("docling_core.transforms.chunker.hybrid_chunker", hybrid_mod)
     sys.modules.setdefault("docling_core.transforms.chunker.hierarchical_chunker", hierarchical_mod)
     sys.modules.setdefault("docling_core.transforms.chunker.tokenizer", tokenizer_pkg)
-    sys.modules.setdefault(
-        "docling_core.transforms.chunker.tokenizer.huggingface", hf_mod
-    )
+    sys.modules.setdefault("docling_core.transforms.chunker.tokenizer.huggingface", hf_mod)
     sys.modules.setdefault("docling_core.transforms.serializer", serializer_pkg)
     sys.modules.setdefault("docling_core.transforms.serializer.base", serializer_base)
     sys.modules.setdefault("docling_core.transforms.serializer.common", serializer_common)
@@ -169,7 +167,6 @@ from DocsToKG.DocParsing.chunking import runtime as chunking_runtime
 from DocsToKG.DocParsing.cli_unified import app
 from DocsToKG.DocParsing.config_adapter import ConfigurationAdapter
 from DocsToKG.DocParsing.settings import Format
-
 
 runner = CliRunner()
 
@@ -223,5 +220,5 @@ def test_cli_chunk_format_option_propagates(monkeypatch, tmp_path):
 
     config = captured["config"]
 
-    assert getattr(config, "format") == "jsonl"
+    assert config.format == "jsonl"
     assert "✅ Chunk stage completed successfully" in result.stdout

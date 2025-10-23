@@ -1,15 +1,15 @@
 import math
-from datetime import datetime, timezone
+from collections.abc import Iterable
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Dict, Iterable
 
 import pyarrow.parquet as pq
 
-from DocsToKG.DocParsing.storage.chunks_writer import ParquetChunksWriter
 from DocsToKG.DocParsing.storage import parquet_schemas, paths
+from DocsToKG.DocParsing.storage.chunks_writer import ParquetChunksWriter
 
 
-def _make_row(idx: int) -> Dict[str, object]:
+def _make_row(idx: int) -> dict[str, object]:
     text = f"chunk text {idx}"
     return {
         "doc_id": f"doc-{idx // 10}",
@@ -17,12 +17,12 @@ def _make_row(idx: int) -> Dict[str, object]:
         "text": text,
         "tokens": idx,
         "span": {"start": 0, "end": len(text)},
-        "created_at": datetime.now(timezone.utc),
+        "created_at": datetime.now(UTC),
         "schema_version": parquet_schemas.SCHEMA_VERSION_CHUNKS,
     }
 
 
-def _row_iter(count: int) -> Iterable[Dict[str, object]]:
+def _row_iter(count: int) -> Iterable[dict[str, object]]:
     for i in range(count):
         yield _make_row(i)
 
@@ -38,7 +38,7 @@ def test_parquet_chunks_writer_streaming_batches(tmp_path: Path) -> None:
         rel_id=rel_id,
         cfg_hash="abc123",
         created_by="pytest",
-        dt_utc=datetime(2024, 1, 1, tzinfo=timezone.utc),
+        dt_utc=datetime(2024, 1, 1, tzinfo=UTC),
     )
 
     assert result.rows_written == row_count
@@ -47,9 +47,7 @@ def test_parquet_chunks_writer_streaming_batches(tmp_path: Path) -> None:
 
     parquet_file = pq.ParquetFile(output_path)
     assert result.row_group_count == parquet_file.metadata.num_row_groups
-    assert parquet_file.metadata.num_row_groups >= math.ceil(
-        row_count / writer.batch_size
-    )
+    assert parquet_file.metadata.num_row_groups >= math.ceil(row_count / writer.batch_size)
 
     footer = parquet_schemas.read_parquet_footer(str(output_path))
     assert footer["docparse.cfg_hash"] == "abc123"
@@ -57,6 +55,6 @@ def test_parquet_chunks_writer_streaming_batches(tmp_path: Path) -> None:
     assert footer["docparse.created_at"] == "2024-01-01T00:00:00Z"
 
     manifest_path = paths.chunks_output_path(
-        tmp_path, rel_id, fmt="parquet", ts=datetime(2024, 1, 1, tzinfo=timezone.utc)
+        tmp_path, rel_id, fmt="parquet", ts=datetime(2024, 1, 1, tzinfo=UTC)
     )
     assert output_path == manifest_path

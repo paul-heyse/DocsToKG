@@ -79,7 +79,7 @@ Implements access control gates at critical I/O boundaries:
 """
 
 import time
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from prometheus_client import Counter, Gauge, Histogram
 
@@ -148,7 +148,7 @@ def _record_prometheus_metrics(
     gate_name: str,
     passed: bool,
     elapsed_ms: float,
-    error_code: Optional[ErrorCode] = None,
+    error_code: ErrorCode | None = None,
 ) -> None:
     """Record gate metrics to Prometheus.
 
@@ -193,8 +193,8 @@ def _emit_gate_event(
     gate_name: str,
     outcome: str,  # "ok" or "reject"
     elapsed_ms: float,
-    error_code: Optional[ErrorCode] = None,
-    details: Optional[Dict[str, Any]] = None,
+    error_code: ErrorCode | None = None,
+    details: dict[str, Any] | None = None,
 ) -> None:
     """Emit a structured policy.gate event.
 
@@ -226,7 +226,7 @@ def _record_gate_metric(
     gate_name: str,
     passed: bool,
     elapsed_ms: float,
-    error_code: Optional[ErrorCode] = None,
+    error_code: ErrorCode | None = None,
 ) -> None:
     """Record a metric for this gate.
 
@@ -263,7 +263,7 @@ def _record_gate_metric(
     description="Validate configuration settings against policy",
     domain="config",
 )
-def config_gate(config: Any) -> Union[PolicyOK, PolicyReject]:
+def config_gate(config: Any) -> PolicyOK | PolicyReject:
     """Validate configuration settings.
 
     Args:
@@ -316,9 +316,9 @@ def config_gate(config: Any) -> Union[PolicyOK, PolicyReject]:
 )
 def url_gate(
     url: str,
-    allowed_hosts: Optional[set] = None,
-    allowed_ports: Optional[set] = None,
-) -> Union[PolicyOK, PolicyReject]:
+    allowed_hosts: set | None = None,
+    allowed_ports: set | None = None,
+) -> PolicyOK | PolicyReject:
     """Validate URL against network security policy.
 
     Args:
@@ -330,7 +330,7 @@ def url_gate(
         PolicyOK if URL is valid, PolicyReject otherwise
     """
     start_ms = time.perf_counter() * 1000
-    details: Dict[str, Any] = {}
+    details: dict[str, Any] = {}
 
     try:
         from urllib.parse import urlparse
@@ -422,9 +422,9 @@ def url_gate(
 )
 def filesystem_gate(
     root_path: str,
-    entry_paths: List[str],
+    entry_paths: list[str],
     allow_symlinks: bool = False,
-) -> Union[PolicyOK, PolicyReject]:
+) -> PolicyOK | PolicyReject:
     """Validate filesystem paths against security policy.
 
     Enforces:
@@ -447,7 +447,7 @@ def filesystem_gate(
     import unicodedata
 
     start_ms = time.perf_counter() * 1000
-    details: Dict[str, Any] = {}
+    details: dict[str, Any] = {}
 
     try:
         # Normalize root path
@@ -464,7 +464,7 @@ def filesystem_gate(
             )
 
         # Track seen paths for collision detection
-        seen_casefold: Dict[str, str] = {}
+        seen_casefold: dict[str, str] = {}
 
         for entry_path in entry_paths:
             # Convert to string if needed
@@ -635,7 +635,7 @@ def extraction_gate(
     max_entry_ratio: float = 10.0,
     max_file_size_mb: int = 10240,
     max_entries: int = 100000,
-) -> Union[PolicyOK, PolicyReject]:
+) -> PolicyOK | PolicyReject:
     """Validate archive extraction parameters.
 
     Enforces:
@@ -656,7 +656,7 @@ def extraction_gate(
         PolicyOK if archive is valid, PolicyReject otherwise
     """
     start_ms = time.perf_counter() * 1000
-    details: Dict[str, Any] = {}
+    details: dict[str, Any] = {}
 
     try:
         # Entry budget check
@@ -743,7 +743,7 @@ def storage_gate(
     src_path: str,
     dst_path: str,
     check_traversal: bool = True,
-) -> Union[PolicyOK, PolicyReject]:
+) -> PolicyOK | PolicyReject:
     """Validate storage operations.
 
     Enforces:
@@ -763,7 +763,7 @@ def storage_gate(
     import os
 
     start_ms = time.perf_counter() * 1000
-    details: Dict[str, Any] = {}
+    details: dict[str, Any] = {}
 
     try:
         # Validate operation
@@ -833,8 +833,8 @@ def storage_gate(
 )
 def db_gate(
     operation: str,
-    details_dict: Optional[Dict[str, Any]] = None,
-) -> Union[PolicyOK, PolicyReject]:
+    details_dict: dict[str, Any] | None = None,
+) -> PolicyOK | PolicyReject:
     """Validate database operation against transactional policy.
 
     Args:
@@ -881,9 +881,9 @@ def db_gate(
 )
 def db_boundary_gate(
     operation: str,
-    tables_affected: Optional[List[str]] = None,
+    tables_affected: list[str] | None = None,
     fs_success: bool = True,
-) -> Union[PolicyOK, PolicyReject]:
+) -> PolicyOK | PolicyReject:
     """Validate database transaction boundaries.
 
     Enforces:
@@ -900,7 +900,7 @@ def db_boundary_gate(
         PolicyOK if transaction valid, PolicyReject otherwise
     """
     start_ms = time.perf_counter() * 1000
-    details: Dict[str, Any] = {}
+    details: dict[str, Any] = {}
 
     try:
         # Validate operation

@@ -49,7 +49,7 @@ Usage:
 
 import json
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 try:
     import yaml
@@ -59,7 +59,7 @@ except ImportError:
 
 def get_prometheus_datasource_config(
     prometheus_url: str = "http://localhost:9090",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Get Prometheus data source configuration for Grafana.
 
     Args:
@@ -95,7 +95,7 @@ def get_prometheus_datasource_config(
     }
 
 
-def get_gates_dashboard_config() -> Dict[str, Any]:
+def get_gates_dashboard_config() -> dict[str, Any]:
     """Get Grafana dashboard configuration for security gates.
 
     Returns:
@@ -185,7 +185,7 @@ def get_gates_dashboard_config() -> Dict[str, Any]:
     }
 
 
-def get_alert_rules_config() -> Dict[str, Any]:
+def get_alert_rules_config() -> dict[str, Any]:
     """Get Prometheus alert rules configuration for security gates.
 
     Returns:

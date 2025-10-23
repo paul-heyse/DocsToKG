@@ -112,7 +112,6 @@ import time
 import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional
 
 from ..errors import ConfigError
 from .extraction_policy import ExtractionSettings
@@ -154,13 +153,13 @@ class IntegrityCheckResult:
     """Result of integrity verification for a single entry."""
 
     pathname: str
-    size_declared: Optional[int]
-    size_written: Optional[int]
-    crc_declared: Optional[str]
-    digest_computed: Optional[str]
+    size_declared: int | None
+    size_written: int | None
+    crc_declared: str | None
+    digest_computed: str | None
     passed: bool
-    error_code: Optional[str] = None
-    error_message: Optional[str] = None
+    error_code: str | None = None
+    error_message: str | None = None
 
 
 class IntegrityVerifier:
@@ -179,7 +178,7 @@ class IntegrityVerifier:
             if hasattr(policy, "integrity_fail_on_mismatch")
             else True
         )
-        self.checks: List[IntegrityCheckResult] = []
+        self.checks: list[IntegrityCheckResult] = []
         self.entries_checked = 0
         self.crc_mismatches = 0
         self.size_mismatches = 0
@@ -187,10 +186,10 @@ class IntegrityVerifier:
     def check_entry(
         self,
         pathname: str,
-        size_declared: Optional[int],
-        size_written: Optional[int],
-        crc_declared: Optional[str],
-        digest_computed: Optional[str],
+        size_declared: int | None,
+        size_written: int | None,
+        crc_declared: str | None,
+        digest_computed: str | None,
     ) -> IntegrityCheckResult:
         """Verify a single entry's integrity.
 
@@ -269,11 +268,11 @@ class TimestampPolicy:
     mode: str = "preserve"  # "preserve" | "normalize" | "source_date_epoch"
     normalize_to: str = "archive_mtime"  # "archive_mtime" | "now"
     preserve_dir_mtime: bool = False
-    value: Optional[int] = None  # Used for normalize/source_date_epoch modes
+    value: int | None = None  # Used for normalize/source_date_epoch modes
 
 
 def compute_target_mtime(
-    entry_mtime: Optional[int],
+    entry_mtime: int | None,
     archive_mtime: int,
     timestamp_policy: TimestampPolicy,
 ) -> int:
@@ -364,7 +363,7 @@ def normalize_pathname(
 
 def validate_format_allowed(
     format_name: str,
-    filters: List[str],
+    filters: list[str],
     policy: ExtractionSettings,
 ) -> None:
     """Validate archive format is in allow-list.
@@ -437,7 +436,7 @@ class DuplicateEntry:
 
     pathname: str
     first_index: int
-    duplicate_indices: List[int]
+    duplicate_indices: list[int]
     policy_action: str  # "reject" | "first_wins" | "last_wins"
     result: str  # "rejected" | "skipped" | "replaced"
 
@@ -453,14 +452,14 @@ class DuplicateDetector:
         """
         self.policy = policy
         self.duplicate_policy = getattr(policy, "duplicate_policy", "reject")
-        self.seen_paths: Dict[str, int] = {}  # path -> first_index
-        self.duplicates: List[DuplicateEntry] = []
+        self.seen_paths: dict[str, int] = {}  # path -> first_index
+        self.duplicates: list[DuplicateEntry] = []
 
     def check_entry(
         self,
         pathname: str,
         scan_index: int,
-    ) -> tuple[bool, Optional[str]]:
+    ) -> tuple[bool, str | None]:
         """Check if entry is duplicate.
 
         Args:
@@ -526,7 +525,7 @@ class ManifestEntry:
 
     path_rel: str
     size: int
-    sha256: Optional[str]
+    sha256: str | None
     mtime: int
     scan_index: int
 
@@ -537,15 +536,15 @@ class ProvenanceManifest:
 
     schema_version: str = "1.0"
     archive_path: str = ""
-    archive_sha256: Optional[str] = None
+    archive_sha256: str | None = None
     format: str = ""
-    filters: List[str] = None
+    filters: list[str] = None
     timestamp_mode: str = "preserve"
-    timestamp_value: Optional[int] = None
-    policy: Dict = None
-    entries: List[ManifestEntry] = None
-    metrics: Dict = None
-    manifest_sha256: Optional[str] = None
+    timestamp_value: int | None = None
+    policy: dict = None
+    entries: list[ManifestEntry] = None
+    metrics: dict = None
+    manifest_sha256: str | None = None
 
     def __post_init__(self):
         if self.filters is None:
@@ -621,7 +620,7 @@ class ProvenanceManifest:
                 temp_path.unlink()
 
 
-def check_windows_portability(path: str, policy: ExtractionSettings) -> tuple[bool, Optional[str]]:
+def check_windows_portability(path: str, policy: ExtractionSettings) -> tuple[bool, str | None]:
     """Check if a path violates Windows portability rules.
 
     Args:
@@ -657,10 +656,10 @@ def check_windows_portability(path: str, policy: ExtractionSettings) -> tuple[bo
 
 
 def validate_archive_format(
-    format_name: Optional[str],
-    filters: Optional[List[str]],
+    format_name: str | None,
+    filters: list[str] | None,
     policy: ExtractionSettings,
-) -> tuple[bool, Optional[str]]:
+) -> tuple[bool, str | None]:
     """Validate archive format and compression filters against allow-list.
 
     Args:

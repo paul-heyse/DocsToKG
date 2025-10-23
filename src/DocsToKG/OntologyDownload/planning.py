@@ -340,13 +340,14 @@ import os
 import re
 import shutil
 import tempfile
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from copy import deepcopy
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from pathlib import Path
-from typing import Any, Dict, Iterable, Iterator, List, Mapping, Optional, Sequence, Tuple
+from typing import Any
 from urllib.parse import urlparse
 
 try:  # pragma: no cover - platform specific availability
@@ -475,7 +476,7 @@ def _log_with_extra(
 
     if isinstance(logger, logging.LoggerAdapter):
         adapter_extra = getattr(logger, "extra", None)
-        merged: Dict[str, object] = dict(adapter_extra or {})
+        merged: dict[str, object] = dict(adapter_extra or {})
         merged.update(extra)
         logger.logger.log(level, message, extra=merged)
         return
@@ -484,7 +485,7 @@ def _log_with_extra(
 
 MANIFEST_SCHEMA_VERSION = "1.0"
 
-MANIFEST_JSON_SCHEMA: Dict[str, Any] = {
+MANIFEST_JSON_SCHEMA: dict[str, Any] = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "title": "DocsToKG Ontology Manifest",
     "type": "object",
@@ -584,7 +585,7 @@ Draft202012Validator.check_schema(MANIFEST_JSON_SCHEMA)
 _MANIFEST_VALIDATOR = Draft202012Validator(MANIFEST_JSON_SCHEMA)
 
 
-def get_manifest_schema() -> Dict[str, Any]:
+def get_manifest_schema() -> dict[str, Any]:
     """Return a deep copy of the manifest JSON Schema definition.
 
     Args:
@@ -597,7 +598,7 @@ def get_manifest_schema() -> Dict[str, Any]:
     return deepcopy(MANIFEST_JSON_SCHEMA)
 
 
-def validate_manifest_dict(payload: Mapping[str, Any], *, source: Optional[Path] = None) -> None:
+def validate_manifest_dict(payload: Mapping[str, Any], *, source: Path | None = None) -> None:
     """Validate manifest payload against the JSON Schema definition.
 
     Args:
@@ -640,7 +641,7 @@ class FetchSpec:
 
     id: str
     resolver: str
-    extras: Dict[str, object]
+    extras: dict[str, object]
     target_formats: Sequence[str]
 
 
@@ -697,7 +698,7 @@ def _make_fetch_spec(
 
 
 def merge_defaults(
-    raw_spec: Mapping[str, object], defaults: DefaultsConfig, *, index: Optional[int] = None
+    raw_spec: Mapping[str, object], defaults: DefaultsConfig, *, index: int | None = None
 ) -> FetchSpec:
     """Merge user-provided specification with defaults to create a fetch spec."""
 
@@ -747,12 +748,12 @@ class FetchResult:
     sha256: str
     manifest_path: Path
     artifacts: Sequence[str]
-    expected_checksum: Optional[ExpectedChecksum] = None
-    etag: Optional[str] = None
-    last_modified: Optional[str] = None
-    content_type: Optional[str] = None
-    content_length: Optional[int] = None
-    cache_status: Optional[Mapping[str, object]] = None
+    expected_checksum: ExpectedChecksum | None = None
+    etag: str | None = None
+    last_modified: str | None = None
+    content_type: str | None = None
+    content_length: int | None = None
+    cache_status: Mapping[str, object] | None = None
 
 
 ResolvedConfig.model_rebuild()
@@ -766,7 +767,7 @@ class BatchPlanningError(RuntimeError):
         *,
         failed_spec: FetchSpec,
         original: BaseException,
-        completed: List["PlannedFetch"],
+        completed: list[PlannedFetch],
         total: int,
     ) -> None:
         self.failed_spec = failed_spec
@@ -789,7 +790,7 @@ class BatchFetchError(RuntimeError):
         *,
         failed_spec: FetchSpec,
         original: BaseException,
-        completed: List[FetchResult],
+        completed: list[FetchResult],
         total: int,
     ) -> None:
         self.failed_spec = failed_spec
@@ -805,9 +806,9 @@ class BatchFetchError(RuntimeError):
 
 
 def _cancel_pending_futures(
-    futures: Mapping[Future[Any], Tuple[int, FetchSpec]],
+    futures: Mapping[Future[Any], tuple[int, FetchSpec]],
     *,
-    current: Optional[Future[Any]] = None,
+    current: Future[Any] | None = None,
 ) -> None:
     """Cancel any futures that are still pending execution."""
 
@@ -899,27 +900,27 @@ class Manifest:
     resolver: str
     url: str
     filename: str
-    version: Optional[str]
-    license: Optional[str]
+    version: str | None
+    license: str | None
     status: str
     sha256: str
-    normalized_sha256: Optional[str]
-    fingerprint: Optional[str]
-    etag: Optional[str]
-    last_modified: Optional[str]
+    normalized_sha256: str | None
+    fingerprint: str | None
+    etag: str | None
+    last_modified: str | None
     downloaded_at: str
     target_formats: Sequence[str]
-    validation: Dict[str, ValidationResult]
+    validation: dict[str, ValidationResult]
     artifacts: Sequence[str]
-    resolver_attempts: Sequence[Dict[str, object]]
-    content_type: Optional[str] = None
-    content_length: Optional[int] = None
-    source_media_type_label: Optional[str] = None
-    streaming_prefix_sha256: Optional[str] = None
-    streaming_content_sha256: Optional[str] = None
-    expected_checksum: Optional[ExpectedChecksum] = None
+    resolver_attempts: Sequence[dict[str, object]]
+    content_type: str | None = None
+    content_length: int | None = None
+    source_media_type_label: str | None = None
+    streaming_prefix_sha256: str | None = None
+    streaming_content_sha256: str | None = None
+    expected_checksum: ExpectedChecksum | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Return a JSON-serializable dictionary for the manifest.
 
         Args:
@@ -1015,13 +1016,13 @@ class PlannedFetch:
     resolver: str
     plan: FetchPlan
     candidates: Sequence[ResolverCandidate]
-    metadata: Dict[str, object] = field(default_factory=dict)
-    last_modified: Optional[str] = None
-    last_modified_at: Optional[datetime] = None
-    size: Optional[int] = None
+    metadata: dict[str, object] = field(default_factory=dict)
+    last_modified: str | None = None
+    last_modified_at: datetime | None = None
+    size: int | None = None
 
 
-def parse_http_datetime(value: Optional[str]) -> Optional[datetime]:
+def parse_http_datetime(value: str | None) -> datetime | None:
     """Parse HTTP ``Last-Modified`` style timestamps into UTC datetimes.
 
     Args:
@@ -1041,11 +1042,11 @@ def parse_http_datetime(value: Optional[str]) -> Optional[datetime]:
     except (TypeError, ValueError, IndexError):
         return None
     if parsed.tzinfo is None:
-        return parsed.replace(tzinfo=timezone.utc)
-    return parsed.astimezone(timezone.utc)
+        return parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
 
 
-def parse_iso_datetime(value: Optional[str]) -> Optional[datetime]:
+def parse_iso_datetime(value: str | None) -> datetime | None:
     """Parse ISO-8601 timestamps into timezone-aware UTC datetimes.
 
     Args:
@@ -1069,11 +1070,11 @@ def parse_iso_datetime(value: Optional[str]) -> Optional[datetime]:
     except ValueError:
         return None
     if parsed.tzinfo is None:
-        return parsed.replace(tzinfo=timezone.utc)
-    return parsed.astimezone(timezone.utc)
+        return parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
 
 
-def parse_version_timestamp(value: Optional[str]) -> Optional[datetime]:
+def parse_version_timestamp(value: str | None) -> datetime | None:
     """Parse version strings or manifest timestamps into UTC datetimes.
 
     Args:
@@ -1097,7 +1098,7 @@ def parse_version_timestamp(value: Optional[str]) -> Optional[datetime]:
     if parsed is not None:
         return parsed
 
-    candidates: List[str] = []
+    candidates: list[str] = []
 
     def _add_candidate(candidate: str) -> None:
         candidate = candidate.strip()
@@ -1127,11 +1128,11 @@ def parse_version_timestamp(value: Optional[str]) -> Optional[datetime]:
                 naive = datetime.strptime(candidate, fmt)
             except ValueError:
                 continue
-            return naive.replace(tzinfo=timezone.utc)
+            return naive.replace(tzinfo=UTC)
     return None
 
 
-def infer_version_timestamp(value: Optional[str]) -> Optional[datetime]:
+def infer_version_timestamp(value: str | None) -> datetime | None:
     """Infer a timestamp from resolver version identifiers.
 
     Args:
@@ -1181,11 +1182,11 @@ def infer_version_timestamp(value: Optional[str]) -> Optional[datetime]:
             naive = datetime.strptime(text, fmt)
         except ValueError:
             continue
-        return naive.replace(tzinfo=timezone.utc)
+        return naive.replace(tzinfo=UTC)
     return None
 
 
-def _coerce_datetime(value: Optional[str]) -> Optional[datetime]:
+def _coerce_datetime(value: str | None) -> datetime | None:
     """Return timezone-aware datetime parsed from HTTP or ISO timestamp."""
 
     parsed = parse_http_datetime(value)
@@ -1194,7 +1195,7 @@ def _coerce_datetime(value: Optional[str]) -> Optional[datetime]:
     return parse_iso_datetime(value)
 
 
-def _normalize_timestamp(value: Optional[str]) -> Optional[str]:
+def _normalize_timestamp(value: str | None) -> str | None:
     """Return canonical ISO8601 string for HTTP timestamp headers."""
 
     parsed = _coerce_datetime(value)
@@ -1203,7 +1204,7 @@ def _normalize_timestamp(value: Optional[str]) -> Optional[str]:
     return parsed.isoformat().replace("+00:00", "Z")
 
 
-def _canonical_media_type(value: Optional[str]) -> Optional[str]:
+def _canonical_media_type(value: str | None) -> str | None:
     """Return a normalized MIME type without parameters."""
 
     if not value:
@@ -1211,7 +1212,7 @@ def _canonical_media_type(value: Optional[str]) -> Optional[str]:
     return value.split(";", 1)[0].strip().lower() or None
 
 
-DEFAULT_VALIDATOR_NAMES: Tuple[str, ...] = (
+DEFAULT_VALIDATOR_NAMES: tuple[str, ...] = (
     "rdflib",
     "pronto",
     "owlready2",
@@ -1224,7 +1225,7 @@ _MEDIA_VALIDATOR_WHITELIST = {
 }
 
 
-def _select_validators(media_type: Optional[str]) -> List[str]:
+def _select_validators(media_type: str | None) -> list[str]:
     """Return validator names appropriate for ``media_type``."""
 
     canonical = _canonical_media_type(media_type)
@@ -1246,7 +1247,7 @@ class PlannerProbeResult:
     status_code: int
     ok: bool
     headers: Mapping[str, str]
-    cache_status: Optional[Mapping[str, object]] = None
+    cache_status: Mapping[str, object] | None = None
 
 
 def planner_http_probe(
@@ -1254,17 +1255,17 @@ def planner_http_probe(
     url: str,
     http_config: DownloadConfiguration,
     logger: logging.Logger,
-    headers: Optional[Mapping[str, str]] = None,
-    service: Optional[str] = None,
-    context: Optional[Mapping[str, object]] = None,
-    planner_config: Optional[PlannerConfig] = None,
-) -> Optional[PlannerProbeResult]:
+    headers: Mapping[str, str] | None = None,
+    service: str | None = None,
+    context: Mapping[str, object] | None = None,
+    planner_config: PlannerConfig | None = None,
+) -> PlannerProbeResult | None:
     """Issue a polite planner probe using shared networking primitives."""
 
     parsed = urlparse(url)
     host = parsed.hostname.lower() if parsed.hostname else None
 
-    base_extra: Dict[str, object] = {"stage": "plan", "url": url}
+    base_extra: dict[str, object] = {"stage": "plan", "url": url}
     if service:
         base_extra["service"] = service
     if host:
@@ -1272,7 +1273,7 @@ def planner_http_probe(
     if context:
         base_extra.update(context)
 
-    def _requires_head(hostname: Optional[str]) -> bool:
+    def _requires_head(hostname: str | None) -> bool:
         if not hostname or planner_config is None:
             return False
         candidates = getattr(planner_config, "head_precheck_hosts", []) or []
@@ -1299,7 +1300,7 @@ def planner_http_probe(
 
     correlation_id = _extract_correlation_id(logger)
     polite_headers = http_config.polite_http_headers(correlation_id=correlation_id)
-    merged_headers: Dict[str, str] = {str(k): str(v) for k, v in polite_headers.items()}
+    merged_headers: dict[str, str] = {str(k): str(v) for k, v in polite_headers.items()}
     if headers:
         for key, value in headers.items():
             merged_headers[str(key)] = str(value)
@@ -1319,7 +1320,7 @@ def planner_http_probe(
 
     client = get_http_client(http_config)
 
-    def _issue(current_method: str, *, allow_range: bool = True) -> Optional[PlannerProbeResult]:
+    def _issue(current_method: str, *, allow_range: bool = True) -> PlannerProbeResult | None:
         range_header = "bytes=0-0" if current_method == "GET" and allow_range else None
 
         def _perform_once() -> PlannerProbeResult:
@@ -1351,7 +1352,7 @@ def planner_http_probe(
                         f"HTTP error {status_code}", request=response.request, response=response
                     )
                     if retry_delay is not None and retry_delay > 0:
-                        setattr(http_error, "_retry_after_delay", retry_delay)
+                        http_error._retry_after_delay = retry_delay
                     raise http_error
                 if status_code == 416 and range_header:
                     raise _RangeRetry()
@@ -1625,7 +1626,7 @@ def _populate_plan_metadata(
     return planned
 
 
-def _read_manifest(manifest_path: Path) -> Optional[dict]:
+def _read_manifest(manifest_path: Path) -> dict | None:
     """Return previously recorded manifest data if a valid JSON file exists.
 
     Args:
@@ -1645,7 +1646,7 @@ def _read_manifest(manifest_path: Path) -> Optional[dict]:
     return payload
 
 
-def _validate_manifest(manifest: Manifest) -> Dict[str, Any]:
+def _validate_manifest(manifest: Manifest) -> dict[str, Any]:
     """Check that a manifest instance satisfies structural and type requirements.
 
     Args:
@@ -1697,7 +1698,7 @@ def _validate_manifest(manifest: Manifest) -> Dict[str, Any]:
     return payload
 
 
-def _parse_last_modified(value: Optional[str]) -> Optional[datetime]:
+def _parse_last_modified(value: str | None) -> datetime | None:
     """Return a timezone-aware datetime parsed from HTTP date headers."""
 
     if not value:
@@ -1707,13 +1708,13 @@ def _parse_last_modified(value: Optional[str]) -> Optional[datetime]:
     except (TypeError, ValueError):
         return None
     if parsed.tzinfo is None:
-        return parsed.replace(tzinfo=timezone.utc)
-    return parsed.astimezone(timezone.utc)
+        return parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
 
 
 def _fetch_last_modified(
     plan: FetchPlan, config: ResolvedConfig, logger: logging.Logger
-) -> Optional[str]:
+) -> str | None:
     """Probe the upstream plan URL for a Last-Modified header."""
 
     http_config = config.defaults.http
@@ -1829,7 +1830,7 @@ def _mirror_to_cas_if_enabled(
     digest: str,
     config: ResolvedConfig,
     logger: logging.LoggerAdapter,
-) -> Optional[Path]:
+) -> Path | None:
     """Mirror ``destination`` into the content-addressable cache when enabled."""
 
     if not config.defaults.enable_cas_mirror:
@@ -1861,14 +1862,14 @@ def _mirror_to_cas_if_enabled(
 def _cleanup_failed_validation_artifacts(
     *,
     destination: Path,
-    extraction_dir: Optional[Path],
-    cas_path: Optional[Path],
+    extraction_dir: Path | None,
+    cas_path: Path | None,
     base_dir: Path,
     logger: logging.LoggerAdapter,
 ) -> None:
     """Remove artefacts produced before a strict-mode validation failure."""
 
-    cleanup_targets: List[Tuple[Optional[Path], str, bool]] = [
+    cleanup_targets: list[tuple[Path | None, str, bool]] = [
         (destination, "downloaded file", False),
         (extraction_dir, "extracted archive", True),
         (cas_path, "cas mirror", False),
@@ -1917,7 +1918,7 @@ def _cleanup_failed_validation_artifacts(
 
 def _build_destination(
     spec: FetchSpec, plan: FetchPlan, config: ResolvedConfig
-) -> Tuple[Path, str, Path]:
+) -> tuple[Path, str, Path]:
     """Determine the output directory and filename for a download.
 
     Args:
@@ -1928,7 +1929,7 @@ def _build_destination(
     Returns:
         Tuple containing the target file path, resolved version, and base directory.
     """
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     version = plan.version or timestamp
     base_dir = LOCAL_ONTOLOGY_DIR / sanitize_filename(spec.id) / sanitize_filename(version)
     for subdir in ("original", "normalized", "validation"):
@@ -1963,11 +1964,11 @@ def _ensure_license_allowed(plan: FetchPlan, config: ResolvedConfig, spec: Fetch
         )
 
 
-def _resolver_candidates(spec: FetchSpec, config: ResolvedConfig) -> List[str]:
-    candidates: List[str] = []
+def _resolver_candidates(spec: FetchSpec, config: ResolvedConfig) -> list[str]:
+    candidates: list[str] = []
     seen = set()
 
-    def _add(name: Optional[str]) -> None:
+    def _add(name: str | None) -> None:
         if not name or name in seen:
             return
         candidates.append(name)
@@ -1985,11 +1986,11 @@ def _resolve_plan_with_fallback(
     config: ResolvedConfig,
     adapter: logging.LoggerAdapter,
     *,
-    cancellation_token: Optional[CancellationToken] = None,
-) -> Tuple[ResolverCandidate, Sequence[ResolverCandidate]]:
-    attempts: List[str] = []
-    candidates: List[ResolverCandidate] = []
-    primary: Optional[ResolverCandidate] = None
+    cancellation_token: CancellationToken | None = None,
+) -> tuple[ResolverCandidate, Sequence[ResolverCandidate]]:
+    attempts: list[str] = []
+    candidates: list[ResolverCandidate] = []
+    primary: ResolverCandidate | None = None
     for attempt_number, resolver_name in enumerate(_resolver_candidates(spec, config), start=1):
         resolver = RESOLVERS.get(resolver_name)
         if resolver is None:
@@ -2088,7 +2089,7 @@ def _resolve_plan_with_fallback(
 # ============================================================================
 
 
-def _get_duckdb_conn(active_config: "ResolvedConfig") -> Optional["duckdb.DuckDBPyConnection"]:
+def _get_duckdb_conn(active_config: ResolvedConfig) -> duckdb.DuckDBPyConnection | None:
     """Get or create DuckDB writer connection from config."""
     if not CATALOG_AVAILABLE or duckdb is None:
         return None
@@ -2108,7 +2109,7 @@ def _get_duckdb_conn(active_config: "ResolvedConfig") -> Optional["duckdb.DuckDB
 
 def _safe_record_boundary(
     adapter: logging.LoggerAdapter, boundary_name: str, boundary_fn, *args, **kwargs
-) -> Tuple[bool, Optional[Any]]:
+) -> tuple[bool, Any | None]:
     """Safely call a boundary context manager with error handling.
 
     Returns: (success: bool, result: Any)
@@ -2139,11 +2140,11 @@ def _safe_record_boundary(
 def fetch_one(
     spec: FetchSpec,
     *,
-    config: Optional[ResolvedConfig] = None,
-    correlation_id: Optional[str] = None,
-    logger: Optional[logging.Logger] = None,
+    config: ResolvedConfig | None = None,
+    correlation_id: str | None = None,
+    logger: logging.Logger | None = None,
     force: bool = False,
-    cancellation_token: Optional[CancellationToken] = None,
+    cancellation_token: CancellationToken | None = None,
 ) -> FetchResult:
     """Fetch, validate, and persist a single ontology described by *spec*.
 
@@ -2196,11 +2197,11 @@ def fetch_one(
     download_config = active_config.defaults.http
     candidate_list = list(candidates) or [primary]
 
-    resolver_attempts: List[Dict[str, object]] = []
-    last_error: Optional[Exception] = None
+    resolver_attempts: list[dict[str, object]] = []
+    last_error: Exception | None = None
 
     for attempt_number, candidate in enumerate(candidate_list, start=1):
-        attempt_record: Dict[str, object] = {
+        attempt_record: dict[str, object] = {
             "resolver": candidate.resolver,
             "url": candidate.plan.url,
             "attempt": attempt_number,
@@ -2361,7 +2362,7 @@ def fetch_one(
                 )
                 if cas_path:
                     artifacts.append(str(cas_path))
-                extraction_dir: Optional[Path] = None
+                extraction_dir: Path | None = None
                 if plan.media_type == "application/zip" or destination.suffix.lower() == ".zip":
                     extraction_dir = destination.parent / f"{destination.stem}_extracted"
                     try:
@@ -2583,7 +2584,7 @@ def fetch_one(
                     source_media_type_label=source_media_label,
                     streaming_prefix_sha256=streaming_prefix_hash,
                     expected_checksum=expected_checksum,
-                    downloaded_at=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+                    downloaded_at=datetime.now(UTC).isoformat().replace("+00:00", "Z"),
                     target_formats=effective_spec.target_formats,
                     validation=validation_results,
                     artifacts=artifacts,
@@ -2620,7 +2621,7 @@ def fetch_one(
 
                             latest_data = {
                                 "version": version,
-                                "downloaded_at": datetime.now(timezone.utc).isoformat(),
+                                "downloaded_at": datetime.now(UTC).isoformat(),
                                 "sha256": result.sha256,
                                 "resolver": effective_spec.resolver,
                                 "correlation_id": correlation,
@@ -2737,7 +2738,7 @@ def fetch_one(
     raise OntologyDownloadError(f"Download failed for '{spec.id}': {last_error}") from last_error
 
 
-def _planned_fetch_to_dict(planned: PlannedFetch) -> Dict[str, Any]:
+def _planned_fetch_to_dict(planned: PlannedFetch) -> dict[str, Any]:
     """Convert a PlannedFetch to a dictionary for database storage.
 
     Args:
@@ -2788,7 +2789,7 @@ def _planned_fetch_to_dict(planned: PlannedFetch) -> Dict[str, Any]:
     }
 
 
-def _dict_to_planned_fetch(data: Dict[str, Any], spec: FetchSpec) -> Optional[PlannedFetch]:
+def _dict_to_planned_fetch(data: dict[str, Any], spec: FetchSpec) -> PlannedFetch | None:
     """Reconstruct a PlannedFetch from a stored dictionary.
 
     Args:
@@ -2842,7 +2843,7 @@ def _dict_to_planned_fetch(data: Dict[str, Any], spec: FetchSpec) -> Optional[Pl
         return None
 
 
-def _get_cached_plan(spec: FetchSpec, logger: logging.LoggerAdapter) -> Optional[PlannedFetch]:
+def _get_cached_plan(spec: FetchSpec, logger: logging.LoggerAdapter) -> PlannedFetch | None:
     """Retrieve a cached plan for an ontology specification from the database.
 
     Args:
@@ -2904,7 +2905,7 @@ def _save_plan_to_db(spec: FetchSpec, planned: PlannedFetch, logger: logging.Log
     return True
 
 
-def _compare_plans(older_plan: Optional[PlannedFetch], newer_plan: PlannedFetch) -> Dict[str, Any]:
+def _compare_plans(older_plan: PlannedFetch | None, newer_plan: PlannedFetch) -> dict[str, Any]:
     """Compare two plan versions and return a diff.
 
     Args:
@@ -2996,7 +2997,7 @@ def _compare_plans(older_plan: Optional[PlannedFetch], newer_plan: PlannedFetch)
 
 def _save_plan_diff_to_db(
     ontology_id: str,
-    older_plan: Optional[PlannedFetch],
+    older_plan: PlannedFetch | None,
     newer_plan: PlannedFetch,
     logger: logging.LoggerAdapter,
 ) -> bool:
@@ -3044,10 +3045,10 @@ def _save_plan_diff_to_db(
 def plan_one(
     spec: FetchSpec,
     *,
-    config: Optional[ResolvedConfig] = None,
-    correlation_id: Optional[str] = None,
-    logger: Optional[logging.Logger] = None,
-    cancellation_token: Optional[CancellationToken] = None,
+    config: ResolvedConfig | None = None,
+    correlation_id: str | None = None,
+    logger: logging.Logger | None = None,
+    cancellation_token: CancellationToken | None = None,
 ) -> PlannedFetch:
     """Return a resolver plan for a single ontology without performing downloads.
 
@@ -3130,12 +3131,12 @@ def plan_one(
 def plan_all(
     specs: Iterable[FetchSpec],
     *,
-    config: Optional[ResolvedConfig] = None,
-    logger: Optional[logging.Logger] = None,
-    since: Optional[datetime] = None,
-    total: Optional[int] = None,
-    cancellation_token_group: Optional[CancellationTokenGroup] = None,
-) -> List[PlannedFetch]:
+    config: ResolvedConfig | None = None,
+    logger: logging.Logger | None = None,
+    since: datetime | None = None,
+    total: int | None = None,
+    cancellation_token_group: CancellationTokenGroup | None = None,
+) -> list[PlannedFetch]:
     """Return resolver plans for a collection of ontologies.
 
     Args:
@@ -3186,14 +3187,14 @@ def plan_all(
 
     index_counter = 0
     max_workers = max(1, active_config.defaults.http.concurrent_plans)
-    progress_payload: Dict[str, object] = {"stage": "plan", "workers": max_workers}
+    progress_payload: dict[str, object] = {"stage": "plan", "workers": max_workers}
     if total_hint is not None:
         progress_payload["progress"] = {"total": total_hint}
     adapter.info("planning batch", extra=progress_payload)
 
-    results: Dict[int, PlannedFetch] = {}
-    futures: Dict[Future[PlannedFetch], tuple[int, FetchSpec]] = {}
-    future_tokens: Dict[Future[PlannedFetch], CancellationToken] = {}
+    results: dict[int, PlannedFetch] = {}
+    futures: dict[Future[PlannedFetch], tuple[int, FetchSpec]] = {}
+    future_tokens: dict[Future[PlannedFetch], CancellationToken] = {}
 
     exhausted = False
 
@@ -3278,7 +3279,7 @@ def plan_all(
     if since is None:
         return ordered_plans
 
-    filtered: List[PlannedFetch] = []
+    filtered: list[PlannedFetch] = []
     for plan in ordered_plans:
         last_modified = plan.last_modified_at or _coerce_datetime(plan.last_modified)
         if last_modified is None:
@@ -3306,12 +3307,12 @@ def plan_all(
 def fetch_all(
     specs: Iterable[FetchSpec],
     *,
-    config: Optional[ResolvedConfig] = None,
-    logger: Optional[logging.Logger] = None,
+    config: ResolvedConfig | None = None,
+    logger: logging.Logger | None = None,
     force: bool = False,
-    total: Optional[int] = None,
-    cancellation_token_group: Optional[CancellationTokenGroup] = None,
-) -> List[FetchResult]:
+    total: int | None = None,
+    cancellation_token_group: CancellationTokenGroup | None = None,
+) -> list[FetchResult]:
     """Fetch a sequence of ontologies sequentially.
 
     Args:
@@ -3368,19 +3369,19 @@ def fetch_all(
         return []
 
     max_workers = max(1, active_config.defaults.http.concurrent_downloads)
-    batch_extra: Dict[str, object] = {"stage": "batch", "workers": max_workers}
+    batch_extra: dict[str, object] = {"stage": "batch", "workers": max_workers}
     if total_hint is not None:
         batch_extra["progress"] = {"total": total_hint}
     adapter.info("starting batch", extra=batch_extra)
 
-    results_map: Dict[int, FetchResult] = {}
-    futures: Dict[Future[FetchResult], tuple[int, FetchSpec]] = {}
-    future_tokens: Dict[Future[FetchResult], CancellationToken] = {}
+    results_map: dict[int, FetchResult] = {}
+    futures: dict[Future[FetchResult], tuple[int, FetchSpec]] = {}
+    future_tokens: dict[Future[FetchResult], CancellationToken] = {}
     exhausted = False
     submitted = 0
 
     def _submit(spec: FetchSpec, index: int) -> None:
-        progress: Dict[str, object] = {"current": index}
+        progress: dict[str, object] = {"current": index}
         if total_hint is not None:
             progress["total"] = total_hint
         adapter.info(

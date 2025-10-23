@@ -65,9 +65,10 @@ import json
 import logging
 import sqlite3
 import threading
-from datetime import datetime, timedelta, timezone
+from collections.abc import Mapping
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Mapping, Optional
+from typing import Any
 
 from ..orchestrator.models import JobState
 from . import feature_flags
@@ -196,7 +197,7 @@ class WorkQueue:
         self,
         artifact_id: str,
         artifact: Mapping[str, Any],
-        resolver_hint: Optional[str] = None,
+        resolver_hint: str | None = None,
     ) -> bool:
         """Idempotently enqueue an artifact for processing.
 
@@ -213,7 +214,7 @@ class WorkQueue:
         """
         conn = self._get_connection()
         try:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             now_iso = now.isoformat()
             artifact_json = json.dumps(dict(artifact))
 
@@ -278,7 +279,7 @@ class WorkQueue:
         """
         conn = self._get_connection()
         try:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             now_iso = now.isoformat()
             lease_expires = now + timedelta(seconds=lease_ttl_sec)
             lease_expires_iso = lease_expires.isoformat()
@@ -367,7 +368,7 @@ class WorkQueue:
         """
         conn = self._get_connection()
         try:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             now_iso = now.isoformat()
 
             # Calculate lease expiration time
@@ -395,7 +396,7 @@ class WorkQueue:
         self,
         job_id: int,
         outcome: str,
-        last_error: Optional[str] = None,
+        last_error: str | None = None,
     ) -> None:
         """Acknowledge job completion with outcome.
 
@@ -423,7 +424,7 @@ class WorkQueue:
 
         conn = self._get_connection()
         try:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             now_iso = now.isoformat()
 
             cursor = conn.execute(
@@ -466,7 +467,7 @@ class WorkQueue:
         """
         conn = self._get_connection()
         try:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             now_iso = now.isoformat()
 
             # Increment attempts
@@ -491,7 +492,7 @@ class WorkQueue:
 
             if attempts < max_attempts:
                 # Re-queue with exponential backoff (simple: just use backoff_sec)
-                retry_time = datetime.now(timezone.utc)
+                retry_time = datetime.now(UTC)
                 retry_time_iso = retry_time.isoformat()
                 delay_expires = (retry_time + timedelta(seconds=backoff_sec)).isoformat()
 
@@ -513,7 +514,7 @@ class WorkQueue:
                 )
             else:
                 # Mark as error
-                error_time = datetime.now(timezone.utc).isoformat()
+                error_time = datetime.now(UTC).isoformat()
 
                 conn.execute(
                     """

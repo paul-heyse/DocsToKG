@@ -59,7 +59,6 @@ SLOs:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List
 
 # === SLO THRESHOLD CONSTANTS ===
 
@@ -116,13 +115,13 @@ class SLOMetric:
     target_value: float
     error_budget: float
     status: str  # "pass", "warning", "fail"
-    details: Dict[str, str]
+    details: dict[str, str]
 
 
 # === SLO DEFINITIONS ===
 
 
-def get_slo_definitions() -> List[SLOThreshold]:
+def get_slo_definitions() -> list[SLOThreshold]:
     """Get all active SLO definitions."""
     return [
         SLOThreshold(

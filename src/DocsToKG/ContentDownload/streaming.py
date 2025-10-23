@@ -98,9 +98,10 @@ import hashlib
 import logging
 import os
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Dict, Literal, Optional
+from typing import Any, Literal
 
 LOGGER = logging.getLogger(__name__)
 
@@ -121,10 +122,10 @@ class ServerValidators:
         content_length: Content-Length header value in bytes
     """
 
-    etag: Optional[str]
-    last_modified: Optional[str]
+    etag: str | None
+    last_modified: str | None
     accept_ranges: bool
-    content_length: Optional[int]
+    content_length: int | None
 
 
 @dataclass(frozen=True)
@@ -141,9 +142,9 @@ class LocalPartState:
 
     path: Path
     bytes_local: int
-    prefix_hash_hex: Optional[str] = None
-    etag: Optional[str] = None
-    last_modified: Optional[str] = None
+    prefix_hash_hex: str | None = None
+    etag: str | None = None
+    last_modified: str | None = None
 
 
 @dataclass(frozen=True)
@@ -157,7 +158,7 @@ class ResumeDecision:
     """
 
     mode: Literal["fresh", "resume", "discard_part"]
-    range_start: Optional[int]
+    range_start: int | None
     reason: str
 
 
@@ -189,7 +190,7 @@ class StreamMetrics:
 
 def ensure_quota(
     root_dir: Path,
-    expected_bytes: Optional[int],
+    expected_bytes: int | None,
     *,
     free_min: int,
     margin: float,
@@ -235,7 +236,7 @@ def ensure_quota(
 
 def can_resume(
     valid: ServerValidators,
-    part: Optional[LocalPartState],
+    part: LocalPartState | None,
     *,
     prefix_check_bytes: int,
     allow_without_validators: bool,
@@ -332,11 +333,11 @@ def stream_to_part(
     client: Any,
     url: str,
     part_path: Path,
-    range_start: Optional[int],
+    range_start: int | None,
     chunk_bytes: int,
     do_fsync: bool,
     preallocate_min: int,
-    expected_total: Optional[int],
+    expected_total: int | None,
     artifact_lock: Callable,
     logger: logging.Logger,
     verify_content_length: bool = True,
@@ -576,7 +577,7 @@ def download_pdf(
     manifest_sink: Any,
     logger: logging.Logger,
     offline: bool = False,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Orchestrate a complete artifact download with resume and deduplication.
 
     Flow:
@@ -665,7 +666,7 @@ def download_pdf(
     safe_slug = hashlib.sha256(canon_url.encode("utf-8")).hexdigest()[:16]
     part_path = staging_dir / f"{safe_slug}.part"
 
-    lp: Optional[LocalPartState] = None
+    lp: LocalPartState | None = None
     if part_path.exists():
         lp = LocalPartState(
             path=part_path,

@@ -92,7 +92,8 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-from typing import Any, Callable, Dict, Optional
+from collections.abc import Callable
+from typing import Any
 
 LOGGER = logging.getLogger(__name__)
 
@@ -102,7 +103,7 @@ LOGGER = logging.getLogger(__name__)
 # ============================================================================
 
 
-def ikey(obj: Dict[str, Any]) -> str:
+def ikey(obj: dict[str, Any]) -> str:
     """Generate a deterministic SHA-256 key from a dictionary.
 
     Serializes with sorted keys and no whitespace to ensure determinism.
@@ -177,7 +178,7 @@ def acquire_lease(
     owner: str,
     ttl_seconds: float,
     now_fn: Callable[[], float] = None,
-) -> Optional[str]:
+) -> str | None:
     """Acquire a lease on the next available job.
 
     Atomically updates the first PLANNED or FAILED job with lease info.
@@ -372,9 +373,9 @@ def run_effect(
     op_key: str,
     job_id: str,
     kind: str,
-    fn: Callable[[], Dict[str, Any]],
+    fn: Callable[[], dict[str, Any]],
     now_fn: Callable[[], float] = None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Execute a side effect exactly once.
 
     Algorithm:

@@ -106,7 +106,7 @@ if TYPE_CHECKING:  # pragma: no cover - import-time hints only
     from . import token_profiles as token_profiles  # noqa: F401 (re-exported at runtime)
 
 
-_LAZY_ATTR_MODULES: Dict[str, str] = {
+_LAZY_ATTR_MODULES: dict[str, str] = {
     "chunking": "DocsToKG.DocParsing.chunking",
     "core": "DocsToKG.DocParsing.core",
     "doctags": "DocsToKG.DocParsing.doctags",
@@ -115,7 +115,7 @@ _LAZY_ATTR_MODULES: Dict[str, str] = {
     "token_profiles": "DocsToKG.DocParsing.token_profiles",
 }
 
-_MODULE_CACHE: Dict[str, ModuleType] = {}
+_MODULE_CACHE: dict[str, ModuleType] = {}
 
 
 def _import_module(module_name: str):
@@ -135,11 +135,9 @@ def _load_module(name: str) -> ModuleType:
     except ModuleNotFoundError as exc:  # pragma: no cover - exercised in tests
         missing = getattr(exc, "name", None) or str(exc)
         raise ImportError(
-            "DocsToKG.DocParsing.{name} could not be imported because the optional "
-            "dependency '{missing}' is not installed. Install the appropriate extras, "
-            'for example `pip install "DocsToKG[docling,gpu]"` to enable this module.'.format(
-                name=name, missing=missing
-            )
+            f"DocsToKG.DocParsing.{name} could not be imported because the optional "
+            f"dependency '{missing}' is not installed. Install the appropriate extras, "
+            'for example `pip install "DocsToKG[docling,gpu]"` to enable this module.'
         ) from exc
     except ImportError as exc:  # pragma: no cover - exercised in tests
         missing = getattr(exc, "name", None)
@@ -149,11 +147,9 @@ def _load_module(name: str) -> ModuleType:
                 parts = message.split("'")
                 missing = parts[1] if len(parts) >= 2 else message
             raise ImportError(
-                "DocsToKG.DocParsing.{name} could not be imported because the optional "
-                "dependency '{missing}' is not installed. Install the appropriate extras, "
-                'for example `pip install "DocsToKG[docling,gpu]"` to enable this module.'.format(
-                    name=name, missing=missing
-                )
+                f"DocsToKG.DocParsing.{name} could not be imported because the optional "
+                f"dependency '{missing}' is not installed. Install the appropriate extras, "
+                'for example `pip install "DocsToKG[docling,gpu]"` to enable this module.'
             ) from exc
         raise
 

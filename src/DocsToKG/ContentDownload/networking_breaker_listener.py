@@ -46,8 +46,9 @@ Typical Usage:
 from __future__ import annotations
 
 import time
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Mapping, Optional, Protocol
+from typing import Any, Protocol
 
 try:
     import pybreaker
@@ -68,7 +69,7 @@ class BreakerListenerConfig:
     run_id: str
     host: str  # breaker key (host)
     scope: str = "host"  # "host" | "resolver"
-    resolver: Optional[str] = None
+    resolver: str | None = None
 
 
 class NetworkBreakerListener(pybreaker.CircuitBreakerListener):  # type: ignore[misc]

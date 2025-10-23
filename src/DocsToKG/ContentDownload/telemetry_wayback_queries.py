@@ -50,8 +50,8 @@ from __future__ import annotations
 
 import math
 import sqlite3
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Optional, Sequence
 
 
 @dataclass(frozen=True)
@@ -105,7 +105,7 @@ def ensure_schema(
         conn.execute(statement)
 
 
-def _percentile(sorted_values: Sequence[int], percentile: float) -> Optional[int]:
+def _percentile(sorted_values: Sequence[int], percentile: float) -> int | None:
     """Return the percentile value using the nearest-rank method."""
 
     if not sorted_values:
@@ -124,7 +124,7 @@ def rate_smoothing_p95(
     run_id: str,
     *,
     role: str,
-) -> Optional[int]:
+) -> int | None:
     """Compute the P95 rate limiter delay for ``run_id`` and ``role``.
 
     Only ``acquire`` actions that include a non-null ``delay_ms`` field are

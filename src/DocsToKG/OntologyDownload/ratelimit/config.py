@@ -72,7 +72,6 @@ Example:
 
 import re
 from dataclasses import dataclass
-from typing import Dict, List, Optional
 
 # ============================================================================
 # Constants & Enums
@@ -193,7 +192,7 @@ def parse_rate_string(spec: str) -> RateSpec:
     return RateSpec(limit=limit, interval_ms=interval_ms)
 
 
-def validate_rate_list(rates: List[RateSpec]) -> bool:
+def validate_rate_list(rates: list[RateSpec]) -> bool:
     """Validate multi-window rate list.
 
     pyrate-limiter requires rates to be ordered by interval (ascending)
@@ -238,7 +237,7 @@ def validate_rate_list(rates: List[RateSpec]) -> bool:
     return True
 
 
-def normalize_rate_list(rates: List[str]) -> List[RateSpec]:
+def normalize_rate_list(rates: list[str]) -> list[RateSpec]:
     """Parse and validate a list of rate strings.
 
     Automatically sorts by interval to ensure correct ordering.
@@ -269,9 +268,9 @@ def normalize_rate_list(rates: List[str]) -> List[RateSpec]:
 
 
 def normalize_per_service_rates(
-    rates_dict: Dict[str, str],
-    default_rate: Optional[str] = None,
-) -> Dict[str, List[RateSpec]]:
+    rates_dict: dict[str, str],
+    default_rate: str | None = None,
+) -> dict[str, list[RateSpec]]:
     """Normalize per-service rate configuration.
 
     Builds a registry of service → rates for use by RateLimitManager.
@@ -292,7 +291,7 @@ def normalize_per_service_rates(
         >>> config["ols"]
         [RateSpec(limit=4, interval_ms=1000)]
     """
-    result: Dict[str, List[RateSpec]] = {}
+    result: dict[str, list[RateSpec]] = {}
 
     for service, rate_str in rates_dict.items():
         try:
@@ -317,7 +316,7 @@ def normalize_per_service_rates(
 # ============================================================================
 
 
-def get_schema_summary() -> Dict[str, str]:
+def get_schema_summary() -> dict[str, str]:
     """Get summary of rate spec schema for documentation.
 
     Returns:

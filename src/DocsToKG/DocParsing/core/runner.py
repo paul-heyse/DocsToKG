@@ -131,22 +131,13 @@ import math
 import random
 import time
 from collections import deque
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from concurrent.futures import FIRST_COMPLETED, Future, wait
 from concurrent.futures import TimeoutError as FutureTimeoutError
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import (
     Any,
-    Callable,
-    Deque,
-    Dict,
-    Iterator,
-    List,
-    Mapping,
-    Optional,
-    Sequence,
-    Tuple,
-    Union,
 )
 
 from DocsToKG.concurrency.executors import create_executor
@@ -173,8 +164,8 @@ class ItemFingerprint:
     """Resume fingerprint recorded alongside stage outputs."""
 
     path: Path
-    input_sha256: Optional[str] = None
-    cfg_hash: Optional[str] = None
+    input_sha256: str | None = None
+    cfg_hash: str | None = None
 
     def matches(self) -> bool:
         """Return ``True`` when the fingerprint on disk matches expectations."""
@@ -205,9 +196,9 @@ class WorkItem:
     cfg_hash: str
     cost_hint: float = 0.0
     metadata: Mapping[str, Any] = field(default_factory=dict)
-    fingerprint: Optional[ItemFingerprint] = None
+    fingerprint: ItemFingerprint | None = None
 
-    def materialize(self) -> "WorkItem":
+    def materialize(self) -> WorkItem:
         """Return a version with plain dictionaries suitable for pickling."""
 
         inputs = {key: Path(value) for key, value in dict(self.inputs).items()}
@@ -254,7 +245,7 @@ class StageOptions:
     resume: bool = False
     force: bool = False
     diagnostics_interval_s: float = 30.0
-    seed: Optional[int] = None
+    seed: int | None = None
     dry_run: bool = False
 
 
@@ -267,7 +258,7 @@ class StageError(Exception):
     category: str
     message: str
     retryable: bool = False
-    detail: Optional[Mapping[str, Any]] = None
+    detail: Mapping[str, Any] | None = None
 
     def __str__(self) -> str:  # pragma: no cover - human readable fallback
         return f"[{self.category}] {self.message}"
@@ -281,7 +272,7 @@ class ItemOutcome:
     duration_s: float
     manifest: Mapping[str, Any] = field(default_factory=dict)
     result: Mapping[str, Any] = field(default_factory=dict)
-    error: Optional[StageError] = None
+    error: StageError | None = None
 
 
 @dataclass(slots=True)
@@ -304,12 +295,10 @@ class StageOutcome:
 class StageHooks:
     """Optional lifecycle hooks invoked around execution."""
 
-    before_stage: Optional[Callable[["StageContext"], None]] = None
-    after_stage: Optional[Callable[[StageOutcome, "StageContext"], None]] = None
-    before_item: Optional[Callable[[WorkItem, "StageContext"], None]] = None
-    after_item: Optional[
-        Callable[[WorkItem, Union[ItemOutcome, StageError], "StageContext"], None]
-    ] = None
+    before_stage: Callable[[StageContext], None] | None = None
+    after_stage: Callable[[StageOutcome, StageContext], None] | None = None
+    before_item: Callable[[WorkItem, StageContext], None] | None = None
+    after_item: Callable[[WorkItem, ItemOutcome | StageError, StageContext], None] | None = None
 
 
 @dataclass(slots=True)
@@ -318,7 +307,7 @@ class StageContext:
 
     plan: StagePlan
     options: StageOptions
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     @property
     def stage_name(self) -> str:
@@ -339,8 +328,8 @@ class _Submission:
 class _WorkerPayload:
     """Result wrapper returned by worker processes/threads."""
 
-    outcome: Optional[ItemOutcome]
-    error: Optional[BaseException]
+    outcome: ItemOutcome | None
+    error: BaseException | None
     started_at: float
     finished_at: float
 
@@ -417,7 +406,7 @@ def _percentile(values: Sequence[float], pct: float) -> float:
     return float(ordered[index])
 
 
-def _create_executor(options: StageOptions) -> Tuple[Optional[cf.Executor], bool]:
+def _create_executor(options: StageOptions) -> tuple[cf.Executor | None, bool]:
     workers = max(1, int(options.workers))
     if workers <= 1:
         return None, False
@@ -427,8 +416,8 @@ def _create_executor(options: StageOptions) -> Tuple[Optional[cf.Executor], bool
 def run_stage(
     plan: StagePlan,
     worker: Callable[[WorkItem], ItemOutcome],
-    options: Optional[StageOptions] = None,
-    hooks: Optional[StageHooks] = None,
+    options: StageOptions | None = None,
+    hooks: StageHooks | None = None,
 ) -> StageOutcome:
     """Execute ``plan`` using the provided ``worker`` and options."""
 
@@ -465,15 +454,15 @@ def run_stage(
     succeeded = 0
     failed = 0
     cancelled = False
-    queue_ms: List[float] = []
-    exec_ms: List[float] = []
-    errors: List[StageError] = []
+    queue_ms: list[float] = []
+    exec_ms: list[float] = []
+    errors: list[StageError] = []
 
     diagnostics_interval = max(1.0, float(options.diagnostics_interval_s or 30.0))
     last_diag = _now()
     wall_start = last_diag
 
-    submission_queue: Deque[Tuple[WorkItem, int]] = deque()
+    submission_queue: deque[tuple[WorkItem, int]] = deque()
 
     for item in items:
         if options.dry_run:
@@ -534,14 +523,14 @@ def run_stage(
         return outcome
 
     executor, _ = _create_executor(options)
-    pending: Dict[Future, _Submission] = {}
+    pending: dict[Future, _Submission] = {}
 
     def _handle_worker_payload(
         item: WorkItem,
         attempt: int,
         payload: _WorkerPayload,
         enqueue_time: float,
-    ) -> Optional[StageError]:
+    ) -> StageError | None:
         nonlocal succeeded, failed
 
         queue_ms.append(max(0.0, (payload.started_at - enqueue_time) * 1000.0))

@@ -65,10 +65,11 @@ Integrates with ContentDownload telemetry system to provide:
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Callable, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -123,20 +124,20 @@ class NetRequestEvent:
 
     # Optional fields with defaults
     event_type: str = "net.request"
-    ttfb_ms: Optional[float] = None  # Time to first byte (if tracked)
+    ttfb_ms: float | None = None  # Time to first byte (if tracked)
     cache: CacheStatus = CacheStatus.MISS
     from_cache: bool = False  # True if from Hishel
     http_version: str = "HTTP/1.1"  # HTTP/1.0, HTTP/1.1, HTTP/2
     http2: bool = False
     bytes_read: int = 0
     bytes_written: int = 0
-    error_code: Optional[str] = None
-    error_message: Optional[str] = None
+    error_code: str | None = None
+    error_message: str | None = None
     attempt: int = 1  # Attempt number (for retries)
     hop: int = 1  # Redirect hop number
-    redirect_target: Optional[str] = None
-    service: Optional[str] = None  # Service name (resolver, provider, etc.)
-    role: Optional[str] = None  # Role (metadata, landing, artifact, etc.)
+    redirect_target: str | None = None
+    service: str | None = None  # Service name (resolver, provider, etc.)
+    role: str | None = None  # Role (metadata, landing, artifact, etc.)
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
@@ -189,20 +190,20 @@ class NetRequestEventBuilder:
         self.status_code = 0
         self.status = RequestStatus.SUCCESS
         self.elapsed_ms = 0.0
-        self.ttfb_ms: Optional[float] = None
+        self.ttfb_ms: float | None = None
         self.cache = CacheStatus.MISS
         self.from_cache = False
         self.http_version = "HTTP/1.1"
         self.http2 = False
         self.bytes_read = 0
         self.bytes_written = 0
-        self.error_code: Optional[str] = None
-        self.error_message: Optional[str] = None
+        self.error_code: str | None = None
+        self.error_message: str | None = None
         self.attempt = 1
         self.hop = 1
-        self.redirect_target: Optional[str] = None
-        self.service: Optional[str] = None
-        self.role: Optional[str] = None
+        self.redirect_target: str | None = None
+        self.service: str | None = None
+        self.role: str | None = None
 
     def with_request(self, method: str, url: str, host: str) -> NetRequestEventBuilder:
         """Set request details."""
@@ -221,7 +222,7 @@ class NetRequestEventBuilder:
         return self
 
     def with_timing(
-        self, elapsed_ms: float, ttfb_ms: Optional[float] = None
+        self, elapsed_ms: float, ttfb_ms: float | None = None
     ) -> NetRequestEventBuilder:
         """Set timing information."""
         self.elapsed_ms = elapsed_ms
@@ -265,7 +266,7 @@ class NetRequestEventBuilder:
         return self
 
     def with_context(
-        self, service: Optional[str] = None, role: Optional[str] = None
+        self, service: str | None = None, role: str | None = None
     ) -> NetRequestEventBuilder:
         """Set context (service, role)."""
         self.service = service
@@ -275,7 +276,7 @@ class NetRequestEventBuilder:
     def build(self) -> NetRequestEvent:
         """Build and return the event."""
         return NetRequestEvent(
-            ts=datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z"),
+            ts=datetime.now(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z"),
             event_type="net.request",
             request_id=self.request_id,
             method=self.method,
@@ -350,7 +351,7 @@ class NetRequestEmitter:
 # Global Singleton Emitter
 # ============================================================================
 
-_EMITTER: Optional[NetRequestEmitter] = None
+_EMITTER: NetRequestEmitter | None = None
 
 
 def get_net_request_emitter() -> NetRequestEmitter:

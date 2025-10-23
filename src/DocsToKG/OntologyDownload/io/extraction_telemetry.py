@@ -48,7 +48,7 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any
 
 # ============================================================================
 # ERROR CODES (15 total, mapped to policies)
@@ -176,8 +176,8 @@ class ExtractionTelemetryEvent:
 
     policies_applied: list[str] = field(default_factory=list)
 
-    error_code: Optional[str] = None
-    error_reason: Optional[str] = None
+    error_code: str | None = None
+    error_reason: str | None = None
     partial: bool = False
 
     duration_ms: float = 0.0
@@ -185,9 +185,9 @@ class ExtractionTelemetryEvent:
     # Provenance & reproducibility
     run_id: str = field(default_factory=lambda: str(__import__("uuid").uuid4()))
     config_hash: str = ""
-    format_name: Optional[str] = None
+    format_name: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert event to dictionary for JSON logging."""
         return {k: v for k, v in self.__dict__.items() if v is not None and v != [] and v != 0.0}
 
@@ -197,13 +197,13 @@ class ExtractionMetrics:
     """Aggregated metrics for extraction operations."""
 
     start_time: float = field(default_factory=time.time)
-    end_time: Optional[float] = None
+    end_time: float | None = None
     total_entries: int = 0
     entries_allowed: int = 0
     entries_extracted: int = 0
     entries_rejected: int = 0
     total_bytes: int = 0
-    rejection_reason: Optional[str] = None
+    rejection_reason: str | None = None
 
     @property
     def duration_ms(self) -> float:

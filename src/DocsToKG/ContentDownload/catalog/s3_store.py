@@ -30,7 +30,6 @@ import hashlib
 import logging
 from pathlib import Path
 from threading import RLock
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +101,7 @@ class S3StorageBackend:
         local_path: str,
         artifact_id: str,
         resolver: str,
-        content_type: Optional[str] = None,
+        content_type: str | None = None,
     ) -> str:
         """Upload file to S3.
 

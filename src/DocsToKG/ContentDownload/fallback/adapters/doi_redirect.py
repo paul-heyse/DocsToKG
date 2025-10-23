@@ -17,7 +17,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any
 
 from DocsToKG.ContentDownload.fallback.adapters import head_pdf
 from DocsToKG.ContentDownload.fallback.types import AttemptPolicy, AttemptResult
@@ -25,7 +25,7 @@ from DocsToKG.ContentDownload.fallback.types import AttemptPolicy, AttemptResult
 
 def adapter_doi_redirect_pdf(
     policy: AttemptPolicy,
-    context: Dict[str, Any],
+    context: dict[str, Any],
 ) -> AttemptResult:
     """Follow DOI redirects to find PDF or landing page.
 

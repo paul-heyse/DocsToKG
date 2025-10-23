@@ -59,7 +59,7 @@ from __future__ import annotations
 import argparse
 import sqlite3
 import time
-from typing import Any, Dict, Optional
+from typing import Any
 
 try:
     from prometheus_client import Counter, Gauge, start_http_server
@@ -96,13 +96,13 @@ RUN_CORRUPTION_COUNT = Gauge(
 )
 
 
-def _fetchone(cx: sqlite3.Connection, sql: str, args: tuple = ()) -> Optional[Any]:
+def _fetchone(cx: sqlite3.Connection, sql: str, args: tuple = ()) -> Any | None:
     """Fetch single value from query."""
     row = cx.execute(sql, args).fetchone()
     return row[0] if row and row[0] is not None else None
 
 
-def _latest_run_id(cx: sqlite3.Connection) -> Optional[str]:
+def _latest_run_id(cx: sqlite3.Connection) -> str | None:
     """Get latest run_id from database."""
     # Prefer explicit run_summary ordering; fallback to max ts in http_events
     row = cx.execute("SELECT run_id FROM run_summary ORDER BY finished_at DESC LIMIT 1").fetchone()
@@ -112,9 +112,9 @@ def _latest_run_id(cx: sqlite3.Connection) -> Optional[str]:
     return row[0] if row else None
 
 
-def _compute_run_summary(cx: sqlite3.Connection, run_id: str) -> Dict[str, float]:
+def _compute_run_summary(cx: sqlite3.Connection, run_id: str) -> dict[str, float]:
     """Compute SLIs for a run."""
-    out: Dict[str, float] = {}
+    out: dict[str, float] = {}
 
     # Yield
     tot, ok = cx.execute(
@@ -230,7 +230,7 @@ def _emit_host_429(cx: sqlite3.Connection, run_id: str) -> None:
         HOST_HTTP429_RATIO.labels(run_id=run_id, host=host).set(float(pct or 0.0))
 
 
-def _emit_breaker_opens(cx: sqlite3.Connection, run_id: str, seen: Dict[tuple, int]) -> None:
+def _emit_breaker_opens(cx: sqlite3.Connection, run_id: str, seen: dict[tuple, int]) -> None:
     """Emit breaker open counters."""
     cur = cx.execute(
         """
@@ -261,7 +261,7 @@ def main() -> None:
     start_http_server(args.port)
     print(f"[prom-exporter] listening on http://0.0.0.0:{args.port}/metrics")
 
-    seen_breaker: Dict[tuple, int] = {}
+    seen_breaker: dict[tuple, int] = {}
 
     while True:
         try:

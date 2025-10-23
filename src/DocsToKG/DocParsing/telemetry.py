@@ -90,9 +90,10 @@ Example:
 from __future__ import annotations
 
 import time
+from collections.abc import Callable, Iterable
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, Optional
+from typing import TYPE_CHECKING, Any
 
 from DocsToKG.DocParsing.io import DEFAULT_JSONL_WRITER
 
@@ -107,7 +108,7 @@ __all__ = [
 ]
 
 
-def _default_writer(path: Path, rows: Iterable[Dict[str, Any]]) -> int:
+def _default_writer(path: Path, rows: Iterable[dict[str, Any]]) -> int:
     """Append ``rows`` to ``path`` using the lock-aware JsonlWriter."""
     return DEFAULT_JSONL_WRITER(path, rows)
 
@@ -120,11 +121,11 @@ class Attempt:
     file_id: str
     stage: str
     status: str
-    reason: Optional[str]
+    reason: str | None
     started_at: float
     finished_at: float
     bytes: int
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(slots=True)
@@ -136,9 +137,9 @@ class ManifestEntry:
     stage: str
     output_path: str
     tokens: int
-    schema_version: Optional[str]
+    schema_version: str | None
     duration_s: float
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class TelemetrySink:
@@ -149,7 +150,7 @@ class TelemetrySink:
         attempts_path: Path,
         manifest_path: Path,
         *,
-        writer: Optional[Callable[[Path, Iterable[Dict[str, Any]]], int | None]] = None,
+        writer: Callable[[Path, Iterable[dict[str, Any]]], int | None] | None = None,
     ) -> None:
         """Initialise sink paths and ensure parent directories exist.
 
@@ -167,7 +168,7 @@ class TelemetrySink:
         self._writer = writer or _default_writer
 
     @property
-    def writer(self) -> Callable[[Path, Iterable[Dict[str, Any]]], int | None]:
+    def writer(self) -> Callable[[Path, Iterable[dict[str, Any]]], int | None]:
         """Return the default writer for this sink."""
 
         return self._writer
@@ -175,9 +176,9 @@ class TelemetrySink:
     def _append_payload(
         self,
         path: Path,
-        payload: Dict[str, Any],
+        payload: dict[str, Any],
         *,
-        writer: Optional[Callable[[Path, Iterable[Dict[str, Any]]], int | None]] = None,
+        writer: Callable[[Path, Iterable[dict[str, Any]]], int | None] | None = None,
     ) -> None:
         """Append ``payload`` to ``path`` using the provided writer."""
 
@@ -188,7 +189,7 @@ class TelemetrySink:
         self,
         attempt: Attempt,
         *,
-        writer: Optional[Callable[[Path, Iterable[Dict[str, Any]]], int | None]] = None,
+        writer: Callable[[Path, Iterable[dict[str, Any]]], int | None] | None = None,
     ) -> None:
         """Append ``attempt`` to the attempts log."""
 
@@ -201,7 +202,7 @@ class TelemetrySink:
         self,
         entry: ManifestEntry,
         *,
-        writer: Optional[Callable[[Path, Iterable[Dict[str, Any]]], int | None]] = None,
+        writer: Callable[[Path, Iterable[dict[str, Any]]], int | None] | None = None,
     ) -> None:
         """Append ``entry`` to the manifest log."""
 
@@ -213,9 +214,9 @@ class TelemetrySink:
 
     def write_provider_event(
         self,
-        payload: Dict[str, Any],
+        payload: dict[str, Any],
         *,
-        writer: Optional[Callable[[Path, Iterable[Dict[str, Any]]], int | None]] = None,
+        writer: Callable[[Path, Iterable[dict[str, Any]]], int | None] | None = None,
     ) -> None:
         """Append provider telemetry to the attempts log."""
 
@@ -240,7 +241,7 @@ class StageTelemetry:
         *,
         run_id: str,
         stage: str,
-        writer: Optional[Callable[[Path, Iterable[Dict[str, Any]]], int | None]] = None,
+        writer: Callable[[Path, Iterable[dict[str, Any]]], int | None] | None = None,
     ) -> None:
         """Bind the telemetry sink to a specific run identifier and stage.
 
@@ -264,8 +265,8 @@ class StageTelemetry:
         input_path: Path | str,
         status: str,
         duration_s: float = 0.0,
-        reason: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        reason: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> None:
         """Persist an Attempt entry describing the outcome for ``doc_id``."""
 
@@ -289,10 +290,10 @@ class StageTelemetry:
         *,
         doc_id: str,
         output_path: Path | str,
-        schema_version: Optional[str],
+        schema_version: str | None,
         duration_s: float,
-        tokens: Optional[int] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        tokens: int | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> None:
         """Append a manifest row for ``doc_id`` and optional metadata."""
 
@@ -316,8 +317,8 @@ class StageTelemetry:
         output_path: Path | str,
         schema_version: str,
         duration_s: float,
-        tokens: Optional[int] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        tokens: int | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> None:
         """Record a successful attempt and mirror the manifest entry."""
 
@@ -344,8 +345,8 @@ class StageTelemetry:
         input_path: Path | str,
         duration_s: float,
         reason: str,
-        metadata: Optional[Dict[str, Any]] = None,
-        manifest_metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
+        manifest_metadata: dict[str, Any] | None = None,
     ) -> None:
         """Record a failure attempt and optionally log manifest metadata."""
 
@@ -372,8 +373,8 @@ class StageTelemetry:
         *,
         doc_id: str,
         input_path: Path | str,
-        reason: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        reason: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> None:
         """Record a skipped attempt and optional manifest metadata."""
 
@@ -400,7 +401,7 @@ class StageTelemetry:
         *,
         output_path: Path | str,
         schema_version: str,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> None:
         """Record the configuration manifest emitted at startup."""
 
@@ -416,13 +417,13 @@ class StageTelemetry:
     def log_provider_event(
         self,
         *,
-        provider: "ProviderIdentity",
+        provider: ProviderIdentity,
         phase: str,
-        data: Dict[str, Any],
+        data: dict[str, Any],
     ) -> None:
         """Record telemetry for provider lifecycle and batch metrics."""
 
-        payload: Dict[str, Any] = {
+        payload: dict[str, Any] = {
             "run_id": self._run_id,
             "file_id": f"__provider__/{provider.name}",
             "stage": self._stage,

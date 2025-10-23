@@ -45,7 +45,6 @@ Usage:
 """
 
 import logging
-from typing import Optional
 
 try:
     from prometheus_client import REGISTRY, generate_latest
@@ -67,7 +66,7 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 # Global reference to the metrics server
-_metrics_server_instance: Optional[ThreadingWSGIServer] = None
+_metrics_server_instance: ThreadingWSGIServer | None = None
 _metrics_server_running = False
 
 
