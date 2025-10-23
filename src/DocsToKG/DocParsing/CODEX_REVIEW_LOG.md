@@ -38,6 +38,13 @@ No eligible files after excludes.
 <!-- 2025-10-23 04:06:56Z UTC -->
 ## Pass 2 — find and fix real bugs
 
+### Batch 0 (Pass 2)
+- Broken: `core.http.normalize_http_timeout` treated `(None, <read>)` tuples as if both slots were provided, so the connect timeout jumped to the read value instead of keeping the default.
+- Fixed:
+  - preserve positional defaults by recognising `None` entries while still coercing numeric/string values
+  - reuse validation that surfaces bad literals early rather than silently misconfiguring retries
+- TODO: backfill coverage that exercises tuple inputs with `None` placeholders for connect/read.
+
 <!-- 2025-10-23 04:24:41Z UTC -->
 ## Pass 1 — find and fix real bugs
 
@@ -56,3 +63,6 @@ No eligible files after excludes.
 
 <!-- 2025-10-23 04:46:08Z UTC -->
 ## Pass 1 — find and fix real bugs
+
+<!-- 2025-10-23 04:50:55Z UTC -->
+## Pass 2 — find and fix real bugs

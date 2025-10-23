@@ -220,13 +220,26 @@ def normalize_http_timeout(timeout: Optional[object]) -> Tuple[float, float]:
     def _coerce_pair(values: Sequence[object]) -> Tuple[float, float]:
         """Coerce arbitrary iterables into a two-element timeout tuple."""
 
-        extracted = [v for v in values if v is not None]
-        if not extracted:
+        items = list(values)
+        if not items:
             return DEFAULT_HTTP_TIMEOUT
-        if len(extracted) == 1:
-            coerced = float(extracted[0])
-            return coerced, coerced
-        return float(extracted[0]), float(extracted[1])
+        if len(items) == 1:
+            single = items[0]
+            if single is None:
+                return DEFAULT_HTTP_TIMEOUT
+            return float(single), float(single)
+
+        def _coerce_element(value: object, *, default: float) -> float:
+            if value is None:
+                return default
+            try:
+                return float(value)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"Invalid timeout value {value!r}") from exc
+
+        connect = _coerce_element(items[0], default=DEFAULT_HTTP_TIMEOUT[0])
+        read = _coerce_element(items[1], default=DEFAULT_HTTP_TIMEOUT[1])
+        return connect, read
 
     if isinstance(timeout, (int, float)):
         coerced = float(timeout)
