@@ -3,12 +3,318 @@
 #   "module": "DocsToKG.OntologyDownload.planning",
 #   "purpose": "Plan ontology downloads, coordinate execution, and emit manifests and lockfiles",
 #   "sections": [
-#     {"id": "infrastructure", "name": "Planning Infrastructure", "anchor": "INF", "kind": "infra"},
-#     {"id": "models", "name": "Planner Data Models", "anchor": "MOD", "kind": "api"},
-#     {"id": "spec-builders", "name": "Specification Builders", "anchor": "SPC", "kind": "helpers"},
-#     {"id": "execution", "name": "Planning & Download Execution", "anchor": "EXE", "kind": "api"},
-#     {"id": "manifests", "name": "Manifest & Lockfile Helpers", "anchor": "MAN", "kind": "helpers"},
-#     {"id": "public-api", "name": "Public Planner API", "anchor": "API", "kind": "api"}
+#     {
+#       "id": "log-with-extra",
+#       "name": "_log_with_extra",
+#       "anchor": "function-log-with-extra",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-manifest-schema",
+#       "name": "get_manifest_schema",
+#       "anchor": "function-get-manifest-schema",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-manifest-dict",
+#       "name": "validate_manifest_dict",
+#       "anchor": "function-validate-manifest-dict",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "fetchspec",
+#       "name": "FetchSpec",
+#       "anchor": "class-fetchspec",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "make-fetch-spec",
+#       "name": "_make_fetch_spec",
+#       "anchor": "function-make-fetch-spec",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "merge-defaults",
+#       "name": "merge_defaults",
+#       "anchor": "function-merge-defaults",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "fetchresult",
+#       "name": "FetchResult",
+#       "anchor": "class-fetchresult",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "batchplanningerror",
+#       "name": "BatchPlanningError",
+#       "anchor": "class-batchplanningerror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "batchfetcherror",
+#       "name": "BatchFetchError",
+#       "anchor": "class-batchfetcherror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "cancel-pending-futures",
+#       "name": "_cancel_pending_futures",
+#       "anchor": "function-cancel-pending-futures",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "executor-is-shutting-down",
+#       "name": "_executor_is_shutting_down",
+#       "anchor": "function-executor-is-shutting-down",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "shutdown-executor-nowait",
+#       "name": "_shutdown_executor_nowait",
+#       "anchor": "function-shutdown-executor-nowait",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "manifest",
+#       "name": "Manifest",
+#       "anchor": "class-manifest",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "plannedfetch",
+#       "name": "PlannedFetch",
+#       "anchor": "class-plannedfetch",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "parse-http-datetime",
+#       "name": "parse_http_datetime",
+#       "anchor": "function-parse-http-datetime",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-iso-datetime",
+#       "name": "parse_iso_datetime",
+#       "anchor": "function-parse-iso-datetime",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-version-timestamp",
+#       "name": "parse_version_timestamp",
+#       "anchor": "function-parse-version-timestamp",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "infer-version-timestamp",
+#       "name": "infer_version_timestamp",
+#       "anchor": "function-infer-version-timestamp",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "coerce-datetime",
+#       "name": "_coerce_datetime",
+#       "anchor": "function-coerce-datetime",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "normalize-timestamp",
+#       "name": "_normalize_timestamp",
+#       "anchor": "function-normalize-timestamp",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "canonical-media-type",
+#       "name": "_canonical_media_type",
+#       "anchor": "function-canonical-media-type",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "select-validators",
+#       "name": "_select_validators",
+#       "anchor": "function-select-validators",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "plannerproberesult",
+#       "name": "PlannerProbeResult",
+#       "anchor": "class-plannerproberesult",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "planner-http-probe",
+#       "name": "planner_http_probe",
+#       "anchor": "function-planner-http-probe",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "populate-plan-metadata",
+#       "name": "_populate_plan_metadata",
+#       "anchor": "function-populate-plan-metadata",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "read-manifest",
+#       "name": "_read_manifest",
+#       "anchor": "function-read-manifest",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-manifest",
+#       "name": "_validate_manifest",
+#       "anchor": "function-validate-manifest",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-last-modified",
+#       "name": "_parse_last_modified",
+#       "anchor": "function-parse-last-modified",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "fetch-last-modified",
+#       "name": "_fetch_last_modified",
+#       "anchor": "function-fetch-last-modified",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "atomic-write-text",
+#       "name": "_atomic_write_text",
+#       "anchor": "function-atomic-write-text",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "atomic-write-json",
+#       "name": "_atomic_write_json",
+#       "anchor": "function-atomic-write-json",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "write-manifest",
+#       "name": "_write_manifest",
+#       "anchor": "function-write-manifest",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "mirror-to-cas-if-enabled",
+#       "name": "_mirror_to_cas_if_enabled",
+#       "anchor": "function-mirror-to-cas-if-enabled",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "cleanup-failed-validation-artifacts",
+#       "name": "_cleanup_failed_validation_artifacts",
+#       "anchor": "function-cleanup-failed-validation-artifacts",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-destination",
+#       "name": "_build_destination",
+#       "anchor": "function-build-destination",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "ensure-license-allowed",
+#       "name": "_ensure_license_allowed",
+#       "anchor": "function-ensure-license-allowed",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolver-candidates",
+#       "name": "_resolver_candidates",
+#       "anchor": "function-resolver-candidates",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolve-plan-with-fallback",
+#       "name": "_resolve_plan_with_fallback",
+#       "anchor": "function-resolve-plan-with-fallback",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-duckdb-conn",
+#       "name": "_get_duckdb_conn",
+#       "anchor": "function-get-duckdb-conn",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "safe-record-boundary",
+#       "name": "_safe_record_boundary",
+#       "anchor": "function-safe-record-boundary",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "fetch-one",
+#       "name": "fetch_one",
+#       "anchor": "function-fetch-one",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "planned-fetch-to-dict",
+#       "name": "_planned_fetch_to_dict",
+#       "anchor": "function-planned-fetch-to-dict",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "dict-to-planned-fetch",
+#       "name": "_dict_to_planned_fetch",
+#       "anchor": "function-dict-to-planned-fetch",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-cached-plan",
+#       "name": "_get_cached_plan",
+#       "anchor": "function-get-cached-plan",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "save-plan-to-db",
+#       "name": "_save_plan_to_db",
+#       "anchor": "function-save-plan-to-db",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "compare-plans",
+#       "name": "_compare_plans",
+#       "anchor": "function-compare-plans",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "save-plan-diff-to-db",
+#       "name": "_save_plan_diff_to_db",
+#       "anchor": "function-save-plan-diff-to-db",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "plan-one",
+#       "name": "plan_one",
+#       "anchor": "function-plan-one",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "plan-all",
+#       "name": "plan_all",
+#       "anchor": "function-plan-all",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "fetch-all",
+#       "name": "fetch_all",
+#       "anchor": "function-fetch-all",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "safe-lock-component",
+#       "name": "_safe_lock_component",
+#       "anchor": "function-safe-lock-component",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "version-lock",
+#       "name": "_version_lock",
+#       "anchor": "function-version-lock",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===

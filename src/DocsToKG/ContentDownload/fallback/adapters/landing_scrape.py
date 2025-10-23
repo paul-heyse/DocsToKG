@@ -1,3 +1,24 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.fallback.adapters.landing_scrape",
+#   "purpose": "Landing page scraper adapter for PDF extraction from HTML.",
+#   "sections": [
+#     {
+#       "id": "pdflinkextractor",
+#       "name": "PDFLinkExtractor",
+#       "anchor": "class-pdflinkextractor",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "adapter-landing-scrape-pdf",
+#       "name": "adapter_landing_scrape_pdf",
+#       "anchor": "function-adapter-landing-scrape-pdf",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Landing page scraper adapter for PDF extraction from HTML."""
 
 from __future__ import annotations

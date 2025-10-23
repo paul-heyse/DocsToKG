@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.config_adapter",
+#   "purpose": "Configuration adapter for converting Pydantic settings to stage config dataclasses.",
+#   "sections": [
+#     {
+#       "id": "configurationadapter",
+#       "name": "ConfigurationAdapter",
+#       "anchor": "class-configurationadapter",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Configuration adapter for converting Pydantic settings to stage config dataclasses.
 
 This module provides adapters that bridge the unified Typer CLI (which uses Pydantic

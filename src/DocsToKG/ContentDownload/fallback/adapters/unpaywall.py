@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.fallback.adapters.unpaywall",
+#   "purpose": "Unpaywall API adapter for Open Access PDF resolution.",
+#   "sections": [
+#     {
+#       "id": "adapter-unpaywall-pdf",
+#       "name": "adapter_unpaywall_pdf",
+#       "anchor": "function-adapter-unpaywall-pdf",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Unpaywall API adapter for Open Access PDF resolution."""
 
 from __future__ import annotations

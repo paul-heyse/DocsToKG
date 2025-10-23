@@ -1,3 +1,42 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.config.feature_flags",
+#   "purpose": "Feature flags for Pydantic v2 optimization features.",
+#   "sections": [
+#     {
+#       "id": "featureflag",
+#       "name": "FeatureFlag",
+#       "anchor": "class-featureflag",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "featureflags",
+#       "name": "FeatureFlags",
+#       "anchor": "class-featureflags",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "get-feature-flags",
+#       "name": "get_feature_flags",
+#       "anchor": "function-get-feature-flags",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "reset-feature-flags",
+#       "name": "reset_feature_flags",
+#       "anchor": "function-reset-feature-flags",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "set-feature-flags",
+#       "name": "set_feature_flags",
+#       "anchor": "function-set-feature-flags",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Feature flags for Pydantic v2 optimization features.
 
 Allows easy enabling/disabling of new features without impacting existing functionality.

@@ -1,3 +1,42 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.embedding.backends.utils",
+#   "purpose": "Shared helper utilities for embedding providers.",
+#   "sections": [
+#     {
+#       "id": "resolve-device",
+#       "name": "resolve_device",
+#       "anchor": "function-resolve-device",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolve-cache-dir",
+#       "name": "resolve_cache_dir",
+#       "anchor": "function-resolve-cache-dir",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "normalise-vectors",
+#       "name": "normalise_vectors",
+#       "anchor": "function-normalise-vectors",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "bounded-batch-size",
+#       "name": "bounded_batch_size",
+#       "anchor": "function-bounded-batch-size",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "coerce-telemetry-tags",
+#       "name": "coerce_telemetry_tags",
+#       "anchor": "function-coerce-telemetry-tags",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Shared helper utilities for embedding providers.
 
 These helpers are intentionally lightweight so concrete providers can import

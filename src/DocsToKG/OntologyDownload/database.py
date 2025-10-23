@@ -3,11 +3,66 @@
 #   "module": "DocsToKG.OntologyDownload.database",
 #   "purpose": "DuckDB catalog for ontology versions, artifacts, extracted files, validations, and provenance",
 #   "sections": [
-#     {"id": "init", "name": "Initialization & Bootstrap", "anchor": "INI", "kind": "api"},
-#     {"id": "migrations", "name": "Schema Migrations", "anchor": "MIG", "kind": "infra"},
-#     {"id": "transactions", "name": "Transaction Boundaries", "anchor": "TXN", "kind": "api"},
-#     {"id": "queries", "name": "Query Facades", "anchor": "QRY", "kind": "api"},
-#     {"id": "types", "name": "Data Transfer Objects", "anchor": "DTO", "kind": "models"}
+#     {
+#       "id": "versionrow",
+#       "name": "VersionRow",
+#       "anchor": "class-versionrow",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "artifactrow",
+#       "name": "ArtifactRow",
+#       "anchor": "class-artifactrow",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "filerow",
+#       "name": "FileRow",
+#       "anchor": "class-filerow",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "validationrow",
+#       "name": "ValidationRow",
+#       "anchor": "class-validationrow",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "planrow",
+#       "name": "PlanRow",
+#       "anchor": "class-planrow",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "plandiffrow",
+#       "name": "PlanDiffRow",
+#       "anchor": "class-plandiffrow",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "versionstats",
+#       "name": "VersionStats",
+#       "anchor": "class-versionstats",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "database",
+#       "name": "Database",
+#       "anchor": "class-database",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "get-database",
+#       "name": "get_database",
+#       "anchor": "function-get-database",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "close-database",
+#       "name": "close_database",
+#       "anchor": "function-close-database",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===

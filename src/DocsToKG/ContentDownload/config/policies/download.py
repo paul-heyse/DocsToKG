@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.config.policies.download",
+#   "purpose": "Download policy configuration.",
+#   "sections": [
+#     {
+#       "id": "downloadpolicy",
+#       "name": "DownloadPolicy",
+#       "anchor": "class-downloadpolicy",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Download policy configuration.
 
 Controls how downloads are performed and verified.

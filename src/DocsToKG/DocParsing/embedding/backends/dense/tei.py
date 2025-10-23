@@ -1,3 +1,24 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.embedding.backends.dense.tei",
+#   "purpose": "Dense embedding provider for Text Embeddings Inference (TEI) services.",
+#   "sections": [
+#     {
+#       "id": "teiconfig",
+#       "name": "TEIConfig",
+#       "anchor": "class-teiconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "teiprovider",
+#       "name": "TEIProvider",
+#       "anchor": "class-teiprovider",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Dense embedding provider for Text Embeddings Inference (TEI) services."""
 
 from __future__ import annotations

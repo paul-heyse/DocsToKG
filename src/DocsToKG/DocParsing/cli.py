@@ -1,3 +1,11 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.cli",
+#   "purpose": "Legacy CLI entry point.",
+#   "sections": []
+# }
+# === /NAVMAP ===
+
 """
 Legacy CLI entry point.
 

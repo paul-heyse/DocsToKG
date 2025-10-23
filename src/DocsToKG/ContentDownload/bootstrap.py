@@ -3,9 +3,84 @@
 #   "module": "DocsToKG.ContentDownload.bootstrap",
 #   "purpose": "Bootstrap orchestrator that coordinates all layers (telemetry, HTTP, resolvers, pipeline)",
 #   "sections": [
-#     {"id": "run-from-config", "name": "run_from_config", "anchor": "#function-run-from-config", "kind": "function"},
-#     {"id": "bootstrap-config", "name": "BootstrapConfig", "anchor": "#class-bootstrapconfig", "kind": "class"},
-#     {"id": "run-result", "name": "RunResult", "anchor": "#class-runresult", "kind": "class"}
+#     {
+#       "id": "should-use-new-bootstrap",
+#       "name": "_should_use_new_bootstrap",
+#       "anchor": "function-should-use-new-bootstrap",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "bootstrapconfig",
+#       "name": "BootstrapConfig",
+#       "anchor": "class-bootstrapconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "runresult",
+#       "name": "RunResult",
+#       "anchor": "class-runresult",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "build-bootstrap-config",
+#       "name": "build_bootstrap_config",
+#       "anchor": "function-build-bootstrap-config",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "run-from-config",
+#       "name": "run_from_config",
+#       "anchor": "function-run-from-config",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-telemetry",
+#       "name": "_build_telemetry",
+#       "anchor": "function-build-telemetry",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-client-map",
+#       "name": "_build_client_map",
+#       "anchor": "function-build-client-map",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "translate-http-config",
+#       "name": "_translate_http_config",
+#       "anchor": "function-translate-http-config",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "translate-telemetry-paths",
+#       "name": "_translate_telemetry_paths",
+#       "anchor": "function-translate-telemetry-paths",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-resolver-registry",
+#       "name": "_build_resolver_registry",
+#       "anchor": "function-build-resolver-registry",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-retry-configs",
+#       "name": "_build_retry_configs",
+#       "anchor": "function-build-retry-configs",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "apply-http-config",
+#       "name": "_apply_http_config",
+#       "anchor": "function-apply-http-config",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "process-artifacts",
+#       "name": "_process_artifacts",
+#       "anchor": "function-process-artifacts",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===

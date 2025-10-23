@@ -1,3 +1,54 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.core.cli_utils",
+#   "purpose": "Shared CLI building blocks for DocParsing subcommands.",
+#   "sections": [
+#     {
+#       "id": "clioption",
+#       "name": "CLIOption",
+#       "anchor": "class-clioption",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "build-subcommand",
+#       "name": "build_subcommand",
+#       "anchor": "function-build-subcommand",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "preview-list",
+#       "name": "preview_list",
+#       "anchor": "function-preview-list",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "merge-args",
+#       "name": "merge_args",
+#       "anchor": "function-merge-args",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "scan-pdf-html",
+#       "name": "scan_pdf_html",
+#       "anchor": "function-scan-pdf-html",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "directory-contains-suffixes",
+#       "name": "directory_contains_suffixes",
+#       "anchor": "function-directory-contains-suffixes",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "detect-mode",
+#       "name": "detect_mode",
+#       "anchor": "function-detect-mode",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Shared CLI building blocks for DocParsing subcommands.
 
 Controllers across DocTags, chunking, and embedding rely on the same option

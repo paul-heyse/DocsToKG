@@ -3,8 +3,24 @@
 #   "module": "DocsToKG.ContentDownload.http_session",
 #   "purpose": "Shared HTTP session factory with polite headers, connection pooling, and telemetry hooks",
 #   "sections": [
-#     {"id": "get-http-session", "name": "get_http_session", "anchor": "function-get-http-session", "kind": "function"},
-#     {"id": "http-config", "name": "HttpConfig", "anchor": "class-httpconfig", "kind": "class"}
+#     {
+#       "id": "httpconfig",
+#       "name": "HttpConfig",
+#       "anchor": "class-httpconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "get-http-session",
+#       "name": "get_http_session",
+#       "anchor": "function-get-http-session",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "reset-http-session",
+#       "name": "reset_http_session",
+#       "anchor": "function-reset-http-session",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===

@@ -1,3 +1,108 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.fallback.models",
+#   "purpose": "Pydantic v2 Models for Telemetry & Dashboard Integration.",
+#   "sections": [
+#     {
+#       "id": "attemptstatus",
+#       "name": "AttemptStatus",
+#       "anchor": "class-attemptstatus",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "tiername",
+#       "name": "TierName",
+#       "anchor": "class-tiername",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "metrictype",
+#       "name": "MetricType",
+#       "anchor": "class-metrictype",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "telemetryattemptrecord",
+#       "name": "TelemetryAttemptRecord",
+#       "anchor": "class-telemetryattemptrecord",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "telemetrybatchrecord",
+#       "name": "TelemetryBatchRecord",
+#       "anchor": "class-telemetrybatchrecord",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "storageconfig",
+#       "name": "StorageConfig",
+#       "anchor": "class-storageconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "dashboardconfig",
+#       "name": "DashboardConfig",
+#       "anchor": "class-dashboardconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "metricsthreshold",
+#       "name": "MetricsThreshold",
+#       "anchor": "class-metricsthreshold",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "telemetryconfig",
+#       "name": "TelemetryConfig",
+#       "anchor": "class-telemetryconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "performancemetrics",
+#       "name": "PerformanceMetrics",
+#       "anchor": "class-performancemetrics",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "tiermetrics",
+#       "name": "TierMetrics",
+#       "anchor": "class-tiermetrics",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "sourcemetrics",
+#       "name": "SourceMetrics",
+#       "anchor": "class-sourcemetrics",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "dashboardpanel",
+#       "name": "DashboardPanel",
+#       "anchor": "class-dashboardpanel",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "dashboarddefinition",
+#       "name": "DashboardDefinition",
+#       "anchor": "class-dashboarddefinition",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "alertrule",
+#       "name": "AlertRule",
+#       "anchor": "class-alertrule",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "exporttarget",
+#       "name": "ExportTarget",
+#       "anchor": "class-exporttarget",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Pydantic v2 Models for Telemetry & Dashboard Integration
 

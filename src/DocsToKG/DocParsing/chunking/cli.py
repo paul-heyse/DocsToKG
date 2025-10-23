@@ -1,3 +1,24 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.chunking.cli",
+#   "purpose": "CLI builder utilities dedicated to the DocParsing chunking stage.",
+#   "sections": [
+#     {
+#       "id": "build-parser",
+#       "name": "build_parser",
+#       "anchor": "function-build-parser",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-args",
+#       "name": "parse_args",
+#       "anchor": "function-parse-args",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """CLI builder utilities dedicated to the DocParsing chunking stage.
 
 IMPORTANT: This module is INTERNAL CLI INFRASTRUCTURE

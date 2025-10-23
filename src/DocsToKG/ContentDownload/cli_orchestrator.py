@@ -3,11 +3,36 @@
 #   "module": "DocsToKG.ContentDownload.cli_orchestrator",
 #   "purpose": "CLI commands for work orchestration (queue management)",
 #   "sections": [
-#     {"id": "queue_enqueue", "name": "queue_enqueue", "anchor": "#function-queue-enqueue", "kind": "function"},
-#     {"id": "queue_import", "name": "queue_import", "anchor": "#function-queue-import", "kind": "function"},
-#     {"id": "queue_run", "name": "queue_run", "anchor": "#function-queue-run", "kind": "function"},
-#     {"id": "queue_stats", "name": "queue_stats", "anchor": "#function-queue-stats", "kind": "function"},
-#     {"id": "queue_retry_failed", "name": "queue_retry_failed", "anchor": "#function-queue-retry-failed", "kind": "function"}
+#     {
+#       "id": "queue-enqueue",
+#       "name": "queue_enqueue",
+#       "anchor": "function-queue-enqueue",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "queue-import",
+#       "name": "queue_import",
+#       "anchor": "function-queue-import",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "queue-run",
+#       "name": "queue_run",
+#       "anchor": "function-queue-run",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "queue-stats",
+#       "name": "queue_stats",
+#       "anchor": "function-queue-stats",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "queue-retry-failed",
+#       "name": "queue_retry_failed",
+#       "anchor": "function-queue-retry-failed",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===

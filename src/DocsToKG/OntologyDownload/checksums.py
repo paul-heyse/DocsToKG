@@ -3,11 +3,54 @@
 #   "module": "DocsToKG.OntologyDownload.checksums",
 #   "purpose": "Normalise and enforce expected checksum metadata for ontology downloads",
 #   "sections": [
-#     {"id": "constants", "name": "Checksum Constants & Patterns", "anchor": "CON", "kind": "constants"},
-#     {"id": "models", "name": "Checksum Models", "anchor": "MOD", "kind": "api"},
-#     {"id": "parsing", "name": "Checksum Parsing Helpers", "anchor": "PRS", "kind": "helpers"},
-#     {"id": "fetching", "name": "Remote Checksum Fetching", "anchor": "FET", "kind": "api"},
-#     {"id": "verification", "name": "Verification Utilities", "anchor": "VER", "kind": "helpers"}
+#     {
+#       "id": "expectedchecksum",
+#       "name": "ExpectedChecksum",
+#       "anchor": "class-expectedchecksum",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "normalize-algorithm",
+#       "name": "_normalize_algorithm",
+#       "anchor": "function-normalize-algorithm",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "normalize-checksum",
+#       "name": "_normalize_checksum",
+#       "anchor": "function-normalize-checksum",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-checksum-extra",
+#       "name": "parse_checksum_extra",
+#       "anchor": "function-parse-checksum-extra",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-checksum-url-extra",
+#       "name": "parse_checksum_url_extra",
+#       "anchor": "function-parse-checksum-url-extra",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "extract-checksum-from-text",
+#       "name": "_extract_checksum_from_text",
+#       "anchor": "function-extract-checksum-from-text",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "fetch-checksum-from-url",
+#       "name": "_fetch_checksum_from_url",
+#       "anchor": "function-fetch-checksum-from-url",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolve-expected-checksum",
+#       "name": "resolve_expected_checksum",
+#       "anchor": "function-resolve-expected-checksum",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===

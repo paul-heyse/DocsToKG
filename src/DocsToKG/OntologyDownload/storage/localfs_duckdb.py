@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.storage.localfs_duckdb",
+#   "purpose": "Local filesystem + DuckDB storage backend implementation.",
+#   "sections": [
+#     {
+#       "id": "localduckdbstorage",
+#       "name": "LocalDuckDBStorage",
+#       "anchor": "class-localduckdbstorage",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Local filesystem + DuckDB storage backend implementation.
 
 Implements the StorageBackend protocol for local filesystem storage with

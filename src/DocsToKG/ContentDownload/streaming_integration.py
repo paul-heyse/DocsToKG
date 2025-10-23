@@ -1,3 +1,54 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.streaming_integration",
+#   "purpose": "Streaming download integration for ContentDownload.",
+#   "sections": [
+#     {
+#       "id": "use-streaming-for-resume",
+#       "name": "use_streaming_for_resume",
+#       "anchor": "function-use-streaming-for-resume",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "try-streaming-resume-decision",
+#       "name": "try_streaming_resume_decision",
+#       "anchor": "function-try-streaming-resume-decision",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "use-streaming-for-io",
+#       "name": "use_streaming_for_io",
+#       "anchor": "function-use-streaming-for-io",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "try-streaming-io",
+#       "name": "try_streaming_io",
+#       "anchor": "function-try-streaming-io",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "use-streaming-for-finalization",
+#       "name": "use_streaming_for_finalization",
+#       "anchor": "function-use-streaming-for-finalization",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "integration-status",
+#       "name": "integration_status",
+#       "anchor": "function-integration-status",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "log-integration-status",
+#       "name": "log_integration_status",
+#       "anchor": "function-log-integration-status",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Streaming download integration for ContentDownload.
 
 This module provides the integration layer between the resolver pipeline and

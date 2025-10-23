@@ -1,3 +1,60 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.catalog.connectors.base",
+#   "purpose": "Catalog Provider Protocol and Base Types.",
+#   "sections": [
+#     {
+#       "id": "providererror",
+#       "name": "ProviderError",
+#       "anchor": "class-providererror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "providerconnectionerror",
+#       "name": "ProviderConnectionError",
+#       "anchor": "class-providerconnectionerror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "provideroperationerror",
+#       "name": "ProviderOperationError",
+#       "anchor": "class-provideroperationerror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "providerconfigerror",
+#       "name": "ProviderConfigError",
+#       "anchor": "class-providerconfigerror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "healthstatus",
+#       "name": "HealthStatus",
+#       "anchor": "class-healthstatus",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "healthcheck",
+#       "name": "HealthCheck",
+#       "anchor": "class-healthcheck",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "documentrecord",
+#       "name": "DocumentRecord",
+#       "anchor": "class-documentrecord",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "catalogprovider",
+#       "name": "CatalogProvider",
+#       "anchor": "class-catalogprovider",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Catalog Provider Protocol and Base Types
 

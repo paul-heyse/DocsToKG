@@ -1,3 +1,48 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.settings_schema",
+#   "purpose": "JSON Schema generation and validation for OntologyDownload settings.",
+#   "sections": [
+#     {
+#       "id": "canonicaljsonschema",
+#       "name": "CanonicalJsonSchema",
+#       "anchor": "class-canonicaljsonschema",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "generate-settings-schema",
+#       "name": "generate_settings_schema",
+#       "anchor": "function-generate-settings-schema",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "generate-submodel-schemas",
+#       "name": "generate_submodel_schemas",
+#       "anchor": "function-generate-submodel-schemas",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "write-schemas-to-disk",
+#       "name": "write_schemas_to_disk",
+#       "anchor": "function-write-schemas-to-disk",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-config-file",
+#       "name": "validate_config_file",
+#       "anchor": "function-validate-config-file",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-schema-summary",
+#       "name": "get_schema_summary",
+#       "anchor": "function-get-schema-summary",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """JSON Schema generation and validation for OntologyDownload settings.
 
 This module provides utilities to generate stable, canonical JSON schemas

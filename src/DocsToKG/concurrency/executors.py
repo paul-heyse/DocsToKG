@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.concurrency.executors",
+#   "purpose": "Executor factory utilities used by DocParsing stage runner.",
+#   "sections": [
+#     {
+#       "id": "create-executor",
+#       "name": "create_executor",
+#       "anchor": "function-create-executor",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Executor factory utilities used by DocParsing stage runner."""
 
 from __future__ import annotations

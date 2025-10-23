@@ -1,3 +1,24 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.config.policies.retry",
+#   "purpose": "Retry policy configuration models.",
+#   "sections": [
+#     {
+#       "id": "backoffpolicy",
+#       "name": "BackoffPolicy",
+#       "anchor": "class-backoffpolicy",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "retrypolicy",
+#       "name": "RetryPolicy",
+#       "anchor": "class-retrypolicy",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Retry policy configuration models.
 
 Defines exponential backoff and retry strategies for transient failures.

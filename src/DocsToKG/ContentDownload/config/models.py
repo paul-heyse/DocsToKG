@@ -1,3 +1,198 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.config.models",
+#   "purpose": "Pydantic v2 Configuration Models for ContentDownload.",
+#   "sections": [
+#     {
+#       "id": "retrypolicy",
+#       "name": "RetryPolicy",
+#       "anchor": "class-retrypolicy",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "backoffpolicy",
+#       "name": "BackoffPolicy",
+#       "anchor": "class-backoffpolicy",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "ratelimitpolicy",
+#       "name": "RateLimitPolicy",
+#       "anchor": "class-ratelimitpolicy",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "robotspolicy",
+#       "name": "RobotsPolicy",
+#       "anchor": "class-robotspolicy",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "downloadpolicy",
+#       "name": "DownloadPolicy",
+#       "anchor": "class-downloadpolicy",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "httpclientconfig",
+#       "name": "HttpClientConfig",
+#       "anchor": "class-httpclientconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "telemetryconfig",
+#       "name": "TelemetryConfig",
+#       "anchor": "class-telemetryconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "hishelconfig",
+#       "name": "HishelConfig",
+#       "anchor": "class-hishelconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "resolvercommonconfig",
+#       "name": "ResolverCommonConfig",
+#       "anchor": "class-resolvercommonconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "unpaywallconfig",
+#       "name": "UnpaywallConfig",
+#       "anchor": "class-unpaywallconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "crossrefconfig",
+#       "name": "CrossrefConfig",
+#       "anchor": "class-crossrefconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "arxivconfig",
+#       "name": "ArxivConfig",
+#       "anchor": "class-arxivconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "europepmcconfig",
+#       "name": "EuropePmcConfig",
+#       "anchor": "class-europepmcconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "coreconfig",
+#       "name": "CoreConfig",
+#       "anchor": "class-coreconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "doajconfig",
+#       "name": "DoajConfig",
+#       "anchor": "class-doajconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "semanticscholarconfig",
+#       "name": "SemanticScholarConfig",
+#       "anchor": "class-semanticscholarconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "landingpageconfig",
+#       "name": "LandingPageConfig",
+#       "anchor": "class-landingpageconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "waybackconfig",
+#       "name": "WaybackConfig",
+#       "anchor": "class-waybackconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "openalexconfig",
+#       "name": "OpenAlexConfig",
+#       "anchor": "class-openalexconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "zenodoconfig",
+#       "name": "ZenodoConfig",
+#       "anchor": "class-zenodoconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "osfsconfig",
+#       "name": "OsfsConfig",
+#       "anchor": "class-osfsconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "openaireconfig",
+#       "name": "OpenAireConfig",
+#       "anchor": "class-openaireconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "halconfig",
+#       "name": "HalConfig",
+#       "anchor": "class-halconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "figshareconfig",
+#       "name": "FigshareConfig",
+#       "anchor": "class-figshareconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "resolversconfig",
+#       "name": "ResolversConfig",
+#       "anchor": "class-resolversconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "queueconfig",
+#       "name": "QueueConfig",
+#       "anchor": "class-queueconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "orchestratorconfig",
+#       "name": "OrchestratorConfig",
+#       "anchor": "class-orchestratorconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "storageconfig",
+#       "name": "StorageConfig",
+#       "anchor": "class-storageconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "catalogconfig",
+#       "name": "CatalogConfig",
+#       "anchor": "class-catalogconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "featuregatesconfig",
+#       "name": "FeatureGatesConfig",
+#       "anchor": "class-featuregatesconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "contentdownloadconfig",
+#       "name": "ContentDownloadConfig",
+#       "anchor": "class-contentdownloadconfig",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Pydantic v2 Configuration Models for ContentDownload
 

@@ -3,8 +3,24 @@
 #   "module": "DocsToKG.ContentDownload.orchestrator.limits",
 #   "purpose": "Thread-safe keyed concurrency limiters for per-resolver and per-host fairness",
 #   "sections": [
-#     {"id": "keyedlimiter", "name": "KeyedLimiter", "anchor": "#class-keyedlimiter", "kind": "class"},
-#     {"id": "hostkey", "name": "host_key", "anchor": "#function-hostkey", "kind": "function"}
+#     {
+#       "id": "semaphoreentry",
+#       "name": "_SemaphoreEntry",
+#       "anchor": "class-semaphoreentry",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "host-key",
+#       "name": "host_key",
+#       "anchor": "function-host-key",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "keyedlimiter",
+#       "name": "KeyedLimiter",
+#       "anchor": "class-keyedlimiter",
+#       "kind": "class"
+#     }
 #   ]
 # }
 # === /NAVMAP ===

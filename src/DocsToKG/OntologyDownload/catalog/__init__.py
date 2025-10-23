@@ -1,3 +1,11 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.catalog.__init__",
+#   "purpose": "DuckDB catalog package for OntologyDownload.",
+#   "sections": []
+# }
+# === /NAVMAP ===
+
 """DuckDB catalog package for OntologyDownload.
 
 Core modules:

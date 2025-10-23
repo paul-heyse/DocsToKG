@@ -1,3 +1,30 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.statistics",
+#   "purpose": "Lightweight runtime metrics for DocsToKG content downloads.",
+#   "sections": [
+#     {
+#       "id": "resolverstats",
+#       "name": "ResolverStats",
+#       "anchor": "class-resolverstats",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "bandwidthtracker",
+#       "name": "BandwidthTracker",
+#       "anchor": "class-bandwidthtracker",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "downloadstatistics",
+#       "name": "DownloadStatistics",
+#       "anchor": "class-downloadstatistics",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Lightweight runtime metrics for DocsToKG content downloads.
 
 Responsibilities

@@ -1,3 +1,30 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.config.audit",
+#   "purpose": "Configuration audit trail tracking.",
+#   "sections": [
+#     {
+#       "id": "configauditlog",
+#       "name": "ConfigAuditLog",
+#       "anchor": "class-configauditlog",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "load-config-with-audit",
+#       "name": "load_config_with_audit",
+#       "anchor": "function-load-config-with-audit",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "compute-config-hash",
+#       "name": "compute_config_hash",
+#       "anchor": "function-compute-config-hash",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Configuration audit trail tracking.
 
 Tracks how configuration was loaded and what sources applied overrides.

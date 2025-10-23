@@ -1,3 +1,78 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.cli_unified",
+#   "purpose": "Unified Typer CLI for DocParsing with Pydantic Settings integration.",
+#   "sections": [
+#     {
+#       "id": "root-callback",
+#       "name": "root_callback",
+#       "anchor": "function-root-callback",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "config-show",
+#       "name": "config_show",
+#       "anchor": "function-config-show",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "config-diff",
+#       "name": "config_diff",
+#       "anchor": "function-config-diff",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "doctags",
+#       "name": "doctags",
+#       "anchor": "function-doctags",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "chunk",
+#       "name": "chunk",
+#       "anchor": "function-chunk",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "embed",
+#       "name": "embed",
+#       "anchor": "function-embed",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "all",
+#       "name": "all",
+#       "anchor": "function-all",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "inspect-dataset",
+#       "name": "_inspect_dataset",
+#       "anchor": "function-inspect-dataset",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "inspect-root",
+#       "name": "inspect_root",
+#       "anchor": "function-inspect-root",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "inspect-dataset",
+#       "name": "inspect_dataset",
+#       "anchor": "function-inspect-dataset",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "main",
+#       "name": "main",
+#       "anchor": "function-main",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Unified Typer CLI for DocParsing with Pydantic Settings integration.
 

@@ -1,65 +1,15 @@
 
-## Table of Contents
+## Environment Setup
 
-- [🚨 Mandatory Pre-Read: FAISS/cuVS Stack Walkthrough](#-mandatory-pre-read-faisscuvs-stack-walkthrough)
-- [0) Guard rails (set once per session)](#0-guard-rails-set-once-per-session)
-- [1) Verify the environment exists (no install)](#1-verify-the-environment-exists-no-install)
-- [2) Run commands strictly from the project `.venv`](#2-run-commands-strictly-from-the-project-venv)
-- [3) Quick health checks (no network)](#3-quick-health-checks-no-network)
-- [4) Typical tasks (all no-install)](#4-typical-tasks-all-no-install)
-- [5) Troubleshooting (stay no-install)](#5-troubleshooting-stay-no-install)
-- [6) “Absolutely no installs” policy (what you may do)](#6-absolutely-no-installs-policy-what-you-may-do)
-- [7) Fallback (only with **explicit approval** to install)](#7-fallback-only-with-explicit-approval-to-install)
-- [8) One-page quick reference (copy/paste safe)](#8-one-page-quick-reference-copy-paste-safe)
-- [Mission and Scope](#mission-and-scope)
-- [Runtime prerequisites](#runtime-prerequisites)
-- [Module architecture](#module-architecture)
-- [Core capabilities](#core-capabilities)
-- [Ingestion workflow](#ingestion-workflow)
-- [Search API quick reference](#search-api-quick-reference)
-- [Key invariants](#key-invariants)
-- [Test matrix & verification](#test-matrix-verification)
-- [Troubleshooting cues](#troubleshooting-cues)
-- [Reference commands](#reference-commands)
-- [Ownership & change management](#ownership-change-management)
-- [Coding Standards & Module Organization](#coding-standards-module-organization)
+Use the uv bootstrap to stand up the project environment:
+1. Optionally run `direnv allow` once per machine to trust `.envrc`.
+2. For CPU-only work, run `./scripts/bootstrap_env.sh`.
+3. For GPU work (requires wheels in `.wheelhouse/`), run `./scripts/bootstrap_env.sh --gpu`.
+4. Activate with `direnv exec . <command>` or `source .venv/bin/activate`.
 
-# 🚨 Mandatory Pre-Read: FAISS/cuVS Stack Walkthrough
+The script installs uv if it is missing, respects `UV_PROJECT_ENVIRONMENT`, and installs DocsToKG in editable mode. After activation, use the tools in `.venv/bin/` (for example `pytest -q`, `ruff check`, or `python -m DocsToKG.<module>`).
 
-Before executing or modifying any HybridSearch code, you **must** complete the following sequence:
 
-1. **Read [`faiss-gpu-wheel-reference.md`](./faiss-gpu-wheel-reference.md).** This is the authoritative guide to the custom `faiss-1.12.0` CUDA wheel. It covers runtime prerequisites, environment knobs (`FAISS_OPT_LEVEL`, `use_cuvs`), GPU index families, tiling heuristics, and the mathematically heavy kernels that underpin HybridSearch. Treat it as mandatory before touching ingestion, routing, or search code.
-2. **Inspect the FAISS package** under `.venv/lib/python3.13/site-packages/faiss`. Review `swigfaiss.py`, `gpu_wrappers.py`, `class_wrappers.py`, and contrib utilities to understand dtype/layout expectations, stream semantics, and the no-index helpers (`knn_gpu`, `pairwise_distance_gpu`) that HybridSearch relies on.
-3. **Read [`cuvs-reference.md`](./cuvs-reference.md).** The cuVS toolkit supplies GPU ANN, clustering, and distance primitives built on RAPIDS RAFT/RMM. The reference documents algorithm APIs, loader prerequisites, and how HybridSearch preloads the libraries even though FAISS currently cannot enable cuVS kernels.
-4. **Read [`libcuvs-reference.md`](./libcuvs-reference.md).** This explains the shared-library loader chain (`libcuvs`, `libraft`, `librmm`, `rapids_logger`), environment switches, and HybridSearch integration hooks (`_ensure_cuvs_loader_path`, `resolve_cuvs_state`, `AdapterStats.cuvs_*`). Essential for diagnosing loader-path or RAPIDS memory-manager issues.
-
-Completing these steps ensures you understand how FAISS, cuVS, and the RAPIDS memory/logging stack interoperate today, why cuVS is currently disabled in the custom FAISS build, and what guardrails HybridSearch enforces when operating on GPU indexes.
-
-# Project Environment — **No-Install** Runbook (for AI agents)
-
-> **Prime directive:** **Use the packages already installed in `./.venv`.**
-> Do **not** fetch or install anything unless you are explicitly told to. The project `.venv` includes custom wheels and GPU-specific builds that must not be disturbed.
-
----
-
-## 0) Guard rails (set once per session)
-
-To make accidental installs impossible:
-
-```bash
-# Always run inside the project venv (enforced)
-export PIP_REQUIRE_VIRTUALENV=1
-
-# Never hit the network/package index unless explicitly allowed
-export PIP_NO_INDEX=1
-
-# Don’t read user site-packages (avoid leakage)
-export PYTHONNOUSERSITE=1
-```
-
-> If you later receive explicit approval to install, temporarily unset `PIP_NO_INDEX` (and only follow the “Fallback (with approval)” section at the end).
-
----
 
 ## 1) Verify the environment exists (no install)
 
@@ -207,12 +157,12 @@ If (and only if) you have written approval to modify the environment, apply the 
 source .venv/bin/activate  # or use ./.venv/bin/python -m pip ...
 unset PIP_NO_INDEX         # allow index access if instructed
 
-# project code (editable) and pinned deps ONLY:
-pip install -e .
-pip install -r requirements.txt
+# project package only (avoid exploratory upgrades)
+uv pip install --python .venv -e .
 
-# If a local wheelhouse exists (to avoid network):
-# pip install --no-index --find-links ./ci/wheels -r requirements.txt
+# Optional extras (only if instructed)
+# uv pip install --python .venv -e .[dev,docs]
+# uv pip install --python .venv --find-links .wheelhouse -e .[gpu]
 ```
 
 > Never “try versions” or compile GPU libs. If a wheel is missing, escalate.

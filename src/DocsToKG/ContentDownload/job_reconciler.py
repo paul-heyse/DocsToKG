@@ -1,7 +1,7 @@
 # === NAVMAP v1 ===
 # {
 #   "module": "DocsToKG.ContentDownload.job_reconciler",
-#   "purpose": "Crash recovery and database↔filesystem state healing",
+#   "purpose": "Crash recovery and database\u2194filesystem state healing",
 #   "sections": [
 #     {
 #       "id": "reconcile-jobs",

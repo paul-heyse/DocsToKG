@@ -1,3 +1,66 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.deployment.monitoring",
+#   "purpose": "Production monitoring and alerting system with comprehensive observability.",
+#   "sections": [
+#     {
+#       "id": "alertseverity",
+#       "name": "AlertSeverity",
+#       "anchor": "class-alertseverity",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "metrictype",
+#       "name": "MetricType",
+#       "anchor": "class-metrictype",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "threshold",
+#       "name": "Threshold",
+#       "anchor": "class-threshold",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "alert",
+#       "name": "Alert",
+#       "anchor": "class-alert",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "metric",
+#       "name": "Metric",
+#       "anchor": "class-metric",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "metricscollector",
+#       "name": "MetricsCollector",
+#       "anchor": "class-metricscollector",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "alertmanager",
+#       "name": "AlertManager",
+#       "anchor": "class-alertmanager",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "productionmonitor",
+#       "name": "ProductionMonitor",
+#       "anchor": "class-productionmonitor",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "get-production-monitor",
+#       "name": "get_production_monitor",
+#       "anchor": "function-get-production-monitor",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Production monitoring and alerting system with comprehensive observability.
 
 Provides real-time metrics collection, anomaly detection, and alert management

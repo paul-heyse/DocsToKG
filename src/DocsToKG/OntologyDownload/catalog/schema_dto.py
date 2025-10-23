@@ -1,3 +1,36 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.catalog.schema_dto",
+#   "purpose": "Data Transfer Objects for schema introspection.",
+#   "sections": [
+#     {
+#       "id": "columninfo",
+#       "name": "ColumnInfo",
+#       "anchor": "class-columninfo",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "indexinfo",
+#       "name": "IndexInfo",
+#       "anchor": "class-indexinfo",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "tableschema",
+#       "name": "TableSchema",
+#       "anchor": "class-tableschema",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "schemainfo",
+#       "name": "SchemaInfo",
+#       "anchor": "class-schemainfo",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Data Transfer Objects for schema introspection.
 
 Represents database schema information, tables, columns, and indexes

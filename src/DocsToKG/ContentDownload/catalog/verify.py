@@ -1,3 +1,30 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.catalog.verify",
+#   "purpose": "Streaming verification and consistency checking for catalog records.",
+#   "sections": [
+#     {
+#       "id": "verificationresult",
+#       "name": "VerificationResult",
+#       "anchor": "class-verificationresult",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "streamingverifier",
+#       "name": "StreamingVerifier",
+#       "anchor": "class-streamingverifier",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "verify-records-sync",
+#       "name": "verify_records_sync",
+#       "anchor": "function-verify-records-sync",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Streaming verification and consistency checking for catalog records.
 
 Provides high-performance async verification of catalog records with:

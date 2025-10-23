@@ -1,3 +1,42 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.catalog.fs_layout",
+#   "purpose": "Filesystem-based storage layout strategies for artifact catalog.",
+#   "sections": [
+#     {
+#       "id": "cas-path",
+#       "name": "cas_path",
+#       "anchor": "function-cas-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "policy-path",
+#       "name": "policy_path",
+#       "anchor": "function-policy-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "dedup-hardlink-or-copy",
+#       "name": "dedup_hardlink_or_copy",
+#       "anchor": "function-dedup-hardlink-or-copy",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "choose-final-path",
+#       "name": "choose_final_path",
+#       "anchor": "function-choose-final-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "extract-basename-from-url",
+#       "name": "extract_basename_from_url",
+#       "anchor": "function-extract-basename-from-url",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Filesystem-based storage layout strategies for artifact catalog.
 
 Provides two storage layout options:

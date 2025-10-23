@@ -3,11 +3,78 @@
 #   "module": "DocsToKG.ContentDownload.urls",
 #   "purpose": "URL canonicalization policies for content downloads",
 #   "sections": [
-#     {"id": "urlpolicy", "name": "UrlPolicy", "anchor": "class-urlpolicy", "kind": "class"},
-#     {"id": "configure-url-policy", "name": "configure_url_policy", "anchor": "function-configure-url-policy", "kind": "function"},
-#     {"id": "canonical-for-index", "name": "canonical_for_index", "anchor": "function-canonical-for-index", "kind": "function"},
-#     {"id": "canonical-for-request", "name": "canonical_for_request", "anchor": "function-canonical-for-request", "kind": "function"},
-#     {"id": "reset-url-policy", "name": "reset_url_policy_for_tests", "anchor": "function-reset-url-policy-for-tests", "kind": "function"}
+#     {
+#       "id": "urlpolicy",
+#       "name": "UrlPolicy",
+#       "anchor": "class-urlpolicy",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "strip-fragment",
+#       "name": "_strip_fragment",
+#       "anchor": "function-strip-fragment",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-bool",
+#       "name": "_parse_bool",
+#       "anchor": "function-parse-bool",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-param-allowlist-spec",
+#       "name": "parse_param_allowlist_spec",
+#       "anchor": "function-parse-param-allowlist-spec",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "configure-url-policy",
+#       "name": "configure_url_policy",
+#       "anchor": "function-configure-url-policy",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "apply-environment-overrides",
+#       "name": "_apply_environment_overrides",
+#       "anchor": "function-apply-environment-overrides",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-url-policy",
+#       "name": "get_url_policy",
+#       "anchor": "function-get-url-policy",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "reset-url-policy-for-tests",
+#       "name": "reset_url_policy_for_tests",
+#       "anchor": "function-reset-url-policy-for-tests",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "select-param-allowlist",
+#       "name": "_select_param_allowlist",
+#       "anchor": "function-select-param-allowlist",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "canonical-for-index",
+#       "name": "canonical_for_index",
+#       "anchor": "function-canonical-for-index",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "canonical-for-request",
+#       "name": "canonical_for_request",
+#       "anchor": "function-canonical-for-request",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "canonical-host",
+#       "name": "canonical_host",
+#       "anchor": "function-canonical-host",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===

@@ -3,13 +3,90 @@
 #   "module": "DocsToKG.OntologyDownload.io.extraction_integrity",
 #   "purpose": "Correctness & integrity verification for archive extraction",
 #   "sections": [
-#     {"id": "crc_integrity", "name": "CRC/Integrity Verification", "anchor": "CRC", "kind": "validators"},
-#     {"id": "timestamps", "name": "Timestamp Policy", "anchor": "TIME", "kind": "policies"},
-#     {"id": "unicode", "name": "Unicode Normalization", "anchor": "UNI", "kind": "validators"},
-#     {"id": "format_allow", "name": "Format Allow-List", "anchor": "FMT", "kind": "validators"},
-#     {"id": "ordering", "name": "Entry Ordering Determinism", "anchor": "ORDER", "kind": "policies"},
-#     {"id": "duplicates", "name": "Duplicate Entry Handling", "anchor": "DUP", "kind": "policies"},
-#     {"id": "manifest", "name": "Provenance Manifest", "anchor": "MANI", "kind": "outputs"}
+#     {
+#       "id": "integritycheckresult",
+#       "name": "IntegrityCheckResult",
+#       "anchor": "class-integritycheckresult",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "integrityverifier",
+#       "name": "IntegrityVerifier",
+#       "anchor": "class-integrityverifier",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "timestamppolicy",
+#       "name": "TimestampPolicy",
+#       "anchor": "class-timestamppolicy",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "compute-target-mtime",
+#       "name": "compute_target_mtime",
+#       "anchor": "function-compute-target-mtime",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "apply-mtime",
+#       "name": "apply_mtime",
+#       "anchor": "function-apply-mtime",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "normalize-pathname",
+#       "name": "normalize_pathname",
+#       "anchor": "function-normalize-pathname",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-format-allowed",
+#       "name": "validate_format_allowed",
+#       "anchor": "function-validate-format-allowed",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-sort-key",
+#       "name": "get_sort_key",
+#       "anchor": "function-get-sort-key",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "duplicateentry",
+#       "name": "DuplicateEntry",
+#       "anchor": "class-duplicateentry",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "duplicatedetector",
+#       "name": "DuplicateDetector",
+#       "anchor": "class-duplicatedetector",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "manifestentry",
+#       "name": "ManifestEntry",
+#       "anchor": "class-manifestentry",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "provenancemanifest",
+#       "name": "ProvenanceManifest",
+#       "anchor": "class-provenancemanifest",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "check-windows-portability",
+#       "name": "check_windows_portability",
+#       "anchor": "function-check-windows-portability",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-archive-format",
+#       "name": "validate_archive_format",
+#       "anchor": "function-validate-archive-format",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===

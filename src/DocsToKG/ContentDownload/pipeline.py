@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.pipeline",
+#   "purpose": "Pipeline Orchestration - Canonical Implementation.",
+#   "sections": [
+#     {
+#       "id": "resolverpipeline",
+#       "name": "ResolverPipeline",
+#       "anchor": "class-resolverpipeline",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Pipeline Orchestration - Canonical Implementation
 

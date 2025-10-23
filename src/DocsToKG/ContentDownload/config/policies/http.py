@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.config.policies.http",
+#   "purpose": "HTTP client configuration.",
+#   "sections": [
+#     {
+#       "id": "httpclientconfig",
+#       "name": "HttpClientConfig",
+#       "anchor": "class-httpclientconfig",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """HTTP client configuration.
 
 Controls HTTPX client behavior, timeouts, pooling, caching, and TLS settings.

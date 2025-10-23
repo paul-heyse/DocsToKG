@@ -1,3 +1,24 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.catalog.connectors.config",
+#   "purpose": "Configuration management for CatalogConnector.",
+#   "sections": [
+#     {
+#       "id": "catalogconfig",
+#       "name": "CatalogConfig",
+#       "anchor": "class-catalogconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "load-catalog-config",
+#       "name": "load_catalog_config",
+#       "anchor": "function-load-catalog-config",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Configuration management for CatalogConnector
 

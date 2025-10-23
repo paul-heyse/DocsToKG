@@ -1,6 +1,6 @@
 # === NAVMAP v1 ===
 # {
-#   "module": "DocsToKG.OntologyDownload",
+#   "module": "DocsToKG.OntologyDownload.__init__",
 #   "purpose": "Package initialization for DocsToKG.OntologyDownload",
 #   "sections": [
 #     {

@@ -1,3 +1,48 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.catalog.consistency",
+#   "purpose": "Deep consistency checking for catalog integrity.",
+#   "sections": [
+#     {
+#       "id": "orphanfile",
+#       "name": "OrphanFile",
+#       "anchor": "class-orphanfile",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "missingfile",
+#       "name": "MissingFile",
+#       "anchor": "class-missingfile",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "hashmismatch",
+#       "name": "HashMismatch",
+#       "anchor": "class-hashmismatch",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "auditissue",
+#       "name": "AuditIssue",
+#       "anchor": "class-auditissue",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "consistencyauditreport",
+#       "name": "ConsistencyAuditReport",
+#       "anchor": "class-consistencyauditreport",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "consistencychecker",
+#       "name": "ConsistencyChecker",
+#       "anchor": "class-consistencychecker",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Deep consistency checking for catalog integrity.
 
 Provides comprehensive validation:

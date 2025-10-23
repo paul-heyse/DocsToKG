@@ -1,3 +1,96 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.config",
+#   "purpose": "Configuration helpers for DocParsing stages.",
+#   "sections": [
+#     {
+#       "id": "load-config-mapping",
+#       "name": "load_config_mapping",
+#       "anchor": "function-load-config-mapping",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "manifest-value",
+#       "name": "_manifest_value",
+#       "anchor": "function-manifest-value",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "coerce-path",
+#       "name": "_coerce_path",
+#       "anchor": "function-coerce-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "coerce-optional-path",
+#       "name": "_coerce_optional_path",
+#       "anchor": "function-coerce-optional-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "coerce-bool",
+#       "name": "_coerce_bool",
+#       "anchor": "function-coerce-bool",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "coerce-int",
+#       "name": "_coerce_int",
+#       "anchor": "function-coerce-int",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "coerce-float",
+#       "name": "_coerce_float",
+#       "anchor": "function-coerce-float",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "coerce-str",
+#       "name": "_coerce_str",
+#       "anchor": "function-coerce-str",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "coerce-str-tuple",
+#       "name": "_coerce_str_tuple",
+#       "anchor": "function-coerce-str-tuple",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "namespace-setdefault",
+#       "name": "_namespace_setdefault",
+#       "anchor": "function-namespace-setdefault",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "annotate-cli-overrides",
+#       "name": "annotate_cli_overrides",
+#       "anchor": "function-annotate-cli-overrides",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-args-with-overrides",
+#       "name": "parse_args_with_overrides",
+#       "anchor": "function-parse-args-with-overrides",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "ensure-cli-metadata",
+#       "name": "ensure_cli_metadata",
+#       "anchor": "function-ensure-cli-metadata",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "stageconfigbase",
+#       "name": "StageConfigBase",
+#       "anchor": "class-stageconfigbase",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Configuration helpers for DocParsing stages.
 

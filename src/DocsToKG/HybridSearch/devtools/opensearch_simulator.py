@@ -1,3 +1,42 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.HybridSearch.devtools.opensearch_simulator",
+#   "purpose": "In-memory analogue of the OpenSearch integration used by hybrid search.",
+#   "sections": [
+#     {
+#       "id": "opensearchindextemplate",
+#       "name": "OpenSearchIndexTemplate",
+#       "anchor": "class-opensearchindextemplate",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "opensearchschemamanager",
+#       "name": "OpenSearchSchemaManager",
+#       "anchor": "class-opensearchschemamanager",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "storedchunk",
+#       "name": "_StoredChunk",
+#       "anchor": "class-storedchunk",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "opensearchsimulator",
+#       "name": "OpenSearchSimulator",
+#       "anchor": "class-opensearchsimulator",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "matches-filters",
+#       "name": "matches_filters",
+#       "anchor": "function-matches-filters",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """In-memory analogue of the OpenSearch integration used by hybrid search.
 
 The real deployment writes chunks to OpenSearch for BM25/SPLADE retrieval. Tests

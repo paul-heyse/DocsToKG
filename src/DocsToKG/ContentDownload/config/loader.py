@@ -1,3 +1,60 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.config.loader",
+#   "purpose": "Configuration Loading with File/Env/CLI Precedence.",
+#   "sections": [
+#     {
+#       "id": "read-file",
+#       "name": "_read_file",
+#       "anchor": "function-read-file",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "assign-nested",
+#       "name": "_assign_nested",
+#       "anchor": "function-assign-nested",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "coerce-env-value",
+#       "name": "_coerce_env_value",
+#       "anchor": "function-coerce-env-value",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "merge-env-overrides",
+#       "name": "_merge_env_overrides",
+#       "anchor": "function-merge-env-overrides",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "merge-cli-overrides",
+#       "name": "_merge_cli_overrides",
+#       "anchor": "function-merge-cli-overrides",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-config",
+#       "name": "load_config",
+#       "anchor": "function-load-config",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-config-file",
+#       "name": "validate_config_file",
+#       "anchor": "function-validate-config-file",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "export-config-schema",
+#       "name": "export_config_schema",
+#       "anchor": "function-export-config-schema",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Configuration Loading with File/Env/CLI Precedence
 

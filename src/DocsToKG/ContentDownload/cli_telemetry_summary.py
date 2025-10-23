@@ -1,3 +1,30 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.cli_telemetry_summary",
+#   "purpose": "CLI for telemetry summary and SLO evaluation.",
+#   "sections": [
+#     {
+#       "id": "load-one",
+#       "name": "load_one",
+#       "anchor": "function-load-one",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "summarize",
+#       "name": "summarize",
+#       "anchor": "function-summarize",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "main",
+#       "name": "main",
+#       "anchor": "function-main",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """CLI for telemetry summary and SLO evaluation.
 
 Computes SLIs from telemetry database and evaluates against SLO targets.

@@ -1,3 +1,42 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.profile_loader",
+#   "purpose": "Profile loader and configuration builder for DocParsing settings.",
+#   "sections": [
+#     {
+#       "id": "load-profile-file",
+#       "name": "load_profile_file",
+#       "anchor": "function-load-profile-file",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "merge-dicts",
+#       "name": "merge_dicts",
+#       "anchor": "function-merge-dicts",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "apply-dot-path-override",
+#       "name": "apply_dot_path_override",
+#       "anchor": "function-apply-dot-path-override",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "env-var-to-dot-path",
+#       "name": "_env_var_to_dot_path",
+#       "anchor": "function-env-var-to-dot-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "settingsbuilder",
+#       "name": "SettingsBuilder",
+#       "anchor": "class-settingsbuilder",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Profile loader and configuration builder for DocParsing settings.
 

@@ -1,3 +1,24 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.api.exceptions",
+#   "purpose": "Canonical Exception Types for Download Pipeline.",
+#   "sections": [
+#     {
+#       "id": "skipdownload",
+#       "name": "SkipDownload",
+#       "anchor": "class-skipdownload",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "downloaderror",
+#       "name": "DownloadError",
+#       "anchor": "class-downloaderror",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Canonical Exception Types for Download Pipeline
 

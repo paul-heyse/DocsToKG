@@ -1,3 +1,42 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.catalog.instrumentation",
+#   "purpose": "Database catalog instrumentation and telemetry.",
+#   "sections": [
+#     {
+#       "id": "emit-tx-commit-event",
+#       "name": "emit_tx_commit_event",
+#       "anchor": "function-emit-tx-commit-event",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-tx-rollback-event",
+#       "name": "emit_tx_rollback_event",
+#       "anchor": "function-emit-tx-rollback-event",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-migration-applied-event",
+#       "name": "emit_migration_applied_event",
+#       "anchor": "function-emit-migration-applied-event",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-boundary-check-event",
+#       "name": "emit_boundary_check_event",
+#       "anchor": "function-emit-boundary-check-event",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-latest-mismatch-event",
+#       "name": "emit_latest_mismatch_event",
+#       "anchor": "function-emit-latest-mismatch-event",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Database catalog instrumentation and telemetry.
 
 Emits db.tx.*, db.migrate.*, and db.boundary.* events for observability

@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.catalog.postgres_store",
+#   "purpose": "PostgreSQL catalog store implementation.",
+#   "sections": [
+#     {
+#       "id": "postgrescatalogstore",
+#       "name": "PostgresCatalogStore",
+#       "anchor": "class-postgrescatalogstore",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """PostgreSQL catalog store implementation.
 
 Provides enterprise-grade database backend with:

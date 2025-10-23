@@ -1,3 +1,24 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.embedding.backends.dense.sentence_transformers",
+#   "purpose": "Dense embedding provider using SentenceTransformer models.",
+#   "sections": [
+#     {
+#       "id": "sentencetransformersconfig",
+#       "name": "SentenceTransformersConfig",
+#       "anchor": "class-sentencetransformersconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "sentencetransformersprovider",
+#       "name": "SentenceTransformersProvider",
+#       "anchor": "class-sentencetransformersprovider",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Dense embedding provider using SentenceTransformer models."""
 
 from __future__ import annotations

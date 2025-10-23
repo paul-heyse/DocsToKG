@@ -3,11 +3,138 @@
 #   "module": "DocsToKG.OntologyDownload.plugins",
 #   "purpose": "Manage resolver and validator plugin registries for the ontology downloader",
 #   "sections": [
-#     {"id": "protocols", "name": "Plugin Protocols", "anchor": "PRT", "kind": "api"},
-#     {"id": "registry", "name": "Registry State & Helpers", "anchor": "REG", "kind": "helpers"},
-#     {"id": "resolver-plugins", "name": "Resolver Plugin Loading", "anchor": "RES", "kind": "api"},
-#     {"id": "validator-plugins", "name": "Validator Plugin Loading", "anchor": "VAL", "kind": "api"},
-#     {"id": "public-api", "name": "Public Registry API", "anchor": "API", "kind": "api"}
+#     {
+#       "id": "resolverplugin",
+#       "name": "ResolverPlugin",
+#       "anchor": "class-resolverplugin",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "validatorplugin",
+#       "name": "ValidatorPlugin",
+#       "anchor": "class-validatorplugin",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "describe-plugin",
+#       "name": "_describe_plugin",
+#       "anchor": "function-describe-plugin",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "detect-entry-version",
+#       "name": "_detect_entry_version",
+#       "anchor": "function-detect-entry-version",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-resolver-plugins-locked",
+#       "name": "_load_resolver_plugins_locked",
+#       "anchor": "function-load-resolver-plugins-locked",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-resolver-plugins",
+#       "name": "load_resolver_plugins",
+#       "anchor": "function-load-resolver-plugins",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "ensure-resolver-plugins",
+#       "name": "ensure_resolver_plugins",
+#       "anchor": "function-ensure-resolver-plugins",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-validator-plugins-locked",
+#       "name": "_load_validator_plugins_locked",
+#       "anchor": "function-load-validator-plugins-locked",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-validator-plugins",
+#       "name": "load_validator_plugins",
+#       "anchor": "function-load-validator-plugins",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "ensure-plugins-loaded",
+#       "name": "ensure_plugins_loaded",
+#       "anchor": "function-ensure-plugins-loaded",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-resolver-registry",
+#       "name": "get_resolver_registry",
+#       "anchor": "function-get-resolver-registry",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-validator-registry",
+#       "name": "get_validator_registry",
+#       "anchor": "function-get-validator-registry",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "register-plugin-registry",
+#       "name": "register_plugin_registry",
+#       "anchor": "function-register-plugin-registry",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-plugin-registry",
+#       "name": "get_plugin_registry",
+#       "anchor": "function-get-plugin-registry",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "list-registered-plugins",
+#       "name": "list_registered_plugins",
+#       "anchor": "function-list-registered-plugins",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-registered-plugin-meta",
+#       "name": "get_registered_plugin_meta",
+#       "anchor": "function-get-registered-plugin-meta",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "store-plugin-metadata",
+#       "name": "_store_plugin_metadata",
+#       "anchor": "function-store-plugin-metadata",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "clear-plugin-metadata",
+#       "name": "_clear_plugin_metadata",
+#       "anchor": "function-clear-plugin-metadata",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "register-resolver",
+#       "name": "register_resolver",
+#       "anchor": "function-register-resolver",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "unregister-resolver",
+#       "name": "unregister_resolver",
+#       "anchor": "function-unregister-resolver",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "register-validator",
+#       "name": "register_validator",
+#       "anchor": "function-register-validator",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "unregister-validator",
+#       "name": "unregister_validator",
+#       "anchor": "function-unregister-validator",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===

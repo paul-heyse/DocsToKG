@@ -1,3 +1,24 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.policy.url_gate",
+#   "purpose": "Authoritative URL security gate.",
+#   "sections": [
+#     {
+#       "id": "policyerror",
+#       "name": "PolicyError",
+#       "anchor": "class-policyerror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "validate-url-security",
+#       "name": "validate_url_security",
+#       "anchor": "function-validate-url-security",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Authoritative URL security gate.
 

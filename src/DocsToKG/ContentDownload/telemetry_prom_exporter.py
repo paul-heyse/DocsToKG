@@ -1,3 +1,48 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.telemetry_prom_exporter",
+#   "purpose": "SQLite \u2192 Prometheus exporter for telemetry metrics (Grafana-ready).",
+#   "sections": [
+#     {
+#       "id": "fetchone",
+#       "name": "_fetchone",
+#       "anchor": "function-fetchone",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "latest-run-id",
+#       "name": "_latest_run_id",
+#       "anchor": "function-latest-run-id",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "compute-run-summary",
+#       "name": "_compute_run_summary",
+#       "anchor": "function-compute-run-summary",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-host-429",
+#       "name": "_emit_host_429",
+#       "anchor": "function-emit-host-429",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-breaker-opens",
+#       "name": "_emit_breaker_opens",
+#       "anchor": "function-emit-breaker-opens",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "main",
+#       "name": "main",
+#       "anchor": "function-main",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """SQLite → Prometheus exporter for telemetry metrics (Grafana-ready).
 
 Polls the run database every N seconds and exposes metrics on /metrics endpoint.

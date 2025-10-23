@@ -3,7 +3,18 @@
 #   "module": "DocsToKG.ContentDownload.robots",
 #   "purpose": "Robots.txt cache and enforcement for respectful web crawling",
 #   "sections": [
-#     {"id": "robotsCache", "name": "RobotsCache", "anchor": "class-robotscache", "kind": "class"}
+#     {
+#       "id": "cacheentry",
+#       "name": "_CacheEntry",
+#       "anchor": "class-cacheentry",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "robotscache",
+#       "name": "RobotsCache",
+#       "anchor": "class-robotscache",
+#       "kind": "class"
+#     }
 #   ]
 # }
 # === /NAVMAP ===

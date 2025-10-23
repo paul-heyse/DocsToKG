@@ -1,3 +1,24 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.policy.path_gate",
+#   "purpose": "Path Safety Validation Gate.",
+#   "sections": [
+#     {
+#       "id": "pathpolicyerror",
+#       "name": "PathPolicyError",
+#       "anchor": "class-pathpolicyerror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "validate-path-safety",
+#       "name": "validate_path_safety",
+#       "anchor": "function-validate-path-safety",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Path Safety Validation Gate.
 

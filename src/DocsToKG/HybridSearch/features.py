@@ -1,3 +1,36 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.HybridSearch.features",
+#   "purpose": "Deterministic feature generation used by ingestion and validation harnesses.",
+#   "sections": [
+#     {
+#       "id": "tokenize",
+#       "name": "tokenize",
+#       "anchor": "function-tokenize",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "tokenize-with-spans",
+#       "name": "tokenize_with_spans",
+#       "anchor": "function-tokenize-with-spans",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "sliding-window",
+#       "name": "sliding_window",
+#       "anchor": "function-sliding-window",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "featuregenerator",
+#       "name": "FeatureGenerator",
+#       "anchor": "class-featuregenerator",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Deterministic feature generation used by ingestion and validation harnesses.
 
 Production ingest jobs rely on external DocParsing services to attach BM25,

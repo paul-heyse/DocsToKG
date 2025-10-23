@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.observability.__init__",
+#   "purpose": "Observability: Event system, telemetry, and queryable storage.",
+#   "sections": [
+#     {
+#       "id": "initialize-events",
+#       "name": "initialize_events",
+#       "anchor": "function-initialize-events",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Observability: Event system, telemetry, and queryable storage.
 
 This package provides a unified event schema, emission system, and sinks that

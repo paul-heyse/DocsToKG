@@ -1,3 +1,30 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.config.bootstrap",
+#   "purpose": "Bootstrap helpers to construct runtime components from ContentDownloadConfig.",
+#   "sections": [
+#     {
+#       "id": "build-http-client",
+#       "name": "build_http_client",
+#       "anchor": "function-build-http-client",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-telemetry-sinks",
+#       "name": "build_telemetry_sinks",
+#       "anchor": "function-build-telemetry-sinks",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-orchestrator",
+#       "name": "build_orchestrator",
+#       "anchor": "function-build-orchestrator",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Bootstrap helpers to construct runtime components from ContentDownloadConfig.
 
 Provides factory functions to build HTTP clients, telemetry sinks, resolvers,

@@ -1,3 +1,96 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.httpx_transport",
+#   "purpose": "Shared HTTPX client factory with Hishel caching for ContentDownload.",
+#   "sections": [
+#     {
+#       "id": "resolve-data-root",
+#       "name": "_resolve_data_root",
+#       "anchor": "function-resolve-data-root",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolve-cache-dir",
+#       "name": "_resolve_cache_dir",
+#       "anchor": "function-resolve-cache-dir",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-ssl-context",
+#       "name": "_build_ssl_context",
+#       "anchor": "function-build-ssl-context",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "request-hook",
+#       "name": "_request_hook",
+#       "anchor": "function-request-hook",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "response-hook",
+#       "name": "_response_hook",
+#       "anchor": "function-response-hook",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-event-hooks",
+#       "name": "_build_event_hooks",
+#       "anchor": "function-build-event-hooks",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "configure-http-client",
+#       "name": "configure_http_client",
+#       "anchor": "function-configure-http-client",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "reset-http-client-for-tests",
+#       "name": "reset_http_client_for_tests",
+#       "anchor": "function-reset-http-client-for-tests",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "purge-http-cache",
+#       "name": "purge_http_cache",
+#       "anchor": "function-purge-http-cache",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-http-client",
+#       "name": "get_http_client",
+#       "anchor": "function-get-http-client",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "close-client-unlocked",
+#       "name": "_close_client_unlocked",
+#       "anchor": "function-close-client-unlocked",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-or-create-cache-router",
+#       "name": "_load_or_create_cache_router",
+#       "anchor": "function-load-or-create-cache-router",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "initialize-rate-limiter-from-config",
+#       "name": "initialize_rate_limiter_from_config",
+#       "anchor": "function-initialize-rate-limiter-from-config",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "create-client-unlocked",
+#       "name": "_create_client_unlocked",
+#       "anchor": "function-create-client-unlocked",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Shared HTTPX client factory with Hishel caching for ContentDownload.
 
 Responsibilities

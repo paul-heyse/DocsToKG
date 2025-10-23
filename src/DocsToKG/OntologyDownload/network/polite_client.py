@@ -1,3 +1,36 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.network.polite_client",
+#   "purpose": "Polite HTTP Client: Combines HTTPX + Rate-Limiting for respectful requests.",
+#   "sections": [
+#     {
+#       "id": "politehttpclient",
+#       "name": "PoliteHttpClient",
+#       "anchor": "class-politehttpclient",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "get-polite-http-client",
+#       "name": "get_polite_http_client",
+#       "anchor": "function-get-polite-http-client",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "close-polite-http-client",
+#       "name": "close_polite_http_client",
+#       "anchor": "function-close-polite-http-client",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "reset-polite-http-client",
+#       "name": "reset_polite_http_client",
+#       "anchor": "function-reset-polite-http-client",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Polite HTTP Client: Combines HTTPX + Rate-Limiting for respectful requests.
 
 Provides a high-level facade that transparently integrates HTTP client and

@@ -1,3 +1,24 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.fallback.adapters.pmc",
+#   "purpose": "PubMed Central adapter for PDF resolution.",
+#   "sections": [
+#     {
+#       "id": "extract-pmcid",
+#       "name": "extract_pmcid",
+#       "anchor": "function-extract-pmcid",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "adapter-pmc-pdf",
+#       "name": "adapter_pmc_pdf",
+#       "anchor": "function-adapter-pmc-pdf",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """PubMed Central adapter for PDF resolution."""
 
 from __future__ import annotations

@@ -1,3 +1,11 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.HybridSearch.devtools.__init__",
+#   "purpose": "Developer tooling helpers for DocsToKG hybrid search.",
+#   "sections": []
+# }
+# === /NAVMAP ===
+
 """Developer tooling helpers for DocsToKG hybrid search.
 
 The ``devtools`` package aggregates utilities that make it easy to spin up a

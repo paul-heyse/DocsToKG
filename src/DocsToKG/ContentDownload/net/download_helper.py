@@ -1,3 +1,30 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.net.download_helper",
+#   "purpose": "Download helpers for ContentDownload pipeline.",
+#   "sections": [
+#     {
+#       "id": "downloaderror",
+#       "name": "DownloadError",
+#       "anchor": "class-downloaderror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "stream-download-to-file",
+#       "name": "stream_download_to_file",
+#       "anchor": "function-stream-download-to-file",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "head-request",
+#       "name": "head_request",
+#       "anchor": "function-head-request",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Download helpers for ContentDownload pipeline.
 

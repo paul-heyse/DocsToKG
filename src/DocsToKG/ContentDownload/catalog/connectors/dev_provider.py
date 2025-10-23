@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.catalog.connectors.dev_provider",
+#   "purpose": "Development Provider (SQLite + Local FS).",
+#   "sections": [
+#     {
+#       "id": "developmentprovider",
+#       "name": "DevelopmentProvider",
+#       "anchor": "class-developmentprovider",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Development Provider (SQLite + Local FS)
 

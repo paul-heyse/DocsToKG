@@ -3,11 +3,102 @@
 #   "module": "DocsToKG.OntologyDownload.io.filesystem",
 #   "purpose": "Provide filesystem utilities for sanitisation, hashing, masking, and archive extraction",
 #   "sections": [
-#     {"id": "limits", "name": "Archive Limits & Helpers", "anchor": "LIM", "kind": "helpers"},
-#     {"id": "sanitisation", "name": "Filename Sanitisation & Identifiers", "anchor": "SAN", "kind": "helpers"},
-#     {"id": "masking", "name": "Sensitive Data Masking", "anchor": "MSK", "kind": "helpers"},
-#     {"id": "hashing", "name": "Hashing Utilities", "anchor": "HAS", "kind": "helpers"},
-#     {"id": "archives", "name": "Archive Extraction Utilities", "anchor": "ARC", "kind": "api"}
+#     {
+#       "id": "compute-config-hash",
+#       "name": "_compute_config_hash",
+#       "anchor": "function-compute-config-hash",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "write-audit-manifest",
+#       "name": "_write_audit_manifest",
+#       "anchor": "function-write-audit-manifest",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolve-max-uncompressed-bytes",
+#       "name": "_resolve_max_uncompressed_bytes",
+#       "anchor": "function-resolve-max-uncompressed-bytes",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "sanitize-filename",
+#       "name": "sanitize_filename",
+#       "anchor": "function-sanitize-filename",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "generate-correlation-id",
+#       "name": "generate_correlation_id",
+#       "anchor": "function-generate-correlation-id",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "mask-sensitive-data",
+#       "name": "mask_sensitive_data",
+#       "anchor": "function-mask-sensitive-data",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "sha256-file",
+#       "name": "sha256_file",
+#       "anchor": "function-sha256-file",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "compute-file-hash",
+#       "name": "_compute_file_hash",
+#       "anchor": "function-compute-file-hash",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-member-path",
+#       "name": "_validate_member_path",
+#       "anchor": "function-validate-member-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "compute-archive-sha256",
+#       "name": "_compute_archive_sha256",
+#       "anchor": "function-compute-archive-sha256",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "generate-encapsulation-root-name",
+#       "name": "_generate_encapsulation_root_name",
+#       "anchor": "function-generate-encapsulation-root-name",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "check-compression-ratio",
+#       "name": "_check_compression_ratio",
+#       "anchor": "function-check-compression-ratio",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "enforce-uncompressed-ceiling",
+#       "name": "_enforce_uncompressed_ceiling",
+#       "anchor": "function-enforce-uncompressed-ceiling",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "extract-archive-safe",
+#       "name": "extract_archive_safe",
+#       "anchor": "function-extract-archive-safe",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "materialize-cached-file",
+#       "name": "_materialize_cached_file",
+#       "anchor": "function-materialize-cached-file",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "format-bytes",
+#       "name": "format_bytes",
+#       "anchor": "function-format-bytes",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===

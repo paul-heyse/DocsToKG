@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.config.policies.ratelimit",
+#   "purpose": "Rate limiting policy configuration.",
+#   "sections": [
+#     {
+#       "id": "ratelimitpolicy",
+#       "name": "RateLimitPolicy",
+#       "anchor": "class-ratelimitpolicy",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Rate limiting policy configuration.
 
 Defines token bucket rate limiting for per-resolver and per-host throttling.

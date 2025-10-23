@@ -1,3 +1,66 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.observability.events",
+#   "purpose": "Canonical Event model and emission system.",
+#   "sections": [
+#     {
+#       "id": "eventids",
+#       "name": "EventIds",
+#       "anchor": "class-eventids",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "eventcontext",
+#       "name": "EventContext",
+#       "anchor": "class-eventcontext",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "event",
+#       "name": "Event",
+#       "anchor": "class-event",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "set-context",
+#       "name": "set_context",
+#       "anchor": "function-set-context",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-context",
+#       "name": "get_context",
+#       "anchor": "function-get-context",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "clear-context",
+#       "name": "clear_context",
+#       "anchor": "function-clear-context",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "flush-events",
+#       "name": "flush_events",
+#       "anchor": "function-flush-events",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "register-sink",
+#       "name": "register_sink",
+#       "anchor": "function-register-sink",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-event",
+#       "name": "emit_event",
+#       "anchor": "function-emit-event",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Canonical Event model and emission system.
 
 Defines the Event dataclass (present on every emitted event), context management

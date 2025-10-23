@@ -1,3 +1,144 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.core",
+#   "purpose": "Core primitives and shared utilities for DocsToKG content downloads.",
+#   "sections": [
+#     {
+#       "id": "atomic-write",
+#       "name": "atomic_write",
+#       "anchor": "function-atomic-write",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "atomic-write-text",
+#       "name": "atomic_write_text",
+#       "anchor": "function-atomic-write-text",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "workartifact",
+#       "name": "WorkArtifact",
+#       "anchor": "class-workartifact",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "downloadcontext",
+#       "name": "DownloadContext",
+#       "anchor": "class-downloadcontext",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "classification",
+#       "name": "Classification",
+#       "anchor": "class-classification",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "reasoncode",
+#       "name": "ReasonCode",
+#       "anchor": "class-reasoncode",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "normalize-classification",
+#       "name": "normalize_classification",
+#       "anchor": "function-normalize-classification",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "normalize-reason",
+#       "name": "normalize_reason",
+#       "anchor": "function-normalize-reason",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "classify-payload",
+#       "name": "classify_payload",
+#       "anchor": "function-classify-payload",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "extract-filename-from-disposition",
+#       "name": "_extract_filename_from_disposition",
+#       "anchor": "function-extract-filename-from-disposition",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-size",
+#       "name": "parse_size",
+#       "anchor": "function-parse-size",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "infer-suffix",
+#       "name": "_infer_suffix",
+#       "anchor": "function-infer-suffix",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "update-tail-buffer",
+#       "name": "update_tail_buffer",
+#       "anchor": "function-update-tail-buffer",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "has-pdf-eof",
+#       "name": "has_pdf_eof",
+#       "anchor": "function-has-pdf-eof",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "tail-contains-html",
+#       "name": "tail_contains_html",
+#       "anchor": "function-tail-contains-html",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "normalize-doi",
+#       "name": "normalize_doi",
+#       "anchor": "function-normalize-doi",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "normalize-pmcid",
+#       "name": "normalize_pmcid",
+#       "anchor": "function-normalize-pmcid",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "strip-prefix",
+#       "name": "strip_prefix",
+#       "anchor": "function-strip-prefix",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "dedupe",
+#       "name": "dedupe",
+#       "anchor": "function-dedupe",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "normalize-pmid",
+#       "name": "normalize_pmid",
+#       "anchor": "function-normalize-pmid",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "normalize-arxiv",
+#       "name": "normalize_arxiv",
+#       "anchor": "function-normalize-arxiv",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "slugify",
+#       "name": "slugify",
+#       "anchor": "function-slugify",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Core primitives and shared utilities for DocsToKG content downloads.
 
 Responsibilities

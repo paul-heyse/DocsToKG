@@ -129,9 +129,48 @@ def get_owlready2() -> Any:
 #   "module": "DocsToKG.OntologyDownload.optdeps",
 #   "purpose": "Guard optional dependency imports used by resolvers and validators",
 #   "sections": [
-#     {"id": "import", "name": "Import Utilities", "anchor": "IMP", "kind": "helpers"},
-#     {"id": "wrappers", "name": "Override Helpers", "anchor": "WRP", "kind": "helpers"},
-#     {"id": "accessors", "name": "Cached Accessors", "anchor": "ACC", "kind": "api"}
+#     {
+#       "id": "import-module",
+#       "name": "_import_module",
+#       "anchor": "function-import-module",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "call-with-override",
+#       "name": "_call_with_override",
+#       "anchor": "function-call-with-override",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-pystow",
+#       "name": "get_pystow",
+#       "anchor": "function-get-pystow",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-rdflib",
+#       "name": "get_rdflib",
+#       "anchor": "function-get-rdflib",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "graph-factory",
+#       "name": "graph_factory",
+#       "anchor": "function-graph-factory",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-pronto",
+#       "name": "get_pronto",
+#       "anchor": "function-get-pronto",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-owlready2",
+#       "name": "get_owlready2",
+#       "anchor": "function-get-owlready2",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===

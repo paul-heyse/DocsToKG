@@ -1,3 +1,60 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.catalog.queries_dto",
+#   "purpose": "Data Transfer Objects for catalog queries.",
+#   "sections": [
+#     {
+#       "id": "versionstats",
+#       "name": "VersionStats",
+#       "anchor": "class-versionstats",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "versionrow",
+#       "name": "VersionRow",
+#       "anchor": "class-versionrow",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "filerow",
+#       "name": "FileRow",
+#       "anchor": "class-filerow",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "validationresult",
+#       "name": "ValidationResult",
+#       "anchor": "class-validationresult",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "validationsummary",
+#       "name": "ValidationSummary",
+#       "anchor": "class-validationsummary",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "artifactinfo",
+#       "name": "ArtifactInfo",
+#       "anchor": "class-artifactinfo",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "versiondelta",
+#       "name": "VersionDelta",
+#       "anchor": "class-versiondelta",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "storageusage",
+#       "name": "StorageUsage",
+#       "anchor": "class-storageusage",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Data Transfer Objects for catalog queries.
 
 Type-safe result shapes for query responses. All DTOs are frozen dataclasses

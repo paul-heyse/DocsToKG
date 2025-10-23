@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.embedding.backends.lexical.pyserini",
+#   "purpose": "Placeholder lexical provider for the future Pyserini integration.",
+#   "sections": [
+#     {
+#       "id": "pyserinibm25provider",
+#       "name": "PyseriniBM25Provider",
+#       "anchor": "class-pyserinibm25provider",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Placeholder lexical provider for the future Pyserini integration."""
 
 from __future__ import annotations

@@ -1,3 +1,42 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.tenacity_retry",
+#   "purpose": "Tenacity retry strategies and classification for ContentDownload.",
+#   "sections": [
+#     {
+#       "id": "is-retryable",
+#       "name": "is_retryable",
+#       "anchor": "function-is-retryable",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "waitretryafter",
+#       "name": "_WaitRetryAfter",
+#       "anchor": "class-waitretryafter",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "make-retry-predicate",
+#       "name": "_make_retry_predicate",
+#       "anchor": "function-make-retry-predicate",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-tenacity-retrying",
+#       "name": "build_tenacity_retrying",
+#       "anchor": "function-build-tenacity-retrying",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "default-before-sleep-hook",
+#       "name": "_default_before_sleep_hook",
+#       "anchor": "function-default-before-sleep-hook",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Tenacity retry strategies and classification for ContentDownload.
 
 Provides:

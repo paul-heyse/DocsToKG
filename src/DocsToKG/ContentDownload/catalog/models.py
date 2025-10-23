@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.catalog.models",
+#   "purpose": "Data models for the artifact catalog.",
+#   "sections": [
+#     {
+#       "id": "documentrecord",
+#       "name": "DocumentRecord",
+#       "anchor": "class-documentrecord",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Data models for the artifact catalog."""
 
 from __future__ import annotations

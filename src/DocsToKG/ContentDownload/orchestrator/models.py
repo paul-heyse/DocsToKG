@@ -3,8 +3,18 @@
 #   "module": "DocsToKG.ContentDownload.orchestrator.models",
 #   "purpose": "Job state enums, result types, and coordination dataclasses",
 #   "sections": [
-#     {"id": "jobstate", "name": "JobState", "anchor": "#class-jobstate", "kind": "enum"},
-#     {"id": "jobresult", "name": "JobResult", "anchor": "#class-jobresult", "kind": "dataclass"}
+#     {
+#       "id": "jobstate",
+#       "name": "JobState",
+#       "anchor": "class-jobstate",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "jobresult",
+#       "name": "JobResult",
+#       "anchor": "class-jobresult",
+#       "kind": "class"
+#     }
 #   ]
 # }
 # === /NAVMAP ===

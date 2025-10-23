@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.core.batching",
+#   "purpose": "Flexible batching helpers used by DocParsing chunking and embedding flows.",
+#   "sections": [
+#     {
+#       "id": "batcher",
+#       "name": "Batcher",
+#       "anchor": "class-batcher",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Flexible batching helpers used by DocParsing chunking and embedding flows.
 
 Chunking and embedding stages process large collections of documents, so they

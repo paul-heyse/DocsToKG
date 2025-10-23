@@ -1,3 +1,24 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.fallback.adapters.arxiv",
+#   "purpose": "arXiv PDF adapter for direct PDF resolution.",
+#   "sections": [
+#     {
+#       "id": "extract-arxiv-id",
+#       "name": "extract_arxiv_id",
+#       "anchor": "function-extract-arxiv-id",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "adapter-arxiv-pdf",
+#       "name": "adapter_arxiv_pdf",
+#       "anchor": "function-adapter-arxiv-pdf",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """arXiv PDF adapter for direct PDF resolution."""
 
 from __future__ import annotations

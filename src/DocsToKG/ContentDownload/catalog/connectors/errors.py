@@ -1,3 +1,30 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.catalog.connectors.errors",
+#   "purpose": "Provider-Specific Exception Types.",
+#   "sections": [
+#     {
+#       "id": "developmentprovidererror",
+#       "name": "DevelopmentProviderError",
+#       "anchor": "class-developmentprovidererror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "enterpriseprovidererror",
+#       "name": "EnterpriseProviderError",
+#       "anchor": "class-enterpriseprovidererror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "cloudprovidererror",
+#       "name": "CloudProviderError",
+#       "anchor": "class-cloudprovidererror",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Provider-Specific Exception Types
 

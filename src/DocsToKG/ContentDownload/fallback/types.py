@@ -1,3 +1,36 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.fallback.types",
+#   "purpose": "Core types for fallback & resiliency strategy.",
+#   "sections": [
+#     {
+#       "id": "attemptpolicy",
+#       "name": "AttemptPolicy",
+#       "anchor": "class-attemptpolicy",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "tierplan",
+#       "name": "TierPlan",
+#       "anchor": "class-tierplan",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "fallbackplan",
+#       "name": "FallbackPlan",
+#       "anchor": "class-fallbackplan",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "attemptresult",
+#       "name": "AttemptResult",
+#       "anchor": "class-attemptresult",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Core types for fallback & resiliency strategy.
 

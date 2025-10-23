@@ -1,3 +1,66 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.cli_v2",
+#   "purpose": "Typer-based CLI for ContentDownload with Pydantic v2 configuration.",
+#   "sections": [
+#     {
+#       "id": "setup-logging",
+#       "name": "_setup_logging",
+#       "anchor": "function-setup-logging",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "run",
+#       "name": "run",
+#       "anchor": "function-run",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "print-config",
+#       "name": "print_config",
+#       "anchor": "function-print-config",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-config",
+#       "name": "validate_config",
+#       "anchor": "function-validate-config",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "explain",
+#       "name": "explain",
+#       "anchor": "function-explain",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "schema",
+#       "name": "schema",
+#       "anchor": "function-schema",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-bootstrap-config",
+#       "name": "_build_bootstrap_config",
+#       "anchor": "function-build-bootstrap-config",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "register-optional-commands",
+#       "name": "_register_optional_commands",
+#       "anchor": "function-register-optional-commands",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "main",
+#       "name": "main",
+#       "anchor": "function-main",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Typer-based CLI for ContentDownload with Pydantic v2 configuration."""
 
 import json

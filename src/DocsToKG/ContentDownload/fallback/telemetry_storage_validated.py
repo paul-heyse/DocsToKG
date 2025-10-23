@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.fallback.telemetry_storage_validated",
+#   "purpose": "Validated Telemetry Storage with Pydantic Integration.",
+#   "sections": [
+#     {
+#       "id": "validatedtelemetrystorage",
+#       "name": "ValidatedTelemetryStorage",
+#       "anchor": "class-validatedtelemetrystorage",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Validated Telemetry Storage with Pydantic Integration
 

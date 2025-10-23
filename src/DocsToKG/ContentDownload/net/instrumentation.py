@@ -1,3 +1,54 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.net.instrumentation",
+#   "purpose": "Structured Telemetry for HTTP Network Layer.",
+#   "sections": [
+#     {
+#       "id": "cachestatus",
+#       "name": "CacheStatus",
+#       "anchor": "class-cachestatus",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "requeststatus",
+#       "name": "RequestStatus",
+#       "anchor": "class-requeststatus",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "netrequestevent",
+#       "name": "NetRequestEvent",
+#       "anchor": "class-netrequestevent",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "netrequesteventbuilder",
+#       "name": "NetRequestEventBuilder",
+#       "anchor": "class-netrequesteventbuilder",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "netrequestemitter",
+#       "name": "NetRequestEmitter",
+#       "anchor": "class-netrequestemitter",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "get-net-request-emitter",
+#       "name": "get_net_request_emitter",
+#       "anchor": "function-get-net-request-emitter",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "reset-net-request-emitter",
+#       "name": "reset_net_request_emitter",
+#       "anchor": "function-reset-net-request-emitter",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Structured Telemetry for HTTP Network Layer.
 

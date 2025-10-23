@@ -1,3 +1,24 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.app_context",
+#   "purpose": "Application context builder for DocParsing.",
+#   "sections": [
+#     {
+#       "id": "appcontext",
+#       "name": "AppContext",
+#       "anchor": "class-appcontext",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "build-app-context",
+#       "name": "build_app_context",
+#       "anchor": "function-build-app-context",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Application context builder for DocParsing.
 

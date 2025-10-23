@@ -1,3 +1,72 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.fallback.loader",
+#   "purpose": "Configuration loader for fallback strategy.",
+#   "sections": [
+#     {
+#       "id": "configurationerror",
+#       "name": "ConfigurationError",
+#       "anchor": "class-configurationerror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "load-from-yaml",
+#       "name": "load_from_yaml",
+#       "anchor": "function-load-from-yaml",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-from-env",
+#       "name": "load_from_env",
+#       "anchor": "function-load-from-env",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-from-cli",
+#       "name": "load_from_cli",
+#       "anchor": "function-load-from-cli",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-fast-profile",
+#       "name": "_get_fast_profile",
+#       "anchor": "function-get-fast-profile",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-reliable-profile",
+#       "name": "_get_reliable_profile",
+#       "anchor": "function-get-reliable-profile",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "merge-configs",
+#       "name": "merge_configs",
+#       "anchor": "function-merge-configs",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-config",
+#       "name": "validate_config",
+#       "anchor": "function-validate-config",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-fallback-plan",
+#       "name": "build_fallback_plan",
+#       "anchor": "function-build-fallback-plan",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-fallback-plan",
+#       "name": "load_fallback_plan",
+#       "anchor": "function-load-fallback-plan",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Configuration loader for fallback strategy.
 
 This module provides functions to load fallback configuration from multiple

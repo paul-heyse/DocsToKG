@@ -1,3 +1,42 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.retries_config",
+#   "purpose": "Tenacity retries configuration loading and management.",
+#   "sections": [
+#     {
+#       "id": "backoffconfig",
+#       "name": "BackoffConfig",
+#       "anchor": "class-backoffconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "retriesconfig",
+#       "name": "RetriesConfig",
+#       "anchor": "class-retriesconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "load-retries-config",
+#       "name": "load_retries_config",
+#       "anchor": "function-load-retries-config",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-retries-config",
+#       "name": "get_retries_config",
+#       "anchor": "function-get-retries-config",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "set-retries-config",
+#       "name": "set_retries_config",
+#       "anchor": "function-set-retries-config",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Tenacity retries configuration loading and management.
 
 Provides RFC-compliant retry configuration with support for:

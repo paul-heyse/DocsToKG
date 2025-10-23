@@ -3,7 +3,18 @@
 #   "module": "DocsToKG.ContentDownload.orchestrator.scheduler",
 #   "purpose": "Orchestrator dispatcher with worker pool, heartbeat, and bounded concurrency",
 #   "sections": [
-#     {"id": "orchestrator", "name": "Orchestrator", "anchor": "#class-orchestrator", "kind": "class"}
+#     {
+#       "id": "orchestratorconfig",
+#       "name": "OrchestratorConfig",
+#       "anchor": "class-orchestratorconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "orchestrator",
+#       "name": "Orchestrator",
+#       "anchor": "class-orchestrator",
+#       "kind": "class"
+#     }
 #   ]
 # }
 # === /NAVMAP ===

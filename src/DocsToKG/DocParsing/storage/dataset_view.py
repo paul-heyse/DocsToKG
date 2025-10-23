@@ -1,3 +1,48 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.storage.dataset_view",
+#   "purpose": "Lazy Dataset Views for Chunks and Vectors.",
+#   "sections": [
+#     {
+#       "id": "datasetsummary",
+#       "name": "DatasetSummary",
+#       "anchor": "class-datasetsummary",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "open-chunks",
+#       "name": "open_chunks",
+#       "anchor": "function-open-chunks",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "open-vectors",
+#       "name": "open_vectors",
+#       "anchor": "function-open-vectors",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "extract-partition-from-path",
+#       "name": "_extract_partition_from_path",
+#       "anchor": "function-extract-partition-from-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "extract-doc-id-from-filename",
+#       "name": "_extract_doc_id_from_filename",
+#       "anchor": "function-extract-doc-id-from-filename",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "summarize",
+#       "name": "summarize",
+#       "anchor": "function-summarize",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Lazy Dataset Views for Chunks and Vectors
 

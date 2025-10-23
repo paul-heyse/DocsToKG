@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.catalog.connectors.connector",
+#   "purpose": "Unified Catalog Connector - Factory Pattern.",
+#   "sections": [
+#     {
+#       "id": "catalogconnector",
+#       "name": "CatalogConnector",
+#       "anchor": "class-catalogconnector",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Unified Catalog Connector - Factory Pattern
 

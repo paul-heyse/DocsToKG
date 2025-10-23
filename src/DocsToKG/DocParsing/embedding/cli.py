@@ -1,3 +1,24 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.embedding.cli",
+#   "purpose": "CLI parser utilities for configuring the DocParsing embedding stage.",
+#   "sections": [
+#     {
+#       "id": "build-parser",
+#       "name": "build_parser",
+#       "anchor": "function-build-parser",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-args",
+#       "name": "parse_args",
+#       "anchor": "function-parse-args",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """CLI parser utilities for configuring the DocParsing embedding stage.
 
 IMPORTANT: This module is INTERNAL CLI INFRASTRUCTURE

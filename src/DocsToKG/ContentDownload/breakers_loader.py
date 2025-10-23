@@ -4,15 +4,69 @@
 #   "purpose": "Load breaker configuration from YAML with env/CLI overlays",
 #   "sections": [
 #     {
-#       "id": "parse-kv-overrides",
-#       "name": "_parse_kv_overrides",
-#       "anchor": "function-parse-kv-overrides",
+#       "id": "parse-bool",
+#       "name": "_parse_bool",
+#       "anchor": "function-parse-bool",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-int",
+#       "name": "_parse_int",
+#       "anchor": "function-parse-int",
 #       "kind": "function"
 #     },
 #     {
 #       "id": "normalize-host-key",
 #       "name": "_normalize_host_key",
 #       "anchor": "function-normalize-host-key",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-kv-overrides",
+#       "name": "_parse_kv_overrides",
+#       "anchor": "function-parse-kv-overrides",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "merge-policy",
+#       "name": "_merge_policy",
+#       "anchor": "function-merge-policy",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "merge-role-policy",
+#       "name": "_merge_role_policy",
+#       "anchor": "function-merge-role-policy",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "apply-classify-override",
+#       "name": "_apply_classify_override",
+#       "anchor": "function-apply-classify-override",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "apply-rolling-override",
+#       "name": "_apply_rolling_override",
+#       "anchor": "function-apply-rolling-override",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "role-from-str",
+#       "name": "_role_from_str",
+#       "anchor": "function-role-from-str",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "merge-docs",
+#       "name": "_merge_docs",
+#       "anchor": "function-merge-docs",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "merge-breaker-docs",
+#       "name": "merge_breaker_docs",
+#       "anchor": "function-merge-breaker-docs",
 #       "kind": "function"
 #     },
 #     {
@@ -25,6 +79,12 @@
 #       "id": "config-from-yaml",
 #       "name": "_config_from_yaml",
 #       "anchor": "function-config-from-yaml",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "maybe-int",
+#       "name": "_maybe_int",
+#       "anchor": "function-maybe-int",
 #       "kind": "function"
 #     },
 #     {

@@ -1,3 +1,42 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.api.types",
+#   "purpose": "Canonical API Types for ContentDownload Pipeline.",
+#   "sections": [
+#     {
+#       "id": "downloadplan",
+#       "name": "DownloadPlan",
+#       "anchor": "class-downloadplan",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "downloadstreamresult",
+#       "name": "DownloadStreamResult",
+#       "anchor": "class-downloadstreamresult",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "downloadoutcome",
+#       "name": "DownloadOutcome",
+#       "anchor": "class-downloadoutcome",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "resolverresult",
+#       "name": "ResolverResult",
+#       "anchor": "class-resolverresult",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "attemptrecord",
+#       "name": "AttemptRecord",
+#       "anchor": "class-attemptrecord",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Canonical API Types for ContentDownload Pipeline
 

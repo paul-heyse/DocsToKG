@@ -4,6 +4,36 @@
 #   "purpose": "Implements DocsToKG.DocParsing.doctags behaviors and helpers",
 #   "sections": [
 #     {
+#       "id": "compute-pdf-cfg-hash",
+#       "name": "_compute_pdf_cfg_hash",
+#       "anchor": "function-compute-pdf-cfg-hash",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "compute-html-cfg-hash",
+#       "name": "_compute_html_cfg_hash",
+#       "anchor": "function-compute-html-cfg-hash",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-pdf-plan",
+#       "name": "_build_pdf_plan",
+#       "anchor": "function-build-pdf-plan",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "pdf-stage-worker",
+#       "name": "_pdf_stage_worker",
+#       "anchor": "function-pdf-stage-worker",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "make-pdf-stage-hooks",
+#       "name": "_make_pdf_stage_hooks",
+#       "anchor": "function-make-pdf-stage-hooks",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "doctagscfg",
 #       "name": "DoctagsCfg",
 #       "anchor": "class-doctagscfg",
@@ -169,6 +199,18 @@
 #       "id": "pdf-main",
 #       "name": "pdf_main",
 #       "anchor": "function-pdf-main",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "html-stage-worker",
+#       "name": "_html_stage_worker",
+#       "anchor": "function-html-stage-worker",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "make-html-stage-hooks",
+#       "name": "_make_html_stage_hooks",
+#       "anchor": "function-make-html-stage-hooks",
 #       "kind": "function"
 #     },
 #     {

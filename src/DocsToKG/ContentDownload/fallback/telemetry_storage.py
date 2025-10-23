@@ -1,3 +1,24 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.fallback.telemetry_storage",
+#   "purpose": "Telemetry Storage Loaders.",
+#   "sections": [
+#     {
+#       "id": "telemetrystorage",
+#       "name": "TelemetryStorage",
+#       "anchor": "class-telemetrystorage",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "get-telemetry-storage",
+#       "name": "get_telemetry_storage",
+#       "anchor": "function-get-telemetry-storage",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Telemetry Storage Loaders
 

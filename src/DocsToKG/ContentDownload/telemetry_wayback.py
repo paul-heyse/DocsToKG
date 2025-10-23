@@ -1,3 +1,48 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.telemetry_wayback",
+#   "purpose": "Wayback resolver telemetry helpers.",
+#   "sections": [
+#     {
+#       "id": "ensure-event-buffer",
+#       "name": "_ensure_event_buffer",
+#       "anchor": "function-ensure-event-buffer",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "telemetrywaybackattempt",
+#       "name": "TelemetryWaybackAttempt",
+#       "anchor": "class-telemetrywaybackattempt",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "telemetrywayback",
+#       "name": "TelemetryWayback",
+#       "anchor": "class-telemetrywayback",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "telemetryattemptctx",
+#       "name": "_TelemetryAttemptCtx",
+#       "anchor": "class-telemetryattemptctx",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "attemptcontext",
+#       "name": "AttemptContext",
+#       "anchor": "class-attemptcontext",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "waybacktelemetry",
+#       "name": "WaybackTelemetry",
+#       "anchor": "class-waybacktelemetry",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Wayback resolver telemetry helpers."""
 
 from __future__ import annotations

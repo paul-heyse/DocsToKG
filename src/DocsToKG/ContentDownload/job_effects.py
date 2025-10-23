@@ -4,6 +4,12 @@
 #   "purpose": "Exactly-once operation logging and replay",
 #   "sections": [
 #     {
+#       "id": "extract-result-json",
+#       "name": "_extract_result_json",
+#       "anchor": "function-extract-result-json",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "run-effect",
 #       "name": "run_effect",
 #       "anchor": "function-run-effect",

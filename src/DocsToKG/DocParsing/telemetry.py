@@ -1,3 +1,48 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.telemetry",
+#   "purpose": "Telemetry data structures and JSONL sinks for DocParsing stages.",
+#   "sections": [
+#     {
+#       "id": "default-writer",
+#       "name": "_default_writer",
+#       "anchor": "function-default-writer",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "attempt",
+#       "name": "Attempt",
+#       "anchor": "class-attempt",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "manifestentry",
+#       "name": "ManifestEntry",
+#       "anchor": "class-manifestentry",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "telemetrysink",
+#       "name": "TelemetrySink",
+#       "anchor": "class-telemetrysink",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "input-bytes",
+#       "name": "_input_bytes",
+#       "anchor": "function-input-bytes",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "stagetelemetry",
+#       "name": "StageTelemetry",
+#       "anchor": "class-stagetelemetry",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Telemetry data structures and JSONL sinks for DocParsing stages.
 
 Each stage records structured attempts and manifest entries to support resume

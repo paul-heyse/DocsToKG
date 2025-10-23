@@ -1,3 +1,54 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.fallback.cli_fallback",
+#   "purpose": "CLI commands for fallback strategy operational control.",
+#   "sections": [
+#     {
+#       "id": "format-plan-table",
+#       "name": "format_plan_table",
+#       "anchor": "function-format-plan-table",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "cmd-fallback-plan",
+#       "name": "cmd_fallback_plan",
+#       "anchor": "function-cmd-fallback-plan",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "mock-adapter",
+#       "name": "_mock_adapter",
+#       "anchor": "function-mock-adapter",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "cmd-fallback-dryrun",
+#       "name": "cmd_fallback_dryrun",
+#       "anchor": "function-cmd-fallback-dryrun",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "cmd-fallback-tune",
+#       "name": "cmd_fallback_tune",
+#       "anchor": "function-cmd-fallback-tune",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "register-fallback-commands",
+#       "name": "register_fallback_commands",
+#       "anchor": "function-register-fallback-commands",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "handle-fallback-command",
+#       "name": "_handle_fallback_command",
+#       "anchor": "function-handle-fallback-command",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """CLI commands for fallback strategy operational control.
 
 This module provides commands for:

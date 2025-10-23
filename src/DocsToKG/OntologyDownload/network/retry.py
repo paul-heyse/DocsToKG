@@ -1,3 +1,60 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.network.retry",
+#   "purpose": "Network retry policies: Tenacity-based backoff for resilient HTTP.",
+#   "sections": [
+#     {
+#       "id": "parse-retry-after-value",
+#       "name": "_parse_retry_after_value",
+#       "anchor": "function-parse-retry-after-value",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "extract-retry-after-seconds",
+#       "name": "_extract_retry_after_seconds",
+#       "anchor": "function-extract-retry-after-seconds",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "retryafterorbackoff",
+#       "name": "_RetryAfterOrBackoff",
+#       "anchor": "class-retryafterorbackoff",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "create-http-retry-policy",
+#       "name": "create_http_retry_policy",
+#       "anchor": "function-create-http-retry-policy",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "create-idempotent-retry-policy",
+#       "name": "create_idempotent_retry_policy",
+#       "anchor": "function-create-idempotent-retry-policy",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "create-aggressive-retry-policy",
+#       "name": "create_aggressive_retry_policy",
+#       "anchor": "function-create-aggressive-retry-policy",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "create-rate-limit-retry-policy",
+#       "name": "create_rate_limit_retry_policy",
+#       "anchor": "function-create-rate-limit-retry-policy",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "retry-http-request",
+#       "name": "retry_http_request",
+#       "anchor": "function-retry-http-request",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Network retry policies: Tenacity-based backoff for resilient HTTP.
 
 Provides retry policies for resilient HTTP requests with exponential backoff.

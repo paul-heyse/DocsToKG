@@ -1,3 +1,11 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.concurrency.__init__",
+#   "purpose": "Concurrency helpers shared across DocsToKG components.",
+#   "sections": []
+# }
+# === /NAVMAP ===
+
 """
 Concurrency helpers shared across DocsToKG components.
 

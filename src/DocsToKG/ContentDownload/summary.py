@@ -1,3 +1,30 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.summary",
+#   "purpose": "Run summary builders and console reporting helpers.",
+#   "sections": [
+#     {
+#       "id": "runresult",
+#       "name": "RunResult",
+#       "anchor": "class-runresult",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "build-summary-record",
+#       "name": "build_summary_record",
+#       "anchor": "function-build-summary-record",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-console-summary",
+#       "name": "emit_console_summary",
+#       "anchor": "function-emit-console-summary",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Run summary builders and console reporting helpers.
 
 Responsibilities

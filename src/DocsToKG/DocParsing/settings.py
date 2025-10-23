@@ -1,3 +1,168 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.settings",
+#   "purpose": "Unified Pydantic v2 Settings for DocParsing configuration management.",
+#   "sections": [
+#     {
+#       "id": "loglevel",
+#       "name": "LogLevel",
+#       "anchor": "class-loglevel",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "logformat",
+#       "name": "LogFormat",
+#       "anchor": "class-logformat",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "runnerpolicy",
+#       "name": "RunnerPolicy",
+#       "anchor": "class-runnerpolicy",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "runnerschedule",
+#       "name": "RunnerSchedule",
+#       "anchor": "class-runnerschedule",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "runneradaptive",
+#       "name": "RunnerAdaptive",
+#       "anchor": "class-runneradaptive",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "doctagsmode",
+#       "name": "DoctagsMode",
+#       "anchor": "class-doctagsmode",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "format",
+#       "name": "Format",
+#       "anchor": "class-format",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "densebackend",
+#       "name": "DenseBackend",
+#       "anchor": "class-densebackend",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "teicompression",
+#       "name": "TeiCompression",
+#       "anchor": "class-teicompression",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "attnbackend",
+#       "name": "AttnBackend",
+#       "anchor": "class-attnbackend",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "spladenorm",
+#       "name": "SpladeNorm",
+#       "anchor": "class-spladenorm",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "appcfg",
+#       "name": "AppCfg",
+#       "anchor": "class-appcfg",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "runnercfg",
+#       "name": "RunnerCfg",
+#       "anchor": "class-runnercfg",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "doctagscfg",
+#       "name": "DocTagsCfg",
+#       "anchor": "class-doctagscfg",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "chunkcfg",
+#       "name": "ChunkCfg",
+#       "anchor": "class-chunkcfg",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "qwenvllmcfg",
+#       "name": "QwenVLLMCfg",
+#       "anchor": "class-qwenvllmcfg",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "teicfg",
+#       "name": "TEICfg",
+#       "anchor": "class-teicfg",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "sentencetransformerscfg",
+#       "name": "SentenceTransformersCfg",
+#       "anchor": "class-sentencetransformerscfg",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "densecfg",
+#       "name": "DenseCfg",
+#       "anchor": "class-densecfg",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "spladestcfg",
+#       "name": "SpladeSTCfg",
+#       "anchor": "class-spladestcfg",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "sparsecfg",
+#       "name": "SparseCfg",
+#       "anchor": "class-sparsecfg",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "localbm25cfg",
+#       "name": "LocalBM25Cfg",
+#       "anchor": "class-localbm25cfg",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "lexicalcfg",
+#       "name": "LexicalCfg",
+#       "anchor": "class-lexicalcfg",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "vectorscfg",
+#       "name": "VectorsCfg",
+#       "anchor": "class-vectorscfg",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "embedcfg",
+#       "name": "EmbedCfg",
+#       "anchor": "class-embedcfg",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "settings",
+#       "name": "Settings",
+#       "anchor": "class-settings",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Unified Pydantic v2 Settings for DocParsing configuration management.
 

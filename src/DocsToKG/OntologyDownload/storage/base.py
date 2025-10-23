@@ -1,3 +1,30 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.storage.base",
+#   "purpose": "Storage backend abstraction for DuckDB catalog.",
+#   "sections": [
+#     {
+#       "id": "storedobject",
+#       "name": "StoredObject",
+#       "anchor": "class-storedobject",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "storedstat",
+#       "name": "StoredStat",
+#       "anchor": "class-storedstat",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "storagebackend",
+#       "name": "StorageBackend",
+#       "anchor": "class-storagebackend",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Storage backend abstraction for DuckDB catalog.
 
 Provides a unified interface for storage operations across different backends

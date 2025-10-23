@@ -1,3 +1,96 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.resolvers.base",
+#   "purpose": "Shared resolver primitives and helpers.",
+#   "sections": [
+#     {
+#       "id": "resolverregistry",
+#       "name": "ResolverRegistry",
+#       "anchor": "class-resolverregistry",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "registeredresolver",
+#       "name": "RegisteredResolver",
+#       "anchor": "class-registeredresolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "resolverevent",
+#       "name": "ResolverEvent",
+#       "anchor": "class-resolverevent",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "resolvereventreason",
+#       "name": "ResolverEventReason",
+#       "anchor": "class-resolvereventreason",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "resolverresult",
+#       "name": "ResolverResult",
+#       "anchor": "class-resolverresult",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "resolver",
+#       "name": "Resolver",
+#       "anchor": "class-resolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "absolute-url",
+#       "name": "_absolute_url",
+#       "anchor": "function-absolute-url",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "find-pdf-via-meta",
+#       "name": "find_pdf_via_meta",
+#       "anchor": "function-find-pdf-via-meta",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "find-pdf-via-link",
+#       "name": "find_pdf_via_link",
+#       "anchor": "function-find-pdf-via-link",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "find-pdf-via-anchor",
+#       "name": "find_pdf_via_anchor",
+#       "anchor": "function-find-pdf-via-anchor",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "collect-candidate-urls",
+#       "name": "_collect_candidate_urls",
+#       "anchor": "function-collect-candidate-urls",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "apiresolverbase",
+#       "name": "ApiResolverBase",
+#       "anchor": "class-apiresolverbase",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "fetch-unpaywall-data",
+#       "name": "_fetch_unpaywall_data",
+#       "anchor": "function-fetch-unpaywall-data",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "fetch-semantic-scholar-data",
+#       "name": "_fetch_semantic_scholar_data",
+#       "anchor": "function-fetch-semantic-scholar-data",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Shared resolver primitives and helpers."""
 
 from __future__ import annotations

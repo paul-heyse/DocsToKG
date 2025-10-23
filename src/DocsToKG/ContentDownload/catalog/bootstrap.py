@@ -1,3 +1,36 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.catalog.bootstrap",
+#   "purpose": "Bootstrap and initialization for catalog system.",
+#   "sections": [
+#     {
+#       "id": "build-catalog-store",
+#       "name": "build_catalog_store",
+#       "anchor": "function-build-catalog-store",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-storage-layout",
+#       "name": "build_storage_layout",
+#       "anchor": "function-build-storage-layout",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-catalog-root-dir",
+#       "name": "get_catalog_root_dir",
+#       "anchor": "function-get-catalog-root-dir",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "catalogbootstrap",
+#       "name": "CatalogBootstrap",
+#       "anchor": "class-catalogbootstrap",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Bootstrap and initialization for catalog system.
 
 Provides factory functions to initialize the catalog, storage layouts, and

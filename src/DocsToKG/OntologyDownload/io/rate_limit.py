@@ -3,9 +3,66 @@
 #   "module": "DocsToKG.OntologyDownload.io.rate_limit",
 #   "purpose": "Expose pyrate-limiter backed throttling for ontology downloads",
 #   "sections": [
-#     {"id": "interfaces", "name": "Limiter Handle Interface", "anchor": "IFC", "kind": "api"},
-#     {"id": "pyrate-manager", "name": "Pyrate Limiter Manager", "anchor": "PRT", "kind": "api"},
-#     {"id": "public-api", "name": "Facade & Helpers", "anchor": "API", "kind": "helpers"}
+#     {
+#       "id": "ratelimiterhandle",
+#       "name": "RateLimiterHandle",
+#       "anchor": "class-ratelimiterhandle",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "table-name-for-key",
+#       "name": "_table_name_for_key",
+#       "anchor": "function-table-name-for-key",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-rate-string",
+#       "name": "_parse_rate_string",
+#       "anchor": "function-parse-rate-string",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "normalise-shared-dir",
+#       "name": "_normalise_shared_dir",
+#       "anchor": "function-normalise-shared-dir",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "limiteradapter",
+#       "name": "_LimiterAdapter",
+#       "anchor": "class-limiteradapter",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "limiterentry",
+#       "name": "_LimiterEntry",
+#       "anchor": "class-limiterentry",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "pyratelimitermanager",
+#       "name": "_PyrateLimiterManager",
+#       "anchor": "class-pyratelimitermanager",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "get-bucket",
+#       "name": "get_bucket",
+#       "anchor": "function-get-bucket",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "apply-retry-after",
+#       "name": "apply_retry_after",
+#       "anchor": "function-apply-retry-after",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "reset",
+#       "name": "reset",
+#       "anchor": "function-reset",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===

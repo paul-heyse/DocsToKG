@@ -1,3 +1,162 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.env",
+#   "purpose": "Environment and path helpers for DocParsing.",
+#   "sections": [
+#     {
+#       "id": "expand-path",
+#       "name": "expand_path",
+#       "anchor": "function-expand-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolve-hf-home",
+#       "name": "resolve_hf_home",
+#       "anchor": "function-resolve-hf-home",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolve-model-root",
+#       "name": "resolve_model_root",
+#       "anchor": "function-resolve-model-root",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "looks-like-filesystem-path",
+#       "name": "looks_like_filesystem_path",
+#       "anchor": "function-looks-like-filesystem-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolve-pdf-model-path",
+#       "name": "resolve_pdf_model_path",
+#       "anchor": "function-resolve-pdf-model-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "init-hf-env",
+#       "name": "init_hf_env",
+#       "anchor": "function-init-hf-env",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "detect-cuda-device",
+#       "name": "_detect_cuda_device",
+#       "anchor": "function-detect-cuda-device",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "ensure-model-environment",
+#       "name": "ensure_model_environment",
+#       "anchor": "function-ensure-model-environment",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "ensure-optional-dependency",
+#       "name": "_ensure_optional_dependency",
+#       "anchor": "function-ensure-optional-dependency",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "ensure-splade-dependencies",
+#       "name": "ensure_splade_dependencies",
+#       "anchor": "function-ensure-splade-dependencies",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "ensure-qwen-dependencies",
+#       "name": "ensure_qwen_dependencies",
+#       "anchor": "function-ensure-qwen-dependencies",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "ensure-splade-environment",
+#       "name": "ensure_splade_environment",
+#       "anchor": "function-ensure-splade-environment",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "ensure-qwen-environment",
+#       "name": "ensure_qwen_environment",
+#       "anchor": "function-ensure-qwen-environment",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "looks-like-data-root",
+#       "name": "_looks_like_data_root",
+#       "anchor": "function-looks-like-data-root",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "detect-data-root",
+#       "name": "detect_data_root",
+#       "anchor": "function-detect-data-root",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "ensure-dir",
+#       "name": "_ensure_dir",
+#       "anchor": "function-ensure-dir",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolve-data-path",
+#       "name": "_resolve_data_path",
+#       "anchor": "function-resolve-data-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "data-doctags",
+#       "name": "data_doctags",
+#       "anchor": "function-data-doctags",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "data-chunks",
+#       "name": "data_chunks",
+#       "anchor": "function-data-chunks",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "data-vectors",
+#       "name": "data_vectors",
+#       "anchor": "function-data-vectors",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "data-manifests",
+#       "name": "data_manifests",
+#       "anchor": "function-data-manifests",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "prepare-data-root",
+#       "name": "prepare_data_root",
+#       "anchor": "function-prepare-data-root",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolve-pipeline-path",
+#       "name": "resolve_pipeline_path",
+#       "anchor": "function-resolve-pipeline-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "data-pdfs",
+#       "name": "data_pdfs",
+#       "anchor": "function-data-pdfs",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "data-html",
+#       "name": "data_html",
+#       "anchor": "function-data-html",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Environment and path helpers for DocParsing.
 

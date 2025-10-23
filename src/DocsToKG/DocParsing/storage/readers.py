@@ -1,3 +1,30 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.storage.readers",
+#   "purpose": "Dataset Readers for DocParsing Artifacts.",
+#   "sections": [
+#     {
+#       "id": "datasetview",
+#       "name": "DatasetView",
+#       "anchor": "class-datasetview",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "scanresult",
+#       "name": "ScanResult",
+#       "anchor": "class-scanresult",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "inspect-dataset",
+#       "name": "inspect_dataset",
+#       "anchor": "function-inspect-dataset",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Dataset Readers for DocParsing Artifacts
 

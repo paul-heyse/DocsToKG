@@ -1,3 +1,30 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.catalog.retention",
+#   "purpose": "Multi-dimensional retention policy engine.",
+#   "sections": [
+#     {
+#       "id": "retentiondecision",
+#       "name": "RetentionDecision",
+#       "anchor": "class-retentiondecision",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "retentionpolicy",
+#       "name": "RetentionPolicy",
+#       "anchor": "class-retentionpolicy",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "retentionevaluator",
+#       "name": "RetentionEvaluator",
+#       "anchor": "class-retentionevaluator",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Multi-dimensional retention policy engine.
 
 Provides fine-grained lifecycle management with:

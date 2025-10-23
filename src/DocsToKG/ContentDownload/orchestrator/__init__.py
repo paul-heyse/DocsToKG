@@ -1,13 +1,8 @@
 # === NAVMAP v1 ===
 # {
-#   "module": "DocsToKG.ContentDownload.orchestrator",
+#   "module": "DocsToKG.ContentDownload.orchestrator.__init__",
 #   "purpose": "Work queue orchestration with bounded concurrency, crash recovery, and fairness",
-#   "sections": [
-#     {"id": "workqueue", "name": "WorkQueue", "anchor": "#class-workqueue", "kind": "class"},
-#     {"id": "orchestrator", "name": "Orchestrator", "anchor": "#class-orchestrator", "kind": "class"},
-#     {"id": "keyedlimiter", "name": "KeyedLimiter", "anchor": "#class-keyedlimiter", "kind": "class"},
-#     {"id": "worker", "name": "Worker", "anchor": "#class-worker", "kind": "class"}
-#   ]
+#   "sections": []
 # }
 # === /NAVMAP ===
 

@@ -1,3 +1,54 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.embedding.backends.base",
+#   "purpose": "Base interfaces and supporting types for embedding providers.",
+#   "sections": [
+#     {
+#       "id": "provideridentity",
+#       "name": "ProviderIdentity",
+#       "anchor": "class-provideridentity",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "providertelemetryevent",
+#       "name": "ProviderTelemetryEvent",
+#       "anchor": "class-providertelemetryevent",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "providercontext",
+#       "name": "ProviderContext",
+#       "anchor": "class-providercontext",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "providererror",
+#       "name": "ProviderError",
+#       "anchor": "class-providererror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "denseembeddingbackend",
+#       "name": "DenseEmbeddingBackend",
+#       "anchor": "class-denseembeddingbackend",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "sparseembeddingbackend",
+#       "name": "SparseEmbeddingBackend",
+#       "anchor": "class-sparseembeddingbackend",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "lexicalembeddingbackend",
+#       "name": "LexicalEmbeddingBackend",
+#       "anchor": "class-lexicalembeddingbackend",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Base interfaces and supporting types for embedding providers."""
 
 from __future__ import annotations

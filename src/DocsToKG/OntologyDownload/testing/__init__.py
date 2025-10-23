@@ -679,13 +679,75 @@ def temporary_validator(name: str, validator: Callable[..., object]):
 
 # === NAVMAP v1 ===
 # {
-#   "module": "DocsToKG.OntologyDownload.testing",
+#   "module": "DocsToKG.OntologyDownload.testing.__init__",
 #   "purpose": "Test utilities providing isolated environments, mock clients, and resolver stubs",
 #   "sections": [
-#     {"id": "fixtures", "name": "TestingEnvironment", "anchor": "ENV", "kind": "api"},
-#     {"id": "mock-http", "name": "HTTP Client Helpers", "anchor": "HTTP", "kind": "helpers"},
-#     {"id": "responses", "name": "Loopback Server & Response Specs", "anchor": "SRV", "kind": "helpers"},
-#     {"id": "plugins", "name": "Temporary Plugin Registration", "anchor": "PLG", "kind": "helpers"}
+#     {
+#       "id": "use-mock-http-client",
+#       "name": "use_mock_http_client",
+#       "anchor": "function-use-mock-http-client",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "responsespec",
+#       "name": "ResponseSpec",
+#       "anchor": "class-responsespec",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "requestrecord",
+#       "name": "RequestRecord",
+#       "anchor": "class-requestrecord",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "threadedhttpserver",
+#       "name": "_ThreadedHTTPServer",
+#       "anchor": "class-threadedhttpserver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "requesthandler",
+#       "name": "_RequestHandler",
+#       "anchor": "class-requesthandler",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "find-free-port",
+#       "name": "_find_free_port",
+#       "anchor": "function-find-free-port",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "testingenvironment",
+#       "name": "TestingEnvironment",
+#       "anchor": "class-testingenvironment",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "testlimiter",
+#       "name": "_TestLimiter",
+#       "anchor": "class-testlimiter",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "storageshim",
+#       "name": "_StorageShim",
+#       "anchor": "class-storageshim",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "temporary-resolver",
+#       "name": "temporary_resolver",
+#       "anchor": "function-temporary-resolver",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "temporary-validator",
+#       "name": "temporary_validator",
+#       "anchor": "function-temporary-validator",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===

@@ -1,3 +1,66 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.network.redirect",
+#   "purpose": "Safe redirect handling: Manual redirect following with security audit.",
+#   "sections": [
+#     {
+#       "id": "redirecterror",
+#       "name": "RedirectError",
+#       "anchor": "class-redirecterror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "maxredirectsexceeded",
+#       "name": "MaxRedirectsExceeded",
+#       "anchor": "class-maxredirectsexceeded",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "unsaferedirecttarget",
+#       "name": "UnsafeRedirectTarget",
+#       "anchor": "class-unsaferedirecttarget",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "missinglocationheader",
+#       "name": "MissingLocationHeader",
+#       "anchor": "class-missinglocationheader",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "redirectpolicy",
+#       "name": "RedirectPolicy",
+#       "anchor": "class-redirectpolicy",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "safe-get-with-redirect",
+#       "name": "safe_get_with_redirect",
+#       "anchor": "function-safe-get-with-redirect",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "safe-post-with-redirect",
+#       "name": "safe_post_with_redirect",
+#       "anchor": "function-safe-post-with-redirect",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "count-redirect-hops",
+#       "name": "count_redirect_hops",
+#       "anchor": "function-count-redirect-hops",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "format-audit-trail",
+#       "name": "format_audit_trail",
+#       "anchor": "function-format-audit-trail",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Safe redirect handling: Manual redirect following with security audit.
 
 HTTPX disables auto-redirect by default (good security practice). This module

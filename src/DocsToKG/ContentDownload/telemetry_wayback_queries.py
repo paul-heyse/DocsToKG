@@ -1,3 +1,36 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.telemetry_wayback_queries",
+#   "purpose": "Wayback telemetry query helpers.",
+#   "sections": [
+#     {
+#       "id": "waybacktelemetryschema",
+#       "name": "WaybackTelemetrySchema",
+#       "anchor": "class-waybacktelemetryschema",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "ensure-schema",
+#       "name": "ensure_schema",
+#       "anchor": "function-ensure-schema",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "percentile",
+#       "name": "_percentile",
+#       "anchor": "function-percentile",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "rate-smoothing-p95",
+#       "name": "rate_smoothing_p95",
+#       "anchor": "function-rate-smoothing-p95",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Wayback telemetry query helpers.
 
 This module intentionally keeps the SQL required for querying the

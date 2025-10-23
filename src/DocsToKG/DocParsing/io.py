@@ -1,3 +1,234 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.io",
+#   "purpose": "Low-level I/O helpers shared across DocParsing stages.",
+#   "sections": [
+#     {
+#       "id": "jsonlwriter",
+#       "name": "JsonlWriter",
+#       "anchor": "class-jsonlwriter",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "partition-normalisation-buffer",
+#       "name": "_partition_normalisation_buffer",
+#       "anchor": "function-partition-normalisation-buffer",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "iter-normalised-text-chunks",
+#       "name": "_iter_normalised_text_chunks",
+#       "anchor": "function-iter-normalised-text-chunks",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "atomic-write",
+#       "name": "atomic_write",
+#       "anchor": "function-atomic-write",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "iter-jsonl",
+#       "name": "iter_jsonl",
+#       "anchor": "function-iter-jsonl",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "iter-jsonl-batches",
+#       "name": "iter_jsonl_batches",
+#       "anchor": "function-iter-jsonl-batches",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "dedupe-preserve-order",
+#       "name": "dedupe_preserve_order",
+#       "anchor": "function-dedupe-preserve-order",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "jsonl-load",
+#       "name": "jsonl_load",
+#       "anchor": "function-jsonl-load",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "jsonl-save",
+#       "name": "jsonl_save",
+#       "anchor": "function-jsonl-save",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "jsonl-append-iter",
+#       "name": "jsonl_append_iter",
+#       "anchor": "function-jsonl-append-iter",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-jsonl-split-map",
+#       "name": "build_jsonl_split_map",
+#       "anchor": "function-build-jsonl-split-map",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "iter-doctags",
+#       "name": "iter_doctags",
+#       "anchor": "function-iter-doctags",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "iter-jsonl-stream",
+#       "name": "_iter_jsonl_stream",
+#       "anchor": "function-iter-jsonl-stream",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "sanitise-stage",
+#       "name": "_sanitise_stage",
+#       "anchor": "function-sanitise-stage",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "telemetry-filename",
+#       "name": "_telemetry_filename",
+#       "anchor": "function-telemetry-filename",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "manifest-filename",
+#       "name": "_manifest_filename",
+#       "anchor": "function-manifest-filename",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "manifest-append",
+#       "name": "manifest_append",
+#       "anchor": "function-manifest-append",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolve-manifest-path",
+#       "name": "resolve_manifest_path",
+#       "anchor": "function-resolve-manifest-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolve-attempts-path",
+#       "name": "resolve_attempts_path",
+#       "anchor": "function-resolve-attempts-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "normalise-hash-name",
+#       "name": "_normalise_hash_name",
+#       "anchor": "function-normalise-hash-name",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "hash-algorithms-available",
+#       "name": "_hash_algorithms_available",
+#       "anchor": "function-hash-algorithms-available",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "select-hash-algorithm",
+#       "name": "_select_hash_algorithm",
+#       "anchor": "function-select-hash-algorithm",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "select-hash-algorithm-uncached",
+#       "name": "_select_hash_algorithm_uncached",
+#       "anchor": "function-select-hash-algorithm-uncached",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "clear-hash-algorithm-cache",
+#       "name": "_clear_hash_algorithm_cache",
+#       "anchor": "function-clear-hash-algorithm-cache",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolve-hash-algorithm",
+#       "name": "resolve_hash_algorithm",
+#       "anchor": "function-resolve-hash-algorithm",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "make-hasher",
+#       "name": "make_hasher",
+#       "anchor": "function-make-hasher",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "compute-chunk-uuid",
+#       "name": "compute_chunk_uuid",
+#       "anchor": "function-compute-chunk-uuid",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "relative-path",
+#       "name": "relative_path",
+#       "anchor": "function-relative-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "quarantine-artifact",
+#       "name": "quarantine_artifact",
+#       "anchor": "function-quarantine-artifact",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "streamingcontenthasher",
+#       "name": "StreamingContentHasher",
+#       "anchor": "class-streamingcontenthasher",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "compute-content-hash",
+#       "name": "compute_content_hash",
+#       "anchor": "function-compute-content-hash",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-manifest-index",
+#       "name": "load_manifest_index",
+#       "anchor": "function-load-manifest-index",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "manifestheapkey",
+#       "name": "_ManifestHeapKey",
+#       "anchor": "class-manifestheapkey",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "manifest-timestamp-key",
+#       "name": "_manifest_timestamp_key",
+#       "anchor": "function-manifest-timestamp-key",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "iter-manifest-tail-lines",
+#       "name": "_iter_manifest_tail_lines",
+#       "anchor": "function-iter-manifest-tail-lines",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "iter-manifest-file",
+#       "name": "_iter_manifest_file",
+#       "anchor": "function-iter-manifest-file",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "iter-manifest-entries",
+#       "name": "iter_manifest_entries",
+#       "anchor": "function-iter-manifest-entries",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Low-level I/O helpers shared across DocParsing stages.
 

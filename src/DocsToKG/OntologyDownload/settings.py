@@ -3,11 +3,348 @@
 #   "module": "DocsToKG.OntologyDownload.settings",
 #   "purpose": "Define configuration models, environment overrides, optional dependency shims, and storage backends",
 #   "sections": [
-#     {"id": "config-models", "name": "Configuration Models", "anchor": "CFG", "kind": "api"},
-#     {"id": "env-overrides", "name": "Environment Overrides", "anchor": "ENV", "kind": "helpers"},
-#     {"id": "config-loading", "name": "Configuration Loading & Validation", "anchor": "LOD", "kind": "api"},
-#     {"id": "opt-deps", "name": "Optional Dependency Shims", "anchor": "OPT", "kind": "helpers"},
-#     {"id": "storage", "name": "Storage Backends", "anchor": "STO", "kind": "api"}
+#     {
+#       "id": "ensure-python-version",
+#       "name": "ensure_python_version",
+#       "anchor": "function-ensure-python-version",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "coerce-sequence",
+#       "name": "_coerce_sequence",
+#       "anchor": "function-coerce-sequence",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-rate-limit-to-rps",
+#       "name": "parse_rate_limit_to_rps",
+#       "anchor": "function-parse-rate-limit-to-rps",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "loggingconfiguration",
+#       "name": "LoggingConfiguration",
+#       "anchor": "class-loggingconfiguration",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "databaseconfiguration",
+#       "name": "DatabaseConfiguration",
+#       "anchor": "class-databaseconfiguration",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "validationconfig",
+#       "name": "ValidationConfig",
+#       "anchor": "class-validationconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "downloadconfiguration",
+#       "name": "DownloadConfiguration",
+#       "anchor": "class-downloadconfiguration",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "plannerconfig",
+#       "name": "PlannerConfig",
+#       "anchor": "class-plannerconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "duckdbsettings",
+#       "name": "DuckDBSettings",
+#       "anchor": "class-duckdbsettings",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "storagesettings",
+#       "name": "StorageSettings",
+#       "anchor": "class-storagesettings",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "defaultsconfig",
+#       "name": "DefaultsConfig",
+#       "anchor": "class-defaultsconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "resolvedconfig",
+#       "name": "ResolvedConfig",
+#       "anchor": "class-resolvedconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "rebuild-pydantic-models",
+#       "name": "_rebuild_pydantic_models",
+#       "anchor": "function-rebuild-pydantic-models",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "read-env-value",
+#       "name": "_read_env_value",
+#       "anchor": "function-read-env-value",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "read-env-int",
+#       "name": "_read_env_int",
+#       "anchor": "function-read-env-int",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "read-env-float",
+#       "name": "_read_env_float",
+#       "anchor": "function-read-env-float",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "read-env-path",
+#       "name": "_read_env_path",
+#       "anchor": "function-read-env-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-default-config",
+#       "name": "get_default_config",
+#       "anchor": "function-get-default-config",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "invalidate-default-config-cache",
+#       "name": "invalidate_default_config_cache",
+#       "anchor": "function-invalidate-default-config-cache",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-env-overrides",
+#       "name": "get_env_overrides",
+#       "anchor": "function-get-env-overrides",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "apply-env-overrides",
+#       "name": "_apply_env_overrides",
+#       "anchor": "function-apply-env-overrides",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-resolved-config",
+#       "name": "build_resolved_config",
+#       "anchor": "function-build-resolved-config",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-schema",
+#       "name": "_validate_schema",
+#       "anchor": "function-validate-schema",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "normalize-config-path",
+#       "name": "normalize_config_path",
+#       "anchor": "function-normalize-config-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-raw-yaml",
+#       "name": "load_raw_yaml",
+#       "anchor": "function-load-raw-yaml",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-config",
+#       "name": "load_config",
+#       "anchor": "function-load-config",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-config",
+#       "name": "validate_config",
+#       "anchor": "function-validate-config",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "create-stub-module",
+#       "name": "_create_stub_module",
+#       "anchor": "function-create-stub-module",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "create-stub-bnode",
+#       "name": "_create_stub_bnode",
+#       "anchor": "function-create-stub-bnode",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "create-stub-literal",
+#       "name": "_create_stub_literal",
+#       "anchor": "function-create-stub-literal",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "create-stub-uri",
+#       "name": "_create_stub_uri",
+#       "anchor": "function-create-stub-uri",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "stubnamespace",
+#       "name": "_StubNamespace",
+#       "anchor": "class-stubnamespace",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "stubnamespacemanager",
+#       "name": "_StubNamespaceManager",
+#       "anchor": "class-stubnamespacemanager",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "stubgraph",
+#       "name": "_StubGraph",
+#       "anchor": "class-stubgraph",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "import-module",
+#       "name": "_import_module",
+#       "anchor": "function-import-module",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "create-pystow-stub",
+#       "name": "_create_pystow_stub",
+#       "anchor": "function-create-pystow-stub",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "create-rdflib-stub",
+#       "name": "_create_rdflib_stub",
+#       "anchor": "function-create-rdflib-stub",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "create-pronto-stub",
+#       "name": "_create_pronto_stub",
+#       "anchor": "function-create-pronto-stub",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "create-owlready-stub",
+#       "name": "_create_owlready_stub",
+#       "anchor": "function-create-owlready-stub",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-pystow",
+#       "name": "get_pystow",
+#       "anchor": "function-get-pystow",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-rdflib",
+#       "name": "get_rdflib",
+#       "anchor": "function-get-rdflib",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-pronto",
+#       "name": "get_pronto",
+#       "anchor": "function-get-pronto",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-owlready2",
+#       "name": "get_owlready2",
+#       "anchor": "function-get-owlready2",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "storagebackend",
+#       "name": "StorageBackend",
+#       "anchor": "class-storagebackend",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "safe-identifiers",
+#       "name": "_safe_identifiers",
+#       "anchor": "function-safe-identifiers",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "directory-size",
+#       "name": "_directory_size",
+#       "anchor": "function-directory-size",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "localstoragebackend",
+#       "name": "LocalStorageBackend",
+#       "anchor": "class-localstoragebackend",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "fsspecstoragebackend",
+#       "name": "FsspecStorageBackend",
+#       "anchor": "class-fsspecstoragebackend",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "get-storage-backend",
+#       "name": "get_storage_backend",
+#       "anchor": "function-get-storage-backend",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "httpsettings",
+#       "name": "HttpSettings",
+#       "anchor": "class-httpsettings",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "cachesettings",
+#       "name": "CacheSettings",
+#       "anchor": "class-cachesettings",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "retrysettings",
+#       "name": "RetrySettings",
+#       "anchor": "class-retrysettings",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "loggingsettings",
+#       "name": "LoggingSettings",
+#       "anchor": "class-loggingsettings",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "telemetrysettings",
+#       "name": "TelemetrySettings",
+#       "anchor": "class-telemetrysettings",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "securitysettings",
+#       "name": "SecuritySettings",
+#       "anchor": "class-securitysettings",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "ratelimitsettings",
+#       "name": "RateLimitSettings",
+#       "anchor": "class-ratelimitsettings",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "extractionsettings",
+#       "name": "ExtractionSettings",
+#       "anchor": "class-extractionsettings",
+#       "kind": "class"
+#     }
 #   ]
 # }
 # === /NAVMAP ===

@@ -1,3 +1,90 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.streaming_schema",
+#   "purpose": "Database schema migrations for streaming architecture.",
+#   "sections": [
+#     {
+#       "id": "get-manifest-db-path",
+#       "name": "_get_manifest_db_path",
+#       "anchor": "function-get-manifest-db-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "schema-v1",
+#       "name": "_schema_v1",
+#       "anchor": "function-schema-v1",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-schema-version",
+#       "name": "get_schema_version",
+#       "anchor": "function-get-schema-version",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "set-schema-version",
+#       "name": "set_schema_version",
+#       "anchor": "function-set-schema-version",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "migrate-to-v1",
+#       "name": "migrate_to_v1",
+#       "anchor": "function-migrate-to-v1",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "run-migrations",
+#       "name": "run_migrations",
+#       "anchor": "function-run-migrations",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "ensure-schema",
+#       "name": "ensure_schema",
+#       "anchor": "function-ensure-schema",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-schema",
+#       "name": "validate_schema",
+#       "anchor": "function-validate-schema",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "repair-schema",
+#       "name": "repair_schema",
+#       "anchor": "function-repair-schema",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-or-create-connection",
+#       "name": "get_or_create_connection",
+#       "anchor": "function-get-or-create-connection",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "close-connection",
+#       "name": "close_connection",
+#       "anchor": "function-close-connection",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "streamingdatabase",
+#       "name": "StreamingDatabase",
+#       "anchor": "class-streamingdatabase",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "health-check",
+#       "name": "health_check",
+#       "anchor": "function-health-check",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Database schema migrations for streaming architecture.
 
 This module provides idempotent schema migrations for the artifact streaming

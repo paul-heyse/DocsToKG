@@ -1,3 +1,54 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.observability.emitters",
+#   "purpose": "Pluggable event sinks for observability.",
+#   "sections": [
+#     {
+#       "id": "eventemitter",
+#       "name": "EventEmitter",
+#       "anchor": "class-eventemitter",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "jsonstdoutemitter",
+#       "name": "JsonStdoutEmitter",
+#       "anchor": "class-jsonstdoutemitter",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "filejsonlemitter",
+#       "name": "FileJsonlEmitter",
+#       "anchor": "class-filejsonlemitter",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "duckdbemitter",
+#       "name": "DuckDBEmitter",
+#       "anchor": "class-duckdbemitter",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "parquetemitter",
+#       "name": "ParquetEmitter",
+#       "anchor": "class-parquetemitter",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "bufferedemitter",
+#       "name": "BufferedEmitter",
+#       "anchor": "class-bufferedemitter",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "multiemitter",
+#       "name": "MultiEmitter",
+#       "anchor": "class-multiemitter",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Pluggable event sinks for observability.
 
 Implementations for writing events to different backends:

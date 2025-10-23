@@ -1,3 +1,42 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.resolvers.registry_v2",
+#   "purpose": "Resolver Registry with Pydantic v2 Integration.",
+#   "sections": [
+#     {
+#       "id": "register-v2",
+#       "name": "register_v2",
+#       "anchor": "function-register-v2",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-registry",
+#       "name": "get_registry",
+#       "anchor": "function-get-registry",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-resolver-class",
+#       "name": "get_resolver_class",
+#       "anchor": "function-get-resolver-class",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-resolvers",
+#       "name": "build_resolvers",
+#       "anchor": "function-build-resolvers",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolverprotocol",
+#       "name": "ResolverProtocol",
+#       "anchor": "class-resolverprotocol",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Resolver Registry with Pydantic v2 Integration
 

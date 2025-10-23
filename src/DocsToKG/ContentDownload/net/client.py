@@ -1,3 +1,72 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.net.client",
+#   "purpose": "HTTPX Client Factory & Singleton Management.",
+#   "sections": [
+#     {
+#       "id": "get-http-client",
+#       "name": "get_http_client",
+#       "anchor": "function-get-http-client",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "close-http-client",
+#       "name": "close_http_client",
+#       "anchor": "function-close-http-client",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "reset-http-client",
+#       "name": "reset_http_client",
+#       "anchor": "function-reset-http-client",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-http-client",
+#       "name": "_build_http_client",
+#       "anchor": "function-build-http-client",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-transport",
+#       "name": "_build_transport",
+#       "anchor": "function-build-transport",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "on-request",
+#       "name": "_on_request",
+#       "anchor": "function-on-request",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "on-response",
+#       "name": "_on_response",
+#       "anchor": "function-on-response",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-net-request",
+#       "name": "_emit_net_request",
+#       "anchor": "function-emit-net-request",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "request-with-redirect-audit",
+#       "name": "request_with_redirect_audit",
+#       "anchor": "function-request-with-redirect-audit",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "normalize-host-for-telemetry",
+#       "name": "_normalize_host_for_telemetry",
+#       "anchor": "function-normalize-host-for-telemetry",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 HTTPX Client Factory & Singleton Management.
 

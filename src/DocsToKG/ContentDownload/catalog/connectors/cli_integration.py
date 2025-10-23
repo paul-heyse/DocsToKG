@@ -1,3 +1,36 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.catalog.connectors.cli_integration",
+#   "purpose": "CLI Integration for CatalogConnector.",
+#   "sections": [
+#     {
+#       "id": "environmentdetector",
+#       "name": "EnvironmentDetector",
+#       "anchor": "class-environmentdetector",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "cliconfigbuilder",
+#       "name": "CLIConfigBuilder",
+#       "anchor": "class-cliconfigbuilder",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "create-connector-from-cli",
+#       "name": "create_connector_from_cli",
+#       "anchor": "function-create-connector-from-cli",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-cli-help-text",
+#       "name": "get_cli_help_text",
+#       "anchor": "function-get-cli-help-text",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 CLI Integration for CatalogConnector
 

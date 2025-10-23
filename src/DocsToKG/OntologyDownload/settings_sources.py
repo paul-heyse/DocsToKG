@@ -1,3 +1,42 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.settings_sources",
+#   "purpose": "TracingSettingsSource: Wraps Pydantic SettingsSource to track field attribution.",
+#   "sections": [
+#     {
+#       "id": "tracingsettingssource",
+#       "name": "TracingSettingsSource",
+#       "anchor": "class-tracingsettingssource",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "get-source-fingerprint",
+#       "name": "get_source_fingerprint",
+#       "anchor": "function-get-source-fingerprint",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "set-source-fingerprint",
+#       "name": "set_source_fingerprint",
+#       "anchor": "function-set-source-fingerprint",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "clear-source-context",
+#       "name": "clear_source_context",
+#       "anchor": "function-clear-source-context",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "init-source-context",
+#       "name": "init_source_context",
+#       "anchor": "function-init-source-context",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """TracingSettingsSource: Wraps Pydantic SettingsSource to track field attribution.
 
 This module provides utilities to capture which source (CLI, environment, config file, or default)

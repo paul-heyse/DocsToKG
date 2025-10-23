@@ -1,5 +1,22 @@
 # DocsToKG • HybridSearch — Subsystem Architecture
 
+> **Go‑Forward Decisions (2025-10-23) — HybridSearch**
+>
+> 1. **Canonical vector format**: **Parquet** is the first‑class vector format for ingestion; JSONL remains supported for compatibility. Partition path: `Embeddings/{family=dense|sparse|lexical}/fmt=parquet/YYYY/MM/<doc_id>.parquet`. Parquet footers carry `docparse.provider`, `model_id`, `dtype`, and `cfg_hash`.
+> 2. **UUID alignment (strict)**: Default `vector_cache_limit = 0` (fail on first drift) to guarantee a deterministic UUID ↔ FAISS‑id bijection. Lenient modes are opt‑in.
+> 3. **Index selection**: **Flat** < 1M vectors; **IVFFlat** ≥ 1M; **IVFPQ** when memory‑bounded. Defaults match this policy unless explicitly overridden.
+> 4. **GPU resources**: Use FAISS **StandardGpuResources** with pre‑allocated scratch (1 GiB default); replicate only when configured. **FP16** remains **experimental** and **off** by default.
+> 5. **cuVS preferred**: Enable cuVS by default when available. Set `use_cuvs: auto` to choose cuVS if compiled; fall back to FAISS otherwise. Ingest/query must **not** fail if cuVS is absent; we log diagnostics and use FAISS transparently.
+>    - **Index policy with cuVS**: <1M vectors → FAISS **Flat** (GPU); 1–10M → cuVS **IVF-Flat**; ≥10M → cuVS **CAGRA** (or cuVS **IVF-PQ** when memory-bounded).
+>    - **Build guidance**: Prefer wheels built with cuVS; expose `--use-cuvs={auto|true|false}` and `--cuvs-index={cagra|ivf_flat|ivf_pq}` on CLI.
+>    - **Non-regression guard**: if cuVS path degrades nDCG@10 by >1% against FAISS baseline on a canary sample, route to FAISS for that namespace and emit an alert.
+ **Fusion & diversification**: **RRF** default weights `{bm25: 0.35, splade: 0.0, dense: 0.65}`, `k0 = 60.0`; **MMR enabled** by default with `λ = 0.7`.
+> 7. **Namespace routing**: LRU‑evict to snapshots when `max_active_namespaces` exceeded; lazy restore on demand. Queries are always **namespace‑scoped**.
+> 8. **Observability**: Emit Prometheus metrics prefixed `hybrid_*` (seconds‑based histograms), structured JSONL logs, and OTel spans (`run_id`, `config_hash`, `namespace`). Keep metric names stable with the north‑star dashboard.
+> 9. **Security posture**: API must **not** return raw dense vectors; only UUIDs/scores/metadata. Snapshots may be encrypted at rest (deployment policy).
+> 10. **Acceptance gates**: Retrieval latencies **p50 ≤ 150ms / p99 ≤ 600ms**, hybrid uplift **≥ +5% nDCG@10** vs best single retriever, deterministic fusion ranking, UUID bijection preserved across restore.
+
+
 ## Purpose & Scope
 
 **Purpose:** Provide hybrid retrieval over chunked corpora by combining lexical (BM25/SPLADE) and dense (FAISS GPU) channels, with deterministic fusion, diversification, and snapshot-based cold starts.
@@ -839,3 +856,36 @@ snapshots:
 - ⏳ Distributed FAISS (sharded indexes across nodes)
 - ⏳ Object storage backends (S3, GCS, Azure)
 - ⏳ Auto-scaling (dynamic GPU provisioning)
+
+
+
+> **Parquet canonicalization:** Prefer `*.vectors.parquet` for ingestion—columnar reads and footer metadata unlock faster ingest and safer auditing. JSONL is supported but not recommended for large batches.
+
+
+
+> **Strict mode (default):** `vector_cache_limit = 0` enforces deterministic UUID ordering and fails on the first drift. Use `vector_cache_limit > 0` only when you accept delayed ordering with bounded cache.
+
+
+## Acceptance Criteria (Go‑Forward)
+
+- Retrieval p50 ≤ 150ms, p99 ≤ 600ms (top‑10, Flat index, namespace‑scoped)
+- Hybrid uplift ≥ +5% nDCG@10 vs best single retriever (internal eval)
+- UUID ↔ FAISS‑id bijection preserved across snapshot restore
+- Fusion deterministic (identical inputs → identical ranking)
+
+
+## Configuration (cuVS)
+
+```yaml
+gpu:
+  use_cuvs: auto        # auto|true|false (auto = prefer cuVS if compiled)
+  cuvs_index: cagra     # cagra|ivf_flat|ivf_pq (auto policy may override)
+  cuvs_build:
+    graph_degree: 32
+    itopk: 64
+    refine_ratio: 2.0
+  faiss_index: ivfflat  # fallback index when cuVS unavailable or gated
+metrics:
+  labels:
+    backend: cuvs|faiss # attach to hybrid_* metrics for dashboards
+```

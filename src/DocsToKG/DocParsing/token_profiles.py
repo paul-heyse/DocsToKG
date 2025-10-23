@@ -1,4 +1,79 @@
 #!/usr/bin/env python3
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.token_profiles",
+#   "purpose": "CLI utility for analysing tokenizer behaviour on DocTags samples.",
+#   "sections": [
+#     {
+#       "id": "tokenprofilescfg",
+#       "name": "TokenProfilesCfg",
+#       "anchor": "class-tokenprofilescfg",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "clean-text",
+#       "name": "_clean_text",
+#       "anchor": "function-clean-text",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-samples",
+#       "name": "_load_samples",
+#       "anchor": "function-load-samples",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "count-tokens",
+#       "name": "_count_tokens",
+#       "anchor": "function-count-tokens",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "mean",
+#       "name": "_mean",
+#       "anchor": "function-mean",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "mean-ratio",
+#       "name": "_mean_ratio",
+#       "anchor": "function-mean-ratio",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "scale",
+#       "name": "_scale",
+#       "anchor": "function-scale",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "render-table",
+#       "name": "_render_table",
+#       "anchor": "function-render-table",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-parser",
+#       "name": "build_parser",
+#       "anchor": "function-build-parser",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-args",
+#       "name": "parse_args",
+#       "anchor": "function-parse-args",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "main",
+#       "name": "main",
+#       "anchor": "function-main",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """CLI utility for analysing tokenizer behaviour on DocTags samples.
 
 Operators can use this module to compare multiple tokenizer vocabularies

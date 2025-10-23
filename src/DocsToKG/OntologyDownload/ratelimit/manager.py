@@ -1,3 +1,36 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.ratelimit.manager",
+#   "purpose": "RateLimitManager: Facade for pyrate-limiter with per-service rate enforcement.",
+#   "sections": [
+#     {
+#       "id": "ratelimitmanager",
+#       "name": "RateLimitManager",
+#       "anchor": "class-ratelimitmanager",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "get-rate-limiter",
+#       "name": "get_rate_limiter",
+#       "anchor": "function-get-rate-limiter",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "close-rate-limiter",
+#       "name": "close_rate_limiter",
+#       "anchor": "function-close-rate-limiter",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "reset-rate-limiter",
+#       "name": "reset_rate_limiter",
+#       "anchor": "function-reset-rate-limiter",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """RateLimitManager: Facade for pyrate-limiter with per-service rate enforcement.
 
 Provides a unified rate-limiting interface for the OntologyDownload subsystem:

@@ -1,3 +1,78 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.streaming",
+#   "purpose": "Download streaming architecture with resume support and exactly-once semantics.",
+#   "sections": [
+#     {
+#       "id": "servervalidators",
+#       "name": "ServerValidators",
+#       "anchor": "class-servervalidators",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "localpartstate",
+#       "name": "LocalPartState",
+#       "anchor": "class-localpartstate",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "resumedecision",
+#       "name": "ResumeDecision",
+#       "anchor": "class-resumedecision",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "streammetrics",
+#       "name": "StreamMetrics",
+#       "anchor": "class-streammetrics",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "ensure-quota",
+#       "name": "ensure_quota",
+#       "anchor": "function-ensure-quota",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "can-resume",
+#       "name": "can_resume",
+#       "anchor": "function-can-resume",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "compute-prefix-sha256",
+#       "name": "_compute_prefix_sha256",
+#       "anchor": "function-compute-prefix-sha256",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "stream-to-part",
+#       "name": "stream_to_part",
+#       "anchor": "function-stream-to-part",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "preallocate-fd",
+#       "name": "_preallocate_fd",
+#       "anchor": "function-preallocate-fd",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "finalize-artifact",
+#       "name": "finalize_artifact",
+#       "anchor": "function-finalize-artifact",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "download-pdf",
+#       "name": "download_pdf",
+#       "anchor": "function-download-pdf",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Download streaming architecture with resume support and exactly-once semantics.
 
 This module implements the core streaming pipeline:

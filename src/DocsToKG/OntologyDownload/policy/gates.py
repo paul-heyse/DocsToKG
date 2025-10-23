@@ -1,3 +1,72 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.policy.gates",
+#   "purpose": "Policy gates: security boundaries for OntologyDownload.",
+#   "sections": [
+#     {
+#       "id": "record-prometheus-metrics",
+#       "name": "_record_prometheus_metrics",
+#       "anchor": "function-record-prometheus-metrics",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-gate-event",
+#       "name": "_emit_gate_event",
+#       "anchor": "function-emit-gate-event",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "record-gate-metric",
+#       "name": "_record_gate_metric",
+#       "anchor": "function-record-gate-metric",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "config-gate",
+#       "name": "config_gate",
+#       "anchor": "function-config-gate",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "url-gate",
+#       "name": "url_gate",
+#       "anchor": "function-url-gate",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "filesystem-gate",
+#       "name": "filesystem_gate",
+#       "anchor": "function-filesystem-gate",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "extraction-gate",
+#       "name": "extraction_gate",
+#       "anchor": "function-extraction-gate",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "storage-gate",
+#       "name": "storage_gate",
+#       "anchor": "function-storage-gate",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "db-gate",
+#       "name": "db_gate",
+#       "anchor": "function-db-gate",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "db-boundary-gate",
+#       "name": "db_boundary_gate",
+#       "anchor": "function-db-boundary-gate",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Policy gates: security boundaries for OntologyDownload.
 
 Implements access control gates at critical I/O boundaries:

@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.context",
+#   "purpose": "Typed runtime context shared across DocParsing stages.",
+#   "sections": [
+#     {
+#       "id": "parsingcontext",
+#       "name": "ParsingContext",
+#       "anchor": "class-parsingcontext",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Typed runtime context shared across DocParsing stages.
 
 The :class:`ParsingContext` dataclass captures the run-scoped attributes that

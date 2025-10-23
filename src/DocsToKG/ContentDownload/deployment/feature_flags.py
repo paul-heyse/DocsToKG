@@ -1,3 +1,42 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.deployment.feature_flags",
+#   "purpose": "Feature flags system for safe feature deployment and experimentation.",
+#   "sections": [
+#     {
+#       "id": "rolloutstrategy",
+#       "name": "RolloutStrategy",
+#       "anchor": "class-rolloutstrategy",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "featureflag",
+#       "name": "FeatureFlag",
+#       "anchor": "class-featureflag",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "featureflagmanager",
+#       "name": "FeatureFlagManager",
+#       "anchor": "class-featureflagmanager",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "get-feature-flag-manager",
+#       "name": "get_feature_flag_manager",
+#       "anchor": "function-get-feature-flag-manager",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "is-feature-enabled",
+#       "name": "is_feature_enabled",
+#       "anchor": "function-is-feature-enabled",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Feature flags system for safe feature deployment and experimentation.
 
 Enables safe rollout of new features without requiring code redeployment.

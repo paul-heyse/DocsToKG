@@ -1,3 +1,30 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.catalog.metadata_extractor",
+#   "purpose": "Metadata extraction and enrichment.",
+#   "sections": [
+#     {
+#       "id": "contentmetadata",
+#       "name": "ContentMetadata",
+#       "anchor": "class-contentmetadata",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "metadataextractor",
+#       "name": "MetadataExtractor",
+#       "anchor": "class-metadataextractor",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "extract-and-store",
+#       "name": "extract_and_store",
+#       "anchor": "function-extract-and-store",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Metadata extraction and enrichment.
 
 Provides:

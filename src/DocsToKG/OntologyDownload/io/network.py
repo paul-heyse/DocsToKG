@@ -3,11 +3,174 @@
 #   "module": "DocsToKG.OntologyDownload.io.network",
 #   "purpose": "Provide secure streaming downloads, DNS validation, and retry-aware HTTP helpers",
 #   "sections": [
-#     {"id": "infrastructure", "name": "Networking Infrastructure & Constants", "anchor": "INF", "kind": "infra"},
-#     {"id": "dns", "name": "DNS & Host Validation", "anchor": "DNS", "kind": "helpers"},
-#     {"id": "httpx", "name": "HTTPX Client & Rate Limiting", "anchor": "HTX", "kind": "api"},
-#     {"id": "streaming", "name": "Streaming Downloader", "anchor": "STR", "kind": "api"},
-#     {"id": "helpers", "name": "Download Helpers & Security Checks", "anchor": "HLP", "kind": "helpers"}
+#     {
+#       "id": "is-documentation-address",
+#       "name": "_is_documentation_address",
+#       "anchor": "function-is-documentation-address",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "enforce-idn-safety",
+#       "name": "_enforce_idn_safety",
+#       "anchor": "function-enforce-idn-safety",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "rebuild-netloc",
+#       "name": "_rebuild_netloc",
+#       "anchor": "function-rebuild-netloc",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "cached-getaddrinfo",
+#       "name": "_cached_getaddrinfo",
+#       "anchor": "function-cached-getaddrinfo",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "prune-dns-cache",
+#       "name": "_prune_dns_cache",
+#       "anchor": "function-prune-dns-cache",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "register-dns-stub",
+#       "name": "register_dns_stub",
+#       "anchor": "function-register-dns-stub",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "clear-dns-stubs",
+#       "name": "clear_dns_stubs",
+#       "anchor": "function-clear-dns-stubs",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-url-security",
+#       "name": "validate_url_security",
+#       "anchor": "function-validate-url-security",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "retry-with-backoff",
+#       "name": "retry_with_backoff",
+#       "anchor": "function-retry-with-backoff",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "log-memory-usage",
+#       "name": "log_memory_usage",
+#       "anchor": "function-log-memory-usage",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "extract-correlation-id",
+#       "name": "_extract_correlation_id",
+#       "anchor": "function-extract-correlation-id",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "downloadresult",
+#       "name": "DownloadResult",
+#       "anchor": "class-downloadresult",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "parse-retry-after",
+#       "name": "_parse_retry_after",
+#       "anchor": "function-parse-retry-after",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "is-retryable-status",
+#       "name": "_is_retryable_status",
+#       "anchor": "function-is-retryable-status",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "is-retryable-error",
+#       "name": "is_retryable_error",
+#       "anchor": "function-is-retryable-error",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "request-with-redirect-audit",
+#       "name": "request_with_redirect_audit",
+#       "anchor": "function-request-with-redirect-audit",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "streamoutcome",
+#       "name": "_StreamOutcome",
+#       "anchor": "class-streamoutcome",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "conditional-headers-from-manifest",
+#       "name": "_conditional_headers_from_manifest",
+#       "anchor": "function-conditional-headers-from-manifest",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-expected-hash",
+#       "name": "_parse_expected_hash",
+#       "anchor": "function-parse-expected-hash",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "initial-progress-state",
+#       "name": "_initial_progress_state",
+#       "anchor": "function-initial-progress-state",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "log-stream-progress",
+#       "name": "_log_stream_progress",
+#       "anchor": "function-log-stream-progress",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "apply-retry-after-from-response",
+#       "name": "_apply_retry_after_from_response",
+#       "anchor": "function-apply-retry-after-from-response",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-media-type",
+#       "name": "_validate_media_type",
+#       "anchor": "function-validate-media-type",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "total-bytes-from-response",
+#       "name": "_total_bytes_from_response",
+#       "anchor": "function-total-bytes-from-response",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "stream-body-to-cache",
+#       "name": "_stream_body_to_cache",
+#       "anchor": "function-stream-body-to-cache",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "download-once",
+#       "name": "_download_once",
+#       "anchor": "function-download-once",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "safe-int",
+#       "name": "_safe_int",
+#       "anchor": "function-safe-int",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "download-stream",
+#       "name": "download_stream",
+#       "anchor": "function-download-stream",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===

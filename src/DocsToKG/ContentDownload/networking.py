@@ -4,6 +4,30 @@
 #   "purpose": "HTTPX client helpers, retry orchestration, and conditional caching",
 #   "sections": [
 #     {
+#       "id": "configure-breaker-registry",
+#       "name": "configure_breaker_registry",
+#       "anchor": "function-configure-breaker-registry",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "set-breaker-registry",
+#       "name": "set_breaker_registry",
+#       "anchor": "function-set-breaker-registry",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "reset-breaker-registry",
+#       "name": "reset_breaker_registry",
+#       "anchor": "function-reset-breaker-registry",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-breaker-registry",
+#       "name": "get_breaker_registry",
+#       "anchor": "function-get-breaker-registry",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "parse-retry-after-header",
 #       "name": "parse_retry_after_header",
 #       "anchor": "function-parse-retry-after-header",
@@ -16,10 +40,100 @@
 #       "kind": "class"
 #     },
 #     {
+#       "id": "normalise-content-type",
+#       "name": "_normalise_content_type",
+#       "anchor": "function-normalise-content-type",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "enforce-content-policy",
+#       "name": "_enforce_content_policy",
+#       "anchor": "function-enforce-content-policy",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "retryafterjitterwait",
 #       "name": "RetryAfterJitterWait",
 #       "anchor": "class-retryafterjitterwait",
 #       "kind": "class"
+#     },
+#     {
+#       "id": "close-response-safely",
+#       "name": "_close_response_safely",
+#       "anchor": "function-close-response-safely",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "before-sleep-close-response",
+#       "name": "_before_sleep_close_response",
+#       "anchor": "function-before-sleep-close-response",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "before-sleep-handler",
+#       "name": "_before_sleep_handler",
+#       "anchor": "function-before-sleep-handler",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "is-retryable-response",
+#       "name": "_is_retryable_response",
+#       "anchor": "function-is-retryable-response",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-retrying-controller",
+#       "name": "_build_retrying_controller",
+#       "anchor": "function-build-retrying-controller",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "compute-url-hash",
+#       "name": "_compute_url_hash",
+#       "anchor": "function-compute-url-hash",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "extract-from-cache",
+#       "name": "_extract_from_cache",
+#       "anchor": "function-extract-from-cache",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "extract-revalidated",
+#       "name": "_extract_revalidated",
+#       "anchor": "function-extract-revalidated",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "extract-stale",
+#       "name": "_extract_stale",
+#       "anchor": "function-extract-stale",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "extract-retry-after",
+#       "name": "_extract_retry_after",
+#       "anchor": "function-extract-retry-after",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "extract-rate-delay",
+#       "name": "_extract_rate_delay",
+#       "anchor": "function-extract-rate-delay",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "extract-breaker-state",
+#       "name": "_extract_breaker_state",
+#       "anchor": "function-extract-breaker-state",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "extract-breaker-recorded",
+#       "name": "_extract_breaker_recorded",
+#       "anchor": "function-extract-breaker-recorded",
+#       "kind": "function"
 #     },
 #     {
 #       "id": "request-with-retries",
@@ -34,10 +148,16 @@
 #       "kind": "function"
 #     },
 #     {
-#       "id": "conditionalrequesthelper",
-#       "name": "ConditionalRequestHelper",
-#       "anchor": "class-conditionalrequesthelper",
-#       "kind": "class"
+#       "id": "looks-like-pdf",
+#       "name": "_looks_like_pdf",
+#       "anchor": "function-looks-like-pdf",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "head-precheck-via-get",
+#       "name": "_head_precheck_via_get",
+#       "anchor": "function-head-precheck-via-get",
+#       "kind": "function"
 #     },
 #     {
 #       "id": "cachedresult",
@@ -52,11 +172,11 @@
 #       "kind": "class"
 #     },
 #     {
-#       "id": "circuitbreaker",
-#       "name": "CircuitBreaker",  # Legacy - removed
-#       "anchor": "class-circuitbreaker",
+#       "id": "conditionalrequesthelper",
+#       "name": "ConditionalRequestHelper",
+#       "anchor": "class-conditionalrequesthelper",
 #       "kind": "class"
-#     },
+#     }
 #   ]
 # }
 # === /NAVMAP ===

@@ -1,3 +1,48 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.conditional_requests",
+#   "purpose": "RFC 7232 conditional request handling (ETag and Last-Modified).",
+#   "sections": [
+#     {
+#       "id": "entityvalidator",
+#       "name": "EntityValidator",
+#       "anchor": "class-entityvalidator",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "parse-entity-validator",
+#       "name": "parse_entity_validator",
+#       "anchor": "function-parse-entity-validator",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-conditional-headers",
+#       "name": "build_conditional_headers",
+#       "anchor": "function-build-conditional-headers",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "should-revalidate",
+#       "name": "should_revalidate",
+#       "anchor": "function-should-revalidate",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "merge-validators",
+#       "name": "merge_validators",
+#       "anchor": "function-merge-validators",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "is-validator-available",
+#       "name": "is_validator_available",
+#       "anchor": "function-is-validator-available",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """RFC 7232 conditional request handling (ETag and Last-Modified).
 
 Responsibilities

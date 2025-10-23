@@ -3,7 +3,18 @@
 #   "module": "DocsToKG.ContentDownload.orchestrator.workers",
 #   "purpose": "Job execution wrapper with concurrency control and telemetry",
 #   "sections": [
-#     {"id": "worker", "name": "Worker", "anchor": "#class-worker", "kind": "class"}
+#     {
+#       "id": "worker",
+#       "name": "Worker",
+#       "anchor": "class-worker",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "artifactvalidationerror",
+#       "name": "_ArtifactValidationError",
+#       "anchor": "class-artifactvalidationerror",
+#       "kind": "class"
+#     }
 #   ]
 # }
 # === /NAVMAP ===

@@ -1,3 +1,24 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.HybridSearch.router",
+#   "purpose": "Namespace-aware coordination of managed FAISS stores and their snapshots.",
+#   "sections": [
+#     {
+#       "id": "storemap",
+#       "name": "_StoreMap",
+#       "anchor": "class-storemap",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "faissrouter",
+#       "name": "FaissRouter",
+#       "anchor": "class-faissrouter",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Namespace-aware coordination of managed FAISS stores and their snapshots.
 
 ``FaissRouter`` encapsulates the namespace strategy described in the package

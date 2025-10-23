@@ -138,3 +138,5 @@ $RECYCLE.BIN/
 # local caches
 .wheelhouse/
 ci/wheels/
+docs/sphinx documentation/_build/
+docs/sphinx documentation/api/generated/

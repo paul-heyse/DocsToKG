@@ -1,3 +1,78 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.ratelimits_loader",
+#   "purpose": "Load rate limit configuration from YAML, environment variables, and CLI arguments.",
+#   "sections": [
+#     {
+#       "id": "normalize-host-key",
+#       "name": "_normalize_host_key",
+#       "anchor": "function-normalize-host-key",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-yaml-file",
+#       "name": "_load_yaml_file",
+#       "anchor": "function-load-yaml-file",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "merge-dicts",
+#       "name": "_merge_dicts",
+#       "anchor": "function-merge-dicts",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-rate-list",
+#       "name": "_parse_rate_list",
+#       "anchor": "function-parse-rate-list",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "apply-env-overlays",
+#       "name": "_apply_env_overlays",
+#       "anchor": "function-apply-env-overlays",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "apply-cli-overrides",
+#       "name": "_apply_cli_overrides",
+#       "anchor": "function-apply-cli-overrides",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-role-rates",
+#       "name": "_build_role_rates",
+#       "anchor": "function-build-role-rates",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-host-policy",
+#       "name": "_build_host_policy",
+#       "anchor": "function-build-host-policy",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-aimd-config",
+#       "name": "_build_aimd_config",
+#       "anchor": "function-build-aimd-config",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-default-config",
+#       "name": "_get_default_config",
+#       "anchor": "function-get-default-config",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-rate-config",
+#       "name": "load_rate_config",
+#       "anchor": "function-load-rate-config",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Load rate limit configuration from YAML, environment variables, and CLI arguments.
 
 Supports hierarchical configuration with precedence:

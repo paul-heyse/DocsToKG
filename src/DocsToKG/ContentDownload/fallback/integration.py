@@ -1,3 +1,30 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.fallback.integration",
+#   "purpose": "Integration of fallback orchestrator into the download pipeline.",
+#   "sections": [
+#     {
+#       "id": "try-fallback-resolution",
+#       "name": "try_fallback_resolution",
+#       "anchor": "function-try-fallback-resolution",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "is-fallback-enabled",
+#       "name": "is_fallback_enabled",
+#       "anchor": "function-is-fallback-enabled",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-fallback-plan-path",
+#       "name": "get_fallback_plan_path",
+#       "anchor": "function-get-fallback-plan-path",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Integration of fallback orchestrator into the download pipeline.
 
 This module provides utilities to integrate the FallbackOrchestrator into

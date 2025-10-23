@@ -1,3 +1,11 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.ratelimit.__init__",
+#   "purpose": "Rate-limiting subsystem: Multi-window rate-limiting with pyrate-limiter.",
+#   "sections": []
+# }
+# === /NAVMAP ===
+
 """Rate-limiting subsystem: Multi-window rate-limiting with pyrate-limiter.
 
 This package provides a production-ready rate-limiting façade based on pyrate-limiter,

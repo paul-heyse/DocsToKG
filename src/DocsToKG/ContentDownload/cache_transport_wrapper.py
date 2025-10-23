@@ -1,3 +1,30 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.cache_transport_wrapper",
+#   "purpose": "Role-aware HTTP transport wrapper for Hishel caching integration.",
+#   "sections": [
+#     {
+#       "id": "roleawarecachetransport",
+#       "name": "RoleAwareCacheTransport",
+#       "anchor": "class-roleawarecachetransport",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "build-role-aware-cache-transport",
+#       "name": "build_role_aware_cache_transport",
+#       "anchor": "function-build-role-aware-cache-transport",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "policyawarecontroller",
+#       "name": "_PolicyAwareController",
+#       "anchor": "class-policyawarecontroller",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Role-aware HTTP transport wrapper for Hishel caching integration.
 
 Responsibilities

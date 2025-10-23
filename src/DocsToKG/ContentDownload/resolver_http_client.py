@@ -3,8 +3,24 @@
 #   "module": "DocsToKG.ContentDownload.resolver_http_client",
 #   "purpose": "Per-resolver HTTP client with rate limiting, retry/backoff, and telemetry emission",
 #   "sections": [
-#     {"id": "resolver-http-client", "name": "ResolverHttpClient", "anchor": "class-resolverhttpclient", "kind": "class"},
-#     {"id": "retry-config", "name": "RetryConfig", "anchor": "class-retryconfig", "kind": "class"}
+#     {
+#       "id": "retryconfig",
+#       "name": "RetryConfig",
+#       "anchor": "class-retryconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "tokenbucket",
+#       "name": "TokenBucket",
+#       "anchor": "class-tokenbucket",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "perresolverhttpclient",
+#       "name": "PerResolverHttpClient",
+#       "anchor": "class-perresolverhttpclient",
+#       "kind": "class"
+#     }
 #   ]
 # }
 # === /NAVMAP ===

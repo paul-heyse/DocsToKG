@@ -3,10 +3,36 @@
 #   "module": "DocsToKG.ContentDownload.cli_telemetry",
 #   "purpose": "CLI subcommands for telemetry inspection, SLO evaluation, and export",
 #   "sections": [
-#     {"id": "install-telemetry-cli", "name": "install_telemetry_cli", "anchor": "function-install-telemetry-cli", "kind": "function"},
-#     {"id": "cmd-summary", "name": "_cmd_summary", "anchor": "function-cmd-summary", "kind": "function"},
-#     {"id": "cmd-export", "name": "_cmd_export", "anchor": "function-cmd-export", "kind": "function"},
-#     {"id": "cmd-query", "name": "_cmd_query", "anchor": "function-cmd-query", "kind": "function"}
+#     {
+#       "id": "install-telemetry-cli",
+#       "name": "install_telemetry_cli",
+#       "anchor": "function-install-telemetry-cli",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "fetch-one",
+#       "name": "_fetch_one",
+#       "anchor": "function-fetch-one",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "cmd-summary",
+#       "name": "_cmd_summary",
+#       "anchor": "function-cmd-summary",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "cmd-export",
+#       "name": "_cmd_export",
+#       "anchor": "function-cmd-export",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "cmd-query",
+#       "name": "_cmd_query",
+#       "anchor": "function-cmd-query",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===

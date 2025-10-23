@@ -3,9 +3,24 @@
 #   "module": "DocsToKG.OntologyDownload.io.probe",
 #   "purpose": "GET-first probing with Range headers; audited redirects via URL gate",
 #   "sections": [
-#     {"id": "types", "name": "Probe Result Types", "anchor": "TYP", "kind": "models"},
-#     {"id": "probe", "name": "Probing Functions", "anchor": "PRB", "kind": "api"},
-#     {"id": "redirect", "name": "Redirect Auditing", "anchor": "RDR", "kind": "infra"}
+#     {
+#       "id": "proberesult",
+#       "name": "ProbeResult",
+#       "anchor": "class-proberesult",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "probe-url",
+#       "name": "probe_url",
+#       "anchor": "function-probe-url",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "extract-probe-result",
+#       "name": "_extract_probe_result",
+#       "anchor": "function-extract-probe-result",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===

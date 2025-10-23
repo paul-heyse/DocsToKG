@@ -1,3 +1,84 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.__init__",
+#   "purpose": "DocParsing package facade with lazy loading and optional dependency guards.",
+#   "sections": [
+#     {
+#       "id": "import-module",
+#       "name": "_import_module",
+#       "anchor": "function-import-module",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-module",
+#       "name": "_load_module",
+#       "anchor": "function-load-module",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "getattr",
+#       "name": "__getattr__",
+#       "anchor": "function-getattr",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "dir",
+#       "name": "__dir__",
+#       "anchor": "function-dir",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "plan",
+#       "name": "plan",
+#       "anchor": "function-plan",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "manifest",
+#       "name": "manifest",
+#       "anchor": "function-manifest",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "pdf-build-parser",
+#       "name": "pdf_build_parser",
+#       "anchor": "function-pdf-build-parser",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "pdf-parse-args",
+#       "name": "pdf_parse_args",
+#       "anchor": "function-pdf-parse-args",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "pdf-main",
+#       "name": "pdf_main",
+#       "anchor": "function-pdf-main",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "html-build-parser",
+#       "name": "html_build_parser",
+#       "anchor": "function-html-build-parser",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "html-parse-args",
+#       "name": "html_parse_args",
+#       "anchor": "function-html-parse-args",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "html-main",
+#       "name": "html_main",
+#       "anchor": "function-html-main",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """DocParsing package facade with lazy loading and optional dependency guards.
 
 This module centralises the public surface for ``DocsToKG.DocParsing`` by

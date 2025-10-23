@@ -1,3 +1,54 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.observability.schema",
+#   "purpose": "JSON Schema generation and validation for observability events.",
+#   "sections": [
+#     {
+#       "id": "generate-settings-schema",
+#       "name": "generate_settings_schema",
+#       "anchor": "function-generate-settings-schema",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "generate-submodel-schemas",
+#       "name": "generate_submodel_schemas",
+#       "anchor": "function-generate-submodel-schemas",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-event",
+#       "name": "validate_event",
+#       "anchor": "function-validate-event",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "write-schemas-to-disk",
+#       "name": "write_schemas_to_disk",
+#       "anchor": "function-write-schemas-to-disk",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-schema-from-file",
+#       "name": "load_schema_from_file",
+#       "anchor": "function-load-schema-from-file",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "compare-schemas",
+#       "name": "compare_schemas",
+#       "anchor": "function-compare-schemas",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-schema-summary",
+#       "name": "get_schema_summary",
+#       "anchor": "function-get-schema-summary",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """JSON Schema generation and validation for observability events.
 
 Provides:

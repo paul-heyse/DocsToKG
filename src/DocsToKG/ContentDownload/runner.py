@@ -3,8 +3,24 @@
 #   "module": "DocsToKG.ContentDownload.runner",
 #   "purpose": "Modern run orchestration using Pydantic v2 config and DownloadPipeline",
 #   "sections": [
-#     {"id": "downloadrun", "name": "DownloadRun", "anchor": "class-downloadrun", "kind": "class"},
-#     {"id": "run-helper", "name": "run", "anchor": "function-run", "kind": "function"}
+#     {
+#       "id": "runresult",
+#       "name": "RunResult",
+#       "anchor": "class-runresult",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "downloadrun",
+#       "name": "DownloadRun",
+#       "anchor": "class-downloadrun",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "run",
+#       "name": "run",
+#       "anchor": "function-run",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===

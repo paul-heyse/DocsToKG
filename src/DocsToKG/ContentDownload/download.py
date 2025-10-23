@@ -1,3 +1,198 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.download",
+#   "purpose": "Download orchestration helpers for the content acquisition pipeline.",
+#   "sections": [
+#     {
+#       "id": "ensure-dir",
+#       "name": "ensure_dir",
+#       "anchor": "function-ensure-dir",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validationresult",
+#       "name": "ValidationResult",
+#       "anchor": "class-validationresult",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "resumedecision",
+#       "name": "ResumeDecision",
+#       "anchor": "class-resumedecision",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "downloadstrategycontext",
+#       "name": "DownloadStrategyContext",
+#       "anchor": "class-downloadstrategycontext",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "downloadpreflightplan",
+#       "name": "DownloadPreflightPlan",
+#       "anchor": "class-downloadpreflightplan",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "downloadstreamresult",
+#       "name": "DownloadStreamResult",
+#       "anchor": "class-downloadstreamresult",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "prepare-candidate-download",
+#       "name": "prepare_candidate_download",
+#       "anchor": "function-prepare-candidate-download",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "stream-candidate-payload",
+#       "name": "stream_candidate_payload",
+#       "anchor": "function-stream-candidate-payload",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "finalize-candidate-download",
+#       "name": "finalize_candidate_download",
+#       "anchor": "function-finalize-candidate-download",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "downloadstrategy",
+#       "name": "DownloadStrategy",
+#       "anchor": "class-downloadstrategy",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "basedownloadstrategy",
+#       "name": "_BaseDownloadStrategy",
+#       "anchor": "class-basedownloadstrategy",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "pdfdownloadstrategy",
+#       "name": "PdfDownloadStrategy",
+#       "anchor": "class-pdfdownloadstrategy",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "htmldownloadstrategy",
+#       "name": "HtmlDownloadStrategy",
+#       "anchor": "class-htmldownloadstrategy",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "xmldownloadstrategy",
+#       "name": "XmlDownloadStrategy",
+#       "anchor": "class-xmldownloadstrategy",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "get-strategy-for-classification",
+#       "name": "get_strategy_for_classification",
+#       "anchor": "function-get-strategy-for-classification",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "downloadstate",
+#       "name": "DownloadState",
+#       "anchor": "class-downloadstate",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "cached-sha256",
+#       "name": "_cached_sha256",
+#       "anchor": "function-cached-sha256",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-cached-artifact",
+#       "name": "_validate_cached_artifact",
+#       "anchor": "function-validate-cached-artifact",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "robotscache",
+#       "name": "RobotsCache",
+#       "anchor": "class-robotscache",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "apply-content-addressed-storage",
+#       "name": "_apply_content_addressed_storage",
+#       "anchor": "function-apply-content-addressed-storage",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "streaming-finalization-enabled",
+#       "name": "_streaming_finalization_enabled",
+#       "anchor": "function-streaming-finalization-enabled",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "try-streaming-finalization",
+#       "name": "_try_streaming_finalization",
+#       "anchor": "function-try-streaming-finalization",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-classification",
+#       "name": "validate_classification",
+#       "anchor": "function-validate-classification",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "handle-resume-logic",
+#       "name": "handle_resume_logic",
+#       "anchor": "function-handle-resume-logic",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "cleanup-sidecar-files",
+#       "name": "cleanup_sidecar_files",
+#       "anchor": "function-cleanup-sidecar-files",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-download-outcome",
+#       "name": "build_download_outcome",
+#       "anchor": "function-build-download-outcome",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "collect-location-urls",
+#       "name": "_collect_location_urls",
+#       "anchor": "function-collect-location-urls",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "cohort-order-for",
+#       "name": "_cohort_order_for",
+#       "anchor": "function-cohort-order-for",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "create-artifact",
+#       "name": "create_artifact",
+#       "anchor": "function-create-artifact",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "download-candidate",
+#       "name": "download_candidate",
+#       "anchor": "function-download-candidate",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "process-one-work",
+#       "name": "process_one_work",
+#       "anchor": "function-process-one-work",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Download orchestration helpers for the content acquisition pipeline.
 
 Responsibilities

@@ -4,7 +4,9 @@
 The Module Organization Guide requires each NAVMAP to list every public item in
 source order. This helper script parses Python modules, extracts top-level
 ``class`` and ``def`` statements, and rewrites the NAVMAP ``sections`` array
-accordingly.
+accordingly. When a module lacks a NAVMAP entirely, the script now injects a
+fresh block using the module's dotted path, the first line of its docstring (if
+available), and the discovered top-level definitions.
 
 Usage:
     python scripts/update_navmaps.py [path ...]
@@ -24,6 +26,7 @@ from typing import Iterable, List
 
 NAVMAP_START = "# === NAVMAP v1 ==="
 NAVMAP_END = "# === /NAVMAP ==="
+ENCODING_PATTERN = re.compile(r"^#.*coding[:=]\s*[-\w.]+")
 
 
 def slugify(name: str) -> str:
@@ -68,6 +71,25 @@ def extract_navmap(lines: List[str]) -> tuple[int, int, str] | None:
     return start, end, payload
 
 
+def parse_navmap_json(payload: str, path: Path) -> dict:
+    """Parse NAVMAP JSON, tolerating inline ``#`` comments."""
+
+    try:
+        return json.loads(payload)
+    except json.JSONDecodeError as exc:
+        cleaned_lines = []
+        for line in payload.splitlines():
+            if "#" in line:
+                line = line.split("#", 1)[0].rstrip()
+            cleaned_lines.append(line)
+        cleaned_payload = "\n".join(cleaned_lines)
+        cleaned_payload = re.sub(r",\s*(?=[}\]])", "", cleaned_payload)
+        try:
+            return json.loads(cleaned_payload)
+        except json.JSONDecodeError as inner_exc:
+            raise RuntimeError(f"Failed to parse NAVMAP JSON in {path}: {inner_exc}") from inner_exc
+
+
 def build_sections(module_ast: ast.Module) -> List[dict]:
     """Generate NAVMAP section entries for top-level classes and functions."""
 
@@ -109,30 +131,84 @@ def build_sections(module_ast: ast.Module) -> List[dict]:
     return sections
 
 
-def update_file(path: Path) -> bool:
-    """Rewrite the NAVMAP in ``path`` if present. Returns ``True`` on change."""
+def compute_module_name(path: Path) -> str:
+    """Return the dotted module path for ``path`` relative to ``src``."""
 
-    text = path.read_text(encoding="utf-8")
-    lines = text.splitlines(keepends=True)
-    navmap_info = extract_navmap(lines)
-    if not navmap_info:
-        return False
-
-    start, end, payload = navmap_info
     try:
-        navmap = json.loads(payload)
-    except json.JSONDecodeError as exc:
-        raise RuntimeError(f"Failed to parse NAVMAP JSON in {path}: {exc}") from exc
+        rel = path.with_suffix("").relative_to(Path("src"))
+    except ValueError:
+        rel = path.with_suffix("")
+    return ".".join(rel.parts)
 
-    module_ast = ast.parse(text)
-    navmap["sections"] = build_sections(module_ast)
+
+def derive_purpose(module_ast: ast.Module) -> str:
+    """Use the first line of the module docstring as the NAVMAP purpose."""
+
+    docstring = ast.get_docstring(module_ast)
+    if not docstring:
+        return "Describe this module's responsibilities."
+
+    summary = docstring.strip().split("\n\n", 1)[0].strip()
+    first_line = summary.splitlines()[0].strip()
+    if not first_line.endswith((".", "!", "?")):
+        first_line += "."
+    return first_line
+
+
+def render_navmap_block(navmap: dict, include_trailing_blank: bool = False) -> List[str]:
+    """Serialise a NAVMAP dictionary into a list of commented lines."""
 
     serialized = json.dumps(navmap, indent=2)
     navmap_lines = [NAVMAP_START + "\n"]
     navmap_lines.extend(f"# {line}\n" for line in serialized.splitlines())
     navmap_lines.append(NAVMAP_END + "\n")
+    if include_trailing_blank:
+        navmap_lines.append("\n")
+    return navmap_lines
 
-    new_lines = lines[:start] + navmap_lines + lines[end + 1 :]
+
+def update_file(path: Path) -> bool:
+    """Ensure ``path`` contains an up-to-date NAVMAP. Returns ``True`` on change."""
+
+    text = path.read_text(encoding="utf-8")
+    lines = text.splitlines(keepends=True)
+    module_ast = ast.parse(text)
+    navmap_info = extract_navmap(lines)
+
+    module_name = compute_module_name(path)
+    purpose_fallback = derive_purpose(module_ast)
+
+    if navmap_info:
+        start, end, payload = navmap_info
+        navmap = parse_navmap_json(payload, path)
+
+        if navmap.get("module") != module_name:
+            navmap["module"] = module_name
+        if not navmap.get("purpose"):
+            navmap["purpose"] = purpose_fallback
+        navmap["sections"] = build_sections(module_ast)
+
+        navmap_lines = render_navmap_block(navmap)
+        new_lines = lines[:start] + navmap_lines + lines[end + 1 :]
+    else:
+        navmap = {
+            "module": module_name,
+            "purpose": purpose_fallback,
+            "sections": build_sections(module_ast),
+        }
+        navmap_lines = render_navmap_block(navmap, include_trailing_blank=True)
+
+        leading: List[str] = []
+        start_idx = 0
+        if lines and lines[0].startswith("#!"):
+            leading.append(lines[0])
+            start_idx = 1
+        if len(lines) > start_idx and ENCODING_PATTERN.match(lines[start_idx]):
+            leading.append(lines[start_idx])
+            start_idx += 1
+        remaining = lines[start_idx:]
+        new_lines = leading + navmap_lines + remaining
+
     new_text = "".join(new_lines)
     if new_text != text:
         path.write_text(new_text, encoding="utf-8")

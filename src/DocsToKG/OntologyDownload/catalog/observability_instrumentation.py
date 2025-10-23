@@ -3,11 +3,102 @@
 #   "module": "DocsToKG.OntologyDownload.catalog.observability_instrumentation",
 #   "purpose": "Observability wiring for catalog operations (Task 1.3)",
 #   "sections": [
-#     {"id": "boundary_events", "name": "Boundary Event Helpers", "anchor": "BOUND", "kind": "utils"},
-#     {"id": "doctor_events", "name": "Doctor Operation Events", "anchor": "DOC", "kind": "utils"},
-#     {"id": "prune_events", "name": "Prune Operation Events", "anchor": "PRUNE", "kind": "utils"},
-#     {"id": "cli_events", "name": "CLI Command Events", "anchor": "CLI", "kind": "utils"},
-#     {"id": "perf_events", "name": "Performance Events", "anchor": "PERF", "kind": "utils"}
+#     {
+#       "id": "emit-boundary-begin",
+#       "name": "emit_boundary_begin",
+#       "anchor": "function-emit-boundary-begin",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-boundary-success",
+#       "name": "emit_boundary_success",
+#       "anchor": "function-emit-boundary-success",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-boundary-error",
+#       "name": "emit_boundary_error",
+#       "anchor": "function-emit-boundary-error",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-doctor-begin",
+#       "name": "emit_doctor_begin",
+#       "anchor": "function-emit-doctor-begin",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-doctor-issue-found",
+#       "name": "emit_doctor_issue_found",
+#       "anchor": "function-emit-doctor-issue-found",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-doctor-fixed",
+#       "name": "emit_doctor_fixed",
+#       "anchor": "function-emit-doctor-fixed",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-doctor-complete",
+#       "name": "emit_doctor_complete",
+#       "anchor": "function-emit-doctor-complete",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-prune-begin",
+#       "name": "emit_prune_begin",
+#       "anchor": "function-emit-prune-begin",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-prune-orphan-found",
+#       "name": "emit_prune_orphan_found",
+#       "anchor": "function-emit-prune-orphan-found",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-prune-deleted",
+#       "name": "emit_prune_deleted",
+#       "anchor": "function-emit-prune-deleted",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-cli-command-begin",
+#       "name": "emit_cli_command_begin",
+#       "anchor": "function-emit-cli-command-begin",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-cli-command-success",
+#       "name": "emit_cli_command_success",
+#       "anchor": "function-emit-cli-command-success",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-cli-command-error",
+#       "name": "emit_cli_command_error",
+#       "anchor": "function-emit-cli-command-error",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-slow-operation",
+#       "name": "emit_slow_operation",
+#       "anchor": "function-emit-slow-operation",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-slow-query",
+#       "name": "emit_slow_query",
+#       "anchor": "function-emit-slow-query",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "timedoperation",
+#       "name": "TimedOperation",
+#       "anchor": "class-timedoperation",
+#       "kind": "class"
+#     }
 #   ]
 # }
 # === /NAVMAP ===

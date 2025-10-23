@@ -1,80 +1,15 @@
 
-## Table of Contents
+## Environment Setup
 
-- [0) Guard rails (set once per session)](#0-guard-rails-set-once-per-session)
-- [1) Verify the environment exists (no install)](#1-verify-the-environment-exists-no-install)
-- [2) Run commands strictly from the project `.venv`](#2-run-commands-strictly-from-the-project-venv)
-- [3) Quick health checks (no network)](#3-quick-health-checks-no-network)
-- [4) Typical tasks (all no-install)](#4-typical-tasks-all-no-install)
-- [5) Troubleshooting (stay no-install)](#5-troubleshooting-stay-no-install)
-- [6) “Absolutely no installs” policy (what you may do)](#6-absolutely-no-installs-policy-what-you-may-do)
-- [7) Fallback (only with **explicit approval** to install)](#7-fallback-only-with-explicit-approval-to-install)
-- [8) One-page quick reference (copy/paste safe)](#8-one-page-quick-reference-copy-paste-safe)
-- [TL;DR Quick Checklist](#tl-dr-quick-checklist)
-- [Environment Activation](#environment-activation)
-- [CI notes](#ci-notes)
-- [Troubleshooting (short)](#troubleshooting-short)
-- [Three-Stage Workflow](#three-stage-workflow)
-- [Before Any Task](#before-any-task)
-- [Quick Start](#quick-start)
-- [Directory Structure](#directory-structure)
-- [Creating Change Proposals](#creating-change-proposals)
-- [Why](#why)
-- [What Changes](#what-changes)
-- [Impact](#impact)
-- [ADDED Requirements](#added-requirements)
-- [MODIFIED Requirements](#modified-requirements)
-- [REMOVED Requirements](#removed-requirements)
-- [1. Implementation](#1-implementation)
-- [Context](#context)
-- [Goals / Non-Goals](#goals-non-goals)
-- [Decisions](#decisions)
-- [Risks / Trade-offs](#risks-trade-offs)
-- [Migration Plan](#migration-plan)
-- [Open Questions](#open-questions)
-- [Spec File Format](#spec-file-format)
-- [RENAMED Requirements](#renamed-requirements)
-- [Troubleshooting](#troubleshooting)
-- [Happy Path Script](#happy-path-script)
-- [ADDED Requirements](#added-requirements)
-- [Multi-Capability Example](#multi-capability-example)
-- [ADDED Requirements](#added-requirements)
-- [ADDED Requirements](#added-requirements)
-- [Best Practices](#best-practices)
-- [Tool Selection Guide](#tool-selection-guide)
-- [Error Recovery](#error-recovery)
-- [Quick Reference](#quick-reference)
-- [Coding Standards & Module Organization](#coding-standards-module-organization)
+Use the uv bootstrap to stand up the project environment:
+1. Optionally run `direnv allow` once per machine to trust `.envrc`.
+2. For CPU-only work, run `./scripts/bootstrap_env.sh`.
+3. For GPU work (requires wheels in `.wheelhouse/`), run `./scripts/bootstrap_env.sh --gpu`.
+4. Activate with `direnv exec . <command>` or `source .venv/bin/activate`.
 
-Here’s a **drop-in `AGENTS.md` section** rewritten to **prefer running with what’s already in the project `.venv`**—**no fetching or installing** unless explicitly authorized. It’s explicit, step-by-step, and tuned for environments with many custom/GPU wheels.
+The script installs uv if it is missing, respects `UV_PROJECT_ENVIRONMENT`, and installs DocsToKG in editable mode. After activation, use the tools in `.venv/bin/` (for example `pytest -q`, `ruff check`, or `python -m DocsToKG.<module>`).
 
----
 
-# Project Environment — **No-Install** Runbook (for AI agents)
-
-> **Prime directive:** **Use the packages already installed in `./.venv`.**
-> Do **not** fetch or install anything unless you are explicitly told to. The project `.venv` includes custom wheels and GPU-specific builds that must not be disturbed.
-
----
-
-## 0) Guard rails (set once per session)
-
-To make accidental installs impossible:
-
-```bash
-# Always run inside the project venv (enforced)
-export PIP_REQUIRE_VIRTUALENV=1
-
-# Never hit the network/package index unless explicitly allowed
-export PIP_NO_INDEX=1
-
-# Don’t read user site-packages (avoid leakage)
-export PYTHONNOUSERSITE=1
-```
-
-> If you later receive explicit approval to install, temporarily unset `PIP_NO_INDEX` (and only follow the “Fallback (with approval)” section at the end).
-
----
 
 ## 1) Verify the environment exists (no install)
 
@@ -225,12 +160,12 @@ If (and only if) you have written approval to modify the environment, apply the 
 source .venv/bin/activate  # or use ./.venv/bin/python -m pip ...
 unset PIP_NO_INDEX         # allow index access if instructed
 
-# project code (editable) and pinned deps ONLY:
-pip install -e .
-pip install -r requirements.txt
+# project package only (no exploratory upgrades)
+uv pip install --python .venv -e .
 
-# If a local wheelhouse exists (to avoid network):
-# pip install --no-index --find-links ./ci/wheels -r requirements.txt
+# Optional: reinstall extras explicitly (only if instructed)
+# uv pip install --python .venv -e .[dev,docs]
+# uv pip install --python .venv --find-links .wheelhouse -e .[gpu]
 ```
 
 > Never “try versions” or compile GPU libs. If a wheel is missing, escalate.
@@ -285,160 +220,25 @@ Instructions for AI coding assistants using OpenSpec for spec-driven development
 - Validate: `openspec validate [change-id] --strict` and fix issues
 - Request approval: Do not start implementation until proposal is approved
 
-Perfect—since you’ve moved **all GPU deps into the `gpu12x` extra**, here’s a clean, drop-in **Agents.md** update that defaults agents to **CPU-only** (works on hosted runners and fresh machines) while keeping a clear **GPU path** for your self-hosted box.
+Keep agents aligned on the shared uv bootstrap: run CPU mode by default, opt into GPU mode only when the `.wheelhouse/` wheels and CUDA stack are available.
 
 ---
 
 ## Environment Activation
 
-Agents default to **CPU mode** (no private wheels, no CUDA). GPU mode is available on your self-hosted runner or any machine with MinIO access.
+Run the uv bootstrap before executing project commands.
 
-### Modes
+- CPU setup: `./scripts/bootstrap_env.sh`
+- GPU setup: `./scripts/bootstrap_env.sh --gpu` (requires `.wheelhouse/` wheels, CUDA drivers, and optional MinIO credentials; you can also set `AGENT_MODE=gpu` before running the script)
+- Optional: `direnv allow` once to trust `.envrc`; afterwards prefer `direnv exec . <command>` or `source .venv/bin/activate`.
 
-- **CPU mode (default):** installs `-e .` (no GPU deps). Runs the full **CPU test set**.
-- **GPU mode (local agents or opt-in):** installs `-e .[gpu12x]` from the local wheelhouse that the bootstrap syncs from **MinIO**.
+The script installs uv when missing, reuses `.venv` (or `UV_PROJECT_ENVIRONMENT`), and installs DocsToKG in editable mode.
 
----
-
-### Local agents (default to **GPU**)
-
-Local agents (running on your workstation / self-hosted box) should **prefer GPU mode** and install the `gpu12x` extra by default.
-
-**Prereqs (local):**
-
-- MinIO wheels reachable (either `mc alias set myminio …` or `MINIO_ACCESS_KEY_ID`/`MINIO_SECRET_ACCESS_KEY` env vars).
-- NVIDIA driver + CUDA 12.x runtime installed (CuPy uses your system CUDA).
-
-**Make CPU the default:**
-
-```bash
-# Add this to your shell or .envrc so agents inherit it:
-export AGENT_MODE=cpu
-```
-
-**Then bootstrap + test:**
-
-```bash
-bash scripts/bootstrap_env.sh     # syncs wheels, installs -e .[gpu12x]
-source .venv/bin/activate
-pytest -q                         # runs full suite, incl. @pytest.mark.gpu
-```
-
-**If you need a quick CPU fallback locally:**
-
-```bash
-AGENT_MODE=cpu bash scripts/bootstrap_env.sh
-source .venv/bin/activate
-pytest -q -m "not gpu"
-```
-
-> The bootstrap will fail fast if MinIO wheels are unreachable or a CuPy install is broken (hard-fail guard). Fix access or switch to `AGENT_MODE=cpu` to proceed without GPU deps.
-
----
-
-### 0) Prereqs (one-time)
-
-- **Python:** 3.13 available as `python3.13` (bootstrap falls back to `python3`/`python`).
-- (Optional) **direnv** if you want auto-activation.
-- **No Git LFS needed for wheels** (we no longer store wheels in LFS).
-
-> `.wheelhouse/` and `ci/wheels/` are **git-ignored**; wheels come from MinIO only in GPU mode.
-
----
-
-### 1) CPU quickstart (agents & hosted CI)
-
-```bash
-# from repo root
-bash scripts/bootstrap_env.sh            # auto-detects CPU mode when no wheelhouse
-source .venv/bin/activate
-pytest -q -m "not gpu"                   # skip GPU-marked tests
-```
-
-This path uses `requirements.txt` (thin wrapper around `-e .` + test tools).
-
----
-
-### 2) GPU quickstart (self-hosted / local with MinIO)
-
-**Provide MinIO creds** (choose one):
-
-- Alias (preferred):
-
-```bash
-mc alias set myminio http://127.0.0.1:9000 <ACCESS_KEY> <SECRET>
-```
-
-- Or env vars:
-
-```bash
-export MINIO_ACCESS_KEY_ID="ci-reader"     # or your Access Key
-export MINIO_SECRET_ACCESS_KEY="<SECRET>"
-```
-
-**Bootstrap in GPU mode:**
-
-```bash
-AGENT_MODE=gpu bash scripts/bootstrap_env.sh
-source .venv/bin/activate
-pytest -q                                   # runs full test suite (incl. @pytest.mark.gpu)
-```
-
-Toggles (optional):
-
-```bash
-export WHEELHOUSE_STRICT=1                  # require wheels only (no PyPI)
-export MINIO_BUCKET="docs2kg-wheels"
-export MINIO_PREFIX="cp313/"
-```
-
----
-
-### 3) With/without direnv
-
-```bash
-# Recommended
-direnv allow
-direnv exec . pytest -q -m "not gpu"       # CPU mode
-direnv exec . python -m pip --version      # sanity check interpreter
-
-# Fallback
-source .venv/bin/activate
-export PYTHONPATH="$PWD/src:${PYTHONPATH:-}"
-```
-
----
-
-### 4) Sanity checks
-
-```bash
-# interpreter & platform
-python -c "import sys,platform; print(sys.version); print(platform.platform())"
-
-# GPU stack (only in GPU mode)
-python - <<'PY'
-import cupy as cp
-print("CuPy:", cp.__version__)
-cp.show_config()
-PY
-```
-
-> If CPU mode is active, GPU tests should be marked `@pytest.mark.gpu` and will be skipped automatically when `DOCSTOKG_SKIP_GPU=1` is set by the bootstrap.
-
----
-
-### 5) What the bootstrap does
-
-- Creates `.venv`, upgrades `pip`.
-- **CPU mode:** installs from `requirements.cpu.txt` (`-e .` + test tools).
-- **GPU mode:** syncs wheels from MinIO → `./.wheelhouse`, installs from `requirements.gpu.txt` using the wheelhouse, and runs a **CuPy hard-fail guard** (auto-repair once; aborts if the wheel is bad).
-
----
 
 ## CI notes
 
-- **Hosted CI (ubuntu-latest):** CPU-only job installs from `requirements.cpu.txt` and runs `pytest -m "not gpu"`.
-- **Self-hosted GPU job:** syncs wheels from local MinIO, installs from `requirements.gpu.txt` with `--no-index --find-links`, then runs the GPU subset.
+- **Hosted CI (ubuntu-latest):** create a Python 3.13 venv, run `uv pip install -e .[dev,docs]`, then execute `pytest -m "not gpu"`.
+- **Self-hosted GPU job:** sync `.wheelhouse/`, run `uv pip install --find-links .wheelhouse -e .[gpu]`, then execute the GPU-inclusive test suite.
 
 ---
 

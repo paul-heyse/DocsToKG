@@ -1,3 +1,48 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.core.models",
+#   "purpose": "Typed data models used to coordinate DocParsing chunking and embedding.",
+#   "sections": [
+#     {
+#       "id": "bm25stats",
+#       "name": "BM25Stats",
+#       "anchor": "class-bm25stats",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "spladecfg",
+#       "name": "SpladeCfg",
+#       "anchor": "class-spladecfg",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "qwencfg",
+#       "name": "QwenCfg",
+#       "anchor": "class-qwencfg",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "chunkworkerconfig",
+#       "name": "ChunkWorkerConfig",
+#       "anchor": "class-chunkworkerconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "chunktask",
+#       "name": "ChunkTask",
+#       "anchor": "class-chunktask",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "chunkresult",
+#       "name": "ChunkResult",
+#       "anchor": "class-chunkresult",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Typed data models used to coordinate DocParsing chunking and embedding.
 
 This module defines the small dataclasses passed between worker processes:

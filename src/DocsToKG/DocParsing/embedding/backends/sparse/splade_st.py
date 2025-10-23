@@ -1,3 +1,42 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.embedding.backends.sparse.splade_st",
+#   "purpose": "SPLADE sentence-transformers sparse embedding provider.",
+#   "sections": [
+#     {
+#       "id": "spladestconfig",
+#       "name": "SpladeSTConfig",
+#       "anchor": "class-spladestconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "get-sparse-encoder-cls",
+#       "name": "_get_sparse_encoder_cls",
+#       "anchor": "function-get-sparse-encoder-cls",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "detect-splade-backend",
+#       "name": "_detect_splade_backend",
+#       "anchor": "function-detect-splade-backend",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-encoder",
+#       "name": "_get_encoder",
+#       "anchor": "function-get-encoder",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "spladestprovider",
+#       "name": "SpladeSTProvider",
+#       "anchor": "class-spladestprovider",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """SPLADE sentence-transformers sparse embedding provider."""
 
 from __future__ import annotations

@@ -1,3 +1,54 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.errors",
+#   "purpose": "Actionable error taxonomy and logging helpers for content downloads.",
+#   "sections": [
+#     {
+#       "id": "downloaderror",
+#       "name": "DownloadError",
+#       "anchor": "class-downloaderror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "networkerror",
+#       "name": "NetworkError",
+#       "anchor": "class-networkerror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "contentpolicyerror",
+#       "name": "ContentPolicyError",
+#       "anchor": "class-contentpolicyerror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "ratelimiterror",
+#       "name": "RateLimitError",
+#       "anchor": "class-ratelimiterror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "get-actionable-error-message",
+#       "name": "get_actionable_error_message",
+#       "anchor": "function-get-actionable-error-message",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "log-download-failure",
+#       "name": "log_download_failure",
+#       "anchor": "function-log-download-failure",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "format-download-summary",
+#       "name": "format_download_summary",
+#       "anchor": "function-format-download-summary",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Actionable error taxonomy and logging helpers for content downloads.
 
 Responsibilities

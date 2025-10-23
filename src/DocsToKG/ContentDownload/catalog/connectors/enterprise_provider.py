@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.catalog.connectors.enterprise_provider",
+#   "purpose": "Enterprise Provider (Postgres + Local FS).",
+#   "sections": [
+#     {
+#       "id": "enterpriseprovider",
+#       "name": "EnterpriseProvider",
+#       "anchor": "class-enterpriseprovider",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Enterprise Provider (Postgres + Local FS)
 

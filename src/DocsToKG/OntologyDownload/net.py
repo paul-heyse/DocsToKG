@@ -3,9 +3,84 @@
 #   "module": "DocsToKG.OntologyDownload.net",
 #   "purpose": "Provide a shared HTTPX client with Hishel caching for ontology networking",
 #   "sections": [
-#     {"id": "constants", "name": "Constants & globals", "anchor": "CONST", "kind": "constants"},
-#     {"id": "helpers", "name": "Client construction helpers", "anchor": "HELP", "kind": "helpers"},
-#     {"id": "api", "name": "Public API", "anchor": "API", "kind": "api"}
+#     {
+#       "id": "ensure-cache-dir",
+#       "name": "_ensure_cache_dir",
+#       "anchor": "function-ensure-cache-dir",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-ssl-context",
+#       "name": "_build_ssl_context",
+#       "anchor": "function-build-ssl-context",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "controller",
+#       "name": "_controller",
+#       "anchor": "function-controller",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "request-hook",
+#       "name": "_request_hook",
+#       "anchor": "function-request-hook",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "response-hook",
+#       "name": "_response_hook",
+#       "anchor": "function-response-hook",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "timeout-for",
+#       "name": "_timeout_for",
+#       "anchor": "function-timeout-for",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "limits-for",
+#       "name": "_limits_for",
+#       "anchor": "function-limits-for",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-http-client",
+#       "name": "_build_http_client",
+#       "anchor": "function-build-http-client",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "close-client-unlocked",
+#       "name": "_close_client_unlocked",
+#       "anchor": "function-close-client-unlocked",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "configure-http-client",
+#       "name": "configure_http_client",
+#       "anchor": "function-configure-http-client",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "reset-http-client",
+#       "name": "reset_http_client",
+#       "anchor": "function-reset-http-client",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-http-client",
+#       "name": "get_http_client",
+#       "anchor": "function-get-http-client",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "set-client-unlocked",
+#       "name": "_set_client_unlocked",
+#       "anchor": "function-set-client-unlocked",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===

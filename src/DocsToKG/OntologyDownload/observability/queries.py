@@ -1,3 +1,36 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.observability.queries",
+#   "purpose": "Stock queries for observability analytics.",
+#   "sections": [
+#     {
+#       "id": "get-slo-query",
+#       "name": "get_slo_query",
+#       "anchor": "function-get-slo-query",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-rate-limit-query",
+#       "name": "get_rate_limit_query",
+#       "anchor": "function-get-rate-limit-query",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-safety-query",
+#       "name": "get_safety_query",
+#       "anchor": "function-get-safety-query",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-extraction-query",
+#       "name": "get_extraction_query",
+#       "anchor": "function-get-extraction-query",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Stock queries for observability analytics.
 
 Pre-built SQL queries for DuckDB that answer common operational questions:

@@ -1,3 +1,36 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.deployment.rollback",
+#   "purpose": "Automated rollback system for safe deployment recovery.",
+#   "sections": [
+#     {
+#       "id": "deploymentstatus",
+#       "name": "DeploymentStatus",
+#       "anchor": "class-deploymentstatus",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "deploymentsnapshot",
+#       "name": "DeploymentSnapshot",
+#       "anchor": "class-deploymentsnapshot",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "rollbackmanager",
+#       "name": "RollbackManager",
+#       "anchor": "class-rollbackmanager",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "get-rollback-manager",
+#       "name": "get_rollback_manager",
+#       "anchor": "function-get-rollback-manager",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Automated rollback system for safe deployment recovery.
 
 Provides snapshot-based rollback, state recovery, and deployment safety mechanisms.

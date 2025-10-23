@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.embedding.config",
+#   "purpose": "Embedding configuration dataclasses, presets, and validation helpers.",
+#   "sections": [
+#     {
+#       "id": "embedcfg",
+#       "name": "EmbedCfg",
+#       "anchor": "class-embedcfg",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Embedding configuration dataclasses, presets, and validation helpers.
 

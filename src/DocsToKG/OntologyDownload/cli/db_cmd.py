@@ -1,10 +1,74 @@
 # === NAVMAP v1 ===
 # {
-#   "module": "src.DocsToKG.OntologyDownload.cli.db_cmd",
+#   "module": "DocsToKG.OntologyDownload.cli.db_cmd",
 #   "purpose": "CLI commands for DuckDB catalog operations (Task 1.2)",
 #   "sections": [
-#     {"id": "imports", "name": "Imports & Setup", "anchor": "IMP", "kind": "infra"},
-#     {"id": "commands", "name": "CLI Commands", "anchor": "CMDS", "kind": "commands"}
+#     {
+#       "id": "get-duckdb-connection",
+#       "name": "_get_duckdb_connection",
+#       "anchor": "function-get-duckdb-connection",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "format-output",
+#       "name": "_format_output",
+#       "anchor": "function-format-output",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "migrate",
+#       "name": "migrate",
+#       "anchor": "function-migrate",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "latest",
+#       "name": "latest",
+#       "anchor": "function-latest",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "versions",
+#       "name": "versions",
+#       "anchor": "function-versions",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "files",
+#       "name": "files",
+#       "anchor": "function-files",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "stats",
+#       "name": "stats",
+#       "anchor": "function-stats",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "delta",
+#       "name": "delta",
+#       "anchor": "function-delta",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "doctor",
+#       "name": "doctor",
+#       "anchor": "function-doctor",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "prune",
+#       "name": "prune",
+#       "anchor": "function-prune",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "backup",
+#       "name": "backup",
+#       "anchor": "function-backup",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===

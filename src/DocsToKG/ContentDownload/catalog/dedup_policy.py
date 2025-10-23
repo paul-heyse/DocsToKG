@@ -1,3 +1,30 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.catalog.dedup_policy",
+#   "purpose": "Smart deduplication policy and recommendations.",
+#   "sections": [
+#     {
+#       "id": "dedupcandidate",
+#       "name": "DedupCandidate",
+#       "anchor": "class-dedupcandidate",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "deduppolicy",
+#       "name": "DedupPolicy",
+#       "anchor": "class-deduppolicy",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "deduppolicyanalyzer",
+#       "name": "DedupPolicyAnalyzer",
+#       "anchor": "class-deduppolicyanalyzer",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Smart deduplication policy and recommendations.
 
 Provides cost-aware dedup analysis with:

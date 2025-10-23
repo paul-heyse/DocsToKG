@@ -1,3 +1,13 @@
+## Environment Setup
+
+Use the uv bootstrap to stand up the project environment:
+1. Optionally run `direnv allow` once per machine to trust `.envrc`.
+2. For CPU-only work, run `./scripts/bootstrap_env.sh`.
+3. For GPU work (requires wheels in `.wheelhouse/`), run `./scripts/bootstrap_env.sh --gpu`.
+4. Activate with `direnv exec . <command>` or `source .venv/bin/activate`.
+
+The script installs uv if it is missing, respects `UV_PROJECT_ENVIRONMENT`, and installs DocsToKG in editable mode. After activation, use the tools in `.venv/bin/` (for example `pytest -q`, `ruff check`, or `python -m DocsToKG.<module>`).
+
 # Repository Guidelines
 
 ## Agents
@@ -12,7 +22,7 @@ Please read AGENTS.md at the root directory
 
 ## Build, Test, and Development Commands
 
-- Run `./scripts/bootstrap_env.sh` to create the venv, install the editable package, and verify the CUDA FAISS wheel; follow with `direnv allow`.
+- Run `./scripts/bootstrap_env.sh` (append `--gpu` when `.wheelhouse/` wheels are present) to create or reuse `.venv`; run `direnv allow` once to trust `.envrc`.
 - `pip install -e .` refreshes dependencies after editing `pyproject.toml`; commit lockstep with the change it enables.
 - `pytest -q` covers the default suite; append `-m real_vectors --real-vectors` or `-m scale_vectors` for GPU smoke tests.
 - Use `./scripts/run_precommit.sh` for Black, Isort, Ruff, and static checks; refresh docs via `python docs/scripts/generate_api_docs.py` and `python docs/scripts/check_links.py --timeout 10`.

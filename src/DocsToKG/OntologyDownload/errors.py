@@ -98,11 +98,66 @@ ConfigError = UserConfigError
 #   "module": "DocsToKG.OntologyDownload.errors",
 #   "purpose": "Define the exception hierarchy used across ontology planning, download, and validation",
 #   "sections": [
-#     {"id": "base", "name": "Base Exceptions", "anchor": "BAS", "kind": "api"},
-#     {"id": "configuration", "name": "Configuration Errors", "anchor": "CFG", "kind": "api"},
-#     {"id": "resolver", "name": "Resolver & Download Errors", "anchor": "RES", "kind": "api"},
-#     {"id": "validation", "name": "Validation Errors", "anchor": "VAL", "kind": "api"},
-#     {"id": "policy", "name": "Policy & Retry Failures", "anchor": "POL", "kind": "api"}
+#     {
+#       "id": "ontologydownloaderror",
+#       "name": "OntologyDownloadError",
+#       "anchor": "class-ontologydownloaderror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "unsupportedpythonerror",
+#       "name": "UnsupportedPythonError",
+#       "anchor": "class-unsupportedpythonerror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "configurationerror",
+#       "name": "ConfigurationError",
+#       "anchor": "class-configurationerror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "resolvererror",
+#       "name": "ResolverError",
+#       "anchor": "class-resolvererror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "validationerror",
+#       "name": "ValidationError",
+#       "anchor": "class-validationerror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "retryablevalidationerror",
+#       "name": "RetryableValidationError",
+#       "anchor": "class-retryablevalidationerror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "validationfailure",
+#       "name": "ValidationFailure",
+#       "anchor": "class-validationfailure",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "policyerror",
+#       "name": "PolicyError",
+#       "anchor": "class-policyerror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "downloadfailure",
+#       "name": "DownloadFailure",
+#       "anchor": "class-downloadfailure",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "userconfigerror",
+#       "name": "UserConfigError",
+#       "anchor": "class-userconfigerror",
+#       "kind": "class"
+#     }
 #   ]
 # }
 # === /NAVMAP ===

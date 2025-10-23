@@ -1,3 +1,90 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.download_execution",
+#   "purpose": "Download Execution Stage - Canonical Implementation.",
+#   "sections": [
+#     {
+#       "id": "log-io-attempt",
+#       "name": "_log_io_attempt",
+#       "anchor": "function-log-io-attempt",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "ctx-get",
+#       "name": "_ctx_get",
+#       "anchor": "function-ctx-get",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "infer-user-agent",
+#       "name": "_infer_user_agent",
+#       "anchor": "function-infer-user-agent",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolve-domain-policy",
+#       "name": "_resolve_domain_policy",
+#       "anchor": "function-resolve-domain-policy",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolve-plan-hints",
+#       "name": "_resolve_plan_hints",
+#       "anchor": "function-resolve-plan-hints",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "coerce-allowed-types",
+#       "name": "_coerce_allowed_types",
+#       "anchor": "function-coerce-allowed-types",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "effective-max-bytes",
+#       "name": "_effective_max_bytes",
+#       "anchor": "function-effective-max-bytes",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolve-storage-tmp-root",
+#       "name": "_resolve_storage_tmp_root",
+#       "anchor": "function-resolve-storage-tmp-root",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "prepare-staging-destination",
+#       "name": "_prepare_staging_destination",
+#       "anchor": "function-prepare-staging-destination",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "cleanup-staging-artifacts",
+#       "name": "_cleanup_staging_artifacts",
+#       "anchor": "function-cleanup-staging-artifacts",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "prepare-candidate-download",
+#       "name": "prepare_candidate_download",
+#       "anchor": "function-prepare-candidate-download",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "stream-candidate-payload",
+#       "name": "stream_candidate_payload",
+#       "anchor": "function-stream-candidate-payload",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "finalize-candidate-download",
+#       "name": "finalize_candidate_download",
+#       "anchor": "function-finalize-candidate-download",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Download Execution Stage - Canonical Implementation
 

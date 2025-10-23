@@ -1,3 +1,66 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.ratelimit.instrumentation",
+#   "purpose": "Rate limiter instrumentation and telemetry helpers.",
+#   "sections": [
+#     {
+#       "id": "normalise-service-host",
+#       "name": "_normalise_service_host",
+#       "anchor": "function-normalise-service-host",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-safe",
+#       "name": "_emit_safe",
+#       "anchor": "function-emit-safe",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-acquire-event",
+#       "name": "emit_acquire_event",
+#       "anchor": "function-emit-acquire-event",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-blocked-event",
+#       "name": "emit_blocked_event",
+#       "anchor": "function-emit-blocked-event",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-cooldown-event",
+#       "name": "emit_cooldown_event",
+#       "anchor": "function-emit-cooldown-event",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-head-skip-event",
+#       "name": "emit_head_skip_event",
+#       "anchor": "function-emit-head-skip-event",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-rate-limit-event",
+#       "name": "emit_rate_limit_event",
+#       "anchor": "function-emit-rate-limit-event",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-rate-info-event",
+#       "name": "emit_rate_info_event",
+#       "anchor": "function-emit-rate-info-event",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "log-rate-limit-stats",
+#       "name": "log_rate_limit_stats",
+#       "anchor": "function-log-rate-limit-stats",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Rate limiter instrumentation and telemetry helpers.
 
 The public API mirrors `network.polite_client` and the re-exports from

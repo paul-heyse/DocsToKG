@@ -1,3 +1,54 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.core.concurrency",
+#   "purpose": "Process-safety helpers for DocParsing pipelines.",
+#   "sections": [
+#     {
+#       "id": "lock-path-for",
+#       "name": "_lock_path_for",
+#       "anchor": "function-lock-path-for",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "acquire-lock",
+#       "name": "_acquire_lock",
+#       "anchor": "function-acquire-lock",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "safe-write",
+#       "name": "safe_write",
+#       "anchor": "function-safe-write",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "set-spawn-or-warn",
+#       "name": "set_spawn_or_warn",
+#       "anchor": "function-set-spawn-or-warn",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "reservedport",
+#       "name": "ReservedPort",
+#       "anchor": "class-reservedport",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "bind-reserved-socket",
+#       "name": "_bind_reserved_socket",
+#       "anchor": "function-bind-reserved-socket",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "find-free-port",
+#       "name": "find_free_port",
+#       "anchor": "function-find-free-port",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Process-safety helpers for DocParsing pipelines.
 
 Chunking and embedding stages parallelise work across processes and threads,

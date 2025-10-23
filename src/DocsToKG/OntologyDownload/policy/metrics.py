@@ -1,3 +1,36 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.policy.metrics",
+#   "purpose": "Per-gate telemetry and metrics collection for operational dashboards.",
+#   "sections": [
+#     {
+#       "id": "gatemetric",
+#       "name": "GateMetric",
+#       "anchor": "class-gatemetric",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "gatemetricssnapshot",
+#       "name": "GateMetricsSnapshot",
+#       "anchor": "class-gatemetricssnapshot",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "metricscollector",
+#       "name": "MetricsCollector",
+#       "anchor": "class-metricscollector",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "get-metrics-collector",
+#       "name": "get_metrics_collector",
+#       "anchor": "function-get-metrics-collector",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Per-gate telemetry and metrics collection for operational dashboards.
 
 Provides counters, histograms, and summaries for policy gate operations.

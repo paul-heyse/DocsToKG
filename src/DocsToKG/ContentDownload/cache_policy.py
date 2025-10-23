@@ -1,3 +1,24 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.cache_policy",
+#   "purpose": "Cache policy resolution and request routing.",
+#   "sections": [
+#     {
+#       "id": "cachedecision",
+#       "name": "CacheDecision",
+#       "anchor": "class-cachedecision",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "cacherouter",
+#       "name": "CacheRouter",
+#       "anchor": "class-cacherouter",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Cache policy resolution and request routing.
 
 Responsibilities

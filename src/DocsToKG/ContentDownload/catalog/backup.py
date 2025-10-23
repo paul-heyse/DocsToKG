@@ -1,3 +1,36 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.catalog.backup",
+#   "purpose": "Catalog backup and recovery utilities.",
+#   "sections": [
+#     {
+#       "id": "backupmetadata",
+#       "name": "BackupMetadata",
+#       "anchor": "class-backupmetadata",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "catalogbackup",
+#       "name": "CatalogBackup",
+#       "anchor": "class-catalogbackup",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "backup-catalog-cli",
+#       "name": "backup_catalog_cli",
+#       "anchor": "function-backup-catalog-cli",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "recover-catalog-cli",
+#       "name": "recover_catalog_cli",
+#       "anchor": "function-recover-catalog-cli",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Catalog backup and recovery utilities.
 
 Provides:

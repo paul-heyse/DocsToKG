@@ -1,3 +1,30 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.fallback.dashboard_integration",
+#   "purpose": "Dashboard Integration Utilities.",
+#   "sections": [
+#     {
+#       "id": "metricssnapshot",
+#       "name": "MetricsSnapshot",
+#       "anchor": "class-metricssnapshot",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "dashboardexporter",
+#       "name": "DashboardExporter",
+#       "anchor": "class-dashboardexporter",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "realtimemonitor",
+#       "name": "RealTimeMonitor",
+#       "anchor": "class-realtimemonitor",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Dashboard Integration Utilities
 

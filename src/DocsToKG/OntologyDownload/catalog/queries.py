@@ -1,14 +1,146 @@
 # === NAVMAP v1 ===
 # {
 #   "module": "DocsToKG.OntologyDownload.catalog.queries",
-#   "purpose": "Type-safe query façades for DuckDB catalog operations",
+#   "purpose": "Type-safe query fa\u00e7ades for DuckDB catalog operations",
 #   "sections": [
-#     {"id": "types", "name": "Data Transfer Objects", "anchor": "DTO", "kind": "models"},
-#     {"id": "versions", "name": "Version Queries", "anchor": "VER", "kind": "api"},
-#     {"id": "artifacts", "name": "Artifact Queries", "anchor": "ART", "kind": "api"},
-#     {"id": "files", "name": "File Queries", "anchor": "FIL", "kind": "api"},
-#     {"id": "validations", "name": "Validation Queries", "anchor": "VAL", "kind": "api"},
-#     {"id": "stats", "name": "Statistics Queries", "anchor": "STA", "kind": "api"}
+#     {
+#       "id": "versionrow",
+#       "name": "VersionRow",
+#       "anchor": "class-versionrow",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "artifactrow",
+#       "name": "ArtifactRow",
+#       "anchor": "class-artifactrow",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "filerow",
+#       "name": "FileRow",
+#       "anchor": "class-filerow",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "validationrow",
+#       "name": "ValidationRow",
+#       "anchor": "class-validationrow",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "list-versions",
+#       "name": "list_versions",
+#       "anchor": "function-list-versions",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-latest",
+#       "name": "get_latest",
+#       "anchor": "function-get-latest",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-version",
+#       "name": "get_version",
+#       "anchor": "function-get-version",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "list-artifacts",
+#       "name": "list_artifacts",
+#       "anchor": "function-list-artifacts",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-artifact",
+#       "name": "get_artifact",
+#       "anchor": "function-get-artifact",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "list-files",
+#       "name": "list_files",
+#       "anchor": "function-list-files",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "list-files-by-format",
+#       "name": "list_files_by_format",
+#       "anchor": "function-list-files-by-format",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-file",
+#       "name": "get_file",
+#       "anchor": "function-get-file",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "list-validations",
+#       "name": "list_validations",
+#       "anchor": "function-list-validations",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "list-validations-by-status",
+#       "name": "list_validations_by_status",
+#       "anchor": "function-list-validations-by-status",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-validation",
+#       "name": "get_validation",
+#       "anchor": "function-get-validation",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-artifact-stats",
+#       "name": "get_artifact_stats",
+#       "anchor": "function-get-artifact-stats",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-file-stats",
+#       "name": "get_file_stats",
+#       "anchor": "function-get-file-stats",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-validation-stats",
+#       "name": "get_validation_stats",
+#       "anchor": "function-get-validation-stats",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "detect-orphans",
+#       "name": "detect_orphans",
+#       "anchor": "function-detect-orphans",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "cachedplanrow",
+#       "name": "CachedPlanRow",
+#       "anchor": "class-cachedplanrow",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "cache-plan",
+#       "name": "cache_plan",
+#       "anchor": "function-cache-plan",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-cached-plan",
+#       "name": "get_cached_plan",
+#       "anchor": "function-get-cached-plan",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-cached-plan-by-service",
+#       "name": "get_cached_plan_by_service",
+#       "anchor": "function-get-cached-plan-by-service",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===

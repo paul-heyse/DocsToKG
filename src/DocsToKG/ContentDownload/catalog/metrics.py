@@ -1,3 +1,30 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.catalog.metrics",
+#   "purpose": "OpenTelemetry metrics for catalog operations.",
+#   "sections": [
+#     {
+#       "id": "catalogmetrics",
+#       "name": "CatalogMetrics",
+#       "anchor": "class-catalogmetrics",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "get-catalog-metrics",
+#       "name": "get_catalog_metrics",
+#       "anchor": "function-get-catalog-metrics",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "reset-metrics-for-tests",
+#       "name": "reset_metrics_for_tests",
+#       "anchor": "function-reset-metrics-for-tests",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """OpenTelemetry metrics for catalog operations.
 
 Provides observability into catalog usage with 3 key metrics:

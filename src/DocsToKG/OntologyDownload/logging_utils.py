@@ -3,9 +3,30 @@
 #   "module": "DocsToKG.OntologyDownload.logging_utils",
 #   "purpose": "Provide structured logging formatters and rotation helpers for ontology downloads",
 #   "sections": [
-#     {"id": "formatter", "name": "JSON Formatter", "anchor": "FMT", "kind": "api"},
-#     {"id": "rotation", "name": "Log Rotation Helpers", "anchor": "ROT", "kind": "helpers"},
-#     {"id": "setup", "name": "Logging Setup", "anchor": "SET", "kind": "api"}
+#     {
+#       "id": "jsonformatter",
+#       "name": "JSONFormatter",
+#       "anchor": "class-jsonformatter",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "compress-old-log",
+#       "name": "_compress_old_log",
+#       "anchor": "function-compress-old-log",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "cleanup-logs",
+#       "name": "_cleanup_logs",
+#       "anchor": "function-cleanup-logs",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "setup-logging",
+#       "name": "setup_logging",
+#       "anchor": "function-setup-logging",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===

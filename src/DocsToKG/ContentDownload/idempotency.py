@@ -1,3 +1,72 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.idempotency",
+#   "purpose": "Idempotency keys and exactly-once effect wrappers.",
+#   "sections": [
+#     {
+#       "id": "ikey",
+#       "name": "ikey",
+#       "anchor": "function-ikey",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "job-key",
+#       "name": "job_key",
+#       "anchor": "function-job-key",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "op-key",
+#       "name": "op_key",
+#       "anchor": "function-op-key",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "acquire-lease",
+#       "name": "acquire_lease",
+#       "anchor": "function-acquire-lease",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "renew-lease",
+#       "name": "renew_lease",
+#       "anchor": "function-renew-lease",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "release-lease",
+#       "name": "release_lease",
+#       "anchor": "function-release-lease",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "advance-state",
+#       "name": "advance_state",
+#       "anchor": "function-advance-state",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "run-effect",
+#       "name": "run_effect",
+#       "anchor": "function-run-effect",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "reconcile-stale-leases",
+#       "name": "reconcile_stale_leases",
+#       "anchor": "function-reconcile-stale-leases",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "reconcile-abandoned-ops",
+#       "name": "reconcile_abandoned_ops",
+#       "anchor": "function-reconcile-abandoned-ops",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Idempotency keys and exactly-once effect wrappers.
 
 This module provides deterministic key generation for both job-level and

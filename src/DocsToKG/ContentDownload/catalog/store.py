@@ -1,3 +1,24 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.catalog.store",
+#   "purpose": "SQLite-based implementation of the artifact catalog store.",
+#   "sections": [
+#     {
+#       "id": "catalogstore",
+#       "name": "CatalogStore",
+#       "anchor": "class-catalogstore",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "sqlitecatalog",
+#       "name": "SQLiteCatalog",
+#       "anchor": "class-sqlitecatalog",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """SQLite-based implementation of the artifact catalog store."""
 
 from __future__ import annotations

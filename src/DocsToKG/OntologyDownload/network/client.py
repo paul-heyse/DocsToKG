@@ -1,3 +1,48 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.network.client",
+#   "purpose": "HTTPX + Hishel HTTP Client Factory.",
+#   "sections": [
+#     {
+#       "id": "get-http-client",
+#       "name": "get_http_client",
+#       "anchor": "function-get-http-client",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "close-http-client",
+#       "name": "close_http_client",
+#       "anchor": "function-close-http-client",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "reset-http-client",
+#       "name": "reset_http_client",
+#       "anchor": "function-reset-http-client",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-cache-dir",
+#       "name": "_get_cache_dir",
+#       "anchor": "function-get-cache-dir",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "create-ssl-context",
+#       "name": "_create_ssl_context",
+#       "anchor": "function-create-ssl-context",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "create-http-client",
+#       "name": "_create_http_client",
+#       "anchor": "function-create-http-client",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """HTTPX + Hishel HTTP Client Factory.
 
 Provides a singleton, thread-safe HTTP client with RFC 9111-compliant caching,

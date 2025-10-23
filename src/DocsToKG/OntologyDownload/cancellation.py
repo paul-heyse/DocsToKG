@@ -135,8 +135,18 @@ class CancellationTokenGroup:
 #   "module": "DocsToKG.OntologyDownload.cancellation",
 #   "purpose": "Provide cooperative cancellation tokens shared by planners, resolvers, and validators",
 #   "sections": [
-#     {"id": "token", "name": "CancellationToken", "anchor": "TOK", "kind": "api"},
-#     {"id": "group", "name": "CancellationTokenGroup", "anchor": "GRP", "kind": "api"}
+#     {
+#       "id": "cancellationtoken",
+#       "name": "CancellationToken",
+#       "anchor": "class-cancellationtoken",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "cancellationtokengroup",
+#       "name": "CancellationTokenGroup",
+#       "anchor": "class-cancellationtokengroup",
+#       "kind": "class"
+#     }
 #   ]
 # }
 # === /NAVMAP ===

@@ -1,3 +1,66 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.core.planning",
+#   "purpose": "Planning utilities that preview DocParsing work and surface manifests.",
+#   "sections": [
+#     {
+#       "id": "new-bucket",
+#       "name": "_new_bucket",
+#       "anchor": "function-new-bucket",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "record-bucket",
+#       "name": "_record_bucket",
+#       "anchor": "function-record-bucket",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "bucket-counts",
+#       "name": "_bucket_counts",
+#       "anchor": "function-bucket-counts",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "manifest-hash-requirements",
+#       "name": "_manifest_hash_requirements",
+#       "anchor": "function-manifest-hash-requirements",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "render-preview",
+#       "name": "_render_preview",
+#       "anchor": "function-render-preview",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "plan-doctags",
+#       "name": "plan_doctags",
+#       "anchor": "function-plan-doctags",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "plan-chunk",
+#       "name": "plan_chunk",
+#       "anchor": "function-plan-chunk",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "plan-embed",
+#       "name": "plan_embed",
+#       "anchor": "function-plan-embed",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "display-plan",
+#       "name": "display_plan",
+#       "anchor": "function-display-plan",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Planning utilities that preview DocParsing work and surface manifests.
 
 Before operators run DocTags, chunking, or embedding at scale they often want

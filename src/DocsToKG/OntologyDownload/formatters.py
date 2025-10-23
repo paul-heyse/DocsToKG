@@ -176,10 +176,30 @@ def format_validation_summary(results: Dict[str, Dict[str, Any]]) -> str:
 #   "module": "DocsToKG.OntologyDownload.formatters",
 #   "purpose": "Turn planning, download, and validation results into reusable table renderings",
 #   "sections": [
-#     {"id": "schema", "name": "Table Schemas", "anchor": "SCH", "kind": "constants"},
-#     {"id": "plan", "name": "Plan Row Formatting", "anchor": "PLN", "kind": "helpers"},
-#     {"id": "results", "name": "Download Result Formatting", "anchor": "RES", "kind": "helpers"},
-#     {"id": "validation", "name": "Validation Summary Formatting", "anchor": "VAL", "kind": "helpers"}
+#     {
+#       "id": "format-table",
+#       "name": "format_table",
+#       "anchor": "function-format-table",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "format-plan-rows",
+#       "name": "format_plan_rows",
+#       "anchor": "function-format-plan-rows",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "format-results-table",
+#       "name": "format_results_table",
+#       "anchor": "function-format-results-table",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "format-validation-summary",
+#       "name": "format_validation_summary",
+#       "anchor": "function-format-validation-summary",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===

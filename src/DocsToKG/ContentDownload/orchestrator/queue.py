@@ -3,7 +3,12 @@
 #   "module": "DocsToKG.ContentDownload.orchestrator.queue",
 #   "purpose": "SQLite-backed work queue with idempotent enqueue, crash-safe leasing, and retry logic",
 #   "sections": [
-#     {"id": "workqueue", "name": "WorkQueue", "anchor": "#class-workqueue", "kind": "class"}
+#     {
+#       "id": "workqueue",
+#       "name": "WorkQueue",
+#       "anchor": "class-workqueue",
+#       "kind": "class"
+#     }
 #   ]
 # }
 # === /NAVMAP ===

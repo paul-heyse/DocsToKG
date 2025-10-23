@@ -1,3 +1,66 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.storage.writers",
+#   "purpose": "Parquet Writers for DocParsing Artifacts.",
+#   "sections": [
+#     {
+#       "id": "parquetwriter",
+#       "name": "ParquetWriter",
+#       "anchor": "class-parquetwriter",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "chunksparquetwriter",
+#       "name": "ChunksParquetWriter",
+#       "anchor": "class-chunksparquetwriter",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "densevectorwriter",
+#       "name": "DenseVectorWriter",
+#       "anchor": "class-densevectorwriter",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "sparsevectorwriter",
+#       "name": "SparseVectorWriter",
+#       "anchor": "class-sparsevectorwriter",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "lexicalvectorwriter",
+#       "name": "LexicalVectorWriter",
+#       "anchor": "class-lexicalvectorwriter",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "create-chunks-writer",
+#       "name": "create_chunks_writer",
+#       "anchor": "function-create-chunks-writer",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "create-dense-writer",
+#       "name": "create_dense_writer",
+#       "anchor": "function-create-dense-writer",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "create-sparse-writer",
+#       "name": "create_sparse_writer",
+#       "anchor": "function-create-sparse-writer",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "create-lexical-writer",
+#       "name": "create_lexical_writer",
+#       "anchor": "function-create-lexical-writer",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Parquet Writers for DocParsing Artifacts
 

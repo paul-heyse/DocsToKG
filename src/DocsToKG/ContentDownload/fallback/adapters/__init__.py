@@ -1,3 +1,30 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.fallback.adapters.__init__",
+#   "purpose": "Fallback source adapters for PDF resolution.",
+#   "sections": [
+#     {
+#       "id": "head-pdf",
+#       "name": "head_pdf",
+#       "anchor": "function-head-pdf",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "canonicalize-url",
+#       "name": "canonicalize_url",
+#       "anchor": "function-canonicalize-url",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-retry-after",
+#       "name": "parse_retry_after",
+#       "anchor": "function-parse-retry-after",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Fallback source adapters for PDF resolution.
 
 This package contains adapters for 7 different sources:

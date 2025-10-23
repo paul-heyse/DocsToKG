@@ -1,3 +1,36 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.storage.embedding_integration",
+#   "purpose": "Embedding Stage Integration with Storage Layer.",
+#   "sections": [
+#     {
+#       "id": "vectorwritererror",
+#       "name": "VectorWriterError",
+#       "anchor": "class-vectorwritererror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "unifiedvectorwriter",
+#       "name": "UnifiedVectorWriter",
+#       "anchor": "class-unifiedvectorwriter",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "create-unified-vector-writer",
+#       "name": "create_unified_vector_writer",
+#       "anchor": "function-create-unified-vector-writer",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "iter-vector-rows",
+#       "name": "iter_vector_rows",
+#       "anchor": "function-iter-vector-rows",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Embedding Stage Integration with Storage Layer
 

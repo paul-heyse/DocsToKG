@@ -1,3 +1,90 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.policy.errors",
+#   "purpose": "Policy error codes and helpers for centralized error handling.",
+#   "sections": [
+#     {
+#       "id": "errorcode",
+#       "name": "ErrorCode",
+#       "anchor": "class-errorcode",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "policyok",
+#       "name": "PolicyOK",
+#       "anchor": "class-policyok",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "policyreject",
+#       "name": "PolicyReject",
+#       "anchor": "class-policyreject",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "policyexception",
+#       "name": "PolicyException",
+#       "anchor": "class-policyexception",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "urlpolicyexception",
+#       "name": "URLPolicyException",
+#       "anchor": "class-urlpolicyexception",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "filesystempolicyexception",
+#       "name": "FilesystemPolicyException",
+#       "anchor": "class-filesystempolicyexception",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "extractionpolicyexception",
+#       "name": "ExtractionPolicyException",
+#       "anchor": "class-extractionpolicyexception",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "storagepolicyexception",
+#       "name": "StoragePolicyException",
+#       "anchor": "class-storagepolicyexception",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "configurationpolicyexception",
+#       "name": "ConfigurationPolicyException",
+#       "anchor": "class-configurationpolicyexception",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "dbboundaryexception",
+#       "name": "DbBoundaryException",
+#       "anchor": "class-dbboundaryexception",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "raise-policy-error",
+#       "name": "raise_policy_error",
+#       "anchor": "function-raise-policy-error",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "scrub-details",
+#       "name": "_scrub_details",
+#       "anchor": "function-scrub-details",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-policy-error-event",
+#       "name": "_emit_policy_error_event",
+#       "anchor": "function-emit-policy-error-event",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Policy error codes and helpers for centralized error handling.
 
 One error catalog used across all policy gates. Each gate raises through

@@ -1,3 +1,36 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.embedding.backends.lexical.local_bm25",
+#   "purpose": "Local BM25 lexical embedding provider.",
+#   "sections": [
+#     {
+#       "id": "tokenize",
+#       "name": "_tokenize",
+#       "anchor": "function-tokenize",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "bm25accumulator",
+#       "name": "BM25Accumulator",
+#       "anchor": "class-bm25accumulator",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "localbm25config",
+#       "name": "LocalBM25Config",
+#       "anchor": "class-localbm25config",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "localbm25provider",
+#       "name": "LocalBM25Provider",
+#       "anchor": "class-localbm25provider",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Local BM25 lexical embedding provider."""
 
 from __future__ import annotations

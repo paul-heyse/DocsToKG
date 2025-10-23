@@ -1,3 +1,84 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.ratelimit",
+#   "purpose": "Per-host and per-role rate limiting with pyrate-limiter.",
+#   "sections": [
+#     {
+#       "id": "ratelimitexceeded",
+#       "name": "RateLimitExceeded",
+#       "anchor": "class-ratelimitexceeded",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "ratetelemetrysink",
+#       "name": "RateTelemetrySink",
+#       "anchor": "class-ratetelemetrysink",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "rolerates",
+#       "name": "RoleRates",
+#       "anchor": "class-rolerates",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "hostpolicy",
+#       "name": "HostPolicy",
+#       "anchor": "class-hostpolicy",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "backendconfig",
+#       "name": "BackendConfig",
+#       "anchor": "class-backendconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "aimdconfig",
+#       "name": "AIMDConfig",
+#       "anchor": "class-aimdconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "rateconfig",
+#       "name": "RateConfig",
+#       "anchor": "class-rateconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "rateacquisition",
+#       "name": "RateAcquisition",
+#       "anchor": "class-rateacquisition",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "ratelimitregistry",
+#       "name": "RateLimitRegistry",
+#       "anchor": "class-ratelimitregistry",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "ratelimitedtransport",
+#       "name": "RateLimitedTransport",
+#       "anchor": "class-ratelimitedtransport",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "get-rate-limiter-manager",
+#       "name": "get_rate_limiter_manager",
+#       "anchor": "function-get-rate-limiter-manager",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "set-rate-limiter-manager",
+#       "name": "set_rate_limiter_manager",
+#       "anchor": "function-set-rate-limiter-manager",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Per-host and per-role rate limiting with pyrate-limiter.
 
 Provides:

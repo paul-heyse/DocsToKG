@@ -4,53 +4,276 @@
 #   "module": "DocsToKG.DocParsing.embedding.runtime",
 #   "purpose": "Embedding pipelines for DocParsing",
 #   "sections": [
-#     {"id": "s1", "name": "_build_bm25_vector", "anchor": "S1", "kind": "function"},
-#     {"id": "s2", "name": "_build_splade_vector", "anchor": "S2", "kind": "function"},
-#     {"id": "s3", "name": "_build_dense_vector", "anchor": "S3", "kind": "function"},
-#     {"id": "s4", "name": "_build_vector_row", "anchor": "S4", "kind": "function"},
-#     {"id": "s5", "name": "_get_sparse_encoder_cls", "anchor": "S5", "kind": "function"},
-#     {"id": "s6", "name": "_get_vllm_components", "anchor": "S6", "kind": "function"},
-#     {"id": "s7", "name": "_shutdown_llm_instance", "anchor": "S7", "kind": "function"},
-#     {"id": "s8", "name": "_LRUCache", "anchor": "S8", "kind": "class"},
-#     {"id": "s9", "name": "flush_llm_cache", "anchor": "S9", "kind": "function"},
-#     {"id": "s10", "name": "close_all_qwen", "anchor": "S10", "kind": "function"},
-#     {"id": "s11", "name": "_qwen_cache_key", "anchor": "S11", "kind": "function"},
-#     {"id": "s12", "name": "_resolve_qwen_dir", "anchor": "S12", "kind": "function"},
-#     {"id": "s13", "name": "_resolve_splade_dir", "anchor": "S13", "kind": "function"},
-#     {"id": "s14", "name": "_expand_optional", "anchor": "S14", "kind": "function"},
-#     {"id": "s15", "name": "_resolve_cli_path", "anchor": "S15", "kind": "function"},
-#     {"id": "s16", "name": "_percentile", "anchor": "S16", "kind": "function"},
-#     {"id": "s17", "name": "_ensure_splade_dependencies", "anchor": "S17", "kind": "function"},
-#     {"id": "s18", "name": "_ensure_qwen_dependencies", "anchor": "S18", "kind": "function"},
-#     {"id": "s19", "name": "ensure_uuid", "anchor": "S19", "kind": "function"},
-#     {"id": "s20", "name": "_legacy_chunk_uuid", "anchor": "S20", "kind": "function"},
-#     {"id": "s21", "name": "tokens", "anchor": "S21", "kind": "function"},
-#     {"id": "s22", "name": "BM25StatsAccumulator", "anchor": "S22", "kind": "class"},
-#     {"id": "s23", "name": "print_bm25_summary", "anchor": "S23", "kind": "function"},
-#     {"id": "s24", "name": "bm25_vector", "anchor": "S24", "kind": "function"},
-#     {"id": "s25", "name": "splade_encode", "anchor": "S25", "kind": "function"},
-#     {"id": "s26", "name": "_detect_splade_backend", "anchor": "S26", "kind": "function"},
-#     {"id": "s27", "name": "_get_splade_encoder", "anchor": "S27", "kind": "function"},
-#     {"id": "s28", "name": "_get_splade_backend_used", "anchor": "S28", "kind": "function"},
-#     {"id": "s29", "name": "SPLADEValidator", "anchor": "S29", "kind": "class"},
-#     {"id": "s30", "name": "_qwen_embed_direct", "anchor": "S30", "kind": "function"},
-#     {"id": "s31", "name": "qwen_embed", "anchor": "S31", "kind": "function"},
-#     {"id": "s32", "name": "QwenEmbeddingQueue", "anchor": "S32", "kind": "class"},
-#     {"id": "s33", "name": "EmbeddingProcessingError", "anchor": "S33", "kind": "class"},
-#     {"id": "s34", "name": "process_pass_a", "anchor": "S34", "kind": "function"},
-#     {"id": "s35", "name": "iter_rows_in_batches", "anchor": "S35", "kind": "function"},
-#     {"id": "s36", "name": "iter_rows_in_batches_with_hash", "anchor": "S36", "kind": "function"},
-#     {"id": "s37", "name": "_validate_chunk_file_schema", "anchor": "S37", "kind": "function"},
-#     {"id": "s38", "name": "iter_chunk_files", "anchor": "S38", "kind": "function"},
-#     {"id": "s39", "name": "_iter_chunks_or_empty", "anchor": "S39", "kind": "function"},
-#     {"id": "s40", "name": "_ensure_pyarrow_vectors", "anchor": "S40", "kind": "function"},
-#     {"id": "s48", "name": "_iter_vector_rows", "anchor": "S48", "kind": "function"},
-#     {"id": "s49", "name": "process_chunk_file_vectors", "anchor": "S49", "kind": "function"},
-#     {"id": "s50", "name": "write_vectors", "anchor": "S50", "kind": "function"},
-#     {"id": "s51", "name": "_handle_embedding_quarantine", "anchor": "S51", "kind": "function"},
-#     {"id": "s52", "name": "_validate_vectors_for_chunks", "anchor": "S52", "kind": "function"},
-#     {"id": "s53", "name": "_main_inner", "anchor": "S53", "kind": "function"},
-#     {"id": "s54", "name": "main", "anchor": "S54", "kind": "function"}
+#     {
+#       "id": "embed-write-vectors",
+#       "name": "_embed_write_vectors",
+#       "anchor": "function-embed-write-vectors",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-bm25-vector",
+#       "name": "_build_bm25_vector",
+#       "anchor": "function-build-bm25-vector",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-splade-vector",
+#       "name": "_build_splade_vector",
+#       "anchor": "function-build-splade-vector",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-dense-vector",
+#       "name": "_build_dense_vector",
+#       "anchor": "function-build-dense-vector",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-vector-row",
+#       "name": "_build_vector_row",
+#       "anchor": "function-build-vector-row",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "flush-llm-cache",
+#       "name": "flush_llm_cache",
+#       "anchor": "function-flush-llm-cache",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "close-all-qwen",
+#       "name": "close_all_qwen",
+#       "anchor": "function-close-all-qwen",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "ensure-splade-dependencies",
+#       "name": "_ensure_splade_dependencies",
+#       "anchor": "function-ensure-splade-dependencies",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "ensure-qwen-dependencies",
+#       "name": "_ensure_qwen_dependencies",
+#       "anchor": "function-ensure-qwen-dependencies",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "splade-encode",
+#       "name": "splade_encode",
+#       "anchor": "function-splade-encode",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "qwen-embed",
+#       "name": "qwen_embed",
+#       "anchor": "function-qwen-embed",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolve-qwen-dir",
+#       "name": "_resolve_qwen_dir",
+#       "anchor": "function-resolve-qwen-dir",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolve-splade-dir",
+#       "name": "_resolve_splade_dir",
+#       "anchor": "function-resolve-splade-dir",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "expand-optional",
+#       "name": "_expand_optional",
+#       "anchor": "function-expand-optional",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolve-cli-path",
+#       "name": "_resolve_cli_path",
+#       "anchor": "function-resolve-cli-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "percentile",
+#       "name": "_percentile",
+#       "anchor": "function-percentile",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "write-fingerprint",
+#       "name": "_write_fingerprint",
+#       "anchor": "function-write-fingerprint",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "compute-embed-cfg-hash",
+#       "name": "_compute_embed_cfg_hash",
+#       "anchor": "function-compute-embed-cfg-hash",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "set-embed-worker-state",
+#       "name": "_set_embed_worker_state",
+#       "anchor": "function-set-embed-worker-state",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-embed-worker-state",
+#       "name": "_get_embed_worker_state",
+#       "anchor": "function-get-embed-worker-state",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "extract-stub-counters",
+#       "name": "_extract_stub_counters",
+#       "anchor": "function-extract-stub-counters",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "process-stub-vectors",
+#       "name": "_process_stub_vectors",
+#       "anchor": "function-process-stub-vectors",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "ensure-uuid",
+#       "name": "ensure_uuid",
+#       "anchor": "function-ensure-uuid",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "legacy-chunk-uuid",
+#       "name": "_legacy_chunk_uuid",
+#       "anchor": "function-legacy-chunk-uuid",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "tokens",
+#       "name": "tokens",
+#       "anchor": "function-tokens",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "bm25statsaccumulator",
+#       "name": "BM25StatsAccumulator",
+#       "anchor": "class-bm25statsaccumulator",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "print-bm25-summary",
+#       "name": "print_bm25_summary",
+#       "anchor": "function-print-bm25-summary",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "bm25-vector",
+#       "name": "bm25_vector",
+#       "anchor": "function-bm25-vector",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "spladevalidator",
+#       "name": "SPLADEValidator",
+#       "anchor": "class-spladevalidator",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "embeddingprocessingerror",
+#       "name": "EmbeddingProcessingError",
+#       "anchor": "class-embeddingprocessingerror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "process-pass-a",
+#       "name": "process_pass_a",
+#       "anchor": "function-process-pass-a",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "iter-rows-in-batches",
+#       "name": "iter_rows_in_batches",
+#       "anchor": "function-iter-rows-in-batches",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "iter-chunks-or-empty",
+#       "name": "_iter_chunks_or_empty",
+#       "anchor": "function-iter-chunks-or-empty",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-chunk-file-schema",
+#       "name": "_validate_chunk_file_schema",
+#       "anchor": "function-validate-chunk-file-schema",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "process-chunk-file-vectors",
+#       "name": "process_chunk_file_vectors",
+#       "anchor": "function-process-chunk-file-vectors",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "write-vectors",
+#       "name": "write_vectors",
+#       "anchor": "function-write-vectors",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "vector-output-path-for-format",
+#       "name": "_vector_output_path_for_format",
+#       "anchor": "function-vector-output-path-for-format",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "handle-embedding-quarantine",
+#       "name": "_handle_embedding_quarantine",
+#       "anchor": "function-handle-embedding-quarantine",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-vectors-for-chunks",
+#       "name": "_validate_vectors_for_chunks",
+#       "anchor": "function-validate-vectors-for-chunks",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-embedding-plan",
+#       "name": "_build_embedding_plan",
+#       "anchor": "function-build-embedding-plan",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "embedding-stage-worker",
+#       "name": "_embedding_stage_worker",
+#       "anchor": "function-embedding-stage-worker",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "make-embedding-stage-hooks",
+#       "name": "_make_embedding_stage_hooks",
+#       "anchor": "function-make-embedding-stage-hooks",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "ensure-pyarrow-vectors",
+#       "name": "_ensure_pyarrow_vectors",
+#       "anchor": "function-ensure-pyarrow-vectors",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "main-inner",
+#       "name": "_main_inner",
+#       "anchor": "function-main-inner",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "main",
+#       "name": "main",
+#       "anchor": "function-main",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===

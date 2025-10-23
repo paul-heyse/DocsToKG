@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.redis_cooldown_store",
+#   "purpose": "Redis-backed cooldown store for distributed circuit breaker coordination.",
+#   "sections": [
+#     {
+#       "id": "rediscooldownstore",
+#       "name": "RedisCooldownStore",
+#       "anchor": "class-rediscooldownstore",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Redis-backed cooldown store for distributed circuit breaker coordination.
 
 Implements the CooldownStore protocol from breakers.py using Redis for

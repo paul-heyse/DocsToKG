@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.catalog.queries_api",
+#   "purpose": "Catalog query API fa\u00e7ade.",
+#   "sections": [
+#     {
+#       "id": "catalogqueries",
+#       "name": "CatalogQueries",
+#       "anchor": "class-catalogqueries",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Catalog query API façade.
 
 High-level query interface for catalog introspection and analysis.

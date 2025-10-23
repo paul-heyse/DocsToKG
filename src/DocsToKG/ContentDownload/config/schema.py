@@ -1,3 +1,30 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.config.schema",
+#   "purpose": "JSON Schema Export for ContentDownload Configuration.",
+#   "sections": [
+#     {
+#       "id": "get-config-schema",
+#       "name": "get_config_schema",
+#       "anchor": "function-get-config-schema",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "export-config-schema",
+#       "name": "export_config_schema",
+#       "anchor": "function-export-config-schema",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "export-resolver-defaults",
+#       "name": "export_resolver_defaults",
+#       "anchor": "function-export-resolver-defaults",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 JSON Schema Export for ContentDownload Configuration
 

@@ -3,10 +3,78 @@
 #   "module": "DocsToKG.OntologyDownload.io.extraction_constraints",
 #   "purpose": "Constraint validators for archive extraction security policies (Phase 2)",
 #   "sections": [
-#     {"id": "path_validation", "name": "Path Normalization & Validation", "anchor": "PATH", "kind": "validators"},
-#     {"id": "type_validation", "name": "Entry Type Validation", "anchor": "TYPE", "kind": "validators"},
-#     {"id": "constraint_validation", "name": "Constraint Enforcement", "anchor": "CONSTR", "kind": "validators"},
-#     {"id": "collision_detection", "name": "Collision Detection", "anchor": "COLL", "kind": "validators"}
+#     {
+#       "id": "normalize-path-unicode",
+#       "name": "normalize_path_unicode",
+#       "anchor": "function-normalize-path-unicode",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-path-constraints",
+#       "name": "validate_path_constraints",
+#       "anchor": "function-validate-path-constraints",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-entry-type",
+#       "name": "validate_entry_type",
+#       "anchor": "function-validate-entry-type",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "casecollisiondetector",
+#       "name": "CaseCollisionDetector",
+#       "anchor": "class-casecollisiondetector",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "validate-entry-count",
+#       "name": "validate_entry_count",
+#       "anchor": "function-validate-entry-count",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-file-size",
+#       "name": "validate_file_size",
+#       "anchor": "function-validate-file-size",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-streaming-file-size",
+#       "name": "validate_streaming_file_size",
+#       "anchor": "function-validate-streaming-file-size",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-entry-compression-ratio",
+#       "name": "validate_entry_compression_ratio",
+#       "anchor": "function-validate-entry-compression-ratio",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "prescanvalidator",
+#       "name": "PreScanValidator",
+#       "anchor": "class-prescanvalidator",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "validate-disk-space",
+#       "name": "validate_disk_space",
+#       "anchor": "function-validate-disk-space",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "apply-default-permissions",
+#       "name": "apply_default_permissions",
+#       "anchor": "function-apply-default-permissions",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "extractionguardian",
+#       "name": "ExtractionGuardian",
+#       "anchor": "class-extractionguardian",
+#       "kind": "class"
+#     }
 #   ]
 # }
 # === /NAVMAP ===

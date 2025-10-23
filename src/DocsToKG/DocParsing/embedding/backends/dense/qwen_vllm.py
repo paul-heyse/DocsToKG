@@ -1,3 +1,66 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.embedding.backends.dense.qwen_vllm",
+#   "purpose": "Qwen3/vLLM dense embedding provider.",
+#   "sections": [
+#     {
+#       "id": "qwenvllmconfig",
+#       "name": "QwenVLLMConfig",
+#       "anchor": "class-qwenvllmconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "shutdown-llm-instance",
+#       "name": "_shutdown_llm_instance",
+#       "anchor": "function-shutdown-llm-instance",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "lrucache",
+#       "name": "_LRUCache",
+#       "anchor": "class-lrucache",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "qwen-cache-key",
+#       "name": "_qwen_cache_key",
+#       "anchor": "function-qwen-cache-key",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-vllm-components",
+#       "name": "_get_vllm_components",
+#       "anchor": "function-get-vllm-components",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "qwen-embed-direct",
+#       "name": "_qwen_embed_direct",
+#       "anchor": "function-qwen-embed-direct",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "qwenqueue",
+#       "name": "_QwenQueue",
+#       "anchor": "class-qwenqueue",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "qwenvllmprovider",
+#       "name": "QwenVLLMProvider",
+#       "anchor": "class-qwenvllmprovider",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "flush-llm-cache",
+#       "name": "flush_llm_cache",
+#       "anchor": "function-flush-llm-cache",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Qwen3/vLLM dense embedding provider."""
 
 from __future__ import annotations

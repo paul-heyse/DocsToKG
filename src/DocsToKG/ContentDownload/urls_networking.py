@@ -1,3 +1,54 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.urls_networking",
+#   "purpose": "URL normalization instrumentation for the networking hub.",
+#   "sections": [
+#     {
+#       "id": "get-strict-mode",
+#       "name": "get_strict_mode",
+#       "anchor": "function-get-strict-mode",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "set-strict-mode",
+#       "name": "set_strict_mode",
+#       "anchor": "function-set-strict-mode",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "record-url-normalization",
+#       "name": "record_url_normalization",
+#       "anchor": "function-record-url-normalization",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "log-url-change-once",
+#       "name": "log_url_change_once",
+#       "anchor": "function-log-url-change-once",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "apply-role-headers",
+#       "name": "apply_role_headers",
+#       "anchor": "function-apply-role-headers",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-url-normalization-stats",
+#       "name": "get_url_normalization_stats",
+#       "anchor": "function-get-url-normalization-stats",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "reset-url-normalization-stats-for-tests",
+#       "name": "reset_url_normalization_stats_for_tests",
+#       "anchor": "function-reset-url-normalization-stats-for-tests",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """URL normalization instrumentation for the networking hub.
 
 Responsibilities

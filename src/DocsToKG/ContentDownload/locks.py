@@ -3,11 +3,132 @@
 #   "module": "DocsToKG.ContentDownload.locks",
 #   "purpose": "File locking helpers for manifests, telemetry, and artifacts",
 #   "sections": [
-#     {"id": "configure-lock-root", "name": "configure_lock_root", "anchor": "function-configure-lock-root", "kind": "function"},
-#     {"id": "manifest-lock", "name": "manifest_lock", "anchor": "function-manifest-lock", "kind": "function"},
-#     {"id": "telemetry-lock", "name": "telemetry_lock", "anchor": "function-telemetry-lock", "kind": "function"},
-#     {"id": "lock-metrics-snapshot", "name": "lock_metrics_snapshot", "anchor": "function-lock-metrics-snapshot", "kind": "function"},
-#     {"id": "reset-lock-root", "name": "reset_lock_root", "anchor": "function-reset-lock-root", "kind": "function"}
+#     {
+#       "id": "lockmetrics",
+#       "name": "_LockMetrics",
+#       "anchor": "class-lockmetrics",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "configure-lock-root",
+#       "name": "configure_lock_root",
+#       "anchor": "function-configure-lock-root",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "reset-lock-root",
+#       "name": "reset_lock_root",
+#       "anchor": "function-reset-lock-root",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-lock-dir",
+#       "name": "_get_lock_dir",
+#       "anchor": "function-get-lock-dir",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "select-lock-class",
+#       "name": "_select_lock_class",
+#       "anchor": "function-select-lock-class",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "lock-mode",
+#       "name": "_lock_mode",
+#       "anchor": "function-lock-mode",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "poll-interval",
+#       "name": "_poll_interval",
+#       "anchor": "function-poll-interval",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "timeout-for",
+#       "name": "_timeout_for",
+#       "anchor": "function-timeout-for",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "hash-path",
+#       "name": "_hash_path",
+#       "anchor": "function-hash-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "lock-file-for",
+#       "name": "_lock_file_for",
+#       "anchor": "function-lock-file-for",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "record-timeout",
+#       "name": "_record_timeout",
+#       "anchor": "function-record-timeout",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "record-success",
+#       "name": "_record_success",
+#       "anchor": "function-record-success",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "p95",
+#       "name": "_p95",
+#       "anchor": "function-p95",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "lockcontext",
+#       "name": "_LockContext",
+#       "anchor": "class-lockcontext",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "category-lock",
+#       "name": "_category_lock",
+#       "anchor": "function-category-lock",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "manifest-lock",
+#       "name": "manifest_lock",
+#       "anchor": "function-manifest-lock",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "telemetry-lock",
+#       "name": "telemetry_lock",
+#       "anchor": "function-telemetry-lock",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "sqlite-lock",
+#       "name": "sqlite_lock",
+#       "anchor": "function-sqlite-lock",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "artifact-lock",
+#       "name": "artifact_lock",
+#       "anchor": "function-artifact-lock",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "summary-lock",
+#       "name": "summary_lock",
+#       "anchor": "function-summary-lock",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "lock-metrics-snapshot",
+#       "name": "lock_metrics_snapshot",
+#       "anchor": "function-lock-metrics-snapshot",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===

@@ -1,3 +1,54 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.fallback.cli_commands",
+#   "purpose": "Extended CLI Commands - UPDATED with Telemetry Storage Integration.",
+#   "sections": [
+#     {
+#       "id": "telemetryanalyzer",
+#       "name": "TelemetryAnalyzer",
+#       "anchor": "class-telemetryanalyzer",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "cmd-fallback-stats",
+#       "name": "cmd_fallback_stats",
+#       "anchor": "function-cmd-fallback-stats",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "configurationtuner",
+#       "name": "ConfigurationTuner",
+#       "anchor": "class-configurationtuner",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "cmd-fallback-tune",
+#       "name": "cmd_fallback_tune",
+#       "anchor": "function-cmd-fallback-tune",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "strategyexplainer",
+#       "name": "StrategyExplainer",
+#       "anchor": "class-strategyexplainer",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "cmd-fallback-explain",
+#       "name": "cmd_fallback_explain",
+#       "anchor": "function-cmd-fallback-explain",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "cmd-fallback-config",
+#       "name": "cmd_fallback_config",
+#       "anchor": "function-cmd-fallback-config",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Extended CLI Commands - UPDATED with Telemetry Storage Integration
 

@@ -1,3 +1,24 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.providers",
+#   "purpose": "Source adapter interfaces for the DocsToKG content download pipeline.",
+#   "sections": [
+#     {
+#       "id": "workprovider",
+#       "name": "WorkProvider",
+#       "anchor": "class-workprovider",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "openalexworkprovider",
+#       "name": "OpenAlexWorkProvider",
+#       "anchor": "class-openalexworkprovider",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Source adapter interfaces for the DocsToKG content download pipeline.
 
 Responsibilities

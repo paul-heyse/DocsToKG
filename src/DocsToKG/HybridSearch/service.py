@@ -16,6 +16,12 @@
 #       "kind": "class"
 #     },
 #     {
+#       "id": "adaptivedenseplanner",
+#       "name": "AdaptiveDensePlanner",
+#       "anchor": "class-adaptivedenseplanner",
+#       "kind": "class"
+#     },
+#     {
 #       "id": "channelresults",
 #       "name": "ChannelResults",
 #       "anchor": "class-channelresults",
@@ -79,6 +85,12 @@
 #       "id": "hybridsearchvalidator",
 #       "name": "HybridSearchValidator",
 #       "anchor": "class-hybridsearchvalidator",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "jsonldataset",
+#       "name": "JsonlDataset",
+#       "anchor": "class-jsonldataset",
 #       "kind": "class"
 #     },
 #     {

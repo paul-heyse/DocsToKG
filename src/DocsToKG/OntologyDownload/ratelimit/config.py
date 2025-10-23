@@ -1,3 +1,48 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.ratelimit.config",
+#   "purpose": "RateSpec parsing and normalization for rate-limiting configuration.",
+#   "sections": [
+#     {
+#       "id": "ratespec",
+#       "name": "RateSpec",
+#       "anchor": "class-ratespec",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "parse-rate-string",
+#       "name": "parse_rate_string",
+#       "anchor": "function-parse-rate-string",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-rate-list",
+#       "name": "validate_rate_list",
+#       "anchor": "function-validate-rate-list",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "normalize-rate-list",
+#       "name": "normalize_rate_list",
+#       "anchor": "function-normalize-rate-list",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "normalize-per-service-rates",
+#       "name": "normalize_per_service_rates",
+#       "anchor": "function-normalize-per-service-rates",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-schema-summary",
+#       "name": "get_schema_summary",
+#       "anchor": "function-get-schema-summary",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """RateSpec parsing and normalization for rate-limiting configuration.
 
 Parses human-readable rate strings (e.g., "5/second") into structured

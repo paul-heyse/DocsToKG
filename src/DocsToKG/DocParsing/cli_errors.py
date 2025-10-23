@@ -1,3 +1,42 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.cli_errors",
+#   "purpose": "Exception types and formatting helpers shared by DocParsing CLIs.",
+#   "sections": [
+#     {
+#       "id": "clivalidationerror",
+#       "name": "CLIValidationError",
+#       "anchor": "class-clivalidationerror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "chunkingclivalidationerror",
+#       "name": "ChunkingCLIValidationError",
+#       "anchor": "class-chunkingclivalidationerror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "doctagsclivalidationerror",
+#       "name": "DoctagsCLIValidationError",
+#       "anchor": "class-doctagsclivalidationerror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "embeddingclivalidationerror",
+#       "name": "EmbeddingCLIValidationError",
+#       "anchor": "class-embeddingclivalidationerror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "format-cli-error",
+#       "name": "format_cli_error",
+#       "anchor": "function-format-cli-error",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Exception types and formatting helpers shared by DocParsing CLIs.
 
 The CLI layers for DocTags, chunking, and embedding all surface validation

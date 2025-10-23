@@ -1,3 +1,24 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.fallback.adapters.wayback",
+#   "purpose": "Wayback Machine adapter for archived PDF resolution.",
+#   "sections": [
+#     {
+#       "id": "extract-domain-from-url",
+#       "name": "extract_domain_from_url",
+#       "anchor": "function-extract-domain-from-url",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "adapter-wayback-pdf",
+#       "name": "adapter_wayback_pdf",
+#       "anchor": "function-adapter-wayback-pdf",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Wayback Machine adapter for archived PDF resolution."""
 
 from __future__ import annotations

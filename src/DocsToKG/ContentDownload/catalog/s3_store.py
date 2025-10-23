@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.catalog.s3_store",
+#   "purpose": "Amazon S3 storage backend implementation.",
+#   "sections": [
+#     {
+#       "id": "s3storagebackend",
+#       "name": "S3StorageBackend",
+#       "anchor": "class-s3storagebackend",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Amazon S3 storage backend implementation.
 
 Provides cloud-native storage with:

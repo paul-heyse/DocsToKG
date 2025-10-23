@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.fallback.orchestrator",
+#   "purpose": "Fallback & Resiliency Orchestrator.",
+#   "sections": [
+#     {
+#       "id": "fallbackorchestrator",
+#       "name": "FallbackOrchestrator",
+#       "anchor": "class-fallbackorchestrator",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Fallback & Resiliency Orchestrator
 

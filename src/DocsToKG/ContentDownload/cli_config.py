@@ -1,3 +1,48 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.cli_config",
+#   "purpose": "CLI commands for configuration inspection and validation.",
+#   "sections": [
+#     {
+#       "id": "cmd-config-print-merged",
+#       "name": "cmd_config_print_merged",
+#       "anchor": "function-cmd-config-print-merged",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "cmd-config-validate",
+#       "name": "cmd_config_validate",
+#       "anchor": "function-cmd-config-validate",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "cmd-config-export-schema",
+#       "name": "cmd_config_export_schema",
+#       "anchor": "function-cmd-config-export-schema",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "cmd-config-defaults",
+#       "name": "cmd_config_defaults",
+#       "anchor": "function-cmd-config-defaults",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "cmd-config-show",
+#       "name": "cmd_config_show",
+#       "anchor": "function-cmd-config-show",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "register-config-commands",
+#       "name": "register_config_commands",
+#       "anchor": "function-register-config-commands",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """CLI commands for configuration inspection and validation.
 
 Provides high-level commands to:

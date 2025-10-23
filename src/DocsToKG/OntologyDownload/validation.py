@@ -3,11 +3,198 @@
 #   "module": "DocsToKG.OntologyDownload.validation",
 #   "purpose": "Coordinate ontology validation budgets, plugin loading, execution, and CLI entrypoints",
 #   "sections": [
-#     {"id": "infrastructure", "name": "Validation Infrastructure", "anchor": "INF", "kind": "infra"},
-#     {"id": "dataclasses", "name": "Validation Models", "anchor": "MOD", "kind": "api"},
-#     {"id": "plugin-management", "name": "Validator Plugin Management", "anchor": "PLG", "kind": "helpers"},
-#     {"id": "execution", "name": "Validation Execution Pipeline", "anchor": "EXE", "kind": "api"},
-#     {"id": "cli", "name": "CLI Utilities & Entrypoint", "anchor": "CLI", "kind": "api"}
+#     {
+#       "id": "current-memory-mb",
+#       "name": "_current_memory_mb",
+#       "anchor": "function-current-memory-mb",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "ensure-validator-budget-manager",
+#       "name": "_ensure_validator_budget_manager",
+#       "anchor": "function-ensure-validator-budget-manager",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "sharedvalidatorbudget",
+#       "name": "_SharedValidatorBudget",
+#       "anchor": "class-sharedvalidatorbudget",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "validatorbudget",
+#       "name": "_ValidatorBudget",
+#       "anchor": "class-validatorbudget",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "acquire-validator-slot",
+#       "name": "_acquire_validator_slot",
+#       "anchor": "function-acquire-validator-slot",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-validator-plugins",
+#       "name": "load_validator_plugins",
+#       "anchor": "function-load-validator-plugins",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validationrequest",
+#       "name": "ValidationRequest",
+#       "anchor": "class-validationrequest",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "validationresult",
+#       "name": "ValidationResult",
+#       "anchor": "class-validationresult",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "validationtimeout",
+#       "name": "ValidationTimeout",
+#       "anchor": "class-validationtimeout",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "write-validation-json",
+#       "name": "_write_validation_json",
+#       "anchor": "function-write-validation-json",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "python-merge-sort",
+#       "name": "_python_merge_sort",
+#       "anchor": "function-python-merge-sort",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "term-to-string",
+#       "name": "_term_to_string",
+#       "anchor": "function-term-to-string",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "canonicalize-turtle",
+#       "name": "_canonicalize_turtle",
+#       "anchor": "function-canonicalize-turtle",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "canonicalize-blank-nodes-line",
+#       "name": "_canonicalize_blank_nodes_line",
+#       "anchor": "function-canonicalize-blank-nodes-line",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "sort-triple-file",
+#       "name": "_sort_triple_file",
+#       "anchor": "function-sort-triple-file",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "normalize-streaming",
+#       "name": "normalize_streaming",
+#       "anchor": "function-normalize-streaming",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validatorsubprocesserror",
+#       "name": "ValidatorSubprocessError",
+#       "anchor": "class-validatorsubprocesserror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "worker-pronto",
+#       "name": "_worker_pronto",
+#       "anchor": "function-worker-pronto",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "worker-owlready2",
+#       "name": "_worker_owlready2",
+#       "anchor": "function-worker-owlready2",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "run-validator-subprocess",
+#       "name": "_run_validator_subprocess",
+#       "anchor": "function-run-validator-subprocess",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "run-with-timeout",
+#       "name": "_run_with_timeout",
+#       "anchor": "function-run-with-timeout",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "prepare-xbrl-package",
+#       "name": "_prepare_xbrl_package",
+#       "anchor": "function-prepare-xbrl-package",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-rdflib",
+#       "name": "validate_rdflib",
+#       "anchor": "function-validate-rdflib",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-pronto",
+#       "name": "validate_pronto",
+#       "anchor": "function-validate-pronto",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-owlready2",
+#       "name": "validate_owlready2",
+#       "anchor": "function-validate-owlready2",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-robot",
+#       "name": "validate_robot",
+#       "anchor": "function-validate-robot",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-arelle",
+#       "name": "validate_arelle",
+#       "anchor": "function-validate-arelle",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "run-validator-task",
+#       "name": "_run_validator_task",
+#       "anchor": "function-run-validator-task",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "run-validator-in-process",
+#       "name": "_run_validator_in_process",
+#       "anchor": "function-run-validator-in-process",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "run-validators",
+#       "name": "run_validators",
+#       "anchor": "function-run-validators",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "run-worker-cli",
+#       "name": "_run_worker_cli",
+#       "anchor": "function-run-worker-cli",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "main",
+#       "name": "main",
+#       "anchor": "function-main",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===

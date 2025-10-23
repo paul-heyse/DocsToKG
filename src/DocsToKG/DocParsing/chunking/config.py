@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.chunking.config",
+#   "purpose": "Typed configuration models and presets for the chunking stage.",
+#   "sections": [
+#     {
+#       "id": "chunkercfg",
+#       "name": "ChunkerCfg",
+#       "anchor": "class-chunkercfg",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Typed configuration models and presets for the chunking stage.
 
 The chunking configuration module translates CLI arguments, environment

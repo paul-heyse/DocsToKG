@@ -70,6 +70,12 @@
 #       "kind": "class"
 #     },
 #     {
+#       "id": "halfopencounter",
+#       "name": "_HalfOpenCounter",
+#       "anchor": "class-halfopencounter",
+#       "kind": "class"
+#     },
+#     {
 #       "id": "breakerregistry",
 #       "name": "BreakerRegistry",
 #       "anchor": "class-breakerregistry",

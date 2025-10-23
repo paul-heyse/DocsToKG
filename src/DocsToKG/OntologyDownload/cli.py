@@ -3,12 +3,246 @@
 #   "module": "DocsToKG.OntologyDownload.cli",
 #   "purpose": "Expose the ontofetch CLI for planning, pulling, validating, and maintaining ontologies",
 #   "sections": [
-#     {"id": "parser", "name": "Parser Construction", "anchor": "PAR", "kind": "api"},
-#     {"id": "constants", "name": "CLI Constants", "anchor": "CON", "kind": "constants"},
-#     {"id": "arg-helpers", "name": "Argument Helpers", "anchor": "ARG", "kind": "helpers"},
-#     {"id": "dispatch", "name": "Subcommand Dispatch", "anchor": "DSP", "kind": "api"},
-#     {"id": "handlers", "name": "Command Handlers", "anchor": "HND", "kind": "api"},
-#     {"id": "entrypoint", "name": "CLI Entrypoint", "anchor": "ENT", "kind": "api"}
+#     {
+#       "id": "build-parser",
+#       "name": "_build_parser",
+#       "anchor": "function-build-parser",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-target-formats",
+#       "name": "_parse_target_formats",
+#       "anchor": "function-parse-target-formats",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-positive-int",
+#       "name": "_parse_positive_int",
+#       "anchor": "function-parse-positive-int",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-allowed-hosts",
+#       "name": "_parse_allowed_hosts",
+#       "anchor": "function-parse-allowed-hosts",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "normalize-plan-args",
+#       "name": "_normalize_plan_args",
+#       "anchor": "function-normalize-plan-args",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-since-arg",
+#       "name": "_parse_since_arg",
+#       "anchor": "function-parse-since-arg",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-since",
+#       "name": "_parse_since",
+#       "anchor": "function-parse-since",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "apply-cli-overrides",
+#       "name": "_apply_cli_overrides",
+#       "anchor": "function-apply-cli-overrides",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolve-specs-from-args",
+#       "name": "_resolve_specs_from_args",
+#       "anchor": "function-resolve-specs-from-args",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "handle-pull",
+#       "name": "_handle_pull",
+#       "anchor": "function-handle-pull",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "handle-plan",
+#       "name": "_handle_plan",
+#       "anchor": "function-handle-plan",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "handle-plan-diff",
+#       "name": "_handle_plan_diff",
+#       "anchor": "function-handle-plan-diff",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "handle-plugins",
+#       "name": "_handle_plugins",
+#       "anchor": "function-handle-plugins",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "scan-filesystem-for-orphans",
+#       "name": "_scan_filesystem_for_orphans",
+#       "anchor": "function-scan-filesystem-for-orphans",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "handle-prune",
+#       "name": "_handle_prune",
+#       "anchor": "function-handle-prune",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "read-api-key-status",
+#       "name": "_read_api_key_status",
+#       "anchor": "function-read-api-key-status",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "database-health-check",
+#       "name": "_database_health_check",
+#       "anchor": "function-database-health-check",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "doctor-report",
+#       "name": "_doctor_report",
+#       "anchor": "function-doctor-report",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "ensure-owner-only-permissions",
+#       "name": "_ensure_owner_only_permissions",
+#       "anchor": "function-ensure-owner-only-permissions",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "apply-doctor-fixes",
+#       "name": "_apply_doctor_fixes",
+#       "anchor": "function-apply-doctor-fixes",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "print-doctor-report",
+#       "name": "_print_doctor_report",
+#       "anchor": "function-print-doctor-report",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "handle-show",
+#       "name": "_handle_show",
+#       "anchor": "function-handle-show",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "selected-validators",
+#       "name": "_selected_validators",
+#       "anchor": "function-selected-validators",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "handle-validate",
+#       "name": "_handle_validate",
+#       "anchor": "function-handle-validate",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "handle-init",
+#       "name": "_handle_init",
+#       "anchor": "function-handle-init",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "handle-config-validate",
+#       "name": "_handle_config_validate",
+#       "anchor": "function-handle-config-validate",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "serialize-fetch-spec",
+#       "name": "_serialize_fetch_spec",
+#       "anchor": "function-serialize-fetch-spec",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "json-default-serializer",
+#       "name": "_json_default_serializer",
+#       "anchor": "function-json-default-serializer",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolved-config-to-dict",
+#       "name": "_resolved_config_to_dict",
+#       "anchor": "function-resolved-config-to-dict",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "redact-sensitive-values",
+#       "name": "_redact_sensitive_values",
+#       "anchor": "function-redact-sensitive-values",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "handle-config-show",
+#       "name": "_handle_config_show",
+#       "anchor": "function-handle-config-show",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "print-config-report",
+#       "name": "_print_config_report",
+#       "anchor": "function-print-config-report",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-batch-failure",
+#       "name": "_emit_batch_failure",
+#       "anchor": "function-emit-batch-failure",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "handle-db-latest",
+#       "name": "_handle_db_latest",
+#       "anchor": "function-handle-db-latest",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "handle-db-versions",
+#       "name": "_handle_db_versions",
+#       "anchor": "function-handle-db-versions",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "handle-db-stats",
+#       "name": "_handle_db_stats",
+#       "anchor": "function-handle-db-stats",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "handle-db-files",
+#       "name": "_handle_db_files",
+#       "anchor": "function-handle-db-files",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "handle-db-validations",
+#       "name": "_handle_db_validations",
+#       "anchor": "function-handle-db-validations",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "print-db-result",
+#       "name": "_print_db_result",
+#       "anchor": "function-print-db-result",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "cli-main",
+#       "name": "cli_main",
+#       "anchor": "function-cli-main",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===

@@ -1,3 +1,42 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.cli.obs_cmd",
+#   "purpose": "Observability CLI commands: tail, stats, export.",
+#   "sections": [
+#     {
+#       "id": "get-duckdb-connection",
+#       "name": "_get_duckdb_connection",
+#       "anchor": "function-get-duckdb-connection",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "format-table",
+#       "name": "_format_table",
+#       "anchor": "function-format-table",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "obs-tail",
+#       "name": "obs_tail",
+#       "anchor": "function-obs-tail",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "obs-stats",
+#       "name": "obs_stats",
+#       "anchor": "function-obs-stats",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "obs-export",
+#       "name": "obs_export",
+#       "anchor": "function-obs-export",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Observability CLI commands: tail, stats, export.
 
 Provides:

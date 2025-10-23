@@ -3,8 +3,18 @@
 #   "module": "DocsToKG.ContentDownload.io_utils",
 #   "purpose": "Atomic file write utilities and Content-Length verification for download integrity",
 #   "sections": [
-#     {"id": "sizeMismatchError", "name": "SizeMismatchError", "anchor": "class-sizemismatcherror", "kind": "exception"},
-#     {"id": "atomicWriteStream", "name": "atomic_write_stream", "anchor": "function-atomic-write-stream", "kind": "function"}
+#     {
+#       "id": "sizemismatcherror",
+#       "name": "SizeMismatchError",
+#       "anchor": "class-sizemismatcherror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "atomic-write-stream",
+#       "name": "atomic_write_stream",
+#       "anchor": "function-atomic-write-stream",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===

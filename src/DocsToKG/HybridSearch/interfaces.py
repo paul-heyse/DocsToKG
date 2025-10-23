@@ -1,3 +1,24 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.HybridSearch.interfaces",
+#   "purpose": "Formal contracts for plugging alternative sparse and dense backends into the.",
+#   "sections": [
+#     {
+#       "id": "lexicalindex",
+#       "name": "LexicalIndex",
+#       "anchor": "class-lexicalindex",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "densevectorstore",
+#       "name": "DenseVectorStore",
+#       "anchor": "class-densevectorstore",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Formal contracts for plugging alternative sparse and dense backends into the
 DocsToKG hybrid search pipeline.
 

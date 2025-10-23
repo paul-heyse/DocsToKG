@@ -1,3 +1,30 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.ci_schema_drift",
+#   "purpose": "CI schema drift detection for OntologyDownloadSettings.",
+#   "sections": [
+#     {
+#       "id": "normalize-schema",
+#       "name": "_normalize_schema",
+#       "anchor": "function-normalize-schema",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "check-schema-drift",
+#       "name": "check_schema_drift",
+#       "anchor": "function-check-schema-drift",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "main",
+#       "name": "main",
+#       "anchor": "function-main",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """CI schema drift detection for OntologyDownloadSettings.
 
 This module provides utilities for detecting schema drift in CI/CD pipelines:

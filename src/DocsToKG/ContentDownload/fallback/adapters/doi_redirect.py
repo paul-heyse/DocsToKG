@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.fallback.adapters.doi_redirect",
+#   "purpose": "DOI Redirect adapter for following DOI chains to PDFs.",
+#   "sections": [
+#     {
+#       "id": "adapter-doi-redirect-pdf",
+#       "name": "adapter_doi_redirect_pdf",
+#       "anchor": "function-adapter-doi-redirect-pdf",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """DOI Redirect adapter for following DOI chains to PDFs."""
 
 from __future__ import annotations

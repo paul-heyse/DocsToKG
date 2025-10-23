@@ -1,3 +1,42 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.catalog.gc",
+#   "purpose": "Garbage collection and retention utilities for the artifact catalog.",
+#   "sections": [
+#     {
+#       "id": "find-orphans",
+#       "name": "find_orphans",
+#       "anchor": "function-find-orphans",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "retention-filter",
+#       "name": "retention_filter",
+#       "anchor": "function-retention-filter",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "collect-referenced-paths",
+#       "name": "collect_referenced_paths",
+#       "anchor": "function-collect-referenced-paths",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "delete-orphan-files",
+#       "name": "delete_orphan_files",
+#       "anchor": "function-delete-orphan-files",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "retentionpolicy",
+#       "name": "RetentionPolicy",
+#       "anchor": "class-retentionpolicy",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Garbage collection and retention utilities for the artifact catalog.
 
 Provides tools for:

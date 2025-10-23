@@ -95,9 +95,69 @@
 #       "kind": "function"
 #     },
 #     {
+#       "id": "inspect-parquet-chunk-file",
+#       "name": "_inspect_parquet_chunk_file",
+#       "anchor": "function-inspect-parquet-chunk-file",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "normalise-validation-targets",
+#       "name": "_normalise_validation_targets",
+#       "anchor": "function-normalise-validation-targets",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "validate-chunk-files",
 #       "name": "_validate_chunk_files",
 #       "anchor": "function-validate-chunk-files",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolve-parquet-chunk-artifact",
+#       "name": "_resolve_parquet_chunk_artifact",
+#       "anchor": "function-resolve-parquet-chunk-artifact",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "collect-chunk-artifacts",
+#       "name": "_collect_chunk_artifacts",
+#       "anchor": "function-collect-chunk-artifacts",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "compute-worker-cfg-hash",
+#       "name": "_compute_worker_cfg_hash",
+#       "anchor": "function-compute-worker-cfg-hash",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "write-fingerprint-for-output",
+#       "name": "_write_fingerprint_for_output",
+#       "anchor": "function-write-fingerprint-for-output",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "ensure-worker-initialised",
+#       "name": "_ensure_worker_initialised",
+#       "anchor": "function-ensure-worker-initialised",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-chunk-plan",
+#       "name": "_build_chunk_plan",
+#       "anchor": "function-build-chunk-plan",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "chunk-stage-worker",
+#       "name": "_chunk_stage_worker",
+#       "anchor": "function-chunk-stage-worker",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "make-chunk-stage-hooks",
+#       "name": "_make_chunk_stage_hooks",
+#       "anchor": "function-make-chunk-stage-hooks",
 #       "kind": "function"
 #     },
 #     {
@@ -110,6 +170,12 @@
 #       "id": "run-validate-only",
 #       "name": "_run_validate_only",
 #       "anchor": "function-run-validate-only",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "write-chunks-atomic",
+#       "name": "_write_chunks_atomic",
+#       "anchor": "function-write-chunks-atomic",
 #       "kind": "function"
 #     },
 #     {

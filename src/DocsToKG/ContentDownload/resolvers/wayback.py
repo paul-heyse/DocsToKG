@@ -4,46 +4,22 @@
 #   "purpose": "Wayback Machine resolver with CDX-first discovery algorithm",
 #   "sections": [
 #     {
+#       "id": "resolverresult",
+#       "name": "ResolverResult",
+#       "anchor": "class-resolverresult",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "httpxresponseadapter",
+#       "name": "_HTTPXResponseAdapter",
+#       "anchor": "class-httpxresponseadapter",
+#       "kind": "class"
+#     },
+#     {
 #       "id": "waybackresolver",
 #       "name": "WaybackResolver",
 #       "anchor": "class-waybackresolver",
 #       "kind": "class"
-#     },
-#     {
-#       "id": "wayback-override-http",
-#       "name": "_override_wayback_http",
-#       "anchor": "function-wayback-override-http",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "wayback-discovery",
-#       "name": "_discover_snapshots",
-#       "anchor": "function-wayback-discovery",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "wayback-availability",
-#       "name": "_check_availability",
-#       "anchor": "function-wayback-availability",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "wayback-cdx",
-#       "name": "_query_cdx",
-#       "anchor": "function-wayback-cdx",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "wayback-html-parse",
-#       "name": "_parse_html_for_pdf",
-#       "anchor": "function-wayback-html-parse",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "wayback-verify-pdf",
-#       "name": "_verify_pdf_snapshot",
-#       "anchor": "function-wayback-verify-pdf",
-#       "kind": "function"
 #     }
 #   ]
 # }

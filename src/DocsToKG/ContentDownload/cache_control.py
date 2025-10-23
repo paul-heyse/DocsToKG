@@ -1,3 +1,42 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.cache_control",
+#   "purpose": "RFC 9111 cache-control directive parsing and interpretation.",
+#   "sections": [
+#     {
+#       "id": "cachecontroldirective",
+#       "name": "CacheControlDirective",
+#       "anchor": "class-cachecontroldirective",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "parse-cache-control",
+#       "name": "parse_cache_control",
+#       "anchor": "function-parse-cache-control",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "is-fresh",
+#       "name": "is_fresh",
+#       "anchor": "function-is-fresh",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "can-serve-stale",
+#       "name": "can_serve_stale",
+#       "anchor": "function-can-serve-stale",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "should-cache",
+#       "name": "should_cache",
+#       "anchor": "function-should-cache",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """RFC 9111 cache-control directive parsing and interpretation.
 
 Responsibilities

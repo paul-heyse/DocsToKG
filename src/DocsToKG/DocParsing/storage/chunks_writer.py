@@ -1,3 +1,24 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.storage.chunks_writer",
+#   "purpose": "Atomic Parquet Writer for Chunks.",
+#   "sections": [
+#     {
+#       "id": "writeresult",
+#       "name": "WriteResult",
+#       "anchor": "class-writeresult",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "parquetchunkswriter",
+#       "name": "ParquetChunksWriter",
+#       "anchor": "class-parquetchunkswriter",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Atomic Parquet Writer for Chunks
 

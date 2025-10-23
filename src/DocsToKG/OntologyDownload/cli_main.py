@@ -1,3 +1,48 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.cli_main",
+#   "purpose": "Main Typer CLI app for OntologyDownload with settings integration.",
+#   "sections": [
+#     {
+#       "id": "normalize-plan-args",
+#       "name": "_normalize_plan_args",
+#       "anchor": "function-normalize-plan-args",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "clicontext",
+#       "name": "CliContext",
+#       "anchor": "class-clicontext",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "get-context",
+#       "name": "get_context",
+#       "anchor": "function-get-context",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "main",
+#       "name": "main",
+#       "anchor": "function-main",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "doctor",
+#       "name": "doctor",
+#       "anchor": "function-doctor",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "version-cmd",
+#       "name": "version_cmd",
+#       "anchor": "function-version-cmd",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Main Typer CLI app for OntologyDownload with settings integration.
 
 Provides a structured Typer CLI with:

@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.telemetry_records.records",
+#   "purpose": "Telemetry Record Types - Extended Data Contracts.",
+#   "sections": [
+#     {
+#       "id": "telemetryattemptrecord",
+#       "name": "TelemetryAttemptRecord",
+#       "anchor": "class-telemetryattemptrecord",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Telemetry Record Types - Extended Data Contracts
 

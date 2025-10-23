@@ -1,3 +1,102 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.cache_loader",
+#   "purpose": "Cache configuration loader with YAML/env/CLI overlay support.",
+#   "sections": [
+#     {
+#       "id": "storagekind",
+#       "name": "StorageKind",
+#       "anchor": "class-storagekind",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "cachedefault",
+#       "name": "CacheDefault",
+#       "anchor": "class-cachedefault",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "cachestorage",
+#       "name": "CacheStorage",
+#       "anchor": "class-cachestorage",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "cacherolepolicy",
+#       "name": "CacheRolePolicy",
+#       "anchor": "class-cacherolepolicy",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "cachehostpolicy",
+#       "name": "CacheHostPolicy",
+#       "anchor": "class-cachehostpolicy",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "cachecontrollerdefaults",
+#       "name": "CacheControllerDefaults",
+#       "anchor": "class-cachecontrollerdefaults",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "cacheconfig",
+#       "name": "CacheConfig",
+#       "anchor": "class-cacheconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "normalize-host-key",
+#       "name": "_normalize_host_key",
+#       "anchor": "function-normalize-host-key",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-yaml",
+#       "name": "_load_yaml",
+#       "anchor": "function-load-yaml",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "merge-dicts",
+#       "name": "_merge_dicts",
+#       "anchor": "function-merge-dicts",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-policy-value",
+#       "name": "_parse_policy_value",
+#       "anchor": "function-parse-policy-value",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "coerce-bool",
+#       "name": "_coerce_bool",
+#       "anchor": "function-coerce-bool",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "apply-env-overlays",
+#       "name": "_apply_env_overlays",
+#       "anchor": "function-apply-env-overlays",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "apply-cli-overrides",
+#       "name": "_apply_cli_overrides",
+#       "anchor": "function-apply-cli-overrides",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-cache-config",
+#       "name": "load_cache_config",
+#       "anchor": "function-load-cache-config",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Cache configuration loader with YAML/env/CLI overlay support.
 
 Responsibilities

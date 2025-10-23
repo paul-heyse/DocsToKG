@@ -1,13 +1,56 @@
 # === NAVMAP v1 ===
 # {
 #   "module": "DocsToKG.OntologyDownload.catalog.doctor",
-#   "purpose": "Database health checks and FS↔DB reconciliation",
+#   "purpose": "Database health checks and FS\u2194DB reconciliation",
 #   "sections": [
-#     {"id": "types", "name": "Doctor Result Types", "anchor": "TYP", "kind": "models"},
-#     {"id": "scan", "name": "Filesystem Scanning", "anchor": "SCAN", "kind": "api"},
-#     {"id": "check", "name": "Health Checks", "anchor": "CHK", "kind": "api"},
-#     {"id": "detect", "name": "Drift Detection", "anchor": "DFT", "kind": "api"},
-#     {"id": "repair", "name": "Auto-Repair Actions", "anchor": "RPR", "kind": "api"}
+#     {
+#       "id": "doctorissue",
+#       "name": "DoctorIssue",
+#       "anchor": "class-doctorissue",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "doctorreport",
+#       "name": "DoctorReport",
+#       "anchor": "class-doctorreport",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "healthcheckresult",
+#       "name": "HealthCheckResult",
+#       "anchor": "class-healthcheckresult",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "quick-health-check",
+#       "name": "quick_health_check",
+#       "anchor": "function-quick-health-check",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "scan-filesystem-artifacts",
+#       "name": "scan_filesystem_artifacts",
+#       "anchor": "function-scan-filesystem-artifacts",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "scan-filesystem-files",
+#       "name": "scan_filesystem_files",
+#       "anchor": "function-scan-filesystem-files",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "detect-db-fs-drifts",
+#       "name": "detect_db_fs_drifts",
+#       "anchor": "function-detect-db-fs-drifts",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "generate-doctor-report",
+#       "name": "generate_doctor_report",
+#       "anchor": "function-generate-doctor-report",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===

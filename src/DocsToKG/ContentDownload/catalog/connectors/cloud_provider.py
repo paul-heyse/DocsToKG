@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.catalog.connectors.cloud_provider",
+#   "purpose": "Cloud Provider (RDS + S3).",
+#   "sections": [
+#     {
+#       "id": "cloudprovider",
+#       "name": "CloudProvider",
+#       "anchor": "class-cloudprovider",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Cloud Provider (RDS + S3)
 

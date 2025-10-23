@@ -1,3 +1,30 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.core.manifest_sink",
+#   "purpose": "Unified manifest sink for DocParsing stages.",
+#   "sections": [
+#     {
+#       "id": "manifestsink",
+#       "name": "ManifestSink",
+#       "anchor": "class-manifestsink",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "manifestentry",
+#       "name": "ManifestEntry",
+#       "anchor": "class-manifestentry",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "jsonlmanifestsink",
+#       "name": "JsonlManifestSink",
+#       "anchor": "class-jsonlmanifestsink",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Unified manifest sink for DocParsing stages.
 
 This module provides a protocol and implementation for writing stage manifest

@@ -3,9 +3,30 @@
 #   "module": "DocsToKG.ContentDownload.telemetry_helpers",
 #   "purpose": "Convenience functions for structured event emission across HTTP, rate limiting, circuit breaker, and fallback layers",
 #   "sections": [
-#     {"id": "emit-http-event", "name": "emit_http_event", "anchor": "function-emit-http-event", "kind": "function"},
-#     {"id": "emit-rate-event", "name": "emit_rate_event", "anchor": "function-emit-rate-event", "kind": "function"},
-#     {"id": "emit-fallback-attempt", "name": "emit_fallback_attempt", "anchor": "function-emit-fallback-attempt", "kind": "function"}
+#     {
+#       "id": "emit-http-event",
+#       "name": "emit_http_event",
+#       "anchor": "function-emit-http-event",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-rate-event",
+#       "name": "emit_rate_event",
+#       "anchor": "function-emit-rate-event",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-breaker-transition",
+#       "name": "emit_breaker_transition",
+#       "anchor": "function-emit-breaker-transition",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-fallback-attempt",
+#       "name": "emit_fallback_attempt",
+#       "anchor": "function-emit-fallback-attempt",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===

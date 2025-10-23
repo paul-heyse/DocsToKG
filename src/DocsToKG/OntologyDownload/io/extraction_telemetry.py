@@ -3,9 +3,36 @@
 #   "module": "DocsToKG.OntologyDownload.io.extraction_telemetry",
 #   "purpose": "Error codes, telemetry constants, and structured logging for archive extraction policies",
 #   "sections": [
-#     {"id": "errors", "name": "Error Codes", "anchor": "ERR", "kind": "constants"},
-#     {"id": "telemetry", "name": "Telemetry Keys", "anchor": "TEL", "kind": "constants"},
-#     {"id": "logging", "name": "Structured Logging", "anchor": "LOG", "kind": "helpers"}
+#     {
+#       "id": "extractionerrorcode",
+#       "name": "ExtractionErrorCode",
+#       "anchor": "class-extractionerrorcode",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "telemetrykey",
+#       "name": "TelemetryKey",
+#       "anchor": "class-telemetrykey",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "extractiontelemetryevent",
+#       "name": "ExtractionTelemetryEvent",
+#       "anchor": "class-extractiontelemetryevent",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "extractionmetrics",
+#       "name": "ExtractionMetrics",
+#       "anchor": "class-extractionmetrics",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "error-message",
+#       "name": "error_message",
+#       "anchor": "function-error-message",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===

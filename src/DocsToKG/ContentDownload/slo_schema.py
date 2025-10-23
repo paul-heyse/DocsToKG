@@ -4,14 +4,40 @@
 #   "purpose": "SLO definitions and thresholds for idempotency system",
 #   "sections": [
 #     {
-#       "id": "slo-constants",
-#       "name": "SLO thresholds",
-#       "anchor": "constants"
+#       "id": "slothreshold",
+#       "name": "SLOThreshold",
+#       "anchor": "class-slothreshold",
+#       "kind": "class"
 #     },
 #     {
-#       "id": "slo-queries",
-#       "name": "SLO query helpers",
-#       "anchor": "queries"
+#       "id": "slometric",
+#       "name": "SLOMetric",
+#       "anchor": "class-slometric",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "get-slo-definitions",
+#       "name": "get_slo_definitions",
+#       "anchor": "function-get-slo-definitions",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "evaluate-slo-status",
+#       "name": "evaluate_slo_status",
+#       "anchor": "function-evaluate-slo-status",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "calculate-error-budget-remaining",
+#       "name": "calculate_error_budget_remaining",
+#       "anchor": "function-calculate-error-budget-remaining",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "should-alert",
+#       "name": "should_alert",
+#       "anchor": "function-should-alert",
+#       "kind": "function"
 #     }
 #   ]
 # }

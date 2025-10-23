@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.fallback.adapters.europe_pmc",
+#   "purpose": "Europe PMC API adapter for PDF resolution.",
+#   "sections": [
+#     {
+#       "id": "adapter-europe-pmc-pdf",
+#       "name": "adapter_europe_pmc_pdf",
+#       "anchor": "function-adapter-europe-pmc-pdf",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Europe PMC API adapter for PDF resolution."""
 
 from __future__ import annotations

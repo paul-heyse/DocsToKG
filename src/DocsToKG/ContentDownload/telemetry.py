@@ -3,12 +3,180 @@
 #   "module": "DocsToKG.ContentDownload.telemetry",
 #   "purpose": "Telemetry sinks, schemas, and resume helpers for content downloads",
 #   "sections": [
-#     {"id": "manifest-entry", "name": "ManifestEntry", "anchor": "class-manifestentry", "kind": "class"},
-#     {"id": "attempt-sink-protocol", "name": "AttemptSink", "anchor": "class-attemptsink", "kind": "class"},
-#     {"id": "jsonl-resume-lookup", "name": "JsonlResumeLookup", "anchor": "class-jsonlresumelookup", "kind": "class"},
-#     {"id": "sqlite-resume-lookup", "name": "SqliteResumeLookup", "anchor": "class-sqliteresumelookup", "kind": "class"},
-#     {"id": "run-telemetry", "name": "RunTelemetry", "anchor": "class-runtelemetry", "kind": "class"},
-#     {"id": "load-resume-completed", "name": "load_resume_completed_from_sqlite", "anchor": "function-load-resume-completed-from-sqlite", "kind": "function"}
+#     {
+#       "id": "simplifiedattemptrecord",
+#       "name": "SimplifiedAttemptRecord",
+#       "anchor": "class-simplifiedattemptrecord",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "normalize-manifest-path",
+#       "name": "normalize_manifest_path",
+#       "anchor": "function-normalize-manifest-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "manifestentry",
+#       "name": "ManifestEntry",
+#       "anchor": "class-manifestentry",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "canonical-key-or-fallback",
+#       "name": "_canonical_key_or_fallback",
+#       "anchor": "function-canonical-key-or-fallback",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "manifesturlindex",
+#       "name": "ManifestUrlIndex",
+#       "anchor": "class-manifesturlindex",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "attemptsink",
+#       "name": "AttemptSink",
+#       "anchor": "class-attemptsink",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "utc-timestamp",
+#       "name": "_utc_timestamp",
+#       "anchor": "function-utc-timestamp",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "ensure-parent-exists",
+#       "name": "_ensure_parent_exists",
+#       "anchor": "function-ensure-parent-exists",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "runtelemetry",
+#       "name": "RunTelemetry",
+#       "anchor": "class-runtelemetry",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "jsonlsink",
+#       "name": "JsonlSink",
+#       "anchor": "class-jsonlsink",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "rotatingjsonlsink",
+#       "name": "RotatingJsonlSink",
+#       "anchor": "class-rotatingjsonlsink",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "csvsink",
+#       "name": "CsvSink",
+#       "anchor": "class-csvsink",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "multisink",
+#       "name": "MultiSink",
+#       "anchor": "class-multisink",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "manifestindexsink",
+#       "name": "ManifestIndexSink",
+#       "anchor": "class-manifestindexsink",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "lastattemptcsvsink",
+#       "name": "LastAttemptCsvSink",
+#       "anchor": "class-lastattemptcsvsink",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "summarysink",
+#       "name": "SummarySink",
+#       "anchor": "class-summarysink",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "sqlitesink",
+#       "name": "SqliteSink",
+#       "anchor": "class-sqlitesink",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "manifest-entry-from-sqlite-row",
+#       "name": "_manifest_entry_from_sqlite_row",
+#       "anchor": "function-manifest-entry-from-sqlite-row",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "iter-resume-rows-from-sqlite",
+#       "name": "_iter_resume_rows_from_sqlite",
+#       "anchor": "function-iter-resume-rows-from-sqlite",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-resume-from-sqlite",
+#       "name": "_load_resume_from_sqlite",
+#       "anchor": "function-load-resume-from-sqlite",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "looks-like-csv-resume-target",
+#       "name": "looks_like_csv_resume_target",
+#       "anchor": "function-looks-like-csv-resume-target",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "looks-like-sqlite-resume-target",
+#       "name": "looks_like_sqlite_resume_target",
+#       "anchor": "function-looks-like-sqlite-resume-target",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "iter-previous-manifest-entries",
+#       "name": "iter_previous_manifest_entries",
+#       "anchor": "function-iter-previous-manifest-entries",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-previous-manifest",
+#       "name": "load_previous_manifest",
+#       "anchor": "function-load-previous-manifest",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "jsonlresumelookup",
+#       "name": "JsonlResumeLookup",
+#       "anchor": "class-jsonlresumelookup",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "sqliteresumelookup",
+#       "name": "SqliteResumeLookup",
+#       "anchor": "class-sqliteresumelookup",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "load-resume-completed-from-sqlite",
+#       "name": "load_resume_completed_from_sqlite",
+#       "anchor": "function-load-resume-completed-from-sqlite",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-manifest-url-index",
+#       "name": "load_manifest_url_index",
+#       "anchor": "function-load-manifest-url-index",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-manifest-entry",
+#       "name": "build_manifest_entry",
+#       "anchor": "function-build-manifest-entry",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===

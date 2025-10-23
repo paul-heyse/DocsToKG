@@ -3,11 +3,90 @@
 #   "module": "DocsToKG.OntologyDownload.manifests",
 #   "purpose": "Manage ontology manifest serialisation, lockfiles, and plan diff helpers",
 #   "sections": [
-#     {"id": "constants", "name": "Manifest Constants", "anchor": "CON", "kind": "constants"},
-#     {"id": "serialization", "name": "Serialisation Helpers", "anchor": "SER", "kind": "helpers"},
-#     {"id": "lockfiles", "name": "Lockfile Utilities", "anchor": "LOC", "kind": "api"},
-#     {"id": "plan-diff", "name": "Plan Diff Utilities", "anchor": "DIF", "kind": "helpers"},
-#     {"id": "resolution", "name": "Manifest Resolution Helpers", "anchor": "RES", "kind": "helpers"}
+#     {
+#       "id": "plan-to-dict",
+#       "name": "plan_to_dict",
+#       "anchor": "function-plan-to-dict",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "write-json-atomic",
+#       "name": "write_json_atomic",
+#       "anchor": "function-write-json-atomic",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "write-lockfile",
+#       "name": "write_lockfile",
+#       "anchor": "function-write-lockfile",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-lockfile-payload",
+#       "name": "load_lockfile_payload",
+#       "anchor": "function-load-lockfile-payload",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "spec-from-lock-entry",
+#       "name": "spec_from_lock_entry",
+#       "anchor": "function-spec-from-lock-entry",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "specs-from-lock-payload",
+#       "name": "specs_from_lock_payload",
+#       "anchor": "function-specs-from-lock-payload",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolve-version-metadata",
+#       "name": "resolve_version_metadata",
+#       "anchor": "function-resolve-version-metadata",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "ensure-manifest-path",
+#       "name": "ensure_manifest_path",
+#       "anchor": "function-ensure-manifest-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-manifest",
+#       "name": "load_manifest",
+#       "anchor": "function-load-manifest",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "collect-version-metadata",
+#       "name": "collect_version_metadata",
+#       "anchor": "function-collect-version-metadata",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-latest-manifest",
+#       "name": "load_latest_manifest",
+#       "anchor": "function-load-latest-manifest",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "results-to-dict",
+#       "name": "results_to_dict",
+#       "anchor": "function-results-to-dict",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "compute-plan-diff",
+#       "name": "compute_plan_diff",
+#       "anchor": "function-compute-plan-diff",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "format-plan-diff",
+#       "name": "format_plan_diff",
+#       "anchor": "function-format-plan-diff",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===

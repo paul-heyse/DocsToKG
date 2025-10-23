@@ -1,3 +1,30 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.ratelimit.tenacity_learning",
+#   "purpose": "Per-provider rate limit learning using Tenacity callbacks.",
+#   "sections": [
+#     {
+#       "id": "providerbehavior",
+#       "name": "ProviderBehavior",
+#       "anchor": "class-providerbehavior",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "providerbehaviortracker",
+#       "name": "ProviderBehaviorTracker",
+#       "anchor": "class-providerbehaviortracker",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "create-learning-retry-policy",
+#       "name": "create_learning_retry_policy",
+#       "anchor": "function-create-learning-retry-policy",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Per-provider rate limit learning using Tenacity callbacks.
 
 Tenacity's `before_sleep` callbacks let us track provider behavior without

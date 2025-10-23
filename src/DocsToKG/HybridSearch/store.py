@@ -4,9 +4,21 @@
 #   "purpose": "Vector store orchestration, OpenSearch helpers, GPU similarity utilities, and persistence",
 #   "sections": [
 #     {
+#       "id": "ensure-cuvs-loader-path",
+#       "name": "_ensure_cuvs_loader_path",
+#       "anchor": "function-ensure-cuvs-loader-path",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "vector-uuid-to-faiss-int",
 #       "name": "_vector_uuid_to_faiss_int",
 #       "anchor": "function-vector-uuid-to-faiss-int",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-gpu-index-probe-config",
+#       "name": "_build_gpu_index_probe_config",
+#       "anchor": "function-build-gpu-index-probe-config",
 #       "kind": "function"
 #     },
 #     {

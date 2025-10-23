@@ -1,3 +1,36 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.policy.registry",
+#   "purpose": "Central registry of policy gates and decorator for gate registration.",
+#   "sections": [
+#     {
+#       "id": "gatemetadata",
+#       "name": "GateMetadata",
+#       "anchor": "class-gatemetadata",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "policyregistry",
+#       "name": "PolicyRegistry",
+#       "anchor": "class-policyregistry",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "get-registry",
+#       "name": "get_registry",
+#       "anchor": "function-get-registry",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "policy-gate",
+#       "name": "policy_gate",
+#       "anchor": "function-policy-gate",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Central registry of policy gates and decorator for gate registration.
 
 All gates register with this registry:

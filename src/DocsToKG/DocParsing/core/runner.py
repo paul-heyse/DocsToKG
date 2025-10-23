@@ -1,3 +1,120 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.core.runner",
+#   "purpose": "Stage runner scaffolding shared by DocParsing pipelines.",
+#   "sections": [
+#     {
+#       "id": "itemfingerprint",
+#       "name": "ItemFingerprint",
+#       "anchor": "class-itemfingerprint",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "workitem",
+#       "name": "WorkItem",
+#       "anchor": "class-workitem",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "stageplan",
+#       "name": "StagePlan",
+#       "anchor": "class-stageplan",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "stageoptions",
+#       "name": "StageOptions",
+#       "anchor": "class-stageoptions",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "stageerror",
+#       "name": "StageError",
+#       "anchor": "class-stageerror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "itemoutcome",
+#       "name": "ItemOutcome",
+#       "anchor": "class-itemoutcome",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "stageoutcome",
+#       "name": "StageOutcome",
+#       "anchor": "class-stageoutcome",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "stagehooks",
+#       "name": "StageHooks",
+#       "anchor": "class-stagehooks",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "stagecontext",
+#       "name": "StageContext",
+#       "anchor": "class-stagecontext",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "submission",
+#       "name": "_Submission",
+#       "anchor": "class-submission",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "workerpayload",
+#       "name": "_WorkerPayload",
+#       "anchor": "class-workerpayload",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "now",
+#       "name": "_now",
+#       "anchor": "function-now",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "call-worker",
+#       "name": "_call_worker",
+#       "anchor": "function-call-worker",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "should-skip",
+#       "name": "_should_skip",
+#       "anchor": "function-should-skip",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "apply-backoff",
+#       "name": "_apply_backoff",
+#       "anchor": "function-apply-backoff",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "percentile",
+#       "name": "_percentile",
+#       "anchor": "function-percentile",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "create-executor",
+#       "name": "_create_executor",
+#       "anchor": "function-create-executor",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "run-stage",
+#       "name": "run_stage",
+#       "anchor": "function-run-stage",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Stage runner scaffolding shared by DocParsing pipelines.
 
 Stages describe the work they need to perform via :class:`StagePlan` and the

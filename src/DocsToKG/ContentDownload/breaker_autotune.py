@@ -4,9 +4,9 @@
 #   "purpose": "Apply safe, bounded adjustments to live circuit breaker and rate-limiter registries",
 #   "sections": [
 #     {
-#       "id": "autotune-plan",
+#       "id": "autotuneplan",
 #       "name": "AutoTunePlan",
-#       "anchor": "class-autotune-plan",
+#       "anchor": "class-autotuneplan",
 #       "kind": "class"
 #     },
 #     {

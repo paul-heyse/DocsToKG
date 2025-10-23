@@ -1,3 +1,24 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.embedding.backends.factory",
+#   "purpose": "Provider factory wiring dense, sparse, and lexical backends.",
+#   "sections": [
+#     {
+#       "id": "providerbundle",
+#       "name": "ProviderBundle",
+#       "anchor": "class-providerbundle",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "providerfactory",
+#       "name": "ProviderFactory",
+#       "anchor": "class-providerfactory",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Provider factory wiring dense, sparse, and lexical backends."""
 
 from __future__ import annotations

@@ -1,3 +1,156 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.storage.parquet_schemas",
+#   "purpose": "Describe this module's responsibilities.",
+#   "sections": [
+#     {
+#       "id": "chunks-schema",
+#       "name": "chunks_schema",
+#       "anchor": "function-chunks-schema",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "dense-schema",
+#       "name": "dense_schema",
+#       "anchor": "function-dense-schema",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "sparse-schema-idspace",
+#       "name": "sparse_schema_idspace",
+#       "anchor": "function-sparse-schema-idspace",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "lexical-schema-idspace",
+#       "name": "lexical_schema_idspace",
+#       "anchor": "function-lexical-schema-idspace",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "lexical-schema-terms",
+#       "name": "lexical_schema_terms",
+#       "anchor": "function-lexical-schema-terms",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "utc-now-iso",
+#       "name": "_utc_now_iso",
+#       "anchor": "function-utc-now-iso",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "to-bytes-meta",
+#       "name": "_to_bytes_meta",
+#       "anchor": "function-to-bytes-meta",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-footer-common",
+#       "name": "build_footer_common",
+#       "anchor": "function-build-footer-common",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-footer-dense",
+#       "name": "build_footer_dense",
+#       "anchor": "function-build-footer-dense",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-footer-sparse",
+#       "name": "build_footer_sparse",
+#       "anchor": "function-build-footer-sparse",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-footer-lexical",
+#       "name": "build_footer_lexical",
+#       "anchor": "function-build-footer-lexical",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "footervalidationresult",
+#       "name": "FooterValidationResult",
+#       "anchor": "class-footervalidationresult",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "decode-file-metadata",
+#       "name": "_decode_file_metadata",
+#       "anchor": "function-decode-file-metadata",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-footer-common",
+#       "name": "validate_footer_common",
+#       "anchor": "function-validate-footer-common",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-footer-vectors",
+#       "name": "validate_footer_vectors",
+#       "anchor": "function-validate-footer-vectors",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-footer-dense",
+#       "name": "validate_footer_dense",
+#       "anchor": "function-validate-footer-dense",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-footer-sparse",
+#       "name": "validate_footer_sparse",
+#       "anchor": "function-validate-footer-sparse",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-footer-lexical",
+#       "name": "validate_footer_lexical",
+#       "anchor": "function-validate-footer-lexical",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "attach-footer-metadata",
+#       "name": "attach_footer_metadata",
+#       "anchor": "function-attach-footer-metadata",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "read-parquet-footer",
+#       "name": "read_parquet_footer",
+#       "anchor": "function-read-parquet-footer",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-parquet-file",
+#       "name": "validate_parquet_file",
+#       "anchor": "function-validate-parquet-file",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "assert-table-matches-schema",
+#       "name": "assert_table_matches_schema",
+#       "anchor": "function-assert-table-matches-schema",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "recommended-parquet-writer-options",
+#       "name": "recommended_parquet_writer_options",
+#       "anchor": "function-recommended-parquet-writer-options",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "legacy-vector-schema",
+#       "name": "_legacy_vector_schema",
+#       "anchor": "function-legacy-vector-schema",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 # file: src/DocsToKG/DocParsing/storage/parquet_schemas.py
 # Purpose: Executable Arrow schema declarations + Parquet footer contract
 # Compatible with: pyarrow >= 9 (recommended >= 12)

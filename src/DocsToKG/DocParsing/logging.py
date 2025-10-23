@@ -1,3 +1,72 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.logging",
+#   "purpose": "Structured logging adapters and manifest logging helpers for DocParsing.",
+#   "sections": [
+#     {
+#       "id": "structuredlogger",
+#       "name": "StructuredLogger",
+#       "anchor": "class-structuredlogger",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "get-logger",
+#       "name": "get_logger",
+#       "anchor": "function-get-logger",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "log-event",
+#       "name": "log_event",
+#       "anchor": "function-log-event",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "stringify-path",
+#       "name": "_stringify_path",
+#       "anchor": "function-stringify-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "manifest-log-skip",
+#       "name": "manifest_log_skip",
+#       "anchor": "function-manifest-log-skip",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "manifest-log-success",
+#       "name": "manifest_log_success",
+#       "anchor": "function-manifest-log-success",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "manifest-log-failure",
+#       "name": "manifest_log_failure",
+#       "anchor": "function-manifest-log-failure",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "summarize-manifest",
+#       "name": "summarize_manifest",
+#       "anchor": "function-summarize-manifest",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "set-stage-telemetry",
+#       "name": "set_stage_telemetry",
+#       "anchor": "function-set-stage-telemetry",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "telemetry-scope",
+#       "name": "telemetry_scope",
+#       "anchor": "function-telemetry-scope",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Structured logging adapters and manifest logging helpers for DocParsing.
 
 Stages emit both console-friendly logs and JSON payloads that feed telemetry

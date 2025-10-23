@@ -1,3 +1,42 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.core.http",
+#   "purpose": "Shared HTTP session management for DocParsing network interactions.",
+#   "sections": [
+#     {
+#       "id": "retryafterwait",
+#       "name": "_RetryAfterWait",
+#       "anchor": "class-retryafterwait",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "tenacityclient",
+#       "name": "TenacityClient",
+#       "anchor": "class-tenacityclient",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "normalize-http-timeout",
+#       "name": "normalize_http_timeout",
+#       "anchor": "function-normalize-http-timeout",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-retry-after-header",
+#       "name": "_parse_retry_after_header",
+#       "anchor": "function-parse-retry-after-header",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-http-session",
+#       "name": "get_http_session",
+#       "anchor": "function-get-http-session",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Shared HTTP session management for DocParsing network interactions.
 
 Certain DocParsing stages—particularly DocTags conversion when downloading

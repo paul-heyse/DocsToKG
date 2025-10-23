@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.catalog.s3_layout",
+#   "purpose": "S3-based storage layout adapter (stub for future implementation).",
+#   "sections": [
+#     {
+#       "id": "s3layout",
+#       "name": "S3Layout",
+#       "anchor": "class-s3layout",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """S3-based storage layout adapter (stub for future implementation).
 
 This module provides a seam for S3 integration. It allows the catalog system

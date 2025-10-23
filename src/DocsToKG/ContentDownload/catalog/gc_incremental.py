@@ -1,3 +1,36 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.catalog.gc_incremental",
+#   "purpose": "Incremental garbage collection with batching and progress tracking.",
+#   "sections": [
+#     {
+#       "id": "gcbatchresult",
+#       "name": "GCBatchResult",
+#       "anchor": "class-gcbatchresult",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "gcstats",
+#       "name": "GCStats",
+#       "anchor": "class-gcstats",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "incrementalgc",
+#       "name": "IncrementalGC",
+#       "anchor": "class-incrementalgc",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "gc-incremental-cli",
+#       "name": "gc_incremental_cli",
+#       "anchor": "function-gc-incremental-cli",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Incremental garbage collection with batching and progress tracking.
 
 Provides production-safe GC with:

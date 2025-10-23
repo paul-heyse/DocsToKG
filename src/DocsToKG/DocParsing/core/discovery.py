@@ -1,3 +1,84 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.core.discovery",
+#   "purpose": "Filesystem discovery utilities for DocParsing manifests and artifacts.",
+#   "sections": [
+#     {
+#       "id": "chunkdiscovery",
+#       "name": "ChunkDiscovery",
+#       "anchor": "class-chunkdiscovery",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "ensure-str-sequence",
+#       "name": "_ensure_str_sequence",
+#       "anchor": "function-ensure-str-sequence",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-structural-marker-profile",
+#       "name": "load_structural_marker_profile",
+#       "anchor": "function-load-structural-marker-profile",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-structural-marker-config",
+#       "name": "load_structural_marker_config",
+#       "anchor": "function-load-structural-marker-config",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "normalise-chunk-relative",
+#       "name": "_normalise_chunk_relative",
+#       "anchor": "function-normalise-chunk-relative",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "vector-artifact-name",
+#       "name": "vector_artifact_name",
+#       "anchor": "function-vector-artifact-name",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "derive-doc-id-and-doctags-path",
+#       "name": "derive_doc_id_and_doctags_path",
+#       "anchor": "function-derive-doc-id-and-doctags-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "derive-doc-id-and-chunks-path",
+#       "name": "derive_doc_id_and_chunks_path",
+#       "anchor": "function-derive-doc-id-and-chunks-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "derive-doc-id-and-vectors-path",
+#       "name": "derive_doc_id_and_vectors_path",
+#       "anchor": "function-derive-doc-id-and-vectors-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "compute-relative-doc-id",
+#       "name": "compute_relative_doc_id",
+#       "anchor": "function-compute-relative-doc-id",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "compute-stable-shard",
+#       "name": "compute_stable_shard",
+#       "anchor": "function-compute-stable-shard",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "iter-chunks",
+#       "name": "iter_chunks",
+#       "anchor": "function-iter-chunks",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Filesystem discovery utilities for DocParsing manifests and artifacts.
 
 The discovery layer translates on-disk structures—DocTags, chunk JSONL files,

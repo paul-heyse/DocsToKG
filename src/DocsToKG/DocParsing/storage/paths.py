@@ -1,3 +1,54 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.storage.paths",
+#   "purpose": "Dataset Layout & Path Builders.",
+#   "sections": [
+#     {
+#       "id": "normalize-rel-id",
+#       "name": "normalize_rel_id",
+#       "anchor": "function-normalize-rel-id",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "timestamp-to-partition",
+#       "name": "_timestamp_to_partition",
+#       "anchor": "function-timestamp-to-partition",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "chunks-output-path",
+#       "name": "chunks_output_path",
+#       "anchor": "function-chunks-output-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "doctags-output-path",
+#       "name": "doctags_output_path",
+#       "anchor": "function-doctags-output-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "vectors-output-path",
+#       "name": "vectors_output_path",
+#       "anchor": "function-vectors-output-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "chunk-file-glob-pattern",
+#       "name": "chunk_file_glob_pattern",
+#       "anchor": "function-chunk-file-glob-pattern",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "extract-partition-keys",
+#       "name": "extract_partition_keys",
+#       "anchor": "function-extract-partition-keys",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Dataset Layout & Path Builders
 

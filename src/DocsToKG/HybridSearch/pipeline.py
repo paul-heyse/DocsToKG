@@ -4,6 +4,12 @@
 #   "purpose": "Ingestion pipeline, feature generation, and observability helpers",
 #   "sections": [
 #     {
+#       "id": "default-training-rng-factory",
+#       "name": "_default_training_rng_factory",
+#       "anchor": "function-default-training-rng-factory",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "countersample",
 #       "name": "CounterSample",
 #       "anchor": "class-countersample",
@@ -56,6 +62,12 @@
 #       "name": "IngestMetrics",
 #       "anchor": "class-ingestmetrics",
 #       "kind": "class"
+#     },
+#     {
+#       "id": "ensure-pyarrow-vectors",
+#       "name": "_ensure_pyarrow_vectors",
+#       "anchor": "function-ensure-pyarrow-vectors",
+#       "kind": "function"
 #     },
 #     {
 #       "id": "batchcommitresult",

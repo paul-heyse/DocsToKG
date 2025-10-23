@@ -1,3 +1,24 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.core.manifest",
+#   "purpose": "Resume and manifest decision helpers for DocParsing stages.",
+#   "sections": [
+#     {
+#       "id": "should-skip-output",
+#       "name": "should_skip_output",
+#       "anchor": "function-should-skip-output",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resumecontroller",
+#       "name": "ResumeController",
+#       "anchor": "class-resumecontroller",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Resume and manifest decision helpers for DocParsing stages.
 
 Chunking and embedding maintain JSONL manifests that record the hash of the
