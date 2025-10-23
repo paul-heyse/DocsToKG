@@ -38,3 +38,11 @@ No eligible files after excludes.
 - Broken: `storage.dataset_view.summarize` tried `Path.stat()` on fragment paths, throwing `FileNotFoundError` for remote or non-local filesystems so summaries could not run outside local disk.
 - Fixed: resolve fragment metadata via the Arrow filesystem (fall back to local `Path.stat`), keep partition/doc-id extraction in place, and suppress filesystem lookup errors.
 - TODO: add coverage that simulates non-local filesystems to catch regressions.
+
+<!-- 2025-10-23 04:29:09Z UTC -->
+## Pass 2 — find and fix real bugs
+
+### Batch 0 (Pass 2)
+- Broken: `storage.dataset_view._extract_partition_from_path` only matched POSIX-style separators, so Windows/UNC fragment paths never surfaced partition buckets during dataset summaries.
+- Fixed: Accept both `/` and `\` when parsing partition components so summaries stay accurate on Windows and shared-network mounts.
+- TODO: Add regression coverage with Windows-style fragment paths once a cross-platform fixture harness lands.

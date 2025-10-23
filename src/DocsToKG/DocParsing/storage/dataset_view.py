@@ -167,8 +167,9 @@ def _extract_partition_from_path(file_path: str) -> Optional[str]:
     Returns:
         Partition string "YYYY-MM", or None if extraction fails.
     """
-    # Match pattern: .../{yyyy}/{mm}/...
-    match = re.search(r"/(\d{4})/(\d{2})/", file_path)
+    normalized = str(file_path)
+    # Match YYYY/MM partitions using either POSIX or Windows separators.
+    match = re.search(r"[\\/](\d{4})[\\/](\d{2})(?:[\\/]|$)", normalized)
     if match:
         return f"{match.group(1)}-{match.group(2)}"
     return None
