@@ -301,9 +301,7 @@ class RetrievalConfig:
                 f"received {type(max_workers).__name__}"
             )
         if max_workers <= 0:
-            raise ValueError(
-                "RetrievalConfig.executor_max_workers must be positive"
-            )
+            raise ValueError("RetrievalConfig.executor_max_workers must be positive")
 
 
 @dataclass(frozen=True)
@@ -473,9 +471,7 @@ class HybridSearchConfigManager:
         try:
             data = yaml.safe_load(raw)
         except yaml.YAMLError as exc:
-            raise ValueError(
-                f"Failed to parse YAML configuration at {self._path}: {exc}"
-            ) from exc
+            raise ValueError(f"Failed to parse YAML configuration at {self._path}: {exc}") from exc
         if not isinstance(data, dict):
             raise ValueError("YAML configuration must define a mapping")
         return data

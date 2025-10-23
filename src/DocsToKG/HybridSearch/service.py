@@ -2859,9 +2859,7 @@ class HybridSearchValidator:
         # Precompute matrix for brute-force recall estimates.
         embedding_cache: Dict[str, np.ndarray] = {}
         vector_ids = [chunk.vector_id for chunk in all_chunks]
-        vector_matrix = self._registry.resolve_embeddings(
-            vector_ids, cache=embedding_cache
-        )
+        vector_matrix = self._registry.resolve_embeddings(vector_ids, cache=embedding_cache)
         vector_matrix = np.asarray(vector_matrix, dtype=np.float32)
         if vector_matrix.ndim == 1:
             vector_matrix = vector_matrix.reshape(1, -1)
@@ -3068,11 +3066,7 @@ class HybridSearchValidator:
             namespace = request.namespace
             if namespace is None:
                 document_namespace = document_payload.get("namespace")
-                namespace = (
-                    ""
-                    if document_namespace is None
-                    else str(document_namespace)
-                )
+                namespace = "" if document_namespace is None else str(document_namespace)
             else:
                 namespace = str(namespace)
             dense_query_vector = doc_to_embedding.get(
@@ -3163,8 +3157,7 @@ class HybridSearchValidator:
             )
 
         chunk_lookup = {
-            (chunk.namespace, chunk.doc_id, chunk.chunk_id): chunk
-            for chunk in self._registry.all()
+            (chunk.namespace, chunk.doc_id, chunk.chunk_id): chunk for chunk in self._registry.all()
         }
 
         redundancy_reductions: List[float] = []
@@ -3181,9 +3174,7 @@ class HybridSearchValidator:
             baseline_request = self._request_for_query(query_payload, page_size=10)
             baseline_response = self._service.search(baseline_request)
             baseline_doc_ids = [result.doc_id for result in baseline_response.results[:10]]
-            baseline_vectors = self._embeddings_for_results(
-                baseline_response.results, chunk_lookup
-            )
+            baseline_vectors = self._embeddings_for_results(baseline_response.results, chunk_lookup)
             baseline_cos = self._average_pairwise_cos(baseline_vectors)
             rrf_cosines.append(baseline_cos)
             if expected_doc_id in baseline_doc_ids:
@@ -3309,8 +3300,7 @@ class HybridSearchValidator:
         max_per_doc = config.fusion.max_chunks_per_doc
         dedupe_threshold = config.fusion.cosine_dedupe_threshold
         chunk_lookup = {
-            (chunk.namespace, chunk.doc_id, chunk.chunk_id): chunk
-            for chunk in self._registry.all()
+            (chunk.namespace, chunk.doc_id, chunk.chunk_id): chunk for chunk in self._registry.all()
         }
         device = int(config.dense.device)
 
@@ -3579,7 +3569,9 @@ class HybridSearchValidator:
             approx_limit = (8 * 1024 * 1024) // bytes_per_vector
             default_ceiling = max(safe_min_batch, min(512, approx_limit))
         available_chunks = len(chunks)
-        safe_max_batch = min(default_ceiling, available_chunks) if available_chunks else default_ceiling
+        safe_max_batch = (
+            min(default_ceiling, available_chunks) if available_chunks else default_ceiling
+        )
         safe_max_batch = max(safe_min_batch, safe_max_batch)
 
         config_manager = getattr(self._service, "_config_manager", None)

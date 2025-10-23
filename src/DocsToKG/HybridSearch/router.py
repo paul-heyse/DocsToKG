@@ -145,9 +145,7 @@ class FaissRouter:
         return {"namespaces": snapshots, "aggregate": aggregate}
 
     @staticmethod
-    def _aggregate_stats(
-        namespaced: Mapping[str, Mapping[str, object]]
-    ) -> Dict[str, object]:
+    def _aggregate_stats(namespaced: Mapping[str, Mapping[str, object]]) -> Dict[str, object]:
         totals: Dict[str, float] = {}
         booleans: Dict[str, Dict[str, int]] = {}
         timestamp_suffixes = ("_ts", "_timestamp")

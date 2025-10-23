@@ -3257,9 +3257,7 @@ def restore_state(
     vector_ids_payload = payload.get("vector_ids")
     if registry is not None:
         if vector_ids_payload is None:
-            logger.warning(
-                "restore_state: payload missing 'vector_ids'; registry will be cleared"
-            )
+            logger.warning("restore_state: payload missing 'vector_ids'; registry will be cleared")
             registry.restore_vector_ids(())
         else:
             if isinstance(vector_ids_payload, (str, bytes)) or not isinstance(
