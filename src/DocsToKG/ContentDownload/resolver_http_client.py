@@ -81,6 +81,9 @@ class RetryConfig:
     rate_burst: float = 2.0
     """Burst tolerance (allow surge up to capacity + burst)."""
 
+    timeout_read_s: Optional[float] = None
+    """Per-resolver read timeout override (seconds)."""
+
 
 class TokenBucket:
     """Thread-safe token bucket for rate limiting."""
@@ -297,8 +300,24 @@ class PerResolverHttpClient:
             LOGGER.error(f"[{self.resolver_name}] Rate limiter timeout: {e}")
             raise
 
-        # Apply timeout from config if not overridden
-        req_timeout = timeout or self.session.timeout
+        # Apply timeout preference: explicit call > resolver override > session default
+        if timeout is not None:
+            req_timeout = timeout
+        else:
+            resolver_timeout = self.config.timeout_read_s
+            if resolver_timeout is not None:
+                session_timeout = getattr(self.session, "timeout", None)
+                if isinstance(session_timeout, httpx.Timeout):
+                    req_timeout = httpx.Timeout(
+                        connect=session_timeout.connect,
+                        read=resolver_timeout,
+                        write=session_timeout.write,
+                        pool=session_timeout.pool,
+                    )
+                else:
+                    req_timeout = resolver_timeout
+            else:
+                req_timeout = getattr(self.session, "timeout", None)
 
         # Execute with retries
         attempt_count = 0
