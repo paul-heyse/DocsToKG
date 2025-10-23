@@ -29,6 +29,7 @@ from DocsToKG.DocParsing.app_context import (
 from DocsToKG.DocParsing.chunking import runtime as chunking_runtime
 from DocsToKG.DocParsing.config_adapter import ConfigurationAdapter
 from DocsToKG.DocParsing.embedding import runtime as embedding_runtime
+from DocsToKG.DocParsing.settings import Format
 
 # ============================================================================
 # CLI Application Setup
@@ -458,6 +459,14 @@ def chunk(
             app_ctx.settings.chunk.input_dir = input_dir
         if output_dir:
             app_ctx.settings.chunk.output_dir = output_dir
+        if fmt:
+            try:
+                app_ctx.settings.chunk.format = Format(fmt.lower())
+            except ValueError as exc:
+                raise typer.BadParameter(
+                    "Format must be 'parquet' or 'jsonl'.",
+                    param_name="format",
+                ) from exc
         if min_tokens:
             app_ctx.settings.chunk.min_tokens = min_tokens
         if max_tokens:
