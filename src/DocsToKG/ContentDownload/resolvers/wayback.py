@@ -60,6 +60,7 @@ from typing import TYPE_CHECKING, Any, Dict, Iterable, Iterator, List, Mapping, 
 import httpx
 
 from DocsToKG.ContentDownload.networking import BreakerOpenError, request_with_retries
+from DocsToKG.ContentDownload.telemetry_wayback import TelemetryWayback
 from DocsToKG.ContentDownload.urls import canonical_for_index, canonical_for_request
 
 from DocsToKG.ContentDownload.resolvers.base import (
@@ -128,6 +129,9 @@ class WaybackResolver:
 
     name = "wayback"
 
+    def __init__(self, telemetry: Optional[TelemetryWayback] = None) -> None:
+        self._telemetry = telemetry or TelemetryWayback()
+
     def is_enabled(self, config: Any, artifact: "WorkArtifact") -> bool:
         """Return ``True`` when prior resolver attempts have failed."""
 
@@ -138,6 +142,7 @@ class WaybackResolver:
         client: httpx.Client,
         config: Any,
         artifact: "WorkArtifact",
+        ctx: Optional[Any] = None,
     ) -> Iterable[ResolverResult]:
         """Yield archived URLs discovered via availability/CDX lookups."""
 
@@ -160,60 +165,102 @@ class WaybackResolver:
         for original_url in artifact.failed_pdf_urls:
             try:
                 canonical_url = canonical_for_index(original_url)
-                publication_year = getattr(artifact, "publication_year", None)
+            except Exception:
+                canonical_url = original_url
 
-                snapshot_url, metadata = self._discover_snapshots(
-                    client,
-                    config,
-                    original_url,
-                    canonical_url,
-                    publication_year,
-                    availability_first,
-                    year_window,
-                    max_snapshots,
-                    min_pdf_bytes,
-                    html_parse_enabled,
-                )
+            with self._telemetry.start_attempt(
+                ctx,
+                original_url=original_url,
+                canonical_url=canonical_url,
+            ) as attempt:
+                try:
+                    publication_year = getattr(artifact, "publication_year", None)
 
-                if snapshot_url:
-                    # When coming from HTML parsing we may need to canonicalise the URL again.
-                    resolved_url = canonical_for_request(snapshot_url, role="artifact")
-                    yield ResolverResult(
-                        url=resolved_url,
-                        metadata={
-                            "source": "wayback",
-                            "original": original_url,
-                            "canonical": canonical_url,
-                            **metadata,
-                        },
-                    )
-                else:
-                    yield ResolverResult(
-                        url=None,
-                        event=ResolverEvent.SKIPPED,
-                        event_reason=ResolverEventReason.NO_WAYBACK_SNAPSHOT,
-                        metadata={
-                            "source": "wayback",
-                            "original": original_url,
-                            "canonical": canonical_url,
-                            "reason": "no_snapshot",
-                            **metadata,
-                        },
+                    snapshot_url, metadata = self._discover_snapshots(
+                        client,
+                        config,
+                        original_url,
+                        canonical_url,
+                        publication_year,
+                        availability_first,
+                        year_window,
+                        max_snapshots,
+                        min_pdf_bytes,
+                        html_parse_enabled,
                     )
 
-            except Exception as exc:  # pragma: no cover - defensive logging
-                LOGGER.exception("Unexpected Wayback resolver error for %s", original_url)
-                yield ResolverResult(
-                    url=None,
-                    event=ResolverEvent.ERROR,
-                    event_reason=ResolverEventReason.UNEXPECTED_ERROR,
-                    metadata={
+                    attempt.record_discovery(metadata)
+
+                    base_metadata: Dict[str, Any] = {
                         "source": "wayback",
                         "original": original_url,
-                        "error": str(exc),
-                        "error_type": type(exc).__name__,
-                    },
-                )
+                        "canonical": canonical_url,
+                        **metadata,
+                    }
+
+                    if snapshot_url:
+                        resolved_url = canonical_for_request(snapshot_url, role="artifact")
+                        attempt.record_candidate(
+                            "success",
+                            candidate_url=resolved_url,
+                            metadata=metadata,
+                        )
+                        attempt.complete(
+                            "success",
+                            metadata={"discovery_method": metadata.get("discovery_method")},
+                        )
+                        base_metadata["telemetry"] = attempt.as_metadata()
+                        yield ResolverResult(
+                            url=resolved_url,
+                            metadata=base_metadata,
+                        )
+                    else:
+                        attempt.record_candidate(
+                            "skip",
+                            candidate_url=None,
+                            metadata=metadata,
+                        )
+                        skip_meta = {
+                            "reason": metadata.get("reason", "no_snapshot"),
+                            "discovery_method": metadata.get("discovery_method"),
+                        }
+                        attempt.complete("skip", metadata=skip_meta)
+                        base_metadata.update(skip_meta)
+                        base_metadata.setdefault("reason", "no_snapshot")
+                        base_metadata["telemetry"] = attempt.as_metadata()
+                        yield ResolverResult(
+                            url=None,
+                            event=ResolverEvent.SKIPPED,
+                            event_reason=ResolverEventReason.NO_WAYBACK_SNAPSHOT,
+                            metadata=base_metadata,
+                        )
+
+                except Exception as exc:  # pragma: no cover - defensive logging
+                    LOGGER.exception("Unexpected Wayback resolver error for %s", original_url)
+                    attempt.record_error(
+                        error=str(exc),
+                        error_type=type(exc).__name__,
+                    )
+                    attempt.complete(
+                        "error",
+                        metadata={
+                            "error": str(exc),
+                            "error_type": type(exc).__name__,
+                        },
+                    )
+                    yield ResolverResult(
+                        url=None,
+                        event=ResolverEvent.ERROR,
+                        event_reason=ResolverEventReason.UNEXPECTED_ERROR,
+                        metadata={
+                            "source": "wayback",
+                            "original": original_url,
+                            "canonical": canonical_url,
+                            "error": str(exc),
+                            "error_type": type(exc).__name__,
+                            "telemetry": attempt.as_metadata(),
+                        },
+                    )
 
     def _discover_snapshots(
         self,
