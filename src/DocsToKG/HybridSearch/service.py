@@ -1849,13 +1849,22 @@ class HybridSearchService:
             bool(request.recall_first),
         )
 
+    def _signature_sort_key(self, value: object) -> str:
+        """Return a deterministic sort key for normalised signature elements."""
+
+        return repr(value)
+
     def _normalize_signature_value(self, value: object) -> object:
         if isinstance(value, Mapping):
             return tuple(
                 (str(key), self._normalize_signature_value(val))
                 for key, val in sorted(value.items(), key=lambda item: str(item[0]))
             )
-        if isinstance(value, (list, tuple, set)):
+        if isinstance(value, (set, frozenset)):
+            normalized = [self._normalize_signature_value(val) for val in value]
+            normalized.sort(key=self._signature_sort_key)
+            return tuple(normalized)
+        if isinstance(value, (list, tuple)):
             return tuple(self._normalize_signature_value(val) for val in value)
         if isinstance(value, (str, int, float, bool)) or value is None:
             return value

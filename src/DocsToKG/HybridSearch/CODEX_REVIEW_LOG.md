@@ -33,3 +33,13 @@ No eligible files after excludes.
 
 <!-- 2025-10-23 04:24:41Z UTC -->
 ## Pass 1 — find and fix real bugs
+
+<!-- 2025-10-23 04:25:01Z UTC -->
+## Pass 2 — find and fix real bugs
+
+### Batch 0 (Pass 2)
+- Broken: Dense planner signatures iterated set-valued filters in arbitrary order, preventing cache hits and destabilising dense oversampling.
+- Fix:
+  - Normalise set inputs by sorting their normalised elements with a deterministic key before tuple conversion.
+  - Added a helper to generate stable sort keys for signature elements.
+- TODO: None.
