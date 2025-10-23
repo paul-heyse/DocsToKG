@@ -91,7 +91,7 @@ NAVMAP:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any, Callable, Optional
 
 import typer
 
@@ -350,6 +350,46 @@ def config_diff(
 # ============================================================================
 
 
+def _build_doctags_execution(
+    app_ctx: AppContext,
+    normalized_mode: str,
+) -> tuple["doctags_module.DoctagsCfg", Optional[str], Callable[..., int]]:
+    """Return the config and runtime callable for the DocTags stage.
+
+    Args:
+        app_ctx: The fully layered application context.
+        normalized_mode: Lowercase mode hint (auto|pdf|html).
+
+    Returns:
+        A tuple of (configured DoctagsCfg, detected mode if auto, runtime callable).
+
+    Raises:
+        ValueError: If auto-detection fails to determine a concrete mode.
+    """
+
+    normalized = ConfigurationAdapter._normalize_mode(normalized_mode) or "auto"
+
+    if normalized == "html":
+        cfg = ConfigurationAdapter.to_doctags(app_ctx, mode="html")
+        return cfg, None, doctags_module.html_main
+
+    cfg = ConfigurationAdapter.to_doctags(app_ctx, mode=normalized)
+
+    if normalized == "auto":
+        input_path = cfg.input
+        if input_path is None:
+            raise ValueError("DocTags input directory is not configured")
+
+        detected_mode = detect_mode(Path(input_path))
+        cfg.mode = detected_mode
+        cfg.finalize()
+
+        runtime = doctags_module.html_main if detected_mode == "html" else doctags_module.pdf_main
+        return cfg, detected_mode, runtime
+
+    return cfg, None, doctags_module.pdf_main
+
+
 @app.command()
 def doctags(
     ctx: typer.Context,
@@ -441,34 +481,21 @@ def doctags(
         )
         typer.echo(f"[dim]🔧 Mode: {normalized_mode}[/dim]")
 
-        # Create adapted config and call stage with it (NEW PATTERN)
-        if normalized_mode == "html":
-            cfg = ConfigurationAdapter.to_doctags(app_ctx, mode="html")
-            exit_code = doctags_module.html_main(config_adapter=cfg)
-        else:
-            cfg = ConfigurationAdapter.to_doctags(app_ctx, mode=normalized_mode)
+        try:
+            cfg, detected_mode, doctags_runner = _build_doctags_execution(
+                app_ctx, normalized_mode
+            )
+        except ValueError as detection_error:
+            typer.secho(
+                f"[red]✗ Failed to auto-detect mode:[/red] {detection_error}",
+                err=True,
+            )
+            raise typer.Exit(code=1)
 
-            if normalized_mode == "auto":
-                try:
-                    detected_mode = detect_mode(Path(cfg.input))
-                except ValueError as detection_error:
-                    typer.secho(
-                        f"[red]✗ Failed to auto-detect mode:[/red] {detection_error}",
-                        err=True,
-                    )
-                    raise typer.Exit(code=1)
+        if detected_mode:
+            typer.echo(f"[dim]🔍 Auto-detected mode: {detected_mode}[/dim]")
 
-                typer.echo(f"[dim]🔍 Auto-detected mode: {detected_mode}[/dim]")
-                target_mode = detected_mode
-                cfg.mode = target_mode
-                cfg.finalize()
-
-                if target_mode == "html":
-                    exit_code = doctags_module.html_main(config_adapter=cfg)
-                else:
-                    exit_code = doctags_module.pdf_main(config_adapter=cfg)
-            else:
-                exit_code = doctags_module.pdf_main(config_adapter=cfg)
+        exit_code = doctags_runner(config_adapter=cfg)
 
         if exit_code != 0:
             typer.secho(f"[red]✗ DocTags stage failed with exit code {exit_code}[/red]", err=True)
@@ -751,6 +778,16 @@ def all(
         raise typer.Exit(code=1)
 
     try:
+        def apply_resume_force(stage_settings: Any) -> None:
+            """Apply pipeline resume/force flags to a stage's settings."""
+
+            stage_settings.force = bool(force)
+            stage_settings.resume = bool(resume) and not bool(force)
+
+        apply_resume_force(app_ctx.settings.doctags)
+        apply_resume_force(app_ctx.settings.chunk)
+        apply_resume_force(app_ctx.settings.embed)
+
         typer.echo("[bold cyan]🚀 Pipeline Start[/bold cyan]")
         typer.echo(f"[dim]📋 Profile: {app_ctx.profile or 'none'}[/dim]")
         typer.echo(
@@ -760,9 +797,26 @@ def all(
         # Stage 1: DocTags
         typer.echo("[bold yellow]▶ Stage 1: DocTags Conversion[/bold yellow]")
         typer.echo(f"[dim]Hash: {app_ctx.cfg_hashes['doctags'][:8]}...[/dim]")
+        normalized_mode = (
+            ConfigurationAdapter._normalize_mode(app_ctx.settings.doctags.mode) or "auto"
+        )
+        typer.echo(f"[dim]🔧 Mode: {normalized_mode}[/dim]")
 
-        cfg_doctags = ConfigurationAdapter.to_doctags(app_ctx, mode="pdf")
-        exit_code = doctags_module.pdf_main(config_adapter=cfg_doctags)
+        try:
+            cfg_doctags, detected_mode, doctags_runner = _build_doctags_execution(
+                app_ctx, normalized_mode
+            )
+        except ValueError as detection_error:
+            typer.secho(
+                f"[red]✗ Failed to auto-detect DocTags mode:[/red] {detection_error}",
+                err=True,
+            )
+            raise typer.Exit(code=1)
+
+        if detected_mode:
+            typer.echo(f"[dim]🔍 Auto-detected mode: {detected_mode}[/dim]")
+
+        exit_code = doctags_runner(config_adapter=cfg_doctags)
 
         if exit_code != 0:
             typer.secho(f"[red]✗ DocTags stage failed with exit code {exit_code}[/red]", err=True)
