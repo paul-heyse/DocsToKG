@@ -1,5 +1,23 @@
 ## Environment Setup
 
+## Table of Contents
+- [Environment Setup](#environment-setup)
+- [Code Style & Architecture References](#code-style-architecture-references)
+- [Mission & Scope](#mission-scope)
+- [Prerequisites & Optional Dependencies (aligns with README)](#prerequisites-optional-dependencies-aligns-with-readme)
+- [Quickstart (from README)](#quickstart-from-readme)
+- [Core Capabilities & Flow](#core-capabilities-flow)
+- [Configuration Surfaces](#configuration-surfaces)
+- [Data Contracts & Schemas](#data-contracts-schemas)
+- [Observability & Operations](#observability-operations)
+- [Performance & Profiling](#performance-profiling)
+- [Invariants & Safe Change Surfaces](#invariants-safe-change-surfaces)
+- [Test Matrix & Quality Gates](#test-matrix-quality-gates)
+- [Failure Modes & Debugging](#failure-modes-debugging)
+- [Canonical Commands](#canonical-commands)
+- [Reference Docs](#reference-docs)
+- [Coding Standards & Module Organization](#coding-standards-module-organization)
+
 Use the uv bootstrap to stand up the project environment:
 1. Optionally run `direnv allow` once per machine to trust `.envrc`.
 2. For CPU-only work, run `./scripts/bootstrap_env.sh`.
@@ -10,7 +28,7 @@ The script installs uv if it is missing, respects `UV_PROJECT_ENVIRONMENT`, and 
 
 ## Code Style & Architecture References
 
-- Review [docs/Formats and Standards/CODESTYLE.md](<../../../../docs/Formats and Standards/CODESTYLE.md>) for the Python 3.12+ baseline, lint/type tooling expectations, and NAVMAP/docstring rules.
+- Review [docs/Formats%20and%20Standards/CODESTYLE.md](<../../../../docs/Formats%20and%20Standards/CODESTYLE.md>) for the Python 3.12+ baseline, lint/type tooling expectations, and NAVMAP/docstring rules.
 - Architecture briefs: [DocParsing overview](<../../../../docs/architecture/120-docparsing.updated.md>) and [Level 2 implementation notes](<../../../../docs/architecture/120-docparsing.level2.updated.md>).
 
 ## Mission & Scope

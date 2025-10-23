@@ -1,5 +1,28 @@
 ## Environment Setup
 
+## Table of Contents
+- [Environment Setup](#environment-setup)
+- [Code Style & Architecture References](#code-style-architecture-references)
+- [Mission & Scope](#mission-scope)
+- [Quickstart (same as README)](#quickstart-same-as-readme)
+- [Architecture & Flow](#architecture-flow)
+- [Storage Layout & Run Outputs](#storage-layout-run-outputs)
+- [CLI & Configuration Surfaces](#cli-configuration-surfaces)
+- [Telemetry, Data Contracts & Error Handling](#telemetry-data-contracts-error-handling)
+- [Networking, Rate Limiting & Politeness](#networking-rate-limiting-politeness)
+- [Operational Playbooks](#operational-playbooks)
+- [Circuit Breaker Operations](#circuit-breaker-operations)
+- [Fallback & Resiliency Strategy Operations](#fallback-resiliency-strategy-operations)
+- [Migration Checklist](#migration-checklist)
+- [Invariants & Safe Change Surfaces](#invariants-safe-change-surfaces)
+- [Test Matrix & Diagnostics](#test-matrix-diagnostics)
+- [P1 (Observability & Integrity)](#p1-observability-integrity)
+- [Observability & SLOs (Phase 4)](#observability-slos-phase-4)
+- [Reference Docs](#reference-docs)
+- [Coding Standards & Module Organization](#coding-standards-module-organization)
+- [Idempotency & Job Coordination](#idempotency-job-coordination)
+- [Work Orchestration (PR #8)](#work-orchestration-pr-8)
+
 Use the uv bootstrap to stand up the project environment:
 1. Optionally run `direnv allow` once per machine to trust `.envrc`.
 2. For CPU-only work, run `./scripts/bootstrap_env.sh`.
@@ -10,7 +33,7 @@ The script installs uv if it is missing, respects `UV_PROJECT_ENVIRONMENT`, and 
 
 ## Code Style & Architecture References
 
-- Follow the shared guidelines in [docs/Formats and Standards/CODESTYLE.md](<../../../../docs/Formats and Standards/CODESTYLE.md>) for Python 3.12+ support, uv-powered tooling, and Google-style docstrings + NAVMAP requirements.
+- Follow the shared guidelines in [docs/Formats%20and%20Standards/CODESTYLE.md](<../../../../docs/Formats%20and%20Standards/CODESTYLE.md>) for Python 3.12+ support, uv-powered tooling, and Google-style docstrings + NAVMAP requirements.
 - Architecture deep dives: [Content Download overview](<../../../../docs/architecture/100-content-download.updated.md>) and [Level 2 design notes](<../../../../docs/architecture/100-content-download.level2.updated.md>).
 
 ## Mission & Scope

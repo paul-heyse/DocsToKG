@@ -70,8 +70,8 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from ..orchestrator.models import JobState
-from . import feature_flags
+from DocsToKG.ContentDownload.orchestrator import feature_flags
+from DocsToKG.ContentDownload.orchestrator.models import JobState
 
 __all__ = ["WorkQueue"]
 

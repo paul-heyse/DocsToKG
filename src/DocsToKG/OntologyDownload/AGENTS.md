@@ -1,5 +1,22 @@
 ## Environment Setup
 
+## Table of Contents
+- [Environment Setup](#environment-setup)
+- [Code Style & Architecture References](#code-style-architecture-references)
+- [Mission & Scope](#mission-scope)
+- [Quickstart (per README)](#quickstart-per-readme)
+- [Core Capabilities & Flow](#core-capabilities-flow)
+- [CLI Reference](#cli-reference)
+- [Folder Map Highlights](#folder-map-highlights)
+- [Configuration & Environment](#configuration-environment)
+- [Outputs & Artifacts](#outputs-artifacts)
+- [Error Handling & Observability](#error-handling-observability)
+- [Extensibility](#extensibility)
+- [Test Matrix & Quality Gates](#test-matrix-quality-gates)
+- [Operational Tips](#operational-tips)
+- [Reference Docs](#reference-docs)
+- [Coding Standards & Module Organization](#coding-standards-module-organization)
+
 Use the uv bootstrap to stand up the project environment:
 1. Optionally run `direnv allow` once per machine to trust `.envrc`.
 2. For CPU-only work, run `./scripts/bootstrap_env.sh`.
@@ -10,7 +27,7 @@ The script installs uv if it is missing, respects `UV_PROJECT_ENVIRONMENT`, and 
 
 ## Code Style & Architecture References
 
-- Follow [docs/Formats and Standards/CODESTYLE.md](<../../../../docs/Formats and Standards/CODESTYLE.md>) for Python 3.12+ compatibility, uv-based tooling, and the NAVMAP/docstring requirements.
+- Follow [docs/Formats%20and%20Standards/CODESTYLE.md](<../../../../docs/Formats%20and%20Standards/CODESTYLE.md>) for Python 3.12+ compatibility, uv-based tooling, and the NAVMAP/docstring requirements.
 - Architecture context: [OntologyDownload overview](<../../../../docs/architecture/110-ontology-download.updated.md>) and [Level 2 planning/execution details](<../../../../docs/architecture/110-ontology-download.level2.updated.md>).
 
 ## Mission & Scope

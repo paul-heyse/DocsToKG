@@ -1,6 +1,54 @@
 
 ## Environment Setup
 
+## Table of Contents
+- [Environment Setup](#environment-setup)
+- [1) Verify the environment exists (no install)](#1-verify-the-environment-exists-no-install)
+- [2) Run commands strictly from the project `.venv`](#2-run-commands-strictly-from-the-project-venv)
+- [3) Quick health checks (no network)](#3-quick-health-checks-no-network)
+- [4) Typical tasks (all no-install)](#4-typical-tasks-all-no-install)
+- [5) Troubleshooting (stay no-install)](#5-troubleshooting-stay-no-install)
+- [6) “Absolutely no installs” policy (what you may do)](#6-absolutely-no-installs-policy-what-you-may-do)
+- [7) Fallback (only with **explicit approval** to install)](#7-fallback-only-with-explicit-approval-to-install)
+- [8) One-page quick reference (copy/paste safe)](#8-one-page-quick-reference-copy-paste-safe)
+- [TL;DR Quick Checklist](#tl-dr-quick-checklist)
+- [Code Style Reference](#code-style-reference)
+- [Domain Guides](#domain-guides)
+- [Environment Activation](#environment-activation)
+- [CI notes](#ci-notes)
+- [Troubleshooting (short)](#troubleshooting-short)
+- [Three-Stage Workflow](#three-stage-workflow)
+- [Before Any Task](#before-any-task)
+- [Quick Start](#quick-start)
+- [Directory Structure](#directory-structure)
+- [Creating Change Proposals](#creating-change-proposals)
+- [Why](#why)
+- [What Changes](#what-changes)
+- [Impact](#impact)
+- [ADDED Requirements](#added-requirements)
+- [MODIFIED Requirements](#modified-requirements)
+- [REMOVED Requirements](#removed-requirements)
+- [1. Implementation](#1-implementation)
+- [Context](#context)
+- [Goals / Non-Goals](#goals-non-goals)
+- [Decisions](#decisions)
+- [Risks / Trade-offs](#risks-trade-offs)
+- [Migration Plan](#migration-plan)
+- [Open Questions](#open-questions)
+- [Spec File Format](#spec-file-format)
+- [RENAMED Requirements](#renamed-requirements)
+- [Troubleshooting](#troubleshooting)
+- [Happy Path Script](#happy-path-script)
+- [ADDED Requirements](#added-requirements)
+- [Multi-Capability Example](#multi-capability-example)
+- [ADDED Requirements](#added-requirements)
+- [ADDED Requirements](#added-requirements)
+- [Best Practices](#best-practices)
+- [Tool Selection Guide](#tool-selection-guide)
+- [Error Recovery](#error-recovery)
+- [Quick Reference](#quick-reference)
+- [Coding Standards & Module Organization](#coding-standards-module-organization)
+
 Use the uv bootstrap to stand up the project environment:
 1. Optionally run `direnv allow` once per machine to trust `.envrc`.
 2. For CPU-only work, run `./scripts/bootstrap_env.sh`.
@@ -226,7 +274,14 @@ Keep agents aligned on the shared uv bootstrap: run CPU mode by default, opt int
 
 ## Code Style Reference
 
-All changes must follow [docs/Formats and Standards/CODESTYLE.md](<../Formats and Standards/CODESTYLE.md>), which summarises the Python 3.12+ target, lint/type tooling (uv + ruff + mypy), and the NAVMAP/docstring patterns expected in every module.
+All changes must follow [docs/Formats%20and%20Standards/CODESTYLE.md](<../Formats%20and%20Standards/CODESTYLE.md>), which summarises the Python 3.12+ target, lint/type tooling (uv + ruff + mypy), and the NAVMAP/docstring patterns expected in every module.
+
+## Domain Guides
+
+- [ContentDownload Agent Guide](<../src/DocsToKG/ContentDownload/AGENTS.md>)
+- [DocParsing Agent Guide](<../src/DocsToKG/DocParsing/AGENTS.md>)
+- [HybridSearch Agent Guide](<../src/DocsToKG/HybridSearch/AGENTS.md>)
+- [OntologyDownload Agent Guide](<../src/DocsToKG/OntologyDownload/AGENTS.md>)
 
 ---
 

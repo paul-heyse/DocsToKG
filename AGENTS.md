@@ -1,5 +1,14 @@
 ## Environment Setup
 
+## Table of Contents
+- [Environment Setup](#environment-setup)
+- [Agents](#agents)
+- [Project Structure & Module Organization](#project-structure-module-organization)
+- [Build, Test, and Development Commands](#build-test-and-development-commands)
+- [Coding Style & Naming Conventions](#coding-style-naming-conventions)
+- [Testing Guidelines](#testing-guidelines)
+- [Commit & Pull Request Guidelines](#commit-pull-request-guidelines)
+
 Use the uv bootstrap to stand up the project environment:
 1. Optionally run `direnv allow` once per machine to trust `.envrc`.
 2. For CPU-only work, run `./scripts/bootstrap_env.sh`.
@@ -12,11 +21,17 @@ The script installs uv if it is missing, respects `UV_PROJECT_ENVIRONMENT`, and 
 
 ## Agents
 
-Please read AGENTS.md at the root directory
+Please read AGENTS.md at the root directory.
+
+- [ContentDownload Agent Guide](<src/DocsToKG/ContentDownload/AGENTS.md>)
+- [DocParsing Agent Guide](<src/DocsToKG/DocParsing/AGENTS.md>)
+- [HybridSearch Agent Guide](<src/DocsToKG/HybridSearch/AGENTS.md>)
+- [OntologyDownload Agent Guide](<src/DocsToKG/OntologyDownload/AGENTS.md>)
+- [OpenSpec Agent Guide](<openspec/AGENTS.md>)
 
 ### Code Style Primer
 
-Before modifying code, review the shared standards in [docs/Formats and Standards/CODESTYLE.md](<docs/Formats and Standards/CODESTYLE.md>). It covers the Python 3.12+ baseline, uv/ruff/mypy expectations, and the Google-style docstring + NAVMAP conventions that every module must follow.
+Before modifying code, review the shared standards in [docs/Formats%20and%20Standards/CODESTYLE.md](<docs/Formats%20and%20Standards/CODESTYLE.md>). It covers the Python 3.12+ baseline, uv/ruff/mypy expectations, and the Google-style docstring + NAVMAP conventions that every module must follow.
 ## Project Structure & Module Organization
 
 - `src/DocsToKG/` hosts production code; extend existing domains (`ContentDownload`, `DocParsing`, `HybridSearch`, `OntologyDownload`) before creating new roots.

@@ -1,6 +1,30 @@
 
 ## Environment Setup
 
+## Table of Contents
+- [Environment Setup](#environment-setup)
+- [Code Style & Architecture References](#code-style-architecture-references)
+- [1) Verify the environment exists (no install)](#1-verify-the-environment-exists-no-install)
+- [2) Run commands strictly from the project `.venv`](#2-run-commands-strictly-from-the-project-venv)
+- [3) Quick health checks (no network)](#3-quick-health-checks-no-network)
+- [4) Typical tasks (all no-install)](#4-typical-tasks-all-no-install)
+- [5) Troubleshooting (stay no-install)](#5-troubleshooting-stay-no-install)
+- [6) “Absolutely no installs” policy (what you may do)](#6-absolutely-no-installs-policy-what-you-may-do)
+- [7) Fallback (only with **explicit approval** to install)](#7-fallback-only-with-explicit-approval-to-install)
+- [8) One-page quick reference (copy/paste safe)](#8-one-page-quick-reference-copy-paste-safe)
+- [Mission and Scope](#mission-and-scope)
+- [Runtime prerequisites](#runtime-prerequisites)
+- [Module architecture](#module-architecture)
+- [Core capabilities](#core-capabilities)
+- [Ingestion workflow](#ingestion-workflow)
+- [Search API quick reference](#search-api-quick-reference)
+- [Key invariants](#key-invariants)
+- [Test matrix & verification](#test-matrix-verification)
+- [Troubleshooting cues](#troubleshooting-cues)
+- [Reference commands](#reference-commands)
+- [Ownership & change management](#ownership-change-management)
+- [Coding Standards & Module Organization](#coding-standards-module-organization)
+
 Use the uv bootstrap to stand up the project environment:
 1. Optionally run `direnv allow` once per machine to trust `.envrc`.
 2. For CPU-only work, run `./scripts/bootstrap_env.sh`.
@@ -11,8 +35,9 @@ The script installs uv if it is missing, respects `UV_PROJECT_ENVIRONMENT`, and 
 
 ## Code Style & Architecture References
 
-- Consult [docs/Formats and Standards/CODESTYLE.md](<../../../../docs/Formats and Standards/CODESTYLE.md>) for the Python 3.12+ baseline, uv-powered tooling, and required Google-style docstrings/NAVMAP metadata.
+- Consult [docs/Formats%20and%20Standards/CODESTYLE.md](<../../../../docs/Formats%20and%20Standards/CODESTYLE.md>) for the Python 3.12+ baseline, uv-powered tooling, and required Google-style docstrings/NAVMAP metadata.
 - Architecture primers: [HybridSearch overview](<../../../../docs/architecture/130-hybrid-search.cuvs.updated.md>) and [Level 2 CUDA/FAISS details](<../../../../docs/architecture/130-hybrid-search.level2.cuvs.updated.md>).
+- **Required library primers:** review [faiss-gpu-wheel-reference](<../../../../src/DocsToKG/HybridSearch/faiss-gpu-wheel-reference.md>), [cuvs-reference](<../../../../src/DocsToKG/HybridSearch/cuvs-reference.md>), and [libcuvs-reference](<../../../../src/DocsToKG/HybridSearch/libcuvs-reference.md>) before touching GPU search internals.
 
 
 ## 1) Verify the environment exists (no install)

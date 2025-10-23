@@ -10,7 +10,7 @@
 - **Linting:** Ruff as the single linter; enable E/F/I/B/UP/SIM sets; `pydocstyle` rules with `convention=google`. citeturn1search4
 - **Types:** Comprehensive type hints (PEP 484/526). Fail CI on new `Any` in changed code. citeturn5search1 citeturn5search0
 - **Docstrings:** **Google style** for all public APIs; parsed by **Sphinx Napoleon**. citeturn0search5 citeturn0search1
-- **Docs build:** `sphinx-build -b html "docs/sphinx documentation" "docs/sphinx documentation/_build/html"` (use `sphinx-autobuild` for live refresh).
+- **Docs build:** `make -C docs dirhtml` (use `sphinx-autobuild docs/source docs/build/dirhtml --watch src` for live refresh).
 - **GPU installs:** `uv pip install --find-links .wheelhouse -e .[gpu]` (wheelhouse holds prebuilt CUDA wheels for Python 3.13).
 - **Navmap:** JSON **NAVMAP v1** comment block at top of key modules; see schema below. (Example in our pipeline module.) fileciteturn9file0
 - **Module README‑overview:** Immediately below NAVMAP: module‑level docstring with Summary → Responsibilities → Public API → Examples → Performance → Observability → Gotchas → References.
@@ -51,7 +51,7 @@
 ## 4) Docstrings (Google style; PEP 257 semantics)
 All public modules, classes, functions, and methods **must** have docstrings. Follow PEP 257 for structure (one‑line summary, blank line, details). Use **Google style sections** (`Args`, `Returns`, `Raises`, `Examples`, `Notes`)—automatically parsed by **Sphinx Napoleon**. citeturn0search0 citeturn0search1 citeturn0search5
 
-Google-style docstrings feed Sphinx builds located under ``docs/sphinx documentation``. Generate HTML locally with ``sphinx-build -b html "docs/sphinx documentation" "docs/sphinx documentation/_build/html"``; the output is ignored by Git.
+Google-style docstrings feed the Sphinx build located under ``docs/``. Generate HTML locally with ``make -C docs dirhtml``; the output is ignored by Git.
 
 **Template (function):**
 ```python
