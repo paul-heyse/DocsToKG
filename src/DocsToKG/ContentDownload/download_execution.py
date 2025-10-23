@@ -444,181 +444,184 @@ def stream_candidate_payload(
 
     # GET request via httpx + hishel
     t0 = time.monotonic_ns()
-    try:
-        get_kwargs = {
-            "stream": True,
-            "allow_redirects": True,
-            "timeout": timeout_s,
-        }
-        if base_headers:
-            get_kwargs["headers"] = dict(base_headers)
-        resp = session.get(url, **get_kwargs)
-        elapsed_ms = (time.monotonic_ns() - t0) // 1_000_000
-        content_type = resp.headers.get("Content-Type", "").lower()
-
-        # Check for hishel cache extensions
-        from_cache = bool(getattr(resp, "extensions", {}).get("from_cache"))
-        revalidated = bool(getattr(resp, "extensions", {}).get("revalidated"))
-
-        _log_io_attempt(
-            telemetry,
-            run_id=run_id,
-            resolver_name=plan.resolver_name,
-            url=url,
-            verb="GET",
-            status=ATTEMPT_STATUS_HTTP_GET,
-            http_status=resp.status_code,
-            elapsed_ms=elapsed_ms,
-            content_type=content_type,
-            extra={
-                "from_cache": from_cache,
-                "revalidated": revalidated,
-            },
-        )
-
-        # Emit cache-aware tokens
-        if from_cache and not revalidated:
-            _log_io_attempt(
-                telemetry,
-                run_id=run_id,
-                resolver_name=plan.resolver_name,
-                url=url,
-                verb="GET",
-                status=ATTEMPT_STATUS_CACHE_HIT,
-                http_status=resp.status_code,
-                content_type=content_type,
-                reason=ATTEMPT_REASON_OK,
-                extra={
-                    "from_cache": True,
-                },
-            )
-        if revalidated and resp.status_code == 304:
-            _log_io_attempt(
-                telemetry,
-                run_id=run_id,
-                resolver_name=plan.resolver_name,
-                url=url,
-                verb="GET",
-                status=ATTEMPT_STATUS_HTTP_304,
-                http_status=304,
-                content_type=content_type,
-                reason=ATTEMPT_REASON_NOT_MODIFIED,
-                extra={
-                    "revalidated": True,
-                    "from_cache": from_cache,
-                },
-            )
-            return DownloadStreamResult(
-                path_tmp="",
-                bytes_written=0,
-                http_status=304,
-                content_type=content_type,
-            )
-    except Exception as e:  # pylint: disable=broad-except
-        raise DownloadError(
-            "conn-error",
-            f"GET request failed: {e}",
-        ) from e
-
-    # Validate content-type if expected
-    if plan.expected_mime and not content_type.startswith(plan.expected_mime):
-        raise SkipDownload(
-            "unexpected-ct",
-            f"Expected {plan.expected_mime}, got {content_type}",
-        )
-
-    # Extract Content-Length and prepare for atomic write
-    cl = resp.headers.get("Content-Length")
-    expected_len = int(cl) if (cl and cl.isdigit()) else None
+    get_kwargs = {
+        "allow_redirects": True,
+        "timeout": timeout_s,
+    }
+    if base_headers:
+        get_kwargs["headers"] = dict(base_headers)
 
     staging_dir: Optional[Path] = None
     tmp_path: Optional[Path] = None
-    effective_max_bytes = (
-        plan.max_bytes_override
-        if plan.max_bytes_override is not None
-        else max_bytes
-    )
-
-    if (
-        effective_max_bytes is not None
-        and expected_len is not None
-        and expected_len > effective_max_bytes
-    ):
-        raise DownloadError(
-            "too-large",
-            f"Content-Length {expected_len} exceeds cap {effective_max_bytes} bytes",
-        )
-
     bytes_streamed = 0
-
-    def _iter_with_limit(source_iter):
-        nonlocal bytes_streamed
-        for chunk in source_iter:
-            if not chunk:
-                yield chunk
-                continue
-            new_total = bytes_streamed + len(chunk)
-            if (
-                effective_max_bytes is not None
-                and new_total > effective_max_bytes
-            ):
-                raise DownloadError(
-                    "too-large",
-                    f"Payload exceeded {effective_max_bytes} bytes",
-                )
-            bytes_streamed = new_total
-            yield chunk
-
-    url_path = Path(urlsplit(plan.url).path)
-    staging_name = f"{url_path.name or 'download.bin'}.part"
+    bytes_written = 0
+    content_type = ""
+    from_cache = False
+    revalidated = False
+    expected_len: Optional[int] = None
+    http_status: Optional[int] = None
+    not_modified_result: Optional[DownloadStreamResult] = None
+    stream_result: Optional[DownloadStreamResult] = None
+    resp_started = False
 
     try:
-        staging_dir, tmp_path = _prepare_staging_destination(
-            run_id,
-            plan.resolver_name,
-            filename=staging_name,
-        )
-        bytes_written = atomic_write_stream(
-            dest_path=str(tmp_path),
-            byte_iter=_iter_with_limit(resp.iter_bytes(chunk_size=chunk_size)),
-            expected_len=(expected_len if verify_content_length else None),
-            chunk_size=chunk_size,
-        )
+        with session.stream("GET", url, **get_kwargs) as resp:
+            resp_started = True
+            elapsed_ms = (time.monotonic_ns() - t0) // 1_000_000
+            content_type = resp.headers.get("Content-Type", "").lower()
+            http_status = resp.status_code
 
-        if effective_max_bytes is not None and bytes_written > effective_max_bytes:
-            _cleanup_staging_artifacts(tmp_path, staging_dir)
-            raise DownloadError(
-                "too-large",
-                f"Payload exceeded {effective_max_bytes} bytes",
+            # Check for hishel cache extensions
+            extensions = getattr(resp, "extensions", {})
+            from_cache = bool(extensions.get("from_cache"))
+            revalidated = bool(extensions.get("revalidated"))
+
+            _log_io_attempt(
+                telemetry,
+                run_id=run_id,
+                resolver_name=plan.resolver_name,
+                url=url,
+                verb="GET",
+                status=ATTEMPT_STATUS_HTTP_GET,
+                http_status=http_status,
+                elapsed_ms=elapsed_ms,
+                content_type=content_type,
+                extra={
+                    "from_cache": from_cache,
+                    "revalidated": revalidated,
+                },
             )
 
-        # Emit final success record
-        _log_io_attempt(
-            telemetry,
-            run_id=run_id,
-            resolver_name=plan.resolver_name,
-            url=url,
-            verb="STREAM",
-            status=ATTEMPT_STATUS_HTTP_200,
-            http_status=resp.status_code,
-            reason=ATTEMPT_REASON_OK,
-            content_type=content_type,
-            bytes_written=bytes_written,
-            content_length_hdr=expected_len,
-            extra={
-                "from_cache": from_cache,
-                "revalidated": revalidated,
-            },
-        )
+            # Emit cache-aware tokens
+            if from_cache and not revalidated:
+                _log_io_attempt(
+                    telemetry,
+                    run_id=run_id,
+                    resolver_name=plan.resolver_name,
+                    url=url,
+                    verb="GET",
+                    status=ATTEMPT_STATUS_CACHE_HIT,
+                    http_status=http_status,
+                    content_type=content_type,
+                    reason=ATTEMPT_REASON_OK,
+                    extra={
+                        "from_cache": True,
+                    },
+                )
 
-        return DownloadStreamResult(
-            path_tmp=str(tmp_path),
-            bytes_written=bytes_written,
-            http_status=resp.status_code,
-            content_type=content_type,
-            staging_path=str(staging_dir) if staging_dir else None,
-        )
+            if revalidated and http_status == 304:
+                _log_io_attempt(
+                    telemetry,
+                    run_id=run_id,
+                    resolver_name=plan.resolver_name,
+                    url=url,
+                    verb="GET",
+                    status=ATTEMPT_STATUS_HTTP_304,
+                    http_status=304,
+                    content_type=content_type,
+                    reason=ATTEMPT_REASON_NOT_MODIFIED,
+                    extra={
+                        "revalidated": True,
+                        "from_cache": from_cache,
+                    },
+                )
+                not_modified_result = DownloadStreamResult(
+                    path_tmp="",
+                    bytes_written=0,
+                    http_status=304,
+                    content_type=content_type,
+                )
+            else:
+                if plan.expected_mime and not content_type.startswith(plan.expected_mime):
+                    raise SkipDownload(
+                        "unexpected-ct",
+                        f"Expected {plan.expected_mime}, got {content_type}",
+                    )
 
+                cl = resp.headers.get("Content-Length")
+                expected_len = int(cl) if (cl and cl.isdigit()) else None
+
+                effective_max_bytes = (
+                    plan.max_bytes_override
+                    if plan.max_bytes_override is not None
+                    else max_bytes
+                )
+
+                if (
+                    effective_max_bytes is not None
+                    and expected_len is not None
+                    and expected_len > effective_max_bytes
+                ):
+                    raise DownloadError(
+                        "too-large",
+                        f"Content-Length {expected_len} exceeds cap {effective_max_bytes} bytes",
+                    )
+
+                def _iter_with_limit(source_iter):
+                    nonlocal bytes_streamed
+                    for chunk in source_iter:
+                        if not chunk:
+                            yield chunk
+                            continue
+                        new_total = bytes_streamed + len(chunk)
+                        if (
+                            effective_max_bytes is not None
+                            and new_total > effective_max_bytes
+                        ):
+                            raise DownloadError(
+                                "too-large",
+                                f"Payload exceeded {effective_max_bytes} bytes",
+                            )
+                        bytes_streamed = new_total
+                        yield chunk
+
+                url_path = Path(urlsplit(plan.url).path)
+                staging_name = f"{url_path.name or 'download.bin'}.part"
+
+                staging_dir, tmp_path = _prepare_staging_destination(
+                    run_id,
+                    plan.resolver_name,
+                    filename=staging_name,
+                )
+                bytes_written = atomic_write_stream(
+                    dest_path=str(tmp_path),
+                    byte_iter=_iter_with_limit(resp.iter_bytes(chunk_size=chunk_size)),
+                    expected_len=(expected_len if verify_content_length else None),
+                    chunk_size=chunk_size,
+                )
+
+                if effective_max_bytes is not None and bytes_written > effective_max_bytes:
+                    _cleanup_staging_artifacts(tmp_path, staging_dir)
+                    raise DownloadError(
+                        "too-large",
+                        f"Payload exceeded {effective_max_bytes} bytes",
+                    )
+
+                _log_io_attempt(
+                    telemetry,
+                    run_id=run_id,
+                    resolver_name=plan.resolver_name,
+                    url=url,
+                    verb="STREAM",
+                    status=ATTEMPT_STATUS_HTTP_200,
+                    http_status=http_status,
+                    reason=ATTEMPT_REASON_OK,
+                    content_type=content_type,
+                    bytes_written=bytes_written,
+                    content_length_hdr=expected_len,
+                    extra={
+                        "from_cache": from_cache,
+                        "revalidated": revalidated,
+                    },
+                )
+
+                stream_result = DownloadStreamResult(
+                    path_tmp=str(tmp_path),
+                    bytes_written=bytes_written,
+                    http_status=http_status,
+                    content_type=content_type,
+                    staging_path=str(staging_dir) if staging_dir else None,
+                )
     except SizeMismatchError:
         _cleanup_staging_artifacts(tmp_path, staging_dir)
         _log_io_attempt(
@@ -628,7 +631,7 @@ def stream_candidate_payload(
             url=url,
             verb="STREAM",
             status=ATTEMPT_STATUS_SIZE_MISMATCH,
-            http_status=resp.status_code,
+            http_status=http_status,
             reason=ATTEMPT_REASON_SIZE_MISMATCH,
             content_type=content_type,
             bytes_written=bytes_streamed,
@@ -639,11 +642,24 @@ def stream_candidate_payload(
         _cleanup_staging_artifacts(tmp_path, staging_dir)
         raise
     except Exception as e:  # pylint: disable=broad-except
+        if not resp_started:
+            raise DownloadError(
+                "conn-error",
+                f"GET request failed: {e}",
+            ) from e
         _cleanup_staging_artifacts(tmp_path, staging_dir)
         raise DownloadError(
             "download-error",
             f"Atomic write failed: {e}",
         ) from e
+
+    if not_modified_result is not None:
+        return not_modified_result
+
+    if stream_result is not None:
+        return stream_result
+
+    raise DownloadError("download-error", "GET request produced no payload")
 
 
 def finalize_candidate_download(
