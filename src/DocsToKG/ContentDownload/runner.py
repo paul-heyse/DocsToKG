@@ -3,8 +3,24 @@
 #   "module": "DocsToKG.ContentDownload.runner",
 #   "purpose": "Modern run orchestration using Pydantic v2 config and DownloadPipeline",
 #   "sections": [
-#     {"id": "downloadrun", "name": "DownloadRun", "anchor": "class-downloadrun", "kind": "class"},
-#     {"id": "run-helper", "name": "run", "anchor": "function-run", "kind": "function"}
+#     {
+#       "id": "runresult",
+#       "name": "RunResult",
+#       "anchor": "class-runresult",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "downloadrun",
+#       "name": "DownloadRun",
+#       "anchor": "class-downloadrun",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "run",
+#       "name": "run",
+#       "anchor": "function-run",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===
@@ -31,13 +47,13 @@ Design Principles
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable, Optional
+from typing import Any
 
 from DocsToKG.ContentDownload.bootstrap import (
     BootstrapConfig,
-    build_bootstrap_config,
     run_from_config,
 )
 from DocsToKG.ContentDownload.bootstrap import (
@@ -56,7 +72,7 @@ _LOGGER = logging.getLogger(__name__)
 class RunResult:
     """Result of a download run."""
 
-    run_id: Optional[str]
+    run_id: str | None
     total_processed: int
     successful: int
     failed: int
@@ -85,6 +101,7 @@ class DownloadRun:
         self.pipeline: Optional[ResolverPipeline] = None
         self._result: Optional[BootstrapRunResult] = None
         self._bootstrap_config: Optional[BootstrapConfig] = None
+        self._bootstrap_config_signature: Optional[str] = None
 
     def __enter__(self) -> DownloadRun:
         """Set up the pipeline and telemetry on context entry."""
@@ -96,7 +113,7 @@ class DownloadRun:
                 "resolvers": self.config.resolvers.order,
             },
         )
-        self._bootstrap_config = build_bootstrap_config(self.config)
+        self._refresh_bootstrap_config()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
@@ -132,11 +149,8 @@ class DownloadRun:
         Returns:
             Summary of the run
         """
-        bootstrap_config = self._build_bootstrap_config()
-
         # Delegate to canonical bootstrap orchestrator
-        if self._bootstrap_config is None:
-            self._bootstrap_config = build_bootstrap_config(self.config)
+        self._refresh_bootstrap_config()
 
         bootstrap_result = run_from_config(
             config=self._bootstrap_config,
@@ -154,6 +168,18 @@ class DownloadRun:
             failed=bootstrap_result.error_count,
             skipped=bootstrap_result.skip_count,
         )
+
+    def _refresh_bootstrap_config(self) -> None:
+        """Ensure cached bootstrap config matches the current run configuration."""
+
+        signature = self._compute_config_signature()
+
+        if (
+            self._bootstrap_config is None
+            or self._bootstrap_config_signature != signature
+        ):
+            self._bootstrap_config = self._build_bootstrap_config()
+            self._bootstrap_config_signature = signature
 
     def _build_bootstrap_config(self) -> BootstrapConfig:
         """Translate ContentDownloadConfig into BootstrapConfig."""
@@ -182,6 +208,16 @@ class DownloadRun:
             policy_knobs=policy_knobs,
             run_id=self.config.run_id,
         )
+
+    def _compute_config_signature(self) -> str:
+        """Return a deterministic signature for the current configuration."""
+
+        config = self.config
+
+        if hasattr(config, "config_hash") and callable(config.config_hash):
+            return config.config_hash()
+
+        return repr(config)
 
     def _build_telemetry_paths(self) -> dict[str, Path]:
         telemetry_cfg = self.config.telemetry
@@ -251,9 +287,9 @@ class DownloadRun:
 
 
 def run(
-    config_path: Optional[str] = None,
-    artifacts: Optional[Iterable[Any]] = None,
-    cli_overrides: Optional[dict[str, Any]] = None,
+    config_path: str | None = None,
+    artifacts: Iterable[Any] | None = None,
+    cli_overrides: dict[str, Any] | None = None,
 ) -> RunResult:
     """Run download pipeline using canonical bootstrap orchestrator.
 

@@ -1,3 +1,24 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.HybridSearch.interfaces",
+#   "purpose": "Formal contracts for plugging alternative sparse and dense backends into the.",
+#   "sections": [
+#     {
+#       "id": "lexicalindex",
+#       "name": "LexicalIndex",
+#       "anchor": "class-lexicalindex",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "densevectorstore",
+#       "name": "DenseVectorStore",
+#       "anchor": "class-densevectorstore",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Formal contracts for plugging alternative sparse and dense backends into the
 DocsToKG hybrid search pipeline.
 
@@ -30,7 +51,8 @@ fusion math.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Callable, List, Mapping, Optional, Protocol, Sequence, Tuple
+from collections.abc import Callable, Mapping, Sequence
+from typing import TYPE_CHECKING, Protocol
 
 import numpy as np
 
@@ -84,8 +106,8 @@ class LexicalIndex(Protocol):
         query_weights: Mapping[str, float],
         filters: Mapping[str, object],
         top_k: int,
-        cursor: Optional[int] = None,
-    ) -> Tuple[List[Tuple[ChunkPayload, float]], Optional[int]]:
+        cursor: int | None = None,
+    ) -> tuple[list[tuple[ChunkPayload, float]], int | None]:
         """Execute a BM25-style sparse search.
 
         Args:
@@ -103,8 +125,8 @@ class LexicalIndex(Protocol):
         query_weights: Mapping[str, float],
         filters: Mapping[str, object],
         top_k: int,
-        cursor: Optional[int] = None,
-    ) -> Tuple[List[Tuple[ChunkPayload, float]], Optional[int]]:
+        cursor: int | None = None,
+    ) -> tuple[list[tuple[ChunkPayload, float]], int | None]:
         """Execute a SPLADE sparse search.
 
         Args:
@@ -122,14 +144,14 @@ class LexicalIndex(Protocol):
         query_weights: Mapping[str, float],
         filters: Mapping[str, object],
         top_k: int,
-        cursor: Optional[int] = None,
+        cursor: int | None = None,
         *,
         k1: float = 1.2,
         b: float = 0.75,
-    ) -> Tuple[List[Tuple[ChunkPayload, float]], Optional[int]]:
+    ) -> tuple[list[tuple[ChunkPayload, float]], int | None]:
         """Optional Okapi BM25 search supporting DF/length-aware scoring."""
 
-    def highlight(self, chunk: ChunkPayload, query_tokens: Sequence[str]) -> List[str]:
+    def highlight(self, chunk: ChunkPayload, query_tokens: Sequence[str]) -> list[str]:
         """Return highlight snippets for ``chunk`` given ``query_tokens``.
 
         Args:
@@ -176,7 +198,7 @@ class DenseVectorStore(Protocol):
         """Immutable configuration backing the dense store."""
 
     @property
-    def adapter_stats(self) -> "AdapterStats":
+    def adapter_stats(self) -> AdapterStats:
         """Return runtime adapter statistics (device, nprobe, replication state)."""
 
     def add(self, vectors: Sequence[np.ndarray], vector_ids: Sequence[str]) -> None:
@@ -185,17 +207,15 @@ class DenseVectorStore(Protocol):
     def remove(self, vector_ids: Sequence[str]) -> None:
         """Delete dense vectors referenced by ``vector_ids``."""
 
-    def search(self, query: np.ndarray, top_k: int) -> Sequence["FaissSearchResult"]:
+    def search(self, query: np.ndarray, top_k: int) -> Sequence[FaissSearchResult]:
         """Search for nearest neighbours of ``query``."""
 
-    def search_many(
-        self, queries: np.ndarray, top_k: int
-    ) -> Sequence[Sequence["FaissSearchResult"]]:
+    def search_many(self, queries: np.ndarray, top_k: int) -> Sequence[Sequence[FaissSearchResult]]:
         """Search for nearest neighbours of multiple queries."""
 
     def search_batch(
         self, queries: np.ndarray, top_k: int
-    ) -> Sequence[Sequence["FaissSearchResult"]]:
+    ) -> Sequence[Sequence[FaissSearchResult]]:
         """Optional alias for batched search."""
 
     def range_search(
@@ -203,8 +223,8 @@ class DenseVectorStore(Protocol):
         query: np.ndarray,
         min_score: float,
         *,
-        limit: Optional[int] = None,
-    ) -> Sequence["FaissSearchResult"]:
+        limit: int | None = None,
+    ) -> Sequence[FaissSearchResult]:
         """Return all vectors scoring above ``min_score`` for ``query``."""
 
     def reconstruct_batch(self, vector_ids: Sequence[str]) -> np.ndarray:
@@ -216,7 +236,7 @@ class DenseVectorStore(Protocol):
     def serialize(self) -> bytes:
         """Return a serialised representation of the index."""
 
-    def restore(self, payload: bytes, *, meta: Optional[Mapping[str, object]] = None) -> None:
+    def restore(self, payload: bytes, *, meta: Mapping[str, object] | None = None) -> None:
         """Restore index state from ``payload``."""
 
     def flush_snapshot(self, *, reason: str = "flush") -> None:
@@ -234,5 +254,5 @@ class DenseVectorStore(Protocol):
     def train(self, vectors: Sequence[np.ndarray]) -> None:
         """Train the index with representative vectors."""
 
-    def set_id_resolver(self, resolver: Callable[[int], Optional[str]]) -> None:
+    def set_id_resolver(self, resolver: Callable[[int], str | None]) -> None:
         """Register a resolver translating FAISS integer IDs to external IDs."""

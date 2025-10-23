@@ -21,11 +21,14 @@ See `docs/01-overview/` for a high-level introduction and `docs/03-architecture/
 git clone https://github.com/paul-heyse/DocsToKG.git
 cd DocsToKG
 
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
+# create a Python 3.13 environment (GPU wheels require 3.13; 3.12 works for CPU-only)
+uv venv --python 3.13 .venv
 
-pip install requirements.txt
+# install project + tooling extras
+uv pip install --python .venv -e .[dev,docs]
 
+# optional GPU stack (requires CUDA + .wheelhouse wheels)
+uv pip install --python .venv --find-links .wheelhouse -e .[gpu]
 ```
 
 > ℹ️ The repository ships with a preconfigured `.envrc` that adds `.venv/bin` to `PATH`,

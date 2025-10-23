@@ -1,3 +1,72 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.net.client",
+#   "purpose": "HTTPX Client Factory & Singleton Management.",
+#   "sections": [
+#     {
+#       "id": "get-http-client",
+#       "name": "get_http_client",
+#       "anchor": "function-get-http-client",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "close-http-client",
+#       "name": "close_http_client",
+#       "anchor": "function-close-http-client",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "reset-http-client",
+#       "name": "reset_http_client",
+#       "anchor": "function-reset-http-client",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-http-client",
+#       "name": "_build_http_client",
+#       "anchor": "function-build-http-client",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-transport",
+#       "name": "_build_transport",
+#       "anchor": "function-build-transport",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "on-request",
+#       "name": "_on_request",
+#       "anchor": "function-on-request",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "on-response",
+#       "name": "_on_response",
+#       "anchor": "function-on-response",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-net-request",
+#       "name": "_emit_net_request",
+#       "anchor": "function-emit-net-request",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "request-with-redirect-audit",
+#       "name": "request_with_redirect_audit",
+#       "anchor": "function-request-with-redirect-audit",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "normalize-host-for-telemetry",
+#       "name": "_normalize_host_for_telemetry",
+#       "anchor": "function-normalize-host-for-telemetry",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 HTTPX Client Factory & Singleton Management.
 
@@ -22,7 +91,7 @@ import logging
 import os
 import time
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 from urllib.parse import urljoin
 
 import httpx
@@ -39,9 +108,9 @@ logger = logging.getLogger(__name__)
 # Singleton State (PID-aware for fork safety)
 # ============================================================================
 
-_CLIENT: Optional[httpx.Client] = None
-_BIND_HASH: Optional[str] = None
-_BIND_PID: Optional[int] = None
+_CLIENT: httpx.Client | None = None
+_BIND_HASH: str | None = None
+_BIND_PID: int | None = None
 
 
 # ============================================================================
@@ -68,14 +137,14 @@ def get_http_client(config: Any) -> httpx.Client:
     pid = os.getpid()
 
     # PID changed → fork detected, rebuild
-    if _CLIENT is None or _BIND_PID != pid:
+    if _CLIENT is None or pid != _BIND_PID:
         logger.debug(f"Creating new HTTPX client (pid={pid}, existing_pid={_BIND_PID})")
         _CLIENT = _build_http_client(config)
         _BIND_PID = pid
         _BIND_HASH = config.config_hash()
 
     # Settings changed mid-process → warn once but keep current client
-    elif _BIND_HASH != config.config_hash():
+    elif config.config_hash() != _BIND_HASH:
         logger.warning(
             "HTTP client settings changed after binding. No hot reload; existing client unchanged."
         )
@@ -225,7 +294,7 @@ def request_with_redirect_audit(
     url: str,
     *,
     max_hops: int = 5,
-    headers: Optional[dict] = None,
+    headers: dict | None = None,
     **kw: Any,
 ) -> httpx.Response:
     """

@@ -21,7 +21,9 @@ sed -i "s/Project Title/${PKG_NAME}/" README.md
 sed -i "s/from yourpkg/from ${PKG_NAME}/" tests/test_basic.py
 
 # Update Python versions
-sed -i "s/python=3\.12/python=${PY_VER}/" environment.yml
+if [[ -f environment.yml ]]; then
+  sed -i "s/python=3\.12/python=${PY_VER}/" environment.yml
+fi
 PYVER_SHORT="py$(echo "${PY_VER}" | tr -d '.')"
 sed -i "s/target-version = \"py[0-9]\+\"/target-version = \"${PYVER_SHORT}\"/" pyproject.toml
 sed -i "s/python_version = \"[0-9.]\+\"/python_version = \"${PY_VER}\"/" pyproject.toml
@@ -29,14 +31,9 @@ sed -i "s/python_version = \"[0-9.]\+\"/python_version = \"${PY_VER}\"/" pyproje
 # Add description
 sed -i "s/description = \".*\"/description = \"${DESC}\"/" pyproject.toml
 
-# Create environment
-if command -v micromamba >/dev/null 2>&1; then
-  eval "$(micromamba shell hook -s bash)"
-  micromamba create -y -p ./.venv -f environment.yml
-else
-  echo "micromamba not found; please install it and rerun scripts/init.sh"
-  exit 2
-fi
+# Create environment via uv bootstrap (installs uv if missing)
+export UV_PROJECT_ENVIRONMENT="${UV_PROJECT_ENVIRONMENT:-$PWD/.venv}"
+bash ./scripts/bootstrap_env.sh --python "$PY_VER"
 
 # Pre-commit hooks
 if command -v pre-commit >/dev/null 2>&1; then

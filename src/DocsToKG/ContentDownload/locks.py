@@ -3,11 +3,132 @@
 #   "module": "DocsToKG.ContentDownload.locks",
 #   "purpose": "File locking helpers for manifests, telemetry, and artifacts",
 #   "sections": [
-#     {"id": "configure-lock-root", "name": "configure_lock_root", "anchor": "function-configure-lock-root", "kind": "function"},
-#     {"id": "manifest-lock", "name": "manifest_lock", "anchor": "function-manifest-lock", "kind": "function"},
-#     {"id": "telemetry-lock", "name": "telemetry_lock", "anchor": "function-telemetry-lock", "kind": "function"},
-#     {"id": "lock-metrics-snapshot", "name": "lock_metrics_snapshot", "anchor": "function-lock-metrics-snapshot", "kind": "function"},
-#     {"id": "reset-lock-root", "name": "reset_lock_root", "anchor": "function-reset-lock-root", "kind": "function"}
+#     {
+#       "id": "lockmetrics",
+#       "name": "_LockMetrics",
+#       "anchor": "class-lockmetrics",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "configure-lock-root",
+#       "name": "configure_lock_root",
+#       "anchor": "function-configure-lock-root",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "reset-lock-root",
+#       "name": "reset_lock_root",
+#       "anchor": "function-reset-lock-root",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-lock-dir",
+#       "name": "_get_lock_dir",
+#       "anchor": "function-get-lock-dir",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "select-lock-class",
+#       "name": "_select_lock_class",
+#       "anchor": "function-select-lock-class",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "lock-mode",
+#       "name": "_lock_mode",
+#       "anchor": "function-lock-mode",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "poll-interval",
+#       "name": "_poll_interval",
+#       "anchor": "function-poll-interval",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "timeout-for",
+#       "name": "_timeout_for",
+#       "anchor": "function-timeout-for",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "hash-path",
+#       "name": "_hash_path",
+#       "anchor": "function-hash-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "lock-file-for",
+#       "name": "_lock_file_for",
+#       "anchor": "function-lock-file-for",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "record-timeout",
+#       "name": "_record_timeout",
+#       "anchor": "function-record-timeout",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "record-success",
+#       "name": "_record_success",
+#       "anchor": "function-record-success",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "p95",
+#       "name": "_p95",
+#       "anchor": "function-p95",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "lockcontext",
+#       "name": "_LockContext",
+#       "anchor": "class-lockcontext",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "category-lock",
+#       "name": "_category_lock",
+#       "anchor": "function-category-lock",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "manifest-lock",
+#       "name": "manifest_lock",
+#       "anchor": "function-manifest-lock",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "telemetry-lock",
+#       "name": "telemetry_lock",
+#       "anchor": "function-telemetry-lock",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "sqlite-lock",
+#       "name": "sqlite_lock",
+#       "anchor": "function-sqlite-lock",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "artifact-lock",
+#       "name": "artifact_lock",
+#       "anchor": "function-artifact-lock",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "summary-lock",
+#       "name": "summary_lock",
+#       "anchor": "function-summary-lock",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "lock-metrics-snapshot",
+#       "name": "lock_metrics_snapshot",
+#       "anchor": "function-lock-metrics-snapshot",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===
@@ -41,9 +162,9 @@ import logging
 import os
 import threading
 import time
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, Iterable, Iterator, List, Optional, Union
 
 from filelock import FileLock, SoftFileLock, Timeout
 
@@ -69,7 +190,7 @@ _LOCK_TIMEOUT_ENV_PREFIX = "DOCSTOKG_LOCK_TIMEOUT_"
 _LOCK_MODE_ENV = "DOCSTOKG_LOCK_MODE"
 _LOCK_POLL_INTERVAL_ENV = "DOCSTOKG_LOCK_POLL_INTERVAL"
 
-_DEFAULT_TIMEOUTS: Dict[str, float] = {
+_DEFAULT_TIMEOUTS: dict[str, float] = {
     "manifest": 5.0,
     "telemetry": 5.0,
     "summary": 5.0,
@@ -81,8 +202,8 @@ _DEFAULT_POLL_INTERVAL = 0.1  # seconds
 _DEFAULT_LOCK_MODE = 0o640
 
 _lock_config_guard = threading.RLock()
-_lock_root: Optional[Path] = None
-_lock_dir: Optional[Path] = None
+_lock_root: Path | None = None
+_lock_dir: Path | None = None
 
 
 @dataclass
@@ -90,13 +211,13 @@ class _LockMetrics:
     acquire_total: int = 0
     timeout_total: int = 0
     wait_ms_sum: float = 0.0
-    wait_ms_samples: List[float] = field(default_factory=list)
+    wait_ms_samples: list[float] = field(default_factory=list)
     hold_ms_sum: float = 0.0
-    hold_ms_samples: List[float] = field(default_factory=list)
+    hold_ms_samples: list[float] = field(default_factory=list)
 
 
 _metrics_guard = threading.RLock()
-_metrics: Dict[str, _LockMetrics] = {}
+_metrics: dict[str, _LockMetrics] = {}
 
 
 def configure_lock_root(run_root: Path) -> Path:
@@ -179,7 +300,7 @@ def _poll_interval() -> float:
         return _DEFAULT_POLL_INTERVAL
 
 
-def _timeout_for(category: str, override: Optional[float]) -> float:
+def _timeout_for(category: str, override: float | None) -> float:
     if override is not None:
         return float(override)
     env_name = f"{_LOCK_TIMEOUT_ENV_PREFIX}{category.upper()}"
@@ -243,7 +364,7 @@ class _LockContext:
         self._acquired_at = time.monotonic()
         self._released = False
 
-    def __enter__(self) -> "_LockContext":
+    def __enter__(self) -> _LockContext:
         return self
 
     def __exit__(self, exc_type, exc, tb) -> None:
@@ -267,9 +388,7 @@ class _LockContext:
 
 
 @contextlib.contextmanager
-def _category_lock(
-    category: str, target: Path, *, timeout: Optional[float] = None
-) -> Iterator[None]:
+def _category_lock(category: str, target: Path, *, timeout: float | None = None) -> Iterator[None]:
     resolved_target = Path(target).expanduser().resolve(strict=False)
     lock_file = _lock_file_for(category, resolved_target)
     lock_cls = _select_lock_class()
@@ -311,41 +430,41 @@ def _category_lock(
         ctx.release()
 
 
-def manifest_lock(path: Path, *, timeout: Optional[float] = None) -> Iterator[None]:
+def manifest_lock(path: Path, *, timeout: float | None = None) -> Iterator[None]:
     """Return a context manager guarding manifest JSONL writes."""
 
     return _category_lock("manifest", path, timeout=timeout)
 
 
-def telemetry_lock(path: Path, *, timeout: Optional[float] = None) -> Iterator[None]:
+def telemetry_lock(path: Path, *, timeout: float | None = None) -> Iterator[None]:
     """Return a context manager guarding telemetry JSONL writes."""
 
     return _category_lock("telemetry", path, timeout=timeout)
 
 
-def sqlite_lock(path: Path, *, timeout: Optional[float] = None) -> Iterator[None]:
+def sqlite_lock(path: Path, *, timeout: float | None = None) -> Iterator[None]:
     """Return a context manager guarding SQLite writes."""
 
     return _category_lock("sqlite", path, timeout=timeout)
 
 
-def artifact_lock(path: Path, *, timeout: Optional[float] = None) -> Iterator[None]:
+def artifact_lock(path: Path, *, timeout: float | None = None) -> Iterator[None]:
     """Return a context manager guarding artifact writes and promotions."""
 
     return _category_lock("artifact", path, timeout=timeout)
 
 
-def summary_lock(path: Path, *, timeout: Optional[float] = None) -> Iterator[None]:
+def summary_lock(path: Path, *, timeout: float | None = None) -> Iterator[None]:
     """Return a context manager guarding summary and report writes."""
 
     return _category_lock("summary", path, timeout=timeout)
 
 
-def lock_metrics_snapshot(*, reset: bool = False) -> Dict[str, Dict[str, Union[int, float]]]:
+def lock_metrics_snapshot(*, reset: bool = False) -> dict[str, dict[str, int | float]]:
     """Return a snapshot of collected lock metrics, optionally clearing them."""
 
     with _metrics_guard:
-        snapshot: Dict[str, Dict[str, float]] = {}
+        snapshot: dict[str, dict[str, float]] = {}
         for category, metrics in _metrics.items():
             summary = {
                 "acquire_total": metrics.acquire_total,

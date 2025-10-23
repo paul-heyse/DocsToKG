@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.context",
+#   "purpose": "Typed runtime context shared across DocParsing stages.",
+#   "sections": [
+#     {
+#       "id": "parsingcontext",
+#       "name": "ParsingContext",
+#       "anchor": "class-parsingcontext",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Typed runtime context shared across DocParsing stages.
 
 The :class:`ParsingContext` dataclass captures the run-scoped attributes that
@@ -9,9 +24,10 @@ payloads when stages record configuration snapshots.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from .config import _manifest_value
 
@@ -126,7 +142,7 @@ class ParsingContext:
             payload[key] = _manifest_value(value)
         return payload
 
-    def copy(self) -> "ParsingContext":
+    def copy(self) -> ParsingContext:
         """Return a shallow copy suitable for isolated mutation."""
 
         clone = ParsingContext(

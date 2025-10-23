@@ -1,3 +1,42 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.monitoring_cli",
+#   "purpose": "CLI commands for monitoring infrastructure.",
+#   "sections": [
+#     {
+#       "id": "start",
+#       "name": "start",
+#       "anchor": "function-start",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "stop",
+#       "name": "stop",
+#       "anchor": "function-stop",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "status",
+#       "name": "status",
+#       "anchor": "function-status",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "grafana-config",
+#       "name": "grafana_config",
+#       "anchor": "function-grafana-config",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "dashboard",
+#       "name": "dashboard",
+#       "anchor": "function-dashboard",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """CLI commands for monitoring infrastructure.
 
 Provides commands to start/stop Prometheus metrics server and configure Grafana.

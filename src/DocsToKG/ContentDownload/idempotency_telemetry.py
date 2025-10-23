@@ -4,14 +4,64 @@
 #   "purpose": "Telemetry event emission for idempotency system",
 #   "sections": [
 #     {
-#       "id": "event-types",
-#       "name": "Event type constants",
-#       "anchor": "constants"
+#       "id": "emit-event",
+#       "name": "emit_event",
+#       "anchor": "function-emit-event",
+#       "kind": "function"
 #     },
 #     {
-#       "id": "emit-functions",
-#       "name": "Event emission functions",
-#       "anchor": "functions"
+#       "id": "emit-job-planned",
+#       "name": "emit_job_planned",
+#       "anchor": "function-emit-job-planned",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-job-leased",
+#       "name": "emit_job_leased",
+#       "anchor": "function-emit-job-leased",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-job-state-changed",
+#       "name": "emit_job_state_changed",
+#       "anchor": "function-emit-job-state-changed",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-lease-renewed",
+#       "name": "emit_lease_renewed",
+#       "anchor": "function-emit-lease-renewed",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-lease-released",
+#       "name": "emit_lease_released",
+#       "anchor": "function-emit-lease-released",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-operation-started",
+#       "name": "emit_operation_started",
+#       "anchor": "function-emit-operation-started",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-operation-completed",
+#       "name": "emit_operation_completed",
+#       "anchor": "function-emit-operation-completed",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-crash-recovery",
+#       "name": "emit_crash_recovery",
+#       "anchor": "function-emit-crash-recovery",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-idempotency-replay",
+#       "name": "emit_idempotency_replay",
+#       "anchor": "function-emit-idempotency-replay",
+#       "kind": "function"
 #     }
 #   ]
 # }
@@ -39,7 +89,7 @@ from __future__ import annotations
 import json
 import logging
 import time
-from typing import Any, Dict, Optional
+from typing import Any
 
 LOGGER = logging.getLogger(__name__)
 
@@ -59,7 +109,7 @@ EVENT_IDEMPOTENCY_REPLAY = "idempotency_replay"
 # === TELEMETRY SINK ===
 
 
-def emit_event(event_type: str, payload: Dict[str, Any]) -> None:
+def emit_event(event_type: str, payload: dict[str, Any]) -> None:
     """Emit structured telemetry event.
 
     Parameters
@@ -143,7 +193,7 @@ def emit_job_state_changed(
     job_id: str,
     from_state: str,
     to_state: str,
-    reason: Optional[str] = None,
+    reason: str | None = None,
 ) -> None:
     """Emit job_state_changed event.
 

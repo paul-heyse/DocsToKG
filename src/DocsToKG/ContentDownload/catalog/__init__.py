@@ -1,3 +1,11 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.catalog.__init__",
+#   "purpose": "Artifact Catalog and Storage Index for ContentDownload.",
+#   "sections": []
+# }
+# === /NAVMAP ===
+
 """
 Artifact Catalog and Storage Index for ContentDownload.
 

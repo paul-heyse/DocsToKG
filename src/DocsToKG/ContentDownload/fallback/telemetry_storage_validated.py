@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.fallback.telemetry_storage_validated",
+#   "purpose": "Validated Telemetry Storage with Pydantic Integration.",
+#   "sections": [
+#     {
+#       "id": "validatedtelemetrystorage",
+#       "name": "ValidatedTelemetryStorage",
+#       "anchor": "class-validatedtelemetrystorage",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Validated Telemetry Storage with Pydantic Integration
 
@@ -11,7 +26,7 @@ Extends TelemetryStorage with:
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from DocsToKG.ContentDownload.fallback.models import (
     AttemptStatus,
@@ -30,8 +45,8 @@ class ValidatedTelemetryStorage:
 
     def __init__(
         self,
-        storage_path: Optional[str] = None,
-        config: Optional[TelemetryConfig] = None,
+        storage_path: str | None = None,
+        config: TelemetryConfig | None = None,
     ):
         """Initialize with optional Pydantic configuration.
 
@@ -41,7 +56,7 @@ class ValidatedTelemetryStorage:
         """
         self.config = config or TelemetryConfig()
         self.storage = TelemetryStorage(storage_path or self.config.storage.path)
-        self._batch_buffer: List[TelemetryAttemptRecord] = []
+        self._batch_buffer: list[TelemetryAttemptRecord] = []
 
     def write_validated_record(
         self,
@@ -52,8 +67,8 @@ class ValidatedTelemetryStorage:
         url: str,
         status: AttemptStatus,
         elapsed_ms: int,
-        http_status: Optional[int] = None,
-        reason: Optional[str] = None,
+        http_status: int | None = None,
+        reason: str | None = None,
         **kwargs,
     ) -> TelemetryAttemptRecord:
         """Write a validated telemetry record.
@@ -105,7 +120,7 @@ class ValidatedTelemetryStorage:
     def write_batch(
         self,
         batch_id: str,
-        records: List[Dict[str, Any]],
+        records: list[dict[str, Any]],
     ) -> TelemetryBatchRecord:
         """Write a validated batch of records.
 
@@ -146,9 +161,9 @@ class ValidatedTelemetryStorage:
     def load_records_validated(
         self,
         period: str = "24h",
-        tier_filter: Optional[TierName] = None,
-        source_filter: Optional[str] = None,
-    ) -> List[TelemetryAttemptRecord]:
+        tier_filter: TierName | None = None,
+        source_filter: str | None = None,
+    ) -> list[TelemetryAttemptRecord]:
         """Load and validate records from storage.
 
         Args:

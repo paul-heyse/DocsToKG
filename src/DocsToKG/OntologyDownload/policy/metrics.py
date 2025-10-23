@@ -1,3 +1,36 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.policy.metrics",
+#   "purpose": "Per-gate telemetry and metrics collection for operational dashboards.",
+#   "sections": [
+#     {
+#       "id": "gatemetric",
+#       "name": "GateMetric",
+#       "anchor": "class-gatemetric",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "gatemetricssnapshot",
+#       "name": "GateMetricsSnapshot",
+#       "anchor": "class-gatemetricssnapshot",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "metricscollector",
+#       "name": "MetricsCollector",
+#       "anchor": "class-metricscollector",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "get-metrics-collector",
+#       "name": "get_metrics_collector",
+#       "anchor": "function-get-metrics-collector",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Per-gate telemetry and metrics collection for operational dashboards.
 
 Provides counters, histograms, and summaries for policy gate operations.
@@ -6,7 +39,7 @@ Designed for integration with monitoring systems (Prometheus, CloudWatch, etc.).
 
 import threading
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from DocsToKG.OntologyDownload.policy.registry import get_registry
 
@@ -22,7 +55,7 @@ class GateMetric:
     gate_name: str
     passed: bool  # True = PolicyOK, False = PolicyReject
     elapsed_ms: float
-    error_code: Optional[str] = None  # Set if failed
+    error_code: str | None = None  # Set if failed
 
 
 @dataclass
@@ -67,7 +100,7 @@ class MetricsCollector:
     def __init__(self):
         """Initialize metrics collector (only once)."""
         if not hasattr(self, "_metrics"):
-            self._metrics: Dict[str, List[GateMetric]] = {}
+            self._metrics: dict[str, list[GateMetric]] = {}
             self._collector_lock = threading.Lock()
 
     def record_metric(self, metric: GateMetric) -> None:
@@ -81,7 +114,7 @@ class MetricsCollector:
                 self._metrics[metric.gate_name] = []
             self._metrics[metric.gate_name].append(metric)
 
-    def get_snapshot(self, gate_name: str) -> Optional[GateMetricsSnapshot]:
+    def get_snapshot(self, gate_name: str) -> GateMetricsSnapshot | None:
         """Get a snapshot of metrics for a gate.
 
         Args:
@@ -131,7 +164,7 @@ class MetricsCollector:
 
             return snapshot
 
-    def get_all_snapshots(self) -> Dict[str, GateMetricsSnapshot]:
+    def get_all_snapshots(self) -> dict[str, GateMetricsSnapshot]:
         """Get snapshots for all gates with metrics.
 
         Returns:
@@ -148,7 +181,7 @@ class MetricsCollector:
 
         return snapshots
 
-    def get_snapshots_by_domain(self, domain: str) -> Dict[str, GateMetricsSnapshot]:
+    def get_snapshots_by_domain(self, domain: str) -> dict[str, GateMetricsSnapshot]:
         """Get snapshots for all gates in a domain.
 
         Args:
@@ -162,7 +195,7 @@ class MetricsCollector:
             name: snapshot for name, snapshot in all_snapshots.items() if snapshot.domain == domain
         }
 
-    def clear_metrics(self, gate_name: Optional[str] = None) -> None:
+    def clear_metrics(self, gate_name: str | None = None) -> None:
         """Clear metrics for a gate or all gates.
 
         Args:
@@ -175,7 +208,7 @@ class MetricsCollector:
             else:
                 self._metrics.clear()
 
-    def get_summary(self) -> Dict[str, Any]:
+    def get_summary(self) -> dict[str, Any]:
         """Get a summary of all metrics.
 
         Returns:
@@ -198,7 +231,7 @@ class MetricsCollector:
         total_rejects = sum(s.rejects for s in snapshots.values())
 
         # Group by domain
-        by_domain: Dict[str, Dict[str, Any]] = {}
+        by_domain: dict[str, dict[str, Any]] = {}
         for snapshot in snapshots.values():
             domain_stats = by_domain.setdefault(
                 snapshot.domain,

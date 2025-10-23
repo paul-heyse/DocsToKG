@@ -3,10 +3,60 @@
 #   "module": "DocsToKG.OntologyDownload.analytics.pipelines",
 #   "purpose": "Polars lazy pipelines for columnar analytics without loops",
 #   "sections": [
-#     {"id": "types", "name": "Pipeline Result Types", "anchor": "TYP", "kind": "models"},
-#     {"id": "latest", "name": "Latest Version Pipeline", "anchor": "LATEST", "kind": "api"},
-#     {"id": "delta", "name": "Version Delta Pipeline", "anchor": "DELTA", "kind": "api"},
-#     {"id": "helpers", "name": "Pipeline Helpers", "anchor": "HELP", "kind": "api"}
+#     {
+#       "id": "latestsummary",
+#       "name": "LatestSummary",
+#       "anchor": "class-latestsummary",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "versiondelta",
+#       "name": "VersionDelta",
+#       "anchor": "class-versiondelta",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "build-latest-summary-pipeline",
+#       "name": "build_latest_summary_pipeline",
+#       "anchor": "function-build-latest-summary-pipeline",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "compute-latest-summary",
+#       "name": "compute_latest_summary",
+#       "anchor": "function-compute-latest-summary",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-version-delta-pipeline",
+#       "name": "build_version_delta_pipeline",
+#       "anchor": "function-build-version-delta-pipeline",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "compute-version-delta",
+#       "name": "compute_version_delta",
+#       "anchor": "function-compute-version-delta",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "arrow-to-lazy-frame",
+#       "name": "arrow_to_lazy_frame",
+#       "anchor": "function-arrow-to-lazy-frame",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "duckdb-to-lazy-frame",
+#       "name": "duckdb_to_lazy_frame",
+#       "anchor": "function-duckdb-to-lazy-frame",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "lazy-frame-to-arrow",
+#       "name": "lazy_frame_to_arrow",
+#       "anchor": "function-lazy-frame-to-arrow",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===
@@ -24,7 +74,6 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Optional
 
 try:  # pragma: no cover
     import polars as pl
@@ -74,7 +123,7 @@ class VersionDelta:
 
 def build_latest_summary_pipeline(
     files_df: pl.LazyFrame,
-    validations_df: Optional[pl.LazyFrame] = None,
+    validations_df: pl.LazyFrame | None = None,
 ) -> pl.LazyFrame:
     """Build lazy pipeline for latest version summary.
 
@@ -101,7 +150,7 @@ def build_latest_summary_pipeline(
 
 def compute_latest_summary(
     files_df: pl.LazyFrame,
-    validations_df: Optional[pl.LazyFrame] = None,
+    validations_df: pl.LazyFrame | None = None,
     top_n: int = 10,
 ) -> LatestSummary:
     """Compute latest version summary using streaming.

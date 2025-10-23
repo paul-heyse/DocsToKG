@@ -1,3 +1,11 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.errors.__init__",
+#   "purpose": "Error handling and retry policies for ContentDownload.",
+#   "sections": []
+# }
+# === /NAVMAP ===
+
 """Error handling and retry policies for ContentDownload.
 
 NAVMAP:

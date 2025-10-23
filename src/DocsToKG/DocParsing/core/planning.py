@@ -1,3 +1,66 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.core.planning",
+#   "purpose": "Planning utilities that preview DocParsing work and surface manifests.",
+#   "sections": [
+#     {
+#       "id": "new-bucket",
+#       "name": "_new_bucket",
+#       "anchor": "function-new-bucket",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "record-bucket",
+#       "name": "_record_bucket",
+#       "anchor": "function-record-bucket",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "bucket-counts",
+#       "name": "_bucket_counts",
+#       "anchor": "function-bucket-counts",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "manifest-hash-requirements",
+#       "name": "_manifest_hash_requirements",
+#       "anchor": "function-manifest-hash-requirements",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "render-preview",
+#       "name": "_render_preview",
+#       "anchor": "function-render-preview",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "plan-doctags",
+#       "name": "plan_doctags",
+#       "anchor": "function-plan-doctags",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "plan-chunk",
+#       "name": "plan_chunk",
+#       "anchor": "function-plan-chunk",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "plan-embed",
+#       "name": "plan_embed",
+#       "anchor": "function-plan-embed",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "display-plan",
+#       "name": "display_plan",
+#       "anchor": "function-display-plan",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Planning utilities that preview DocParsing work and surface manifests.
 
 Before operators run DocTags, chunking, or embedding at scale they often want
@@ -11,8 +74,9 @@ computing plan hashes used by dry-run workflows.
 from __future__ import annotations
 
 import sys
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional, Sequence, TextIO, Tuple
+from typing import Any, TextIO
 
 from DocsToKG.DocParsing.cli_errors import DoctagsCLIValidationError
 from DocsToKG.DocParsing.env import (
@@ -38,22 +102,22 @@ from .manifest import ResumeController, should_skip_output
 PLAN_PREVIEW_LIMIT = 5
 
 
-def _new_bucket() -> Dict[str, Any]:
+def _new_bucket() -> dict[str, Any]:
     """Return a new mutable bucket for tracking plan membership."""
 
     return {"count": 0, "preview": []}
 
 
-def _record_bucket(bucket: Dict[str, Any], doc_id: str) -> None:
+def _record_bucket(bucket: dict[str, Any], doc_id: str) -> None:
     """Update ``bucket`` with ``doc_id`` while respecting preview bounds."""
 
-    preview: List[str] = bucket.setdefault("preview", [])
+    preview: list[str] = bucket.setdefault("preview", [])
     if len(preview) < PLAN_PREVIEW_LIMIT:
         preview.append(doc_id)
     bucket["count"] = bucket.get("count", 0) + 1
 
 
-def _bucket_counts(entry: Dict[str, Any], key: str) -> Tuple[int, List[str]]:
+def _bucket_counts(entry: dict[str, Any], key: str) -> tuple[int, list[str]]:
     """Return ``(count, preview)`` for ``key`` within ``entry``."""
 
     value = entry.get(key)
@@ -74,8 +138,8 @@ def _bucket_counts(entry: Dict[str, Any], key: str) -> Tuple[int, List[str]]:
 
 
 def _manifest_hash_requirements(
-    manifest_entry: Optional[Mapping[str, object]],
-) -> Tuple[Optional[str], Optional[str]]:
+    manifest_entry: Mapping[str, object] | None,
+) -> tuple[str | None, str | None]:
     """Return manifest hash metadata when both entry and hash are present."""
 
     if not manifest_entry or not isinstance(manifest_entry, Mapping):
@@ -90,7 +154,7 @@ def _manifest_hash_requirements(
     return raw_hash, algorithm
 
 
-def _render_preview(preview: List[str], count: int) -> str:
+def _render_preview(preview: list[str], count: int) -> str:
     """Render a preview string that includes remainder hints when applicable."""
 
     items = list(preview)
@@ -108,7 +172,7 @@ __all__ = [
 ]
 
 
-def plan_doctags(argv: Sequence[str]) -> Dict[str, Any]:
+def plan_doctags(argv: Sequence[str]) -> dict[str, Any]:
     """Compute which DocTags inputs would be processed."""
 
     from DocsToKG.DocParsing import doctags as doctags_module
@@ -220,7 +284,7 @@ def plan_doctags(argv: Sequence[str]) -> Dict[str, Any]:
     }
 
 
-def plan_chunk(argv: Sequence[str]) -> Dict[str, Any]:
+def plan_chunk(argv: Sequence[str]) -> dict[str, Any]:
     """Compute which DocTags files the chunk stage would touch."""
 
     from DocsToKG.DocParsing import chunking as chunk_module
@@ -307,7 +371,7 @@ def plan_chunk(argv: Sequence[str]) -> Dict[str, Any]:
     }
 
 
-def plan_embed(argv: Sequence[str]) -> Dict[str, Any]:
+def plan_embed(argv: Sequence[str]) -> dict[str, Any]:
     """Compute which chunk files the embed stage would process or validate."""
 
     from DocsToKG.DocParsing import doctags as doctags_module
@@ -345,7 +409,7 @@ def plan_embed(argv: Sequence[str]) -> Dict[str, Any]:
     if args.validate_only:
         validate_bucket = _new_bucket()
         missing_bucket = _new_bucket()
-        notes: List[str] = []
+        notes: list[str] = []
         if chunks_missing:
             notes.append("Chunks directory missing")
         if vectors_missing:
@@ -390,7 +454,7 @@ def plan_embed(argv: Sequence[str]) -> Dict[str, Any]:
     planned = _new_bucket()
     skipped = _new_bucket()
 
-    notes: List[str] = []
+    notes: list[str] = []
     if chunks_missing:
         return {
             "stage": "embed",
@@ -457,10 +521,10 @@ def plan_embed(argv: Sequence[str]) -> Dict[str, Any]:
     }
 
 
-def display_plan(plans: Sequence[Dict[str, Any]], stream: Optional[TextIO] = None) -> List[str]:
+def display_plan(plans: Sequence[dict[str, Any]], stream: TextIO | None = None) -> list[str]:
     """Pretty-print plan summaries and return the rendered lines."""
 
-    lines: List[str] = ["docparse all plan"]
+    lines: list[str] = ["docparse all plan"]
     for entry in plans:
         stage = entry.get("stage", "unknown")
         notes = entry.get("notes", [])

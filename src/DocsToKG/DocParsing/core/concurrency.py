@@ -1,3 +1,54 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.core.concurrency",
+#   "purpose": "Process-safety helpers for DocParsing pipelines.",
+#   "sections": [
+#     {
+#       "id": "lock-path-for",
+#       "name": "_lock_path_for",
+#       "anchor": "function-lock-path-for",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "acquire-lock",
+#       "name": "_acquire_lock",
+#       "anchor": "function-acquire-lock",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "safe-write",
+#       "name": "safe_write",
+#       "anchor": "function-safe-write",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "set-spawn-or-warn",
+#       "name": "set_spawn_or_warn",
+#       "anchor": "function-set-spawn-or-warn",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "reservedport",
+#       "name": "ReservedPort",
+#       "anchor": "class-reservedport",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "bind-reserved-socket",
+#       "name": "_bind_reserved_socket",
+#       "anchor": "function-bind-reserved-socket",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "find-free-port",
+#       "name": "find_free_port",
+#       "anchor": "function-find-free-port",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Process-safety helpers for DocParsing pipelines.
 
 Chunking and embedding stages parallelise work across processes and threads,
@@ -32,8 +83,8 @@ import contextlib
 import logging
 import socket
 import time
+from collections.abc import Callable, Iterator
 from pathlib import Path
-from typing import Callable, Iterator, Optional
 
 from filelock import FileLock, Timeout
 
@@ -118,7 +169,7 @@ def safe_write(
         return True
 
 
-def set_spawn_or_warn(logger: Optional[logging.Logger] = None) -> None:
+def set_spawn_or_warn(logger: logging.Logger | None = None) -> None:
     """Ensure the multiprocessing start method is set to ``spawn``."""
 
     import multiprocessing as mp
@@ -164,11 +215,11 @@ class ReservedPort(contextlib.AbstractContextManager["ReservedPort"]):
         self._host = host
         self._closed = False
 
-    def __enter__(self) -> "ReservedPort":
+    def __enter__(self) -> ReservedPort:
         """Enter the context manager and return self."""
         return self
 
-    def __exit__(self, exc_type, exc, tb) -> Optional[bool]:
+    def __exit__(self, exc_type, exc, tb) -> bool | None:
         """Exit the context manager and close the socket."""
         self.close()
         return None
@@ -201,7 +252,7 @@ class ReservedPort(contextlib.AbstractContextManager["ReservedPort"]):
                 self._closed = True
 
 
-def _bind_reserved_socket(host: str, port: int) -> Optional[socket.socket]:
+def _bind_reserved_socket(host: str, port: int) -> socket.socket | None:
     """Bind a socket to the specified host and port, returning None on failure."""
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:

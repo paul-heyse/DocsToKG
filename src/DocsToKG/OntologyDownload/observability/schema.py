@@ -1,3 +1,54 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.observability.schema",
+#   "purpose": "JSON Schema generation and validation for observability events.",
+#   "sections": [
+#     {
+#       "id": "generate-settings-schema",
+#       "name": "generate_settings_schema",
+#       "anchor": "function-generate-settings-schema",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "generate-submodel-schemas",
+#       "name": "generate_submodel_schemas",
+#       "anchor": "function-generate-submodel-schemas",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-event",
+#       "name": "validate_event",
+#       "anchor": "function-validate-event",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "write-schemas-to-disk",
+#       "name": "write_schemas_to_disk",
+#       "anchor": "function-write-schemas-to-disk",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-schema-from-file",
+#       "name": "load_schema_from_file",
+#       "anchor": "function-load-schema-from-file",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "compare-schemas",
+#       "name": "compare_schemas",
+#       "anchor": "function-compare-schemas",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-schema-summary",
+#       "name": "get_schema_summary",
+#       "anchor": "function-get-schema-summary",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """JSON Schema generation and validation for observability events.
 
 Provides:
@@ -10,9 +61,9 @@ Provides:
 
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +74,7 @@ logger = logging.getLogger(__name__)
 EVENT_JSON_SCHEMA_VERSION = "1.0"
 
 # Canonical schema definition (manually maintained to stay in sync with Event)
-EVENT_JSON_SCHEMA: Dict[str, Any] = {
+EVENT_JSON_SCHEMA: dict[str, Any] = {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "$id": "https://docstokg.example.org/observability/event-schema-v1.0.json",
     "title": "OntologyDownload Event Schema",
@@ -110,7 +161,7 @@ EVENT_JSON_SCHEMA: Dict[str, Any] = {
 # ============================================================================
 
 
-def generate_settings_schema() -> Dict[str, Any]:
+def generate_settings_schema() -> dict[str, Any]:
     """Generate canonical JSON Schema for events.
 
     Returns:
@@ -119,7 +170,7 @@ def generate_settings_schema() -> Dict[str, Any]:
     return EVENT_JSON_SCHEMA.copy()
 
 
-def generate_submodel_schemas() -> Dict[str, Dict[str, Any]]:
+def generate_submodel_schemas() -> dict[str, dict[str, Any]]:
     """Generate schemas for individual event sub-models.
 
     Returns:
@@ -150,7 +201,7 @@ def generate_submodel_schemas() -> Dict[str, Dict[str, Any]]:
 # ============================================================================
 
 
-def validate_event(event_dict: Dict[str, Any]) -> tuple[bool, List[str]]:
+def validate_event(event_dict: dict[str, Any]) -> tuple[bool, list[str]]:
     """Validate an event against the canonical schema.
 
     Args:
@@ -181,7 +232,7 @@ def validate_event(event_dict: Dict[str, Any]) -> tuple[bool, List[str]]:
 # ============================================================================
 
 
-def write_schemas_to_disk(output_dir: Path) -> Dict[str, Path]:
+def write_schemas_to_disk(output_dir: Path) -> dict[str, Path]:
     """Write schemas to disk for CI drift detection.
 
     Args:
@@ -225,7 +276,7 @@ def write_schemas_to_disk(output_dir: Path) -> Dict[str, Path]:
 # ============================================================================
 
 
-def load_schema_from_file(filepath: Path) -> Optional[Dict[str, Any]]:
+def load_schema_from_file(filepath: Path) -> dict[str, Any] | None:
     """Load a schema from disk.
 
     Args:
@@ -242,7 +293,7 @@ def load_schema_from_file(filepath: Path) -> Optional[Dict[str, Any]]:
         return None
 
 
-def compare_schemas(schema1: Dict[str, Any], schema2: Dict[str, Any]) -> Dict[str, Any]:
+def compare_schemas(schema1: dict[str, Any], schema2: dict[str, Any]) -> dict[str, Any]:
     """Compare two schemas.
 
     Args:
@@ -305,7 +356,7 @@ def compare_schemas(schema1: Dict[str, Any], schema2: Dict[str, Any]) -> Dict[st
 # ============================================================================
 
 
-def get_schema_summary() -> Dict[str, Any]:
+def get_schema_summary() -> dict[str, Any]:
     """Get a human-readable summary of the event schema.
 
     Returns:
@@ -319,7 +370,7 @@ def get_schema_summary() -> Dict[str, Any]:
         "required_properties": len(schema.get("required", [])),
         "required_fields": schema.get("required", []),
         "event_levels": schema.get("properties", {}).get("level", {}).get("enum", []),
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(UTC).isoformat(),
         "properties_overview": {
             name: {
                 "type": prop.get("type"),

@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.telemetry_export_parquet",
+#   "purpose": "DuckDB-based Parquet exporter for long-term trend analysis.",
+#   "sections": [
+#     {
+#       "id": "main",
+#       "name": "main",
+#       "anchor": "function-main",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """DuckDB-based Parquet exporter for long-term trend analysis.
 
 Exports SQLite telemetry tables to compressed Parquet format for efficient

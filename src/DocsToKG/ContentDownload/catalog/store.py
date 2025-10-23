@@ -1,3 +1,24 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.catalog.store",
+#   "purpose": "SQLite-based implementation of the artifact catalog store.",
+#   "sections": [
+#     {
+#       "id": "catalogstore",
+#       "name": "CatalogStore",
+#       "anchor": "class-catalogstore",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "sqlitecatalog",
+#       "name": "SQLiteCatalog",
+#       "anchor": "class-sqlitecatalog",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """SQLite-based implementation of the artifact catalog store."""
 
 from __future__ import annotations
@@ -7,7 +28,6 @@ import sqlite3
 import threading
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
 
 from DocsToKG.ContentDownload.catalog.models import DocumentRecord
 
@@ -27,11 +47,11 @@ class CatalogStore:
         artifact_id: str,
         source_url: str,
         resolver: str,
-        content_type: Optional[str],
+        content_type: str | None,
         bytes: int,
-        sha256: Optional[str],
+        sha256: str | None,
         storage_uri: str,
-        run_id: Optional[str],
+        run_id: str | None,
     ) -> DocumentRecord:
         """Register or retrieve a document record (idempotent).
 
@@ -53,19 +73,19 @@ class CatalogStore:
         """
         raise NotImplementedError
 
-    def get_by_artifact(self, artifact_id: str) -> List[DocumentRecord]:
+    def get_by_artifact(self, artifact_id: str) -> list[DocumentRecord]:
         """Get all records for an artifact ID."""
         raise NotImplementedError
 
-    def get_by_sha256(self, sha256: str) -> List[DocumentRecord]:
+    def get_by_sha256(self, sha256: str) -> list[DocumentRecord]:
         """Get all records with a given SHA-256 hash."""
         raise NotImplementedError
 
-    def get_by_run(self, run_id: str) -> List[DocumentRecord]:
+    def get_by_run(self, run_id: str) -> list[DocumentRecord]:
         """Get all records from a specific run."""
         raise NotImplementedError
 
-    def find_duplicates(self) -> List[Tuple[str, int]]:
+    def find_duplicates(self) -> list[tuple[str, int]]:
         """Find (sha256, count) tuples where count > 1."""
         raise NotImplementedError
 
@@ -77,11 +97,11 @@ class CatalogStore:
         """
         raise NotImplementedError
 
-    def stats(self) -> Dict[str, int]:
+    def stats(self) -> dict[str, int]:
         """Return catalog statistics."""
         raise NotImplementedError
 
-    def get_all_records(self) -> List[DocumentRecord]:
+    def get_all_records(self) -> list[DocumentRecord]:
         """Get all records in the catalog."""
         raise NotImplementedError
 
@@ -143,11 +163,11 @@ class SQLiteCatalog(CatalogStore):
         artifact_id: str,
         source_url: str,
         resolver: str,
-        content_type: Optional[str],
+        content_type: str | None,
         bytes: int,
-        sha256: Optional[str],
+        sha256: str | None,
         storage_uri: str,
-        run_id: Optional[str],
+        run_id: str | None,
     ) -> DocumentRecord:
         """Register or retrieve a document record (idempotent).
 
@@ -201,7 +221,7 @@ class SQLiteCatalog(CatalogStore):
 
             return self._row_to_record(row)
 
-    def get_by_artifact(self, artifact_id: str) -> List[DocumentRecord]:
+    def get_by_artifact(self, artifact_id: str) -> list[DocumentRecord]:
         """Get all records for an artifact ID."""
         with self._lock:
             cursor = self.conn.execute(
@@ -216,7 +236,7 @@ class SQLiteCatalog(CatalogStore):
             )
             return [self._row_to_record(row) for row in cursor.fetchall()]
 
-    def get_by_sha256(self, sha256: str) -> List[DocumentRecord]:
+    def get_by_sha256(self, sha256: str) -> list[DocumentRecord]:
         """Get all records with a given SHA-256 hash."""
         with self._lock:
             cursor = self.conn.execute(
@@ -231,7 +251,7 @@ class SQLiteCatalog(CatalogStore):
             )
             return [self._row_to_record(row) for row in cursor.fetchall()]
 
-    def get_by_run(self, run_id: str) -> List[DocumentRecord]:
+    def get_by_run(self, run_id: str) -> list[DocumentRecord]:
         """Get all records from a specific run."""
         with self._lock:
             cursor = self.conn.execute(
@@ -246,7 +266,7 @@ class SQLiteCatalog(CatalogStore):
             )
             return [self._row_to_record(row) for row in cursor.fetchall()]
 
-    def find_duplicates(self) -> List[Tuple[str, int]]:
+    def find_duplicates(self) -> list[tuple[str, int]]:
         """Find (sha256, count) tuples where count > 1."""
         with self._lock:
             cursor = self.conn.execute(
@@ -269,7 +289,7 @@ class SQLiteCatalog(CatalogStore):
         """
         raise NotImplementedError
 
-    def stats(self) -> Dict[str, int]:
+    def stats(self) -> dict[str, int]:
         """Return catalog statistics."""
         with self._lock:
             cursor = self.conn.execute("SELECT COUNT(*) FROM documents")
@@ -293,7 +313,7 @@ class SQLiteCatalog(CatalogStore):
                 "total_bytes": total_bytes,
             }
 
-    def get_all_records(self) -> List[DocumentRecord]:
+    def get_all_records(self) -> list[DocumentRecord]:
         """Get all records in the catalog."""
         with self._lock:
             cursor = self.conn.execute(

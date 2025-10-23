@@ -1,3 +1,24 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.catalog.schema_inspector",
+#   "purpose": "Database schema introspection API.",
+#   "sections": [
+#     {
+#       "id": "quote-identifier",
+#       "name": "_quote_identifier",
+#       "anchor": "function-quote-identifier",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "catalogschema",
+#       "name": "CatalogSchema",
+#       "anchor": "class-catalogschema",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Database schema introspection API.
 
 Provides methods to inspect database schema, tables, columns, and indexes

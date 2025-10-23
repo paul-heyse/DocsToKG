@@ -1,3 +1,11 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.fallback.__init__",
+#   "purpose": "Fallback & Resiliency Strategy.",
+#   "sections": []
+# }
+# === /NAVMAP ===
+
 """
 Fallback & Resiliency Strategy
 

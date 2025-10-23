@@ -1,3 +1,30 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.catalog.verify",
+#   "purpose": "Streaming verification and consistency checking for catalog records.",
+#   "sections": [
+#     {
+#       "id": "verificationresult",
+#       "name": "VerificationResult",
+#       "anchor": "class-verificationresult",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "streamingverifier",
+#       "name": "StreamingVerifier",
+#       "anchor": "class-streamingverifier",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "verify-records-sync",
+#       "name": "verify_records_sync",
+#       "anchor": "function-verify-records-sync",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Streaming verification and consistency checking for catalog records.
 
 Provides high-performance async verification of catalog records with:
@@ -12,9 +39,9 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Optional
 
 from DocsToKG.ContentDownload.catalog.store import CatalogStore
 
@@ -27,9 +54,9 @@ class VerificationResult:
 
     record_id: int
     expected_sha256: str
-    computed_sha256: Optional[str]
+    computed_sha256: str | None
     matches: bool
-    error: Optional[str] = None
+    error: str | None = None
     elapsed_ms: int = 0
 
 
@@ -143,7 +170,7 @@ class StreamingVerifier:
     async def verify_batch(
         self,
         records: list[tuple[int, str, str]],  # (record_id, storage_uri, expected_sha256)
-        progress_callback: Optional[Callable[[int, int, VerificationResult], None]] = None,
+        progress_callback: Callable[[int, int, VerificationResult], None] | None = None,
         fail_fast: bool = False,
     ) -> list[VerificationResult]:
         """Verify multiple records concurrently.
@@ -182,7 +209,7 @@ class StreamingVerifier:
 
     async def verify_all_records(
         self,
-        progress_callback: Optional[Callable[[int, int, VerificationResult], None]] = None,
+        progress_callback: Callable[[int, int, VerificationResult], None] | None = None,
         sample_rate: float = 1.0,
     ) -> dict[str, int]:
         """Verify all records in catalog.
@@ -247,9 +274,9 @@ class StreamingVerifier:
 
 def verify_records_sync(
     catalog: CatalogStore,
-    record_ids: Optional[list[int]] = None,
+    record_ids: list[int] | None = None,
     max_concurrent: int = 5,
-    progress_callback: Optional[Callable[[int, int, VerificationResult], None]] = None,
+    progress_callback: Callable[[int, int, VerificationResult], None] | None = None,
 ) -> dict[str, int]:
     """Synchronous wrapper for batch verification.
 

@@ -3,10 +3,36 @@
 #   "module": "DocsToKG.ContentDownload.cli_telemetry",
 #   "purpose": "CLI subcommands for telemetry inspection, SLO evaluation, and export",
 #   "sections": [
-#     {"id": "install-telemetry-cli", "name": "install_telemetry_cli", "anchor": "function-install-telemetry-cli", "kind": "function"},
-#     {"id": "cmd-summary", "name": "_cmd_summary", "anchor": "function-cmd-summary", "kind": "function"},
-#     {"id": "cmd-export", "name": "_cmd_export", "anchor": "function-cmd-export", "kind": "function"},
-#     {"id": "cmd-query", "name": "_cmd_query", "anchor": "function-cmd-query", "kind": "function"}
+#     {
+#       "id": "install-telemetry-cli",
+#       "name": "install_telemetry_cli",
+#       "anchor": "function-install-telemetry-cli",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "fetch-one",
+#       "name": "_fetch_one",
+#       "anchor": "function-fetch-one",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "cmd-summary",
+#       "name": "_cmd_summary",
+#       "anchor": "function-cmd-summary",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "cmd-export",
+#       "name": "_cmd_export",
+#       "anchor": "function-cmd-export",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "cmd-query",
+#       "name": "_cmd_query",
+#       "anchor": "function-cmd-query",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===
@@ -38,7 +64,6 @@ import sqlite3
 import sys
 import time
 from pathlib import Path
-from typing import Optional
 
 __all__ = ["install_telemetry_cli"]
 
@@ -102,7 +127,7 @@ def install_telemetry_cli(subparsers: argparse._SubParsersAction) -> None:
     pq.set_defaults(func=_cmd_query)
 
 
-def _fetch_one(cx: sqlite3.Connection, sql: str, params: tuple = ()) -> Optional[float]:
+def _fetch_one(cx: sqlite3.Connection, sql: str, params: tuple = ()) -> float | None:
     """Fetch single value from query result."""
     row = cx.execute(sql, params).fetchone()
     return row[0] if row and row[0] is not None else None

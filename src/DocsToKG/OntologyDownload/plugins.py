@@ -3,11 +3,138 @@
 #   "module": "DocsToKG.OntologyDownload.plugins",
 #   "purpose": "Manage resolver and validator plugin registries for the ontology downloader",
 #   "sections": [
-#     {"id": "protocols", "name": "Plugin Protocols", "anchor": "PRT", "kind": "api"},
-#     {"id": "registry", "name": "Registry State & Helpers", "anchor": "REG", "kind": "helpers"},
-#     {"id": "resolver-plugins", "name": "Resolver Plugin Loading", "anchor": "RES", "kind": "api"},
-#     {"id": "validator-plugins", "name": "Validator Plugin Loading", "anchor": "VAL", "kind": "api"},
-#     {"id": "public-api", "name": "Public Registry API", "anchor": "API", "kind": "api"}
+#     {
+#       "id": "resolverplugin",
+#       "name": "ResolverPlugin",
+#       "anchor": "class-resolverplugin",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "validatorplugin",
+#       "name": "ValidatorPlugin",
+#       "anchor": "class-validatorplugin",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "describe-plugin",
+#       "name": "_describe_plugin",
+#       "anchor": "function-describe-plugin",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "detect-entry-version",
+#       "name": "_detect_entry_version",
+#       "anchor": "function-detect-entry-version",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-resolver-plugins-locked",
+#       "name": "_load_resolver_plugins_locked",
+#       "anchor": "function-load-resolver-plugins-locked",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-resolver-plugins",
+#       "name": "load_resolver_plugins",
+#       "anchor": "function-load-resolver-plugins",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "ensure-resolver-plugins",
+#       "name": "ensure_resolver_plugins",
+#       "anchor": "function-ensure-resolver-plugins",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-validator-plugins-locked",
+#       "name": "_load_validator_plugins_locked",
+#       "anchor": "function-load-validator-plugins-locked",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-validator-plugins",
+#       "name": "load_validator_plugins",
+#       "anchor": "function-load-validator-plugins",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "ensure-plugins-loaded",
+#       "name": "ensure_plugins_loaded",
+#       "anchor": "function-ensure-plugins-loaded",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-resolver-registry",
+#       "name": "get_resolver_registry",
+#       "anchor": "function-get-resolver-registry",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-validator-registry",
+#       "name": "get_validator_registry",
+#       "anchor": "function-get-validator-registry",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "register-plugin-registry",
+#       "name": "register_plugin_registry",
+#       "anchor": "function-register-plugin-registry",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-plugin-registry",
+#       "name": "get_plugin_registry",
+#       "anchor": "function-get-plugin-registry",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "list-registered-plugins",
+#       "name": "list_registered_plugins",
+#       "anchor": "function-list-registered-plugins",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-registered-plugin-meta",
+#       "name": "get_registered_plugin_meta",
+#       "anchor": "function-get-registered-plugin-meta",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "store-plugin-metadata",
+#       "name": "_store_plugin_metadata",
+#       "anchor": "function-store-plugin-metadata",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "clear-plugin-metadata",
+#       "name": "_clear_plugin_metadata",
+#       "anchor": "function-clear-plugin-metadata",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "register-resolver",
+#       "name": "register_resolver",
+#       "anchor": "function-register-resolver",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "unregister-resolver",
+#       "name": "unregister_resolver",
+#       "anchor": "function-unregister-resolver",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "register-validator",
+#       "name": "register_validator",
+#       "anchor": "function-register-validator",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "unregister-validator",
+#       "name": "unregister_validator",
+#       "anchor": "function-unregister-validator",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===
@@ -26,8 +153,9 @@ from __future__ import annotations
 import logging
 import threading
 from collections import OrderedDict
+from collections.abc import MutableMapping
 from importlib import metadata
-from typing import Any, Dict, MutableMapping, Optional, Protocol
+from typing import Any, Protocol
 
 __all__ = [
     "ResolverPlugin",
@@ -65,9 +193,9 @@ class ValidatorPlugin(Protocol):
 
 _PLUGINS_LOCK = threading.Lock()
 _PLUGINS_INITIALIZED = False
-_RESOLVER_ENTRY_META: Dict[str, Dict[str, str]] = {}
-_VALIDATOR_ENTRY_META: Dict[str, Dict[str, str]] = {}
-_PLUGIN_REGISTRIES: Dict[str, MutableMapping[str, Any]] = {}
+_RESOLVER_ENTRY_META: dict[str, dict[str, str]] = {}
+_VALIDATOR_ENTRY_META: dict[str, dict[str, str]] = {}
+_PLUGIN_REGISTRIES: dict[str, MutableMapping[str, Any]] = {}
 _RESOLVER_REGISTRY: MutableMapping[str, ResolverPlugin] = {}
 _VALIDATOR_REGISTRY: MutableMapping[str, ValidatorPlugin] = {}
 
@@ -75,7 +203,7 @@ _VALIDATOR_REGISTRY: MutableMapping[str, ValidatorPlugin] = {}
 def _describe_plugin(obj: object) -> str:
     module = getattr(obj, "__module__", obj.__class__.__module__)
     if callable(obj) and hasattr(obj, "__name__"):
-        name = getattr(obj, "__name__")
+        name = obj.__name__
     else:
         qualname = getattr(obj, "__qualname__", obj.__class__.__name__)
         name = ".".join(part for part in qualname.split(".") if part != "<locals>")
@@ -140,7 +268,7 @@ def _load_resolver_plugins_locked(
 def load_resolver_plugins(
     registry: MutableMapping[str, ResolverPlugin],
     *,
-    logger: Optional[logging.Logger] = None,
+    logger: logging.Logger | None = None,
     reload: bool = False,
 ) -> None:
     """Discover resolver plugins registered via ``entry_points``."""
@@ -153,7 +281,7 @@ def load_resolver_plugins(
 def ensure_resolver_plugins(
     registry: MutableMapping[str, ResolverPlugin],
     *,
-    logger: Optional[logging.Logger] = None,
+    logger: logging.Logger | None = None,
 ) -> None:
     """Load resolver plugins exactly once per interpreter."""
 
@@ -200,7 +328,7 @@ def _load_validator_plugins_locked(
 def load_validator_plugins(
     registry: MutableMapping[str, ValidatorPlugin],
     *,
-    logger: Optional[logging.Logger] = None,
+    logger: logging.Logger | None = None,
     reload: bool = False,
 ) -> None:
     """Discover validator plugins registered via ``entry_points``."""
@@ -212,7 +340,7 @@ def load_validator_plugins(
 
 def ensure_plugins_loaded(
     *,
-    logger: Optional[logging.Logger] = None,
+    logger: logging.Logger | None = None,
     reload: bool = False,
 ) -> tuple[MutableMapping[str, ResolverPlugin], MutableMapping[str, ValidatorPlugin]]:
     """Load resolver and validator plugins exactly once in a thread-safe manner."""
@@ -243,7 +371,7 @@ def ensure_plugins_loaded(
 
 def get_resolver_registry(
     *,
-    logger: Optional[logging.Logger] = None,
+    logger: logging.Logger | None = None,
 ) -> MutableMapping[str, ResolverPlugin]:
     """Return the resolver plugin registry, ensuring plugins are loaded once."""
 
@@ -253,7 +381,7 @@ def get_resolver_registry(
 
 def get_validator_registry(
     *,
-    logger: Optional[logging.Logger] = None,
+    logger: logging.Logger | None = None,
 ) -> MutableMapping[str, ValidatorPlugin]:
     """Return the validator plugin registry, ensuring plugins are loaded once."""
 
@@ -289,7 +417,7 @@ def get_plugin_registry(kind: str) -> MutableMapping[str, Any]:
         raise ValueError(f"No plugin registry registered for kind '{kind}'") from exc
 
 
-def list_registered_plugins(kind: str) -> "OrderedDict[str, str]":
+def list_registered_plugins(kind: str) -> OrderedDict[str, str]:
     """Return mapping of plugin names to qualified identifiers for ``kind``."""
 
     if kind == "resolver":
@@ -302,7 +430,7 @@ def list_registered_plugins(kind: str) -> "OrderedDict[str, str]":
     return OrderedDict(sorted(items.items()))
 
 
-def get_registered_plugin_meta(kind: str) -> Dict[str, Dict[str, str]]:
+def get_registered_plugin_meta(kind: str) -> dict[str, dict[str, str]]:
     """Return metadata captured for entry-point registered plugins."""
 
     ensure_plugins_loaded()

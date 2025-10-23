@@ -1,3 +1,42 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.cli_errors",
+#   "purpose": "Exception types and formatting helpers shared by DocParsing CLIs.",
+#   "sections": [
+#     {
+#       "id": "clivalidationerror",
+#       "name": "CLIValidationError",
+#       "anchor": "class-clivalidationerror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "chunkingclivalidationerror",
+#       "name": "ChunkingCLIValidationError",
+#       "anchor": "class-chunkingclivalidationerror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "doctagsclivalidationerror",
+#       "name": "DoctagsCLIValidationError",
+#       "anchor": "class-doctagsclivalidationerror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "embeddingclivalidationerror",
+#       "name": "EmbeddingCLIValidationError",
+#       "anchor": "class-embeddingclivalidationerror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "format-cli-error",
+#       "name": "format_cli_error",
+#       "anchor": "function-format-cli-error",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Exception types and formatting helpers shared by DocParsing CLIs.
 
 The CLI layers for DocTags, chunking, and embedding all surface validation
@@ -11,7 +50,6 @@ predictable for both humans and automation.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 __all__ = [
     "CLIValidationError",
@@ -28,7 +66,7 @@ class CLIValidationError(ValueError):
 
     option: str
     message: str
-    hint: Optional[str] = None
+    hint: str | None = None
     stage: str = "cli"
 
     def __post_init__(self) -> None:  # pragma: no cover - simple wiring

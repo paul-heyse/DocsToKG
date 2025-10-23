@@ -1,3 +1,24 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.config.policies.retry",
+#   "purpose": "Retry policy configuration models.",
+#   "sections": [
+#     {
+#       "id": "backoffpolicy",
+#       "name": "BackoffPolicy",
+#       "anchor": "class-backoffpolicy",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "retrypolicy",
+#       "name": "RetryPolicy",
+#       "anchor": "class-retrypolicy",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Retry policy configuration models.
 
 Defines exponential backoff and retry strategies for transient failures.
@@ -5,8 +26,6 @@ Used by resolvers to handle network errors, rate limits, and server errors.
 """
 
 from __future__ import annotations
-
-from typing import List
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -36,7 +55,7 @@ class RetryPolicy(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    retry_statuses: List[int] = Field(
+    retry_statuses: list[int] = Field(
         default_factory=lambda: [429, 500, 502, 503, 504],
         description="HTTP status codes to retry on",
     )
@@ -47,7 +66,7 @@ class RetryPolicy(BaseModel):
 
     @field_validator("retry_statuses")
     @classmethod
-    def validate_statuses(cls, v: List[int]) -> List[int]:
+    def validate_statuses(cls, v: list[int]) -> list[int]:
         """Validate HTTP status codes."""
         if not v:
             raise ValueError("retry_statuses must not be empty")

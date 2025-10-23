@@ -13,7 +13,6 @@
 from __future__ import annotations
 
 import logging
-from typing import List
 
 import pytest
 
@@ -25,7 +24,7 @@ class _StubLimiter:
 
     def __init__(self, failures: int) -> None:
         self._failures_remaining = failures
-        self.calls: List[int] = []
+        self.calls: list[int] = []
 
     def try_acquire(self, name: str, weight: int) -> bool:
         self.calls.append(weight)
@@ -35,19 +34,19 @@ class _StubLimiter:
         return True
 
 
-def test_limiter_adapter_consume_waits_when_exhausted(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
+def test_limiter_adapter_consume_waits_when_exhausted(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
     """``consume`` should keep retrying when the limiter is temporarily exhausted."""
 
     limiter = _StubLimiter(failures=2)
     adapter = _LimiterAdapter(limiter, "service:host")
-    sleep_calls: List[float] = []
+    sleep_calls: list[float] = []
 
     def _fake_sleep(seconds: float) -> None:
         sleep_calls.append(seconds)
 
-    monkeypatch.setattr(
-        "DocsToKG.OntologyDownload.io.rate_limit.time.sleep", _fake_sleep
-    )
+    monkeypatch.setattr("DocsToKG.OntologyDownload.io.rate_limit.time.sleep", _fake_sleep)
 
     with caplog.at_level(logging.DEBUG):
         adapter.consume(tokens=1.0)

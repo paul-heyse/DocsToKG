@@ -1,3 +1,24 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.policy.url_gate",
+#   "purpose": "Authoritative URL security gate.",
+#   "sections": [
+#     {
+#       "id": "policyerror",
+#       "name": "PolicyError",
+#       "anchor": "class-policyerror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "validate-url-security",
+#       "name": "validate_url_security",
+#       "anchor": "function-validate-url-security",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Authoritative URL security gate.
 
@@ -16,7 +37,6 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Optional
 from urllib.parse import urlparse, urlunparse
 
 logger = logging.getLogger(__name__)
@@ -28,7 +48,7 @@ class PolicyError(RuntimeError):
     pass
 
 
-def validate_url_security(url: str, http_config: Optional[object] = None) -> str:
+def validate_url_security(url: str, http_config: object | None = None) -> str:
     """
     Validate URL against security policy.
 

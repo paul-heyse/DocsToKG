@@ -4,6 +4,12 @@
 #   "purpose": "Ingestion pipeline, feature generation, and observability helpers",
 #   "sections": [
 #     {
+#       "id": "default-training-rng-factory",
+#       "name": "_default_training_rng_factory",
+#       "anchor": "function-default-training-rng-factory",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "countersample",
 #       "name": "CounterSample",
 #       "anchor": "class-countersample",
@@ -56,6 +62,12 @@
 #       "name": "IngestMetrics",
 #       "anchor": "class-ingestmetrics",
 #       "kind": "class"
+#     },
+#     {
+#       "id": "ensure-pyarrow-vectors",
+#       "name": "_ensure_pyarrow_vectors",
+#       "anchor": "function-ensure-pyarrow-vectors",
+#       "kind": "function"
 #     },
 #     {
 #       "id": "batchcommitresult",
@@ -114,24 +126,13 @@ import re
 import time
 import uuid
 from collections import defaultdict, deque
+from collections.abc import Callable, Iterable, Iterator, Mapping, MutableMapping, Sequence
 from contextlib import closing, contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from threading import RLock
 from typing import (
     TYPE_CHECKING,
-    Callable,
-    Deque,
-    Dict,
-    Iterable,
-    Iterator,
-    List,
-    Mapping,
-    MutableMapping,
-    Optional,
-    Sequence,
-    Set,
-    Tuple,
 )
 
 import numpy as np
@@ -224,16 +225,16 @@ class MetricsCollector:
         self._lock = RLock()
         self._histogram_window = 512
 
-        def _deque_factory() -> Deque[float]:
+        def _deque_factory() -> deque[float]:
             return deque(maxlen=self._histogram_window)
 
-        self._counters: MutableMapping[Tuple[str, Tuple[Tuple[str, str], ...]], float] = (
+        self._counters: MutableMapping[tuple[str, tuple[tuple[str, str], ...]], float] = (
             defaultdict(float)
         )
-        self._histograms: MutableMapping[Tuple[str, Tuple[Tuple[str, str], ...]], Deque[float]] = (
+        self._histograms: MutableMapping[tuple[str, tuple[tuple[str, str], ...]], deque[float]] = (
             defaultdict(_deque_factory)
         )
-        self._gauges: MutableMapping[Tuple[str, Tuple[Tuple[str, str], ...]], float] = {}
+        self._gauges: MutableMapping[tuple[str, tuple[tuple[str, str], ...]], float] = {}
 
     def increment(self, name: str, amount: float = 1.0, **labels: str) -> None:
         """Increase a counter metric by ``amount`` for the supplied label set.
@@ -271,7 +272,7 @@ class MetricsCollector:
         with self._lock:
             self._gauges[key] = value
 
-    def percentile(self, name: str, percentile: float, **labels: str) -> Optional[float]:
+    def percentile(self, name: str, percentile: float, **labels: str) -> float | None:
         """Return the requested percentile for a histogram metric if available.
 
         Args:
@@ -352,7 +353,7 @@ class TraceRecorder:
 class Observability:
     """Facade for metrics, structured logging, and tracing."""
 
-    def __init__(self, *, logger: Optional[logging.Logger] = None) -> None:
+    def __init__(self, *, logger: logging.Logger | None = None) -> None:
         """Initialise observers with an optional external logger."""
         self._metrics = MetricsCollector()
         self._logger = logger or logging.getLogger("DocsToKG.HybridSearch")
@@ -372,7 +373,7 @@ class Observability:
         """Create a tracing span that records timing and metadata."""
         return self._tracer.span(name, **attributes)
 
-    def metrics_snapshot(self) -> Dict[str, list[Mapping[str, object]]]:
+    def metrics_snapshot(self) -> dict[str, list[Mapping[str, object]]]:
         """Export a JSON-serializable snapshot of counters, histograms, and gauges."""
         counters = [sample.__dict__ for sample in self._metrics.export_counters()]
         histograms = [sample.__dict__ for sample in self._metrics.export_histograms()]
@@ -426,7 +427,7 @@ class IngestMetrics:
     chunks_deleted: int = 0
 
 
-def _ensure_pyarrow_vectors() -> Tuple[object, object]:
+def _ensure_pyarrow_vectors() -> tuple[object, object]:
     """Return the pyarrow modules required for parquet ingestion."""
 
     global _PYARROW_MODULE, _PYARROW_PARQUET
@@ -450,8 +451,8 @@ class BatchCommitResult:
     """Summary describing a single committed ingestion batch."""
 
     chunk_count: int = 0
-    namespaces: Tuple[str, ...] = ()
-    vector_ids: Optional[Tuple[str, ...]] = None
+    namespaces: tuple[str, ...] = ()
+    vector_ids: tuple[str, ...] | None = None
 
 
 @dataclass(slots=True)
@@ -459,8 +460,8 @@ class IngestSummary:
     """Aggregate summary returned from :meth:`ChunkIngestionPipeline.upsert_documents`."""
 
     chunk_count: int = 0
-    namespaces: Tuple[str, ...] = ()
-    vector_ids: Optional[Tuple[str, ...]] = None
+    namespaces: tuple[str, ...] = ()
+    vector_ids: tuple[str, ...] | None = None
 
 
 class ChunkIngestionPipeline:
@@ -489,10 +490,10 @@ class ChunkIngestionPipeline:
         faiss_index: DenseVectorStore,
         opensearch: LexicalIndex,
         registry: ChunkRegistry,
-        observability: Optional[Observability] = None,
+        observability: Observability | None = None,
         vector_cache_limit: int = _DEFAULT_VECTOR_CACHE_LIMIT,
-        vector_cache_stats_hook: Optional[Callable[[int, DocumentInput], None]] = None,
-        training_sample_rng_factory: Optional[Callable[[], np.random.Generator]] = None,
+        vector_cache_stats_hook: Callable[[int, DocumentInput], None] | None = None,
+        training_sample_rng_factory: Callable[[], np.random.Generator] | None = None,
     ) -> None:
         """Initialise the ingestion pipeline with storage backends and instrumentation.
 
@@ -612,8 +613,8 @@ class ChunkIngestionPipeline:
                 )
 
         total_chunks = 0
-        namespaces: Set[str] = set()
-        vector_ids: List[str] | None = [] if collect_vector_ids else None
+        namespaces: set[str] = set()
+        vector_ids: list[str] | None = [] if collect_vector_ids else None
 
         try:
             for document in documents:
@@ -772,7 +773,7 @@ class ChunkIngestionPipeline:
 
         rng = self._training_sample_rng_factory()
 
-        reservoir: List[ChunkPayload] = []
+        reservoir: list[ChunkPayload] = []
         # Reservoir sampling over existing registry entries
         i = 0
         with closing(self._registry.iter_all()) as iterator:
@@ -796,7 +797,7 @@ class ChunkIngestionPipeline:
         if not reservoir:
             return [chunk.features.embedding for chunk in new_chunks]
 
-        cache: Dict[str, np.ndarray] = {}
+        cache: dict[str, np.ndarray] = {}
         for chunk in reservoir:
             embedding = chunk.features.embedding
             if isinstance(embedding, np.ndarray):
@@ -807,7 +808,7 @@ class ChunkIngestionPipeline:
         )
         return [row for row in matrix]
 
-    def _load_precomputed_chunks(self, document: DocumentInput) -> List[ChunkPayload]:
+    def _load_precomputed_chunks(self, document: DocumentInput) -> list[ChunkPayload]:
         """Load chunk and vector artifacts from disk for a document.
 
         Args:
@@ -821,7 +822,7 @@ class ChunkIngestionPipeline:
         """
         chunk_iter = self._iter_jsonl(document.chunk_path)
         vector_iter = self._iter_vector_file(document.vector_path)
-        vector_cache: Dict[str, Mapping[str, object]] = {}
+        vector_cache: dict[str, Mapping[str, object]] = {}
         missing_uuid_entries = False
 
         def _normalise_vector_id(
@@ -829,7 +830,7 @@ class ChunkIngestionPipeline:
             *,
             allow_missing: bool,
             source: str,
-        ) -> Optional[str]:
+        ) -> str | None:
             raw_uuid = entry.get("uuid")
             if raw_uuid is None or (isinstance(raw_uuid, str) and not raw_uuid.strip()):
                 raw_uuid = entry.get("UUID")
@@ -856,7 +857,7 @@ class ChunkIngestionPipeline:
                     "artifacts are ordered and sorted consistently by UUID before re-running ingestion."
                 )
 
-        def _pop_vector(vector_id: str) -> Optional[Mapping[str, object]]:
+        def _pop_vector(vector_id: str) -> Mapping[str, object] | None:
             nonlocal missing_uuid_entries
             cached = vector_cache.pop(vector_id, None)
             _maybe_track_cache()
@@ -877,8 +878,8 @@ class ChunkIngestionPipeline:
                 _maybe_track_cache()
             return None
 
-        payloads: List[ChunkPayload] = []
-        missing: List[str] = []
+        payloads: list[ChunkPayload] = []
+        missing: list[str] = []
         for entry in chunk_iter:
             chunk_context = (
                 f"chunk artifact {document.chunk_path} "
@@ -926,7 +927,7 @@ class ChunkIngestionPipeline:
                 "Missing vector entries for chunk UUIDs: " + ", ".join(sorted(set(missing)))
             )
 
-        extra_vector_ids: List[str] = []
+        extra_vector_ids: list[str] = []
         max_preview = 10
         truncated = False
         if vector_cache:
@@ -966,7 +967,7 @@ class ChunkIngestionPipeline:
             raise IngestError(message)
         return payloads
 
-    def _resolve_char_offset(self, entry: Mapping[str, object], text: str) -> Tuple[int, int]:
+    def _resolve_char_offset(self, entry: Mapping[str, object], text: str) -> tuple[int, int]:
         """Determine the character span for ``entry`` if metadata is present."""
 
         span_fields = (
@@ -985,10 +986,10 @@ class ChunkIngestionPipeline:
         return (0, len(text))
 
     @staticmethod
-    def _normalise_char_span(span: object) -> Optional[Tuple[int, int]]:
+    def _normalise_char_span(span: object) -> tuple[int, int] | None:
         """Normalise heterogeneous span payloads into a ``(start, end)`` tuple."""
 
-        def _coerce(value: object) -> Optional[int]:
+        def _coerce(value: object) -> int | None:
             if isinstance(value, bool):
                 return None
             try:
@@ -1008,13 +1009,13 @@ class ChunkIngestionPipeline:
             return None
 
         if isinstance(span, Mapping):
-            start: Optional[int] = None
+            start: int | None = None
             for key in ("start", "begin", "offset", "char_start"):
                 if key in span:
                     start = _coerce(span.get(key))
                 if start is not None:
                     break
-            end: Optional[int] = None
+            end: int | None = None
             for key in ("end", "stop", "finish", "char_end"):
                 if key in span:
                     end = _coerce(span.get(key))
@@ -1041,7 +1042,7 @@ class ChunkIngestionPipeline:
 
         return None
 
-    def _delete_existing_for_doc(self, doc_id: str, namespace: str) -> Tuple[str, ...]:
+    def _delete_existing_for_doc(self, doc_id: str, namespace: str) -> tuple[str, ...]:
         """Remove previously ingested chunks for a document/namespace pair.
 
         Args:
@@ -1084,7 +1085,7 @@ class ChunkIngestionPipeline:
             embedding=vector,
         )
 
-    def _weights_from_payload(self, payload: Mapping[str, object]) -> Dict[str, float]:
+    def _weights_from_payload(self, payload: Mapping[str, object]) -> dict[str, float]:
         """Deserialize sparse weight payloads into a term-to-weight mapping.
 
         Args:
@@ -1116,12 +1117,12 @@ class ChunkIngestionPipeline:
         weights = _materialise(payload.get("weights"))
         return {str(term): float(weight) for term, weight in zip(terms, weights)}
 
-    def _read_vector_file(self, path: Path) -> List[Dict[str, object]]:
+    def _read_vector_file(self, path: Path) -> list[dict[str, object]]:
         """Eagerly load vector records from JSONL or Parquet."""
 
         return list(self._iter_vector_file(path))
 
-    def _iter_vector_file(self, path: Path) -> Iterator[Dict[str, object]]:
+    def _iter_vector_file(self, path: Path) -> Iterator[dict[str, object]]:
         """Stream vector records from ``path`` regardless of format."""
 
         suffix = path.suffix.lower()
@@ -1133,7 +1134,7 @@ class ChunkIngestionPipeline:
             return
         raise IngestError(f"Unsupported vector artifact format for {path}")
 
-    def _iter_parquet(self, path: Path) -> Iterator[Dict[str, object]]:
+    def _iter_parquet(self, path: Path) -> Iterator[dict[str, object]]:
         """Yield rows from a parquet vectors artifact lazily."""
 
         if not path.exists():
@@ -1151,13 +1152,15 @@ class ChunkIngestionPipeline:
                         entry["model_metadata"] = json.loads(metadata)
                     except json.JSONDecodeError:
                         entry["model_metadata"] = {}
-                elif metadata in (None, ""):
-                    entry["model_metadata"] = {}
-                elif isinstance(metadata, dict) and metadata.keys() == {"__hybrid_dummy__"}:
+                elif (
+                    metadata in (None, "")
+                    or isinstance(metadata, dict)
+                    and metadata.keys() == {"__hybrid_dummy__"}
+                ):
                     entry["model_metadata"] = {}
                 yield entry
 
-    def _iter_jsonl(self, path: Path) -> Iterator[Dict[str, object]]:
+    def _iter_jsonl(self, path: Path) -> Iterator[dict[str, object]]:
         """Yield parsed JSON objects from a JSONL artifact lazily."""
 
         if not path.exists():
@@ -1173,7 +1176,7 @@ class ChunkIngestionPipeline:
                         f"Failed to parse JSONL artifact {path} at line {line_number}: {exc.msg}"
                     ) from exc
 
-    def _read_jsonl(self, path: Path) -> List[Dict[str, object]]:
+    def _read_jsonl(self, path: Path) -> list[dict[str, object]]:
         """Return the contents of a JSONL artifact eagerly."""
 
         return list(self._iter_jsonl(path))

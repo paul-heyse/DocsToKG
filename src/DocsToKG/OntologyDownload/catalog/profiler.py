@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.catalog.profiler",
+#   "purpose": "Query profiling and optimization API.",
+#   "sections": [
+#     {
+#       "id": "catalogprofiler",
+#       "name": "CatalogProfiler",
+#       "anchor": "class-catalogprofiler",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Query profiling and optimization API.
 
 Provides performance analysis and optimization recommendations for queries

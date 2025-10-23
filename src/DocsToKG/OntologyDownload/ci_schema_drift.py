@@ -1,3 +1,30 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.ci_schema_drift",
+#   "purpose": "CI schema drift detection for OntologyDownloadSettings.",
+#   "sections": [
+#     {
+#       "id": "normalize-schema",
+#       "name": "_normalize_schema",
+#       "anchor": "function-normalize-schema",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "check-schema-drift",
+#       "name": "check_schema_drift",
+#       "anchor": "function-check-schema-drift",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "main",
+#       "name": "main",
+#       "anchor": "function-main",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """CI schema drift detection for OntologyDownloadSettings.
 
 This module provides utilities for detecting schema drift in CI/CD pipelines:
@@ -20,7 +47,6 @@ import json
 import sys
 from difflib import unified_diff
 from pathlib import Path
-from typing import Dict, List, Tuple
 
 from DocsToKG.OntologyDownload.settings_schema import (
     generate_settings_schema,
@@ -28,7 +54,7 @@ from DocsToKG.OntologyDownload.settings_schema import (
 )
 
 
-def _normalize_schema(schema: Dict) -> str:
+def _normalize_schema(schema: dict) -> str:
     """Normalize schema to deterministic JSON string.
 
     Args:
@@ -85,7 +111,7 @@ def check_schema_drift(
     # Load expected schemas
     print("📋 Loading committed schemas...")
     expected_top = None
-    expected_sub: Dict[str, Dict] = {}
+    expected_sub: dict[str, dict] = {}
 
     top_schema_path = expected_dir / "settings.schema.json"
     if top_schema_path.exists():
@@ -114,7 +140,7 @@ def check_schema_drift(
 
     # Compare schemas
     print("🔄 Comparing schemas...")
-    drifts: List[Tuple[str, str, str]] = []  # (schema_name, expected, current)
+    drifts: list[tuple[str, str, str]] = []  # (schema_name, expected, current)
 
     # Check top-level schema
     if expected_top is not None:

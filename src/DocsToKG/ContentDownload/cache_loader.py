@@ -1,3 +1,102 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.cache_loader",
+#   "purpose": "Cache configuration loader with YAML/env/CLI overlay support.",
+#   "sections": [
+#     {
+#       "id": "storagekind",
+#       "name": "StorageKind",
+#       "anchor": "class-storagekind",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "cachedefault",
+#       "name": "CacheDefault",
+#       "anchor": "class-cachedefault",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "cachestorage",
+#       "name": "CacheStorage",
+#       "anchor": "class-cachestorage",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "cacherolepolicy",
+#       "name": "CacheRolePolicy",
+#       "anchor": "class-cacherolepolicy",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "cachehostpolicy",
+#       "name": "CacheHostPolicy",
+#       "anchor": "class-cachehostpolicy",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "cachecontrollerdefaults",
+#       "name": "CacheControllerDefaults",
+#       "anchor": "class-cachecontrollerdefaults",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "cacheconfig",
+#       "name": "CacheConfig",
+#       "anchor": "class-cacheconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "normalize-host-key",
+#       "name": "_normalize_host_key",
+#       "anchor": "function-normalize-host-key",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-yaml",
+#       "name": "_load_yaml",
+#       "anchor": "function-load-yaml",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "merge-dicts",
+#       "name": "_merge_dicts",
+#       "anchor": "function-merge-dicts",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-policy-value",
+#       "name": "_parse_policy_value",
+#       "anchor": "function-parse-policy-value",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "coerce-bool",
+#       "name": "_coerce_bool",
+#       "anchor": "function-coerce-bool",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "apply-env-overlays",
+#       "name": "_apply_env_overlays",
+#       "anchor": "function-apply-env-overlays",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "apply-cli-overrides",
+#       "name": "_apply_cli_overrides",
+#       "anchor": "function-apply-cli-overrides",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-cache-config",
+#       "name": "load_cache_config",
+#       "anchor": "function-load-cache-config",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Cache configuration loader with YAML/env/CLI overlay support.
 
 Responsibilities
@@ -20,11 +119,11 @@ Design Notes
 from __future__ import annotations
 
 import logging
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional, Sequence
+from typing import Any
 
 try:
     import idna
@@ -74,8 +173,8 @@ class CacheStorage:
 class CacheRolePolicy:
     """Per-role cache policy (e.g., metadata vs landing)."""
 
-    ttl_s: Optional[int] = None
-    swrv_s: Optional[int] = None
+    ttl_s: int | None = None
+    swrv_s: int | None = None
     body_key: bool = False
 
     def __post_init__(self) -> None:
@@ -90,8 +189,8 @@ class CacheRolePolicy:
 class CacheHostPolicy:
     """Per-host cache policy with role-specific overrides."""
 
-    ttl_s: Optional[int] = None
-    role: Dict[str, CacheRolePolicy] = field(default_factory=dict)
+    ttl_s: int | None = None
+    role: dict[str, CacheRolePolicy] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """Validate host policy settings."""
@@ -106,8 +205,8 @@ class CacheHostPolicy:
 class CacheControllerDefaults:
     """Global cache controller defaults."""
 
-    cacheable_methods: List[str] = field(default_factory=lambda: ["GET", "HEAD"])
-    cacheable_statuses: List[int] = field(default_factory=lambda: [200, 301, 308])
+    cacheable_methods: list[str] = field(default_factory=lambda: ["GET", "HEAD"])
+    cacheable_statuses: list[int] = field(default_factory=lambda: [200, 301, 308])
     allow_heuristics: bool = False
     default: CacheDefault = CacheDefault.DO_NOT_CACHE
 
@@ -118,7 +217,7 @@ class CacheConfig:
 
     storage: CacheStorage
     controller: CacheControllerDefaults
-    hosts: Dict[str, CacheHostPolicy]
+    hosts: dict[str, CacheHostPolicy]
 
     def __post_init__(self) -> None:
         """Validate configuration invariants."""
@@ -167,7 +266,7 @@ def _normalize_host_key(host: str) -> str:
         return h.lower()
 
 
-def _load_yaml(yaml_path: Optional[str | Path]) -> Dict[str, Any]:
+def _load_yaml(yaml_path: str | Path | None) -> dict[str, Any]:
     """Load and parse YAML file.
 
     Args:
@@ -194,7 +293,7 @@ def _load_yaml(yaml_path: Optional[str | Path]) -> Dict[str, Any]:
         raise ValueError(f"Failed to parse cache YAML: {e}") from e
 
 
-def _merge_dicts(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
+def _merge_dicts(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
     """Deep merge two dictionaries.
 
     Args:
@@ -213,7 +312,7 @@ def _merge_dicts(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, An
     return result
 
 
-def _parse_policy_value(value_str: str) -> Dict[str, Any]:
+def _parse_policy_value(value_str: str) -> dict[str, Any]:
     """Parse a policy value string (e.g., 'ttl_s:259200,swrv_s:180').
 
     Args:
@@ -222,7 +321,7 @@ def _parse_policy_value(value_str: str) -> Dict[str, Any]:
     Returns:
         Dictionary of parsed values
     """
-    result: Dict[str, Any] = {}
+    result: dict[str, Any] = {}
     for part in value_str.split(","):
         part = part.strip()
         if not part:
@@ -255,7 +354,7 @@ def _coerce_bool(value: Any) -> bool:
     return bool(value)
 
 
-def _apply_env_overlays(doc: Dict[str, Any], env: Mapping[str, str]) -> Dict[str, Any]:
+def _apply_env_overlays(doc: dict[str, Any], env: Mapping[str, str]) -> dict[str, Any]:
     """Apply environment variable overlays to configuration.
 
     Env var patterns:
@@ -314,11 +413,11 @@ def _apply_env_overlays(doc: Dict[str, Any], env: Mapping[str, str]) -> Dict[str
 
 
 def _apply_cli_overrides(
-    doc: Dict[str, Any],
+    doc: dict[str, Any],
     cli_host_overrides: Sequence[str] | None = None,
     cli_role_overrides: Sequence[str] | None = None,
-    cli_defaults_override: Optional[str] = None,
-) -> Dict[str, Any]:
+    cli_defaults_override: str | None = None,
+) -> dict[str, Any]:
     """Apply CLI argument overlays to configuration.
 
     Args:
@@ -371,12 +470,12 @@ def _apply_cli_overrides(
 
 
 def load_cache_config(
-    yaml_path: Optional[str | Path] = None,
+    yaml_path: str | Path | None = None,
     *,
     env: Mapping[str, str],
     cli_host_overrides: Sequence[str] | None = None,
     cli_role_overrides: Sequence[str] | None = None,
-    cli_defaults_override: Optional[str] = None,
+    cli_defaults_override: str | None = None,
 ) -> CacheConfig:
     """Load cache configuration with YAML → env → CLI precedence.
 
@@ -445,11 +544,11 @@ def load_cache_config(
     )
 
     # Parse hosts
-    hosts: Dict[str, CacheHostPolicy] = {}
+    hosts: dict[str, CacheHostPolicy] = {}
     for host_key, host_policy_doc in doc.get("hosts", {}).items():
         normalized = _normalize_host_key(host_key)
         host_ttl = host_policy_doc.get("ttl_s")
-        role_policies: Dict[str, CacheRolePolicy] = {}
+        role_policies: dict[str, CacheRolePolicy] = {}
         for role_name, role_doc in host_policy_doc.get("role", {}).items():
             role_policies[role_name] = CacheRolePolicy(
                 ttl_s=role_doc.get("ttl_s"),

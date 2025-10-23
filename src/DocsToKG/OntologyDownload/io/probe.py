@@ -3,9 +3,24 @@
 #   "module": "DocsToKG.OntologyDownload.io.probe",
 #   "purpose": "GET-first probing with Range headers; audited redirects via URL gate",
 #   "sections": [
-#     {"id": "types", "name": "Probe Result Types", "anchor": "TYP", "kind": "models"},
-#     {"id": "probe", "name": "Probing Functions", "anchor": "PRB", "kind": "api"},
-#     {"id": "redirect", "name": "Redirect Auditing", "anchor": "RDR", "kind": "infra"}
+#     {
+#       "id": "proberesult",
+#       "name": "ProbeResult",
+#       "anchor": "class-proberesult",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "probe-url",
+#       "name": "probe_url",
+#       "anchor": "function-probe-url",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "extract-probe-result",
+#       "name": "_extract_probe_result",
+#       "anchor": "function-extract-probe-result",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===
@@ -22,7 +37,8 @@ Implements smart probing strategy:
 from __future__ import annotations
 
 import logging
-from typing import Callable, NamedTuple, Optional
+from collections.abc import Callable
+from typing import NamedTuple
 
 import httpx
 
@@ -38,16 +54,16 @@ class ProbeResult(NamedTuple):
     status: int
     """HTTP status code"""
 
-    content_type: Optional[str]
+    content_type: str | None
     """Content-Type header value"""
 
-    content_length: Optional[int]
+    content_length: int | None
     """Content length (from Content-Length or Content-Range)"""
 
-    etag: Optional[str]
+    etag: str | None
     """ETag header value"""
 
-    last_modified: Optional[str]
+    last_modified: str | None
     """Last-Modified header value"""
 
 
@@ -55,7 +71,7 @@ def probe_url(
     client: httpx.Client,
     url: str,
     *,
-    validate_redirect: Optional[Callable] = None,
+    validate_redirect: Callable | None = None,
 ) -> ProbeResult:
     """Probe URL for metadata using GET-first strategy.
 
@@ -111,7 +127,7 @@ def _extract_probe_result(response: httpx.Response, original_url: str) -> ProbeR
     status = response.status_code
 
     # Extract content length
-    content_length: Optional[int] = None
+    content_length: int | None = None
 
     # 206 Partial Content: extract total size from Content-Range
     if status == 206:

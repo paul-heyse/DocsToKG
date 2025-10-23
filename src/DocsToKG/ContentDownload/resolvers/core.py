@@ -16,7 +16,8 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Iterable
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, Any
 
 import httpx
 
@@ -41,7 +42,7 @@ class CoreResolver(ApiResolverBase):
     name = "core"
     api_display_name = "CORE"
 
-    def is_enabled(self, config: Any, artifact: "WorkArtifact") -> bool:
+    def is_enabled(self, config: Any, artifact: WorkArtifact) -> bool:
         """Return ``True`` when a DOI is present and the CORE API is configured.
 
         Args:
@@ -58,7 +59,7 @@ class CoreResolver(ApiResolverBase):
         self,
         client: httpx.Client,
         config: Any,
-        artifact: "WorkArtifact",
+        artifact: WorkArtifact,
     ) -> Iterable[ResolverResult]:
         """Yield download URLs discovered via the CORE search API.
 

@@ -1,6 +1,6 @@
 # === NAVMAP v1 ===
 # {
-#   "module": "DocsToKG",
+#   "module": "DocsToKG.__init__",
 #   "purpose": "Package initialization for DocsToKG",
 #   "sections": [
 #     {

@@ -1,3 +1,30 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.summary",
+#   "purpose": "Run summary builders and console reporting helpers.",
+#   "sections": [
+#     {
+#       "id": "runresult",
+#       "name": "RunResult",
+#       "anchor": "class-runresult",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "build-summary-record",
+#       "name": "build_summary_record",
+#       "anchor": "function-build-summary-record",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-console-summary",
+#       "name": "emit_console_summary",
+#       "anchor": "function-emit-console-summary",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Run summary builders and console reporting helpers.
 
 Responsibilities
@@ -22,7 +49,7 @@ Design Notes
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict
+from typing import Any
 
 __all__ = [
     "RunResult",
@@ -43,8 +70,8 @@ class RunResult:
     skipped: int
     worker_failures: int
     bytes_downloaded: int
-    summary: Dict[str, Any]
-    summary_record: Dict[str, Any]
+    summary: dict[str, Any]
+    summary_record: dict[str, Any]
 
 
 def build_summary_record(
@@ -57,8 +84,8 @@ def build_summary_record(
     skipped: int,
     worker_failures: int,
     bytes_downloaded: int,
-    summary: Dict[str, Any],
-) -> Dict[str, Any]:
+    summary: dict[str, Any],
+) -> dict[str, Any]:
     """Assemble the structured run summary record persisted to metrics sinks."""
 
     reason_totals = summary.get("reason_totals", {})

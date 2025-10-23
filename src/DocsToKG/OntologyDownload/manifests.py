@@ -3,11 +3,90 @@
 #   "module": "DocsToKG.OntologyDownload.manifests",
 #   "purpose": "Manage ontology manifest serialisation, lockfiles, and plan diff helpers",
 #   "sections": [
-#     {"id": "constants", "name": "Manifest Constants", "anchor": "CON", "kind": "constants"},
-#     {"id": "serialization", "name": "Serialisation Helpers", "anchor": "SER", "kind": "helpers"},
-#     {"id": "lockfiles", "name": "Lockfile Utilities", "anchor": "LOC", "kind": "api"},
-#     {"id": "plan-diff", "name": "Plan Diff Utilities", "anchor": "DIF", "kind": "helpers"},
-#     {"id": "resolution", "name": "Manifest Resolution Helpers", "anchor": "RES", "kind": "helpers"}
+#     {
+#       "id": "plan-to-dict",
+#       "name": "plan_to_dict",
+#       "anchor": "function-plan-to-dict",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "write-json-atomic",
+#       "name": "write_json_atomic",
+#       "anchor": "function-write-json-atomic",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "write-lockfile",
+#       "name": "write_lockfile",
+#       "anchor": "function-write-lockfile",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-lockfile-payload",
+#       "name": "load_lockfile_payload",
+#       "anchor": "function-load-lockfile-payload",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "spec-from-lock-entry",
+#       "name": "spec_from_lock_entry",
+#       "anchor": "function-spec-from-lock-entry",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "specs-from-lock-payload",
+#       "name": "specs_from_lock_payload",
+#       "anchor": "function-specs-from-lock-payload",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolve-version-metadata",
+#       "name": "resolve_version_metadata",
+#       "anchor": "function-resolve-version-metadata",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "ensure-manifest-path",
+#       "name": "ensure_manifest_path",
+#       "anchor": "function-ensure-manifest-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-manifest",
+#       "name": "load_manifest",
+#       "anchor": "function-load-manifest",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "collect-version-metadata",
+#       "name": "collect_version_metadata",
+#       "anchor": "function-collect-version-metadata",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-latest-manifest",
+#       "name": "load_latest_manifest",
+#       "anchor": "function-load-latest-manifest",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "results-to-dict",
+#       "name": "results_to_dict",
+#       "anchor": "function-results-to-dict",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "compute-plan-diff",
+#       "name": "compute_plan_diff",
+#       "anchor": "function-compute-plan-diff",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "format-plan-diff",
+#       "name": "format_plan_diff",
+#       "anchor": "function-format-plan-diff",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===
@@ -29,9 +108,9 @@ import logging
 import os
 import tempfile
 from collections import OrderedDict
-from datetime import datetime, timezone
+from collections.abc import Mapping, MutableMapping, Sequence
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Dict, List, Mapping, MutableMapping, Optional, Sequence, Tuple
 
 from .errors import ConfigError
 from .planning import (
@@ -46,7 +125,7 @@ from .settings import CACHE_DIR, LOCAL_ONTOLOGY_DIR, STORAGE, DefaultsConfig
 DEFAULT_LOCKFILE_PATH = Path("ontologies.lock.json")
 DEFAULT_PLAN_BASELINE = CACHE_DIR / "plans" / "baseline.json"
 LOCKFILE_SCHEMA_VERSION = "1.0"
-PLAN_DIFF_FIELDS: Tuple[str, ...] = (
+PLAN_DIFF_FIELDS: tuple[str, ...] = (
     "url",
     "version",
     "license",
@@ -81,7 +160,7 @@ __all__ = [
 def plan_to_dict(plan: PlannedFetch) -> dict:
     """Convert a planned fetch into a JSON-friendly dictionary."""
 
-    candidates: List[dict] = []
+    candidates: list[dict] = []
     for candidate in getattr(plan, "candidates", ()):
         candidate_payload = {
             "resolver": candidate.resolver,
@@ -185,7 +264,7 @@ def write_lockfile(plans: Sequence[PlannedFetch], path: Path) -> Path:
 
     payload = {
         "schema_version": LOCKFILE_SCHEMA_VERSION,
-        "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "generated_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         "entries": [plan_to_dict(plan) for plan in plans],
     }
     written_path = write_json_atomic(path, payload)
@@ -196,7 +275,7 @@ def write_lockfile(plans: Sequence[PlannedFetch], path: Path) -> Path:
     return written_path
 
 
-def load_lockfile_payload(path: Path) -> Dict[str, object]:
+def load_lockfile_payload(path: Path) -> dict[str, object]:
     """Return the parsed lockfile payload."""
 
     resolved = path.expanduser()
@@ -225,7 +304,7 @@ def load_lockfile_payload(path: Path) -> Dict[str, object]:
     return payload
 
 
-def spec_from_lock_entry(entry: Dict[str, object], defaults: DefaultsConfig) -> FetchSpec:
+def spec_from_lock_entry(entry: dict[str, object], defaults: DefaultsConfig) -> FetchSpec:
     """Convert a lockfile entry back into a fetch specification."""
 
     if not isinstance(entry, dict):
@@ -237,7 +316,7 @@ def spec_from_lock_entry(entry: Dict[str, object], defaults: DefaultsConfig) -> 
     if not isinstance(url, str) or not url:
         raise ConfigError(f"Lock file entry for '{ontology_id}' is missing 'url'")
 
-    extras: Dict[str, object] = {"url": url}
+    extras: dict[str, object] = {"url": url}
     headers = entry.get("headers")
     if isinstance(headers, Mapping):
         extras["headers"] = {str(key): str(value) for key, value in headers.items()}
@@ -282,11 +361,11 @@ def spec_from_lock_entry(entry: Dict[str, object], defaults: DefaultsConfig) -> 
 
 
 def specs_from_lock_payload(
-    payload: Dict[str, object],
+    payload: dict[str, object],
     *,
     defaults: DefaultsConfig,
     requested_ids: Sequence[str],
-) -> List[FetchSpec]:
+) -> list[FetchSpec]:
     """Build fetch specifications from lockfile payload."""
 
     entries = payload.get("entries") or []
@@ -302,14 +381,12 @@ def specs_from_lock_payload(
     return [spec_from_lock_entry(entry, defaults) for entry in selected]
 
 
-def resolve_version_metadata(
-    ontology_id: str, version: str
-) -> Tuple[Path, Optional[datetime], int]:
+def resolve_version_metadata(ontology_id: str, version: str) -> tuple[Path, datetime | None, int]:
     """Return path, timestamp, and size metadata for a stored version."""
 
     path = STORAGE.version_path(ontology_id, version)
     manifest_path = path / "manifest.json"
-    timestamp: Optional[datetime] = None
+    timestamp: datetime | None = None
     if manifest_path.exists():
         try:
             manifest = json.loads(manifest_path.read_text())
@@ -321,14 +398,14 @@ def resolve_version_metadata(
         timestamp = infer_version_timestamp(version)
     if timestamp is None:
         try:
-            timestamp = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
+            timestamp = datetime.fromtimestamp(path.stat().st_mtime, tz=UTC)
         except OSError:
             timestamp = None
     size = STORAGE.directory_size(path)
     return path, timestamp, size
 
 
-def ensure_manifest_path(ontology_id: str, version: Optional[str]) -> Path:
+def ensure_manifest_path(ontology_id: str, version: str | None) -> Path:
     """Return the manifest path for a given ontology and version."""
 
     selected_version = version
@@ -352,14 +429,14 @@ def load_manifest(manifest_path: Path) -> dict:
     return json.loads(manifest_path.read_text())
 
 
-def collect_version_metadata(ontology_id: str) -> List[Dict[str, object]]:
+def collect_version_metadata(ontology_id: str) -> list[dict[str, object]]:
     """Return sorted metadata entries for stored ontology versions."""
 
     from .io import sanitize_filename  # Lazy import to avoid circular dependency
 
     safe_id = sanitize_filename(ontology_id)
     base_dir = LOCAL_ONTOLOGY_DIR / safe_id
-    metadata: List[Dict[str, object]] = []
+    metadata: list[dict[str, object]] = []
     for version in STORAGE.available_versions(ontology_id):
         if version == "latest":
             continue
@@ -377,9 +454,9 @@ def collect_version_metadata(ontology_id: str) -> List[Dict[str, object]]:
                 timestamp = parse_iso_datetime((manifest_data or {}).get("last_modified"))
         if timestamp is None:
             if manifest_path.exists():
-                timestamp = datetime.fromtimestamp(manifest_path.stat().st_mtime, tz=timezone.utc)
+                timestamp = datetime.fromtimestamp(manifest_path.stat().st_mtime, tz=UTC)
             elif version_dir.exists():
-                timestamp = datetime.fromtimestamp(version_dir.stat().st_mtime, tz=timezone.utc)
+                timestamp = datetime.fromtimestamp(version_dir.stat().st_mtime, tz=UTC)
         size = STORAGE.directory_size(version_dir)
         metadata.append(
             {
@@ -392,13 +469,13 @@ def collect_version_metadata(ontology_id: str) -> List[Dict[str, object]]:
         )
 
     metadata.sort(
-        key=lambda item: item["timestamp"] or datetime.min.replace(tzinfo=timezone.utc),
+        key=lambda item: item["timestamp"] or datetime.min.replace(tzinfo=UTC),
         reverse=True,
     )
     return metadata
 
 
-def load_latest_manifest(ontology_id: str) -> Optional[Dict[str, object]]:
+def load_latest_manifest(ontology_id: str) -> dict[str, object] | None:
     """Return the most recent manifest for ``ontology_id`` when available."""
 
     for entry in collect_version_metadata(ontology_id):
@@ -440,7 +517,7 @@ def results_to_dict(result: FetchResult) -> dict:
     }
 
 
-def compute_plan_diff(baseline: Sequence[dict], current: Sequence[dict]) -> Dict[str, object]:
+def compute_plan_diff(baseline: Sequence[dict], current: Sequence[dict]) -> dict[str, object]:
     """Compute a diff between baseline and current plan payloads."""
 
     baseline_index = OrderedDict(
@@ -452,12 +529,12 @@ def compute_plan_diff(baseline: Sequence[dict], current: Sequence[dict]) -> Dict
 
     added = [current_index[key] for key in current_index.keys() - baseline_index.keys()]
     removed = [baseline_index[key] for key in baseline_index.keys() - current_index.keys()]
-    modified: List[Dict[str, object]] = []
+    modified: list[dict[str, object]] = []
 
     for key in baseline_index.keys() & current_index.keys():
         before = baseline_index[key]
         after = current_index[key]
-        changes: MutableMapping[str, Dict[str, object]] = {}
+        changes: MutableMapping[str, dict[str, object]] = {}
         for field in PLAN_DIFF_FIELDS:
             before_value = before.get(field)
             after_value = after.get(field)
@@ -469,10 +546,10 @@ def compute_plan_diff(baseline: Sequence[dict], current: Sequence[dict]) -> Dict
     return {"added": added, "removed": removed, "modified": modified}
 
 
-def format_plan_diff(diff: Dict[str, object]) -> List[str]:
+def format_plan_diff(diff: dict[str, object]) -> list[str]:
     """Render human-readable diff lines from plan comparison."""
 
-    lines: List[str] = []
+    lines: list[str] = []
     for entry in diff.get("added", []):
         version = entry.get("version") or "unknown"
         lines.append(f"+ {entry.get('id')} version={version} url={entry.get('url', '')}")

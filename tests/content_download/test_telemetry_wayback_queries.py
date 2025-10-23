@@ -7,7 +7,6 @@ import sqlite3
 import pytest
 
 from DocsToKG.ContentDownload.telemetry_wayback_queries import (
-    WAYBACK_SCHEMA,
     ensure_schema,
     rate_smoothing_p95,
 )
@@ -104,4 +103,3 @@ def test_rate_smoothing_p95_filters_by_role(conn: sqlite3.Connection) -> None:
 
 def test_rate_smoothing_p95_returns_none_when_no_rows(conn: sqlite3.Connection) -> None:
     assert rate_smoothing_p95(conn, "missing-run", role="metadata") is None
-

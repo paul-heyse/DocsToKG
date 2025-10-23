@@ -1,3 +1,84 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.core.discovery",
+#   "purpose": "Filesystem discovery utilities for DocParsing manifests and artifacts.",
+#   "sections": [
+#     {
+#       "id": "chunkdiscovery",
+#       "name": "ChunkDiscovery",
+#       "anchor": "class-chunkdiscovery",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "ensure-str-sequence",
+#       "name": "_ensure_str_sequence",
+#       "anchor": "function-ensure-str-sequence",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-structural-marker-profile",
+#       "name": "load_structural_marker_profile",
+#       "anchor": "function-load-structural-marker-profile",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-structural-marker-config",
+#       "name": "load_structural_marker_config",
+#       "anchor": "function-load-structural-marker-config",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "normalise-chunk-relative",
+#       "name": "_normalise_chunk_relative",
+#       "anchor": "function-normalise-chunk-relative",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "vector-artifact-name",
+#       "name": "vector_artifact_name",
+#       "anchor": "function-vector-artifact-name",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "derive-doc-id-and-doctags-path",
+#       "name": "derive_doc_id_and_doctags_path",
+#       "anchor": "function-derive-doc-id-and-doctags-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "derive-doc-id-and-chunks-path",
+#       "name": "derive_doc_id_and_chunks_path",
+#       "anchor": "function-derive-doc-id-and-chunks-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "derive-doc-id-and-vectors-path",
+#       "name": "derive_doc_id_and_vectors_path",
+#       "anchor": "function-derive-doc-id-and-vectors-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "compute-relative-doc-id",
+#       "name": "compute_relative_doc_id",
+#       "anchor": "function-compute-relative-doc-id",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "compute-stable-shard",
+#       "name": "compute_stable_shard",
+#       "anchor": "function-compute-stable-shard",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "iter-chunks",
+#       "name": "iter_chunks",
+#       "anchor": "function-iter-chunks",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Filesystem discovery utilities for DocParsing manifests and artifacts.
 
 The discovery layer translates on-disk structures—DocTags, chunk JSONL files,
@@ -11,14 +92,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterator, List, Tuple
 
 from DocsToKG.DocParsing.config import load_toml_markers, load_yaml_markers
 
-DEFAULT_HEADING_MARKERS: Tuple[str, ...] = ("#",)
-DEFAULT_CAPTION_MARKERS: Tuple[str, ...] = (
+DEFAULT_HEADING_MARKERS: tuple[str, ...] = ("#",)
+DEFAULT_CAPTION_MARKERS: tuple[str, ...] = (
     "Figure caption:",
     "Table:",
     "Picture description:",
@@ -57,7 +138,7 @@ class ChunkDiscovery:
         return str(self.resolved_path)
 
 
-def _ensure_str_sequence(value: object, label: str) -> List[str]:
+def _ensure_str_sequence(value: object, label: str) -> list[str]:
     """Normalise structural marker entries into string lists."""
 
     if value is None:
@@ -69,13 +150,13 @@ def _ensure_str_sequence(value: object, label: str) -> List[str]:
     return [item for item in value if item]
 
 
-def load_structural_marker_profile(path: Path) -> Tuple[List[str], List[str]]:
+def load_structural_marker_profile(path: Path) -> tuple[list[str], list[str]]:
     """Load heading/caption marker overrides from JSON, YAML, or TOML files."""
 
     raw = path.read_text(encoding="utf-8")
     suffix = path.suffix.lower()
 
-    parsers: List[str] = []
+    parsers: list[str] = []
     if suffix in {".yaml", ".yml"}:
         parsers = ["yaml"]
     elif suffix == ".toml":
@@ -119,7 +200,7 @@ def load_structural_marker_profile(path: Path) -> Tuple[List[str], List[str]]:
 
     if isinstance(data, list):
         headings = _ensure_str_sequence(data, "headings")
-        captions: List[str] = []
+        captions: list[str] = []
     elif isinstance(data, dict):
         headings = _ensure_str_sequence(data.get("headings"), "headings")
         captions = _ensure_str_sequence(data.get("captions"), "captions")
@@ -129,7 +210,7 @@ def load_structural_marker_profile(path: Path) -> Tuple[List[str], List[str]]:
     return headings, captions
 
 
-def load_structural_marker_config(path: Path) -> Tuple[List[str], List[str]]:
+def load_structural_marker_config(path: Path) -> tuple[list[str], list[str]]:
     """Backward compatible alias for :func:`load_structural_marker_profile`."""
 
     return load_structural_marker_profile(path)

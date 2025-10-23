@@ -108,8 +108,9 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Dict, Iterable, Mapping, Optional, Protocol, Tuple
+from typing import TYPE_CHECKING, Any, Protocol
 from urllib.parse import urlparse
 
 import httpx
@@ -160,7 +161,7 @@ LOGGER = logging.getLogger(__name__)
 # --- Normalization Helpers ---
 
 
-def normalize_license_to_spdx(value: Optional[str]) -> Optional[str]:
+def normalize_license_to_spdx(value: str | None) -> str | None:
     """Normalize common license strings to canonical SPDX identifiers."""
 
     if value is None:
@@ -208,17 +209,17 @@ class FetchPlan:
     """Concrete plan output from a resolver."""
 
     url: str
-    headers: Dict[str, str]
-    filename_hint: Optional[str]
-    version: Optional[str]
-    license: Optional[str]
-    media_type: Optional[str]
-    service: Optional[str] = None
-    last_modified: Optional[str] = None
-    content_length: Optional[int] = None
-    checksum: Optional[str] = None
-    checksum_algorithm: Optional[str] = None
-    checksum_url: Optional[str] = None
+    headers: dict[str, str]
+    filename_hint: str | None
+    version: str | None
+    license: str | None
+    media_type: str | None
+    service: str | None = None
+    last_modified: str | None = None
+    content_length: int | None = None
+    checksum: str | None = None
+    checksum_algorithm: str | None = None
+    checksum_url: str | None = None
 
 
 class Resolver(Protocol):
@@ -226,11 +227,11 @@ class Resolver(Protocol):
 
     def plan(
         self,
-        spec: "FetchSpec",
+        spec: FetchSpec,
         config: ResolvedConfig,
         logger: logging.Logger,
         *,
-        cancellation_token: Optional[CancellationToken] = None,
+        cancellation_token: CancellationToken | None = None,
     ) -> FetchPlan:
         """Produce a :class:`FetchPlan` describing how to retrieve ``spec``.
 
@@ -257,7 +258,7 @@ class ResolverCandidate:
 class BaseResolver:
     """Shared helpers for resolver implementations."""
 
-    def _normalize_media_type(self, media_type: Optional[str]) -> Optional[str]:
+    def _normalize_media_type(self, media_type: str | None) -> str | None:
         if not media_type:
             return None
         canonical = media_type.split(";")[0].strip().lower()
@@ -269,10 +270,10 @@ class BaseResolver:
 
     def _preferred_media_type(
         self,
-        spec: "FetchSpec",
+        spec: FetchSpec,
         *,
-        default: Optional[str],
-    ) -> Optional[str]:
+        default: str | None,
+    ) -> str | None:
         formats = getattr(spec, "target_formats", ()) or ()
         for value in formats:
             if not isinstance(value, str):
@@ -285,12 +286,12 @@ class BaseResolver:
     def _negotiate_media_type(
         self,
         *,
-        spec: "FetchSpec",
-        default: Optional[str] = None,
-        headers: Optional[Dict[str, str]] = None,
-    ) -> Tuple[Optional[str], Dict[str, str]]:
-        resolved_headers: Dict[str, str] = dict(headers or {})
-        accept_key: Optional[str] = None
+        spec: FetchSpec,
+        default: str | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> tuple[str | None, dict[str, str]]:
+        resolved_headers: dict[str, str] = dict(headers or {})
+        accept_key: str | None = None
         for key in resolved_headers:
             if key.lower() == "accept":
                 accept_key = key
@@ -313,8 +314,8 @@ class BaseResolver:
         config: ResolvedConfig,
         logger: logging.Logger,
         name: str,
-        service: Optional[str] = None,
-        host: Optional[str] = None,
+        service: str | None = None,
+        host: str | None = None,
     ):
         """Run a callable with retry semantics tailored for resolver APIs."""
 
@@ -371,7 +372,7 @@ class BaseResolver:
         except httpx.RequestError as exc:
             raise ResolverError(f"{name} API connection error: {exc}") from exc
 
-    def _extract_correlation_id(self, logger: logging.Logger) -> Optional[str]:
+    def _extract_correlation_id(self, logger: logging.Logger) -> str | None:
         """Return the correlation id from a logger adapter when available."""
 
         extra = getattr(logger, "extra", None)
@@ -383,7 +384,7 @@ class BaseResolver:
 
     def _build_polite_headers(
         self, config: ResolvedConfig, logger: logging.Logger
-    ) -> Dict[str, str]:
+    ) -> dict[str, str]:
         """Create polite headers derived from configuration and logger context."""
 
         http_config = config.defaults.http
@@ -396,14 +397,14 @@ class BaseResolver:
         url: str,
         config: ResolvedConfig,
         logger: logging.Logger,
-        service: Optional[str],
-        headers: Optional[Mapping[str, str]] = None,
-        timeout: Optional[int] = None,
+        service: str | None,
+        headers: Mapping[str, str] | None = None,
+        timeout: int | None = None,
         **kwargs,
     ) -> httpx.Response:
         """Issue an HTTP request with polite headers and retry semantics."""
 
-        final_headers: Dict[str, str] = dict(self._build_polite_headers(config, logger))
+        final_headers: dict[str, str] = dict(self._build_polite_headers(config, logger))
         if headers:
             final_headers.update({str(k): str(v) for k, v in dict(headers).items()})
 
@@ -440,18 +441,18 @@ class BaseResolver:
         self,
         *,
         url: str,
-        http_config: Optional[DownloadConfiguration] = None,
-        headers: Optional[Dict[str, str]] = None,
-        filename_hint: Optional[str] = None,
-        version: Optional[str] = None,
-        license: Optional[str] = None,
-        media_type: Optional[str] = None,
-        service: Optional[str] = None,
-        last_modified: Optional[str] = None,
-        content_length: Optional[int] = None,
-        checksum: Optional[str] = None,
-        checksum_algorithm: Optional[str] = None,
-        checksum_url: Optional[str] = None,
+        http_config: DownloadConfiguration | None = None,
+        headers: dict[str, str] | None = None,
+        filename_hint: str | None = None,
+        version: str | None = None,
+        license: str | None = None,
+        media_type: str | None = None,
+        service: str | None = None,
+        last_modified: str | None = None,
+        content_length: int | None = None,
+        checksum: str | None = None,
+        checksum_algorithm: str | None = None,
+        checksum_url: str | None = None,
     ) -> FetchPlan:
         """Construct a ``FetchPlan`` from resolver components."""
 
@@ -485,7 +486,7 @@ class OBOResolver(BaseResolver):
         config: ResolvedConfig,
         logger: logging.Logger,
         *,
-        cancellation_token: Optional[CancellationToken] = None,
+        cancellation_token: CancellationToken | None = None,
     ) -> FetchPlan:
         """Build a :class:`FetchPlan` by resolving OBO-hosted download URLs."""
 
@@ -543,7 +544,7 @@ class OLSResolver(BaseResolver):
         config: ResolvedConfig,
         logger: logging.Logger,
         *,
-        cancellation_token: Optional[CancellationToken] = None,
+        cancellation_token: CancellationToken | None = None,
     ) -> FetchPlan:
         """Plan an OLS download by issuing HTTPX requests through the shared client."""
 
@@ -617,7 +618,7 @@ class BioPortalResolver(BaseResolver):
         config_dir = pystow.join("ontology-fetcher", "configs")
         self.api_key_path = config_dir / "bioportal_api_key.txt"
 
-    def _load_api_key(self) -> Optional[str]:
+    def _load_api_key(self) -> str | None:
         if self.api_key_path.exists():
             return self.api_key_path.read_text().strip() or None
         return None
@@ -628,7 +629,7 @@ class BioPortalResolver(BaseResolver):
         config: ResolvedConfig,
         logger: logging.Logger,
         *,
-        cancellation_token: Optional[CancellationToken] = None,
+        cancellation_token: CancellationToken | None = None,
     ) -> FetchPlan:
         """Plan a BioPortal download using HTTPX."""
 
@@ -714,7 +715,7 @@ class LOVResolver(BaseResolver):
     API_ROOT = "https://lov.linkeddata.es/dataset/lov/api/v2"
 
     @staticmethod
-    def _iter_dicts(payload: Any) -> Iterable[Dict[str, Any]]:
+    def _iter_dicts(payload: Any) -> Iterable[dict[str, Any]]:
         if isinstance(payload, dict):
             yield payload
             for value in payload.values():
@@ -729,7 +730,7 @@ class LOVResolver(BaseResolver):
         config: ResolvedConfig,
         logger: logging.Logger,
         *,
-        cancellation_token: Optional[CancellationToken] = None,
+        cancellation_token: CancellationToken | None = None,
     ) -> FetchPlan:
         """Plan a LOV download by inspecting linked metadata for URLs and licenses."""
 
@@ -801,7 +802,7 @@ class SKOSResolver(BaseResolver):
         config: ResolvedConfig,
         logger: logging.Logger,
         *,
-        cancellation_token: Optional[CancellationToken] = None,
+        cancellation_token: CancellationToken | None = None,
     ) -> FetchPlan:
         """Plan a SKOS vocabulary download from explicit configuration metadata."""
 
@@ -842,7 +843,7 @@ class DirectResolver(BaseResolver):
         config: ResolvedConfig,
         logger: logging.Logger,
         *,
-        cancellation_token: Optional[CancellationToken] = None,
+        cancellation_token: CancellationToken | None = None,
     ) -> FetchPlan:
         """Plan a direct download from declarative extras without discovery."""
 
@@ -903,7 +904,7 @@ class XBRLResolver(BaseResolver):
         config: ResolvedConfig,
         logger: logging.Logger,
         *,
-        cancellation_token: Optional[CancellationToken] = None,
+        cancellation_token: CancellationToken | None = None,
     ) -> FetchPlan:
         """Plan an XBRL taxonomy download using declarative resolver extras."""
 
@@ -946,7 +947,7 @@ class OntobeeResolver(BaseResolver):
         config: ResolvedConfig,
         logger: logging.Logger,
         *,
-        cancellation_token: Optional[CancellationToken] = None,
+        cancellation_token: CancellationToken | None = None,
     ) -> FetchPlan:
         """Plan an Ontobee download by composing the appropriate REST endpoint."""
 
@@ -997,7 +998,7 @@ class OntobeeResolver(BaseResolver):
         return self._build_plan(url=url, media_type="application/rdf+xml", service="ontobee")
 
 
-RESOLVERS: Dict[str, BaseResolver] = {
+RESOLVERS: dict[str, BaseResolver] = {
     "obo": OBOResolver(),
     "bioregistry": OBOResolver(),
     "lov": LOVResolver(),

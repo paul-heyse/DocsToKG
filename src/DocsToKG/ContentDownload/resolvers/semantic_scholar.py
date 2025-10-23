@@ -17,7 +17,8 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Iterable
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, Any
 
 import httpx
 
@@ -44,7 +45,7 @@ class SemanticScholarResolver:
 
     name = "semantic_scholar"
 
-    def is_enabled(self, config: Any, artifact: "WorkArtifact") -> bool:
+    def is_enabled(self, config: Any, artifact: WorkArtifact) -> bool:
         """Return ``True`` when a DOI is available for Semantic Scholar queries.
 
         Args:
@@ -60,7 +61,7 @@ class SemanticScholarResolver:
         self,
         client: httpx.Client,
         config: Any,
-        artifact: "WorkArtifact",
+        artifact: WorkArtifact,
     ) -> Iterable[ResolverResult]:
         """Yield Semantic Scholar hosted PDFs linked to ``artifact``.
 

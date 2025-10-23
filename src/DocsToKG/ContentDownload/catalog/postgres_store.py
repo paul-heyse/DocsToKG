@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.catalog.postgres_store",
+#   "purpose": "PostgreSQL catalog store implementation.",
+#   "sections": [
+#     {
+#       "id": "postgrescatalogstore",
+#       "name": "PostgresCatalogStore",
+#       "anchor": "class-postgrescatalogstore",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """PostgreSQL catalog store implementation.
 
 Provides enterprise-grade database backend with:
@@ -13,7 +28,6 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 from threading import RLock
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -133,11 +147,11 @@ class PostgresCatalogStore:
         artifact_id: str,
         source_url: str,
         resolver: str,
-        content_type: Optional[str],
+        content_type: str | None,
         bytes: int,
-        sha256: Optional[str],
+        sha256: str | None,
         storage_uri: str,
-        run_id: Optional[str],
+        run_id: str | None,
     ):
         """Register or fetch document record.
 
@@ -293,10 +307,9 @@ class PostgresCatalogStore:
         """Find all duplicate groups (sha256, count)."""
         with self._lock:
             try:
-                with self.pool.connection() as conn:
-                    with conn.cursor() as cur:
-                        cur.execute(
-                            """
+                with self.pool.connection() as conn, conn.cursor() as cur:
+                    cur.execute(
+                        """
                             SELECT sha256, COUNT(*) as count
                             FROM documents
                             WHERE sha256 IS NOT NULL
@@ -304,8 +317,8 @@ class PostgresCatalogStore:
                             HAVING COUNT(*) > 1
                             ORDER BY count DESC
                             """
-                        )
-                        return [(row[0], row[1]) for row in cur.fetchall()]
+                    )
+                    return [(row[0], row[1]) for row in cur.fetchall()]
             except Exception as e:
                 logger.error(f"Failed to find duplicates: {e}")
                 raise
@@ -349,25 +362,24 @@ class PostgresCatalogStore:
         """Get catalog statistics."""
         with self._lock:
             try:
-                with self.pool.connection() as conn:
-                    with conn.cursor() as cur:
-                        cur.execute("SELECT COUNT(*) FROM documents")
-                        total_records = cur.fetchone()[0]
+                with self.pool.connection() as conn, conn.cursor() as cur:
+                    cur.execute("SELECT COUNT(*) FROM documents")
+                    total_records = cur.fetchone()[0]
 
-                        cur.execute("SELECT SUM(bytes) FROM documents")
-                        total_bytes = cur.fetchone()[0] or 0
+                    cur.execute("SELECT SUM(bytes) FROM documents")
+                    total_bytes = cur.fetchone()[0] or 0
 
-                        cur.execute(
-                            "SELECT COUNT(DISTINCT sha256) FROM documents WHERE sha256 IS NOT NULL"
-                        )
-                        unique_hashes = cur.fetchone()[0]
+                    cur.execute(
+                        "SELECT COUNT(DISTINCT sha256) FROM documents WHERE sha256 IS NOT NULL"
+                    )
+                    unique_hashes = cur.fetchone()[0]
 
-                        return {
-                            "total_records": total_records,
-                            "total_bytes": total_bytes,
-                            "total_gb": total_bytes / 1024 / 1024 / 1024,
-                            "unique_hashes": unique_hashes,
-                        }
+                    return {
+                        "total_records": total_records,
+                        "total_bytes": total_bytes,
+                        "total_gb": total_bytes / 1024 / 1024 / 1024,
+                        "unique_hashes": unique_hashes,
+                    }
             except Exception as e:
                 logger.error(f"Failed to get stats: {e}")
                 raise

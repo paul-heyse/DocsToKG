@@ -1,3 +1,11 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.config.__init__",
+#   "purpose": "ContentDownload Configuration Package.",
+#   "sections": []
+# }
+# === /NAVMAP ===
+
 """
 ContentDownload Configuration Package
 

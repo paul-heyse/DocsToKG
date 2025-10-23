@@ -93,10 +93,11 @@ contracts across ingestion, service, and observability components.
 
 from __future__ import annotations
 
+from collections.abc import Mapping, MutableMapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Mapping, MutableMapping, Optional, Sequence, Tuple, Union
+from typing import Any, Union
 
 import numpy as np
 from numpy.typing import NDArray
@@ -155,8 +156,8 @@ class DocumentInput:
     chunk_path: Path
     vector_path: Path
     metadata: Mapping[str, Any]
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 @dataclass(slots=True)
@@ -166,7 +167,7 @@ class EmbeddingProxy:
     vector_id: str
 
     def __array__(
-        self, dtype: Optional[np.dtype] = None
+        self, dtype: np.dtype | None = None
     ) -> np.ndarray:  # pragma: no cover - defensive
         raise TypeError(
             "EmbeddingProxy does not expose array semantics; request reconstructions "
@@ -207,7 +208,7 @@ class ChunkFeatures:
     splade_weights: Mapping[str, float]
     embedding: EmbeddingLike
 
-    def copy(self) -> "ChunkFeatures":
+    def copy(self) -> ChunkFeatures:
         """Create a deep copy of the chunk features.
 
         This method creates independent copies of all feature data to prevent
@@ -288,7 +289,7 @@ class ChunkPayload:
     token_count: int
     source_chunk_idxs: Sequence[int]
     doc_items_refs: Sequence[str]
-    char_offset: Optional[Tuple[int, int]] = None
+    char_offset: tuple[int, int] | None = None
 
 
 @dataclass(slots=True)
@@ -314,10 +315,10 @@ class HybridSearchDiagnostics:
         ... )
     """
 
-    bm25_score: Optional[float] = None
-    splade_score: Optional[float] = None
-    dense_score: Optional[float] = None
-    fusion_weights: Optional[Mapping[str, float]] = None
+    bm25_score: float | None = None
+    splade_score: float | None = None
+    dense_score: float | None = None
+    fusion_weights: Mapping[str, float] | None = None
 
 
 @dataclass(slots=True)
@@ -361,8 +362,8 @@ class HybridSearchResult:
     fused_rank: int
     text: str
     highlights: Sequence[str]
-    provenance_offsets: Sequence[Tuple[int, int]]
-    diagnostics: Optional[HybridSearchDiagnostics]
+    provenance_offsets: Sequence[tuple[int, int]]
+    diagnostics: HybridSearchDiagnostics | None
     metadata: Mapping[str, Any]
 
 
@@ -393,10 +394,10 @@ class HybridSearchRequest:
     """
 
     query: str
-    namespace: Optional[str]
+    namespace: str | None
     filters: Mapping[str, Any]
     page_size: int
-    cursor: Optional[str] = None
+    cursor: str | None = None
     diversification: bool = False
     diagnostics: bool = True
     recall_first: bool = False
@@ -429,7 +430,7 @@ class HybridSearchResponse:
     """
 
     results: Sequence[HybridSearchResult]
-    next_cursor: Optional[str]
+    next_cursor: str | None
     total_candidates: int
     timings_ms: Mapping[str, float]
     fusion_weights: Mapping[str, float] = field(default_factory=dict)

@@ -1,3 +1,72 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.idempotency",
+#   "purpose": "Idempotency keys and exactly-once effect wrappers.",
+#   "sections": [
+#     {
+#       "id": "ikey",
+#       "name": "ikey",
+#       "anchor": "function-ikey",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "job-key",
+#       "name": "job_key",
+#       "anchor": "function-job-key",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "op-key",
+#       "name": "op_key",
+#       "anchor": "function-op-key",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "acquire-lease",
+#       "name": "acquire_lease",
+#       "anchor": "function-acquire-lease",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "renew-lease",
+#       "name": "renew_lease",
+#       "anchor": "function-renew-lease",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "release-lease",
+#       "name": "release_lease",
+#       "anchor": "function-release-lease",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "advance-state",
+#       "name": "advance_state",
+#       "anchor": "function-advance-state",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "run-effect",
+#       "name": "run_effect",
+#       "anchor": "function-run-effect",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "reconcile-stale-leases",
+#       "name": "reconcile_stale_leases",
+#       "anchor": "function-reconcile-stale-leases",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "reconcile-abandoned-ops",
+#       "name": "reconcile_abandoned_ops",
+#       "anchor": "function-reconcile-abandoned-ops",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Idempotency keys and exactly-once effect wrappers.
 
 This module provides deterministic key generation for both job-level and
@@ -23,7 +92,8 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-from typing import Any, Callable, Dict, Optional
+from collections.abc import Callable
+from typing import Any
 
 LOGGER = logging.getLogger(__name__)
 
@@ -33,7 +103,7 @@ LOGGER = logging.getLogger(__name__)
 # ============================================================================
 
 
-def ikey(obj: Dict[str, Any]) -> str:
+def ikey(obj: dict[str, Any]) -> str:
     """Generate a deterministic SHA-256 key from a dictionary.
 
     Serializes with sorted keys and no whitespace to ensure determinism.
@@ -108,7 +178,7 @@ def acquire_lease(
     owner: str,
     ttl_seconds: float,
     now_fn: Callable[[], float] = None,
-) -> Optional[str]:
+) -> str | None:
     """Acquire a lease on the next available job.
 
     Atomically updates the first PLANNED or FAILED job with lease info.
@@ -303,9 +373,9 @@ def run_effect(
     op_key: str,
     job_id: str,
     kind: str,
-    fn: Callable[[], Dict[str, Any]],
+    fn: Callable[[], dict[str, Any]],
     now_fn: Callable[[], float] = None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Execute a side effect exactly once.
 
     Algorithm:

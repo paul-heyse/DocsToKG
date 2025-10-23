@@ -1,7 +1,6 @@
 import sys
 import types
 
-import typer
 import pytest
 
 if "docling_core.transforms.chunker.hybrid_chunker" not in sys.modules:
@@ -17,9 +16,7 @@ if "docling_core.transforms.chunker.hybrid_chunker" not in sys.modules:
     sys.modules["docling_core.transforms.chunker"].__path__ = []
     sys.modules["docling_core.transforms.chunker.hybrid_chunker"] = stub_module
     sys.modules["docling_core"].transforms = sys.modules["docling_core.transforms"]
-    sys.modules["docling_core.transforms"].chunker = sys.modules[
-        "docling_core.transforms.chunker"
-    ]
+    sys.modules["docling_core.transforms"].chunker = sys.modules["docling_core.transforms.chunker"]
 
 if "DocsToKG.DocParsing.chunking" not in sys.modules:
     chunking_runtime_stub = types.ModuleType("DocsToKG.DocParsing.chunking.runtime")

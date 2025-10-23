@@ -1,3 +1,84 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.ratelimit",
+#   "purpose": "Per-host and per-role rate limiting with pyrate-limiter.",
+#   "sections": [
+#     {
+#       "id": "ratelimitexceeded",
+#       "name": "RateLimitExceeded",
+#       "anchor": "class-ratelimitexceeded",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "ratetelemetrysink",
+#       "name": "RateTelemetrySink",
+#       "anchor": "class-ratetelemetrysink",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "rolerates",
+#       "name": "RoleRates",
+#       "anchor": "class-rolerates",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "hostpolicy",
+#       "name": "HostPolicy",
+#       "anchor": "class-hostpolicy",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "backendconfig",
+#       "name": "BackendConfig",
+#       "anchor": "class-backendconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "aimdconfig",
+#       "name": "AIMDConfig",
+#       "anchor": "class-aimdconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "rateconfig",
+#       "name": "RateConfig",
+#       "anchor": "class-rateconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "rateacquisition",
+#       "name": "RateAcquisition",
+#       "anchor": "class-rateacquisition",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "ratelimitregistry",
+#       "name": "RateLimitRegistry",
+#       "anchor": "class-ratelimitregistry",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "ratelimitedtransport",
+#       "name": "RateLimitedTransport",
+#       "anchor": "class-ratelimitedtransport",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "get-rate-limiter-manager",
+#       "name": "get_rate_limiter_manager",
+#       "anchor": "function-get-rate-limiter-manager",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "set-rate-limiter-manager",
+#       "name": "set_rate_limiter_manager",
+#       "anchor": "function-set-rate-limiter-manager",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Per-host and per-role rate limiting with pyrate-limiter.
 
 Provides:
@@ -16,8 +97,9 @@ from __future__ import annotations
 import logging
 import threading
 import time
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
-from typing import Callable, Dict, List, Literal, Mapping, Optional, Protocol, Tuple
+from typing import Literal, Protocol
 
 import httpx
 
@@ -70,19 +152,19 @@ class RateTelemetrySink(Protocol):
 class RoleRates:
     """Role-specific rate policy."""
 
-    rates: List[str] = field(default_factory=list)
+    rates: list[str] = field(default_factory=list)
     max_delay_ms: int = 200
     count_head: bool = False
-    max_concurrent: Optional[int] = None
+    max_concurrent: int | None = None
 
 
 @dataclass(frozen=True)
 class HostPolicy:
     """Per-host policy grouping role policies."""
 
-    metadata: Optional[RoleRates] = None
-    landing: Optional[RoleRates] = None
-    artifact: Optional[RoleRates] = None
+    metadata: RoleRates | None = None
+    landing: RoleRates | None = None
+    artifact: RoleRates | None = None
 
 
 @dataclass(frozen=True)
@@ -114,7 +196,7 @@ class RateConfig:
     hosts: Mapping[str, HostPolicy]
     backend: BackendConfig = BackendConfig()
     aimd: AIMDConfig = AIMDConfig()
-    global_max_inflight: Optional[int] = 500
+    global_max_inflight: int | None = 500
 
 
 @dataclass
@@ -136,8 +218,8 @@ class RateLimitRegistry:
         self,
         cfg: RateConfig,
         *,
-        telemetry: Optional[RateTelemetrySink] = None,
-        run_id: Optional[str] = None,
+        telemetry: RateTelemetrySink | None = None,
+        run_id: str | None = None,
         now: Callable[[], float] = time.monotonic,
     ) -> None:
         self._cfg = cfg
@@ -146,10 +228,10 @@ class RateLimitRegistry:
         self._now = now
 
         self._lock = threading.RLock()
-        self._limiters: Dict[Tuple[str, Role], Limiter] = {}
-        self._sem: Dict[Tuple[str, Role], threading.BoundedSemaphore] = {}
-        self._aimd_mult: Dict[Tuple[str, Role], float] = {}
-        self._counters: Dict[Tuple[str, Role], Dict[str, int]] = {}
+        self._limiters: dict[tuple[str, Role], Limiter] = {}
+        self._sem: dict[tuple[str, Role], threading.BoundedSemaphore] = {}
+        self._aimd_mult: dict[tuple[str, Role], float] = {}
+        self._counters: dict[tuple[str, Role], dict[str, int]] = {}
 
         # Global in-flight ceiling
         self._global_sem = (
@@ -186,7 +268,7 @@ class RateLimitRegistry:
 
         return self._cfg.defaults.get(role, RoleRates())
 
-    def _parse_rates(self, rates: List[str]) -> List[Rate]:
+    def _parse_rates(self, rates: list[str]) -> list[Rate]:
         """Parse rate strings like '10/SECOND', '5000/HOUR', '1/3SECOND'."""
         parsed = []
         for rate_str in rates:
@@ -228,7 +310,7 @@ class RateLimitRegistry:
             # Default to seconds
             return 1000
 
-    def _get_or_create_limiter(self, host: str, role: Role) -> Optional[Limiter]:
+    def _get_or_create_limiter(self, host: str, role: Role) -> Limiter | None:
         """Get or create a Limiter for (host, role)."""
         key = (host, role)
         if key in self._limiters:
@@ -261,7 +343,7 @@ class RateLimitRegistry:
                 raise RateLimitExceeded("Global in-flight ceiling exceeded")
 
         concurrency_held = False
-        concurrency_key: Optional[Tuple[str, Role]] = None
+        concurrency_key: tuple[str, Role] | None = None
 
         try:
             policy = self._effective_policy(host, role)
@@ -462,7 +544,7 @@ class RateLimitedTransport(httpx.BaseTransport):
         inner: httpx.BaseTransport,
         *,
         registry: RateLimitRegistry,
-        telemetry: Optional[RateTelemetrySink] = None,
+        telemetry: RateTelemetrySink | None = None,
     ) -> None:
         self._inner = inner
         self._reg = registry
@@ -475,7 +557,7 @@ class RateLimitedTransport(httpx.BaseTransport):
         host: str = str(request.url.host or "unknown").lower()
 
         # Acquire rate limit tokens
-        acquisition: Optional[RateAcquisition] = None
+        acquisition: RateAcquisition | None = None
         try:
             acquisition = self._reg.acquire(host=host, role=role, method=request.method)
         except RateLimitExceeded as e:
@@ -508,15 +590,15 @@ class RateLimitedTransport(httpx.BaseTransport):
 
 
 # Global rate limiter manager singleton
-_GLOBAL_RATE_LIMITER_MANAGER: Optional[RateLimitRegistry] = None
+_GLOBAL_RATE_LIMITER_MANAGER: RateLimitRegistry | None = None
 _RATE_LIMITER_LOCK = threading.Lock()
 
 
 def get_rate_limiter_manager(
-    cfg: Optional[RateConfig] = None,
+    cfg: RateConfig | None = None,
     *,
-    telemetry: Optional[RateTelemetrySink] = None,
-    run_id: Optional[str] = None,
+    telemetry: RateTelemetrySink | None = None,
+    run_id: str | None = None,
 ) -> RateLimitRegistry:
     """Get or create the global rate limiter manager.
 
@@ -553,7 +635,7 @@ def get_rate_limiter_manager(
         return manager
 
 
-def set_rate_limiter_manager(manager: Optional[RateLimitRegistry]) -> None:
+def set_rate_limiter_manager(manager: RateLimitRegistry | None) -> None:
     """Set the global rate limiter manager (for testing).
 
     Args:

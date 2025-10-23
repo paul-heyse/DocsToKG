@@ -4,6 +4,12 @@
 #   "purpose": "Exactly-once operation logging and replay",
 #   "sections": [
 #     {
+#       "id": "extract-result-json",
+#       "name": "_extract_result_json",
+#       "anchor": "function-extract-result-json",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "run-effect",
 #       "name": "run_effect",
 #       "anchor": "function-run-effect",
@@ -74,7 +80,29 @@ from __future__ import annotations
 import json
 import sqlite3
 import time
-from typing import Any, Callable, Optional
+from collections.abc import Callable
+from typing import Any
+
+
+def _extract_result_json(row: Any) -> str | None:
+    """Return the ``result_json`` column from a SQLite row.
+
+    The helper accepts rows returned both as ``sqlite3.Row`` mappings and as
+    tuple/list sequences (the default when ``row_factory`` is unset).
+    """
+
+    if row is None:
+        return None
+
+    # ``sqlite3.Row`` implements ``keys`` while tuples/lists do not.
+    keys = getattr(row, "keys", None)
+    if callable(keys) and "result_json" in keys():
+        return row["result_json"]
+
+    if isinstance(row, (tuple, list)):
+        return row[0] if row else None
+
+    return None
 
 
 def run_effect(
@@ -136,8 +164,9 @@ def run_effect(
             "SELECT result_json FROM artifact_ops WHERE op_key=?",
             (opkey,),
         ).fetchone()
-        if row and row["result_json"]:
-            return json.loads(row["result_json"])
+        result_json = _extract_result_json(row)
+        if result_json:
+            return json.loads(result_json)
         return {}
 
     # First attempt: perform the effect
@@ -163,7 +192,7 @@ def get_effect_result(
     cx: sqlite3.Connection,
     *,
     opkey: str,
-) -> Optional[dict[str, Any]]:
+) -> dict[str, Any] | None:
     """Retrieve a previously recorded operation result.
 
     Parameters
@@ -188,6 +217,7 @@ def get_effect_result(
         "SELECT result_json FROM artifact_ops WHERE op_key=?",
         (opkey,),
     ).fetchone()
-    if row and row["result_json"]:
-        return json.loads(row["result_json"])
+    result_json = _extract_result_json(row)
+    if result_json:
+        return json.loads(result_json)
     return None

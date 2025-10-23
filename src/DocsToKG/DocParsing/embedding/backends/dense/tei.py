@@ -1,9 +1,30 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.embedding.backends.dense.tei",
+#   "purpose": "Dense embedding provider for Text Embeddings Inference (TEI) services.",
+#   "sections": [
+#     {
+#       "id": "teiconfig",
+#       "name": "TEIConfig",
+#       "anchor": "class-teiconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "teiprovider",
+#       "name": "TEIProvider",
+#       "anchor": "class-teiprovider",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Dense embedding provider for Text Embeddings Inference (TEI) services."""
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Sequence
 
 import httpx
 
@@ -16,7 +37,7 @@ class TEIConfig:
     url: str
     timeout_seconds: float = 30.0
     max_inflight: int = 4
-    headers: Dict[str, str] = field(default_factory=dict)
+    headers: dict[str, str] = field(default_factory=dict)
     verify: bool = True
 
 
@@ -62,7 +83,7 @@ class TEIProvider(DenseEmbeddingBackend):
         self,
         texts: Sequence[str],
         *,
-        batch_hint: Optional[int] = None,
+        batch_hint: int | None = None,
     ) -> Sequence[Sequence[float]]:
         if not texts:
             return []
@@ -138,7 +159,7 @@ class TEIProvider(DenseEmbeddingBackend):
                 detail="TEI response did not contain a list of vectors.",
                 retryable=False,
             )
-        vectors: List[List[float]] = []
+        vectors: list[list[float]] = []
         for vector in vectors_raw:
             if not isinstance(vector, (list, tuple)):
                 raise ProviderError(

@@ -1,3 +1,24 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.catalog.connectors.config",
+#   "purpose": "Configuration management for CatalogConnector.",
+#   "sections": [
+#     {
+#       "id": "catalogconfig",
+#       "name": "CatalogConfig",
+#       "anchor": "class-catalogconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "load-catalog-config",
+#       "name": "load_catalog_config",
+#       "anchor": "function-load-catalog-config",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Configuration management for CatalogConnector
 
@@ -16,7 +37,7 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import Any, Dict, Literal, Optional
+from typing import Any, Literal
 
 logger = logging.getLogger(__name__)
 
@@ -60,8 +81,8 @@ class CatalogConfig:
     def __init__(
         self,
         provider_type: Literal["development", "enterprise", "cloud"],
-        config_file: Optional[str] = None,
-        config_dict: Optional[Dict[str, Any]] = None,
+        config_file: str | None = None,
+        config_dict: dict[str, Any] | None = None,
         use_env: bool = True,
     ):
         """Initialize configuration loader.
@@ -76,9 +97,9 @@ class CatalogConfig:
         self.config_file = config_file
         self.config_dict = config_dict or {}
         self.use_env = use_env
-        self._config: Dict[str, Any] = {}
+        self._config: dict[str, Any] = {}
 
-    def load(self) -> Dict[str, Any]:
+    def load(self) -> dict[str, Any]:
         """Load and merge configuration from all sources.
 
         Precedence (highest to lowest):
@@ -117,7 +138,7 @@ class CatalogConfig:
         logger.info(f"Configuration loaded for provider: {self.provider_type}")
         return self._config
 
-    def _load_file(self, path: str) -> Dict[str, Any]:
+    def _load_file(self, path: str) -> dict[str, Any]:
         """Load configuration from YAML or JSON file.
 
         Args:
@@ -156,7 +177,7 @@ class CatalogConfig:
             logger.error(f"Failed to load config file {path}: {e}")
             raise
 
-    def _load_env(self) -> Dict[str, Any]:
+    def _load_env(self) -> dict[str, Any]:
         """Load configuration from environment variables.
 
         Environment variable format:
@@ -170,7 +191,7 @@ class CatalogConfig:
         Returns:
             Configuration dictionary from environment
         """
-        config: Dict[str, Any] = {}
+        config: dict[str, Any] = {}
         prefix = self.ENV_PREFIXES.get(self.provider_type, "CATALOG_")
 
         for key, value in os.environ.items():
@@ -320,10 +341,10 @@ class CatalogConfig:
 
 def load_catalog_config(
     provider_type: Literal["development", "enterprise", "cloud"],
-    config_file: Optional[str] = None,
-    config_dict: Optional[Dict[str, Any]] = None,
+    config_file: str | None = None,
+    config_dict: dict[str, Any] | None = None,
     use_env: bool = True,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Load catalog configuration.
 
     This is a convenience function for quickly loading catalog config.

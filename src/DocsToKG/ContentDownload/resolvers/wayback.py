@@ -4,46 +4,22 @@
 #   "purpose": "Wayback Machine resolver with CDX-first discovery algorithm",
 #   "sections": [
 #     {
+#       "id": "resolverresult",
+#       "name": "ResolverResult",
+#       "anchor": "class-resolverresult",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "httpxresponseadapter",
+#       "name": "_HTTPXResponseAdapter",
+#       "anchor": "class-httpxresponseadapter",
+#       "kind": "class"
+#     },
+#     {
 #       "id": "waybackresolver",
 #       "name": "WaybackResolver",
 #       "anchor": "class-waybackresolver",
 #       "kind": "class"
-#     },
-#     {
-#       "id": "wayback-override-http",
-#       "name": "_override_wayback_http",
-#       "anchor": "function-wayback-override-http",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "wayback-discovery",
-#       "name": "_discover_snapshots",
-#       "anchor": "function-wayback-discovery",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "wayback-availability",
-#       "name": "_check_availability",
-#       "anchor": "function-wayback-availability",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "wayback-cdx",
-#       "name": "_query_cdx",
-#       "anchor": "function-wayback-cdx",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "wayback-html-parse",
-#       "name": "_parse_html_for_pdf",
-#       "anchor": "function-wayback-html-parse",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "wayback-verify-pdf",
-#       "name": "_verify_pdf_snapshot",
-#       "anchor": "function-wayback-verify-pdf",
-#       "kind": "function"
 #     }
 #   ]
 # }
@@ -54,8 +30,9 @@ from __future__ import annotations
 
 import itertools
 import logging
+from collections.abc import Iterable, Iterator, Mapping
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any, Dict, Iterable, Iterator, List, Mapping, Optional, Tuple
+from typing import TYPE_CHECKING, Any
 
 import httpx
 
@@ -131,10 +108,10 @@ class WaybackResolver:
 
     name = "wayback"
 
-    def __init__(self, telemetry: Optional[TelemetryWayback] = None) -> None:
+    def __init__(self, telemetry: TelemetryWayback | None = None) -> None:
         self._telemetry = telemetry or TelemetryWayback()
 
-    def is_enabled(self, config: Any, artifact: "WorkArtifact") -> bool:
+    def is_enabled(self, config: Any, artifact: WorkArtifact) -> bool:
         """Return ``True`` when prior resolver attempts have failed."""
 
         return bool(artifact.failed_pdf_urls)
@@ -143,8 +120,8 @@ class WaybackResolver:
         self,
         client: httpx.Client,
         config: Any,
-        artifact: "WorkArtifact",
-        ctx: Optional[Any] = None,
+        artifact: WorkArtifact,
+        ctx: Any | None = None,
     ) -> Iterable[ResolverResult]:
         """Yield archived URLs discovered via availability/CDX lookups."""
 
@@ -193,7 +170,7 @@ class WaybackResolver:
 
                     attempt.record_discovery(metadata)
 
-                    base_metadata: Dict[str, Any] = {
+                    base_metadata: dict[str, Any] = {
                         "source": "wayback",
                         "original": original_url,
                         "canonical": canonical_url,
@@ -270,16 +247,16 @@ class WaybackResolver:
         config: Any,
         original_url: str,
         canonical_url: str,
-        publication_year: Optional[int],
+        publication_year: int | None,
         availability_first: bool,
         year_window: int,
         max_snapshots: int,
         min_pdf_bytes: int,
         html_parse_enabled: bool,
-    ) -> Tuple[Optional[str], Dict[str, Any]]:
+    ) -> tuple[str | None, dict[str, Any]]:
         """Discover a suitable snapshot using availability followed by CDX search."""
 
-        metadata: Dict[str, Any] = {
+        metadata: dict[str, Any] = {
             "discovery_method": "none",
             "original": original_url,
         }
@@ -361,10 +338,10 @@ class WaybackResolver:
         config: Any,
         url: str,
         min_pdf_bytes: int,
-    ) -> Tuple[Optional[str], Dict[str, Any]]:
+    ) -> tuple[str | None, dict[str, Any]]:
         """Use the Wayback availability API as a fast-path for direct PDFs."""
 
-        metadata: Dict[str, Any] = {
+        metadata: dict[str, Any] = {
             "availability_checked": True,
             "availability_available": False,
         }
@@ -406,21 +383,21 @@ class WaybackResolver:
         client: httpx.Client,
         config: Any,
         url: str,
-        publication_year: Optional[int],
+        publication_year: int | None,
         year_window: int,
         max_snapshots: int,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Query the Wayback CDX API for snapshot metadata."""
 
         if WaybackMachineCDXServerAPI is None:  # pragma: no cover - optional dependency
             LOGGER.debug("waybackpy not available; skipping CDX query for %s", url)
             return []
 
-        snapshots: List[Dict[str, Any]] = []
+        snapshots: list[dict[str, Any]] = []
 
         try:
-            start_ts: Optional[str] = None
-            end_ts: Optional[str] = None
+            start_ts: str | None = None
+            end_ts: str | None = None
             if publication_year:
                 start_year = max(1994, publication_year - year_window)
                 end_year = publication_year + year_window
@@ -459,10 +436,10 @@ class WaybackResolver:
         client: httpx.Client,
         config: Any,
         html_url: str,
-    ) -> Tuple[Optional[str], Dict[str, Any]]:
+    ) -> tuple[str | None, dict[str, Any]]:
         """Fetch an archived HTML page and attempt to recover a PDF link from it."""
 
-        metadata: Dict[str, Any] = {
+        metadata: dict[str, Any] = {
             "html_snapshot_url": html_url,
         }
 
@@ -538,10 +515,10 @@ class WaybackResolver:
         config: Any,
         url: str,
         min_bytes: int,
-    ) -> Tuple[bool, Dict[str, Any]]:
+    ) -> tuple[bool, dict[str, Any]]:
         """Sanity-check that an archived URL points to a plausible PDF."""
 
-        metadata: Dict[str, Any] = {
+        metadata: dict[str, Any] = {
             "candidate_url": url,
         }
 
@@ -639,8 +616,8 @@ class WaybackResolver:
         def _fetch(
             target_url: str,
             *,
-            params: Optional[Dict[str, Any]] = None,
-            req_headers: Optional[Dict[str, str]] = None,
+            params: dict[str, Any] | None = None,
+            req_headers: dict[str, str] | None = None,
         ) -> _HTTPXResponseAdapter:
             response = request_with_retries(
                 client,
@@ -656,7 +633,7 @@ class WaybackResolver:
 
         def _cdx_get_response(
             target_url: str,
-            req_headers: Optional[Dict[str, str]] = None,
+            req_headers: dict[str, str] | None = None,
             retries: int = 5,  # noqa: D417 - signature required by waybackpy
             backoff_factor: float = 0.5,
         ) -> _HTTPXResponseAdapter:
@@ -665,8 +642,8 @@ class WaybackResolver:
 
         def _availability_get(
             target_url: str,
-            params: Optional[Dict[str, Any]] = None,
-            req_headers: Optional[Dict[str, str]] = None,
+            params: dict[str, Any] | None = None,
+            req_headers: dict[str, str] | None = None,
         ) -> _HTTPXResponseAdapter:
             return _fetch(target_url, params=params, req_headers=req_headers)
 

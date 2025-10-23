@@ -1,3 +1,42 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.settings_sources",
+#   "purpose": "TracingSettingsSource: Wraps Pydantic SettingsSource to track field attribution.",
+#   "sections": [
+#     {
+#       "id": "tracingsettingssource",
+#       "name": "TracingSettingsSource",
+#       "anchor": "class-tracingsettingssource",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "get-source-fingerprint",
+#       "name": "get_source_fingerprint",
+#       "anchor": "function-get-source-fingerprint",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "set-source-fingerprint",
+#       "name": "set_source_fingerprint",
+#       "anchor": "function-set-source-fingerprint",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "clear-source-context",
+#       "name": "clear_source_context",
+#       "anchor": "function-clear-source-context",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "init-source-context",
+#       "name": "init_source_context",
+#       "anchor": "function-init-source-context",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """TracingSettingsSource: Wraps Pydantic SettingsSource to track field attribution.
 
 This module provides utilities to capture which source (CLI, environment, config file, or default)
@@ -15,12 +54,12 @@ Example:
 """
 
 import contextvars
-from typing import Any, Dict, Tuple
+from typing import Any
 
 from pydantic_settings import PydanticBaseSettingsSource
 
 # Thread-local context to capture source mapping across settings loads
-_source_context: contextvars.ContextVar[Dict[str, str]] = contextvars.ContextVar(
+_source_context: contextvars.ContextVar[dict[str, str]] = contextvars.ContextVar(
     "source_fingerprint", default={}
 )
 
@@ -47,7 +86,7 @@ class TracingSettingsSource(PydanticBaseSettingsSource):
         self.source = source
         self.source_name = source_name
 
-    def get_field_value(self, field, field_name: str) -> Tuple[Any, str, bool]:
+    def get_field_value(self, field, field_name: str) -> tuple[Any, str, bool]:
         """Get field value and record source attribution.
 
         Calls the wrapped source's get_field_value() method and, if a value is found
@@ -75,7 +114,7 @@ class TracingSettingsSource(PydanticBaseSettingsSource):
             # Re-raise; don't suppress errors in source loading
             raise
 
-    def __call__(self) -> Dict[str, Any]:
+    def __call__(self) -> dict[str, Any]:
         """Fallback for tuple-returning sources.
 
         Some SettingsSource implementations return a dict directly when called.
@@ -98,7 +137,7 @@ class TracingSettingsSource(PydanticBaseSettingsSource):
         return f"TracingSettingsSource(source={self.source.__class__.__name__}, name='{self.source_name}')"
 
 
-def get_source_fingerprint() -> Dict[str, str]:
+def get_source_fingerprint() -> dict[str, str]:
     """Retrieve accumulated source attribution map.
 
     This function returns a dictionary mapping field names to source names.
@@ -117,7 +156,7 @@ def get_source_fingerprint() -> Dict[str, str]:
     return _source_context.get().copy()  # Return copy to prevent external mutation
 
 
-def set_source_fingerprint(fingerprint: Dict[str, str]) -> None:
+def set_source_fingerprint(fingerprint: dict[str, str]) -> None:
     """Set the source fingerprint (primarily for testing).
 
     Args:

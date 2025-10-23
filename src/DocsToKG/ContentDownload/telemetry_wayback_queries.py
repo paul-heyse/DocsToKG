@@ -1,3 +1,36 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.telemetry_wayback_queries",
+#   "purpose": "Wayback telemetry query helpers.",
+#   "sections": [
+#     {
+#       "id": "waybacktelemetryschema",
+#       "name": "WaybackTelemetrySchema",
+#       "anchor": "class-waybacktelemetryschema",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "ensure-schema",
+#       "name": "ensure_schema",
+#       "anchor": "function-ensure-schema",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "percentile",
+#       "name": "_percentile",
+#       "anchor": "function-percentile",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "rate-smoothing-p95",
+#       "name": "rate_smoothing_p95",
+#       "anchor": "function-rate-smoothing-p95",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Wayback telemetry query helpers.
 
 This module intentionally keeps the SQL required for querying the
@@ -17,8 +50,8 @@ from __future__ import annotations
 
 import math
 import sqlite3
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Optional, Sequence
 
 
 @dataclass(frozen=True)
@@ -72,7 +105,7 @@ def ensure_schema(
         conn.execute(statement)
 
 
-def _percentile(sorted_values: Sequence[int], percentile: float) -> Optional[int]:
+def _percentile(sorted_values: Sequence[int], percentile: float) -> int | None:
     """Return the percentile value using the nearest-rank method."""
 
     if not sorted_values:
@@ -91,7 +124,7 @@ def rate_smoothing_p95(
     run_id: str,
     *,
     role: str,
-) -> Optional[int]:
+) -> int | None:
     """Compute the P95 rate limiter delay for ``run_id`` and ``role``.
 
     Only ``acquire`` actions that include a non-null ``delay_ms`` field are

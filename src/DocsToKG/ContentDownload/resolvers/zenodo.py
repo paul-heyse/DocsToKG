@@ -17,7 +17,8 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Iterable
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, Any
 
 import httpx
 
@@ -45,7 +46,7 @@ class ZenodoResolver(ApiResolverBase):
     name = "zenodo"
     api_display_name = "Zenodo"
 
-    def is_enabled(self, config: Any, artifact: "WorkArtifact") -> bool:
+    def is_enabled(self, config: Any, artifact: WorkArtifact) -> bool:
         """Return ``True`` when a DOI is present to drive Zenodo lookups.
 
         Args:
@@ -61,7 +62,7 @@ class ZenodoResolver(ApiResolverBase):
         self,
         client: httpx.Client,
         config: Any,
-        artifact: "WorkArtifact",
+        artifact: WorkArtifact,
     ) -> Iterable[ResolverResult]:
         """Yield Zenodo hosted PDFs for the supplied work.
 

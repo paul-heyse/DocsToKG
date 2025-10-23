@@ -1,3 +1,54 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.streaming_integration",
+#   "purpose": "Streaming download integration for ContentDownload.",
+#   "sections": [
+#     {
+#       "id": "use-streaming-for-resume",
+#       "name": "use_streaming_for_resume",
+#       "anchor": "function-use-streaming-for-resume",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "try-streaming-resume-decision",
+#       "name": "try_streaming_resume_decision",
+#       "anchor": "function-try-streaming-resume-decision",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "use-streaming-for-io",
+#       "name": "use_streaming_for_io",
+#       "anchor": "function-use-streaming-for-io",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "try-streaming-io",
+#       "name": "try_streaming_io",
+#       "anchor": "function-try-streaming-io",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "use-streaming-for-finalization",
+#       "name": "use_streaming_for_finalization",
+#       "anchor": "function-use-streaming-for-finalization",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "integration-status",
+#       "name": "integration_status",
+#       "anchor": "function-integration-status",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "log-integration-status",
+#       "name": "log_integration_status",
+#       "anchor": "function-log-integration-status",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Streaming download integration for ContentDownload.
 
 This module provides the integration layer between the resolver pipeline and
@@ -12,7 +63,7 @@ the new streaming architecture. It coordinates:
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Dict, Optional
+from typing import TYPE_CHECKING, Any
 
 LOGGER = logging.getLogger(__name__)
 
@@ -88,14 +139,14 @@ def use_streaming_for_resume(plan: Any) -> bool:
 
 
 def try_streaming_resume_decision(
-    validators: Optional[Dict[str, Any]],
-    part_state: Optional[Any],
+    validators: dict[str, Any] | None,
+    part_state: Any | None,
     *,
     prefix_check_bytes: int = 65536,
     allow_without_validators: bool = False,
-    client: Optional[Any] = None,
-    url: Optional[str] = None,
-) -> Optional[Any]:
+    client: Any | None = None,
+    url: str | None = None,
+) -> Any | None:
     """Try using streaming.can_resume() if available, return None on fallback.
 
     This allows download.py to try the new streaming logic and gracefully
@@ -190,8 +241,8 @@ def try_streaming_io(
     *,
     chunk_bytes: int = 65536,
     fsync: bool = True,
-    progress_callback: Optional[Any] = None,
-) -> Optional[Any]:
+    progress_callback: Any | None = None,
+) -> Any | None:
     """Try using streaming.stream_to_part() if available, return None on fallback.
 
     Args:
@@ -282,7 +333,7 @@ def use_streaming_for_finalization(outcome: Any) -> bool:
 # ============================================================================
 
 
-def integration_status() -> Dict[str, bool]:
+def integration_status() -> dict[str, bool]:
     """Get status of all optional streaming integrations.
 
     Returns:

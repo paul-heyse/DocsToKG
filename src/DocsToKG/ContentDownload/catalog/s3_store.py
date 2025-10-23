@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.catalog.s3_store",
+#   "purpose": "Amazon S3 storage backend implementation.",
+#   "sections": [
+#     {
+#       "id": "s3storagebackend",
+#       "name": "S3StorageBackend",
+#       "anchor": "class-s3storagebackend",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Amazon S3 storage backend implementation.
 
 Provides cloud-native storage with:
@@ -15,7 +30,6 @@ import hashlib
 import logging
 from pathlib import Path
 from threading import RLock
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +101,7 @@ class S3StorageBackend:
         local_path: str,
         artifact_id: str,
         resolver: str,
-        content_type: Optional[str] = None,
+        content_type: str | None = None,
     ) -> str:
         """Upload file to S3.
 

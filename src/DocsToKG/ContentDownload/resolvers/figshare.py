@@ -17,7 +17,8 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Iterable, List, Optional
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, Any
 
 import httpx
 
@@ -45,7 +46,7 @@ class FigshareResolver(ApiResolverBase):
     name = "figshare"
     api_display_name = "Figshare"
 
-    def is_enabled(self, config: Any, artifact: "WorkArtifact") -> bool:
+    def is_enabled(self, config: Any, artifact: WorkArtifact) -> bool:
         """Return ``True`` when a DOI is available for Figshare searches.
 
         Args:
@@ -61,7 +62,7 @@ class FigshareResolver(ApiResolverBase):
         self,
         client: httpx.Client,
         config: Any,
-        artifact: "WorkArtifact",
+        artifact: WorkArtifact,
     ) -> Iterable[ResolverResult]:
         """Yield Figshare file download URLs associated with ``artifact``.
 
@@ -96,7 +97,7 @@ class FigshareResolver(ApiResolverBase):
             return
 
         if isinstance(data, list):
-            articles: List[dict] = data
+            articles: list[dict] = data
         else:
             LOGGER.warning(
                 "Figshare API returned non-list articles payload: %s",
@@ -117,7 +118,7 @@ class FigshareResolver(ApiResolverBase):
                     LOGGER.warning("Skipping non-dict Figshare file entry: %r", file_entry)
                     continue
                 filename = (file_entry.get("name") or "").lower()
-                download_url: Optional[str] = file_entry.get("download_url")
+                download_url: str | None = file_entry.get("download_url")
 
                 if filename.endswith(".pdf") and download_url:
                     yield ResolverResult(

@@ -1,3 +1,24 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.app_context",
+#   "purpose": "Application context builder for DocParsing.",
+#   "sections": [
+#     {
+#       "id": "appcontext",
+#       "name": "AppContext",
+#       "anchor": "class-appcontext",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "build-app-context",
+#       "name": "build_app_context",
+#       "anchor": "function-build-app-context",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Application context builder for DocParsing.
 
@@ -14,7 +35,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 from pydantic import ValidationError
 
@@ -39,10 +60,10 @@ class AppContext:
     """
 
     settings: Settings
-    cfg_hashes: Dict[str, str]  # Per-stage content hashes
-    profile: Optional[str] = None
+    cfg_hashes: dict[str, str]  # Per-stage content hashes
+    profile: str | None = None
     strict_config: bool = True
-    source_tracking: Dict[str, str] = None  # Optional: key → source layer
+    source_tracking: dict[str, str] = None  # Optional: key → source layer
 
     def __post_init__(self) -> None:
         """Initialize source tracking if not provided."""
@@ -51,31 +72,31 @@ class AppContext:
 
 
 def build_app_context(
-    profile: Optional[str] = None,
-    profile_file: Optional[Path] = None,
+    profile: str | None = None,
+    profile_file: Path | None = None,
     strict_config: bool = True,
     track_sources: bool = False,
     # Global overrides
-    data_root: Optional[Path] = None,
-    log_level: Optional[str] = None,
-    log_format: Optional[str] = None,
+    data_root: Path | None = None,
+    log_level: str | None = None,
+    log_format: str | None = None,
     # Runner overrides
-    workers: Optional[int] = None,
-    policy: Optional[str] = None,
+    workers: int | None = None,
+    policy: str | None = None,
     # Doctags overrides
-    doctags_input_dir: Optional[Path] = None,
-    doctags_output_dir: Optional[Path] = None,
-    doctags_mode: Optional[str] = None,
+    doctags_input_dir: Path | None = None,
+    doctags_output_dir: Path | None = None,
+    doctags_mode: str | None = None,
     # Chunk overrides
-    chunk_input_dir: Optional[Path] = None,
-    chunk_output_dir: Optional[Path] = None,
-    chunk_format: Optional[str] = None,
-    chunk_min_tokens: Optional[int] = None,
-    chunk_max_tokens: Optional[int] = None,
+    chunk_input_dir: Path | None = None,
+    chunk_output_dir: Path | None = None,
+    chunk_format: str | None = None,
+    chunk_min_tokens: int | None = None,
+    chunk_max_tokens: int | None = None,
     # Embed overrides
-    embed_input_chunks_dir: Optional[Path] = None,
-    embed_output_vectors_dir: Optional[Path] = None,
-    embed_vector_format: Optional[str] = None,
+    embed_input_chunks_dir: Path | None = None,
+    embed_output_vectors_dir: Path | None = None,
+    embed_vector_format: str | None = None,
     # Additional overrides (CLI can pass arbitrary kwargs)
     **extra_overrides: Any,
 ) -> AppContext:
@@ -116,7 +137,7 @@ def build_app_context(
     """
 
     # Build CLI overrides dict from all provided parameters
-    cli_overrides: Dict[str, Any] = {}
+    cli_overrides: dict[str, Any] = {}
 
     if data_root is not None:
         cli_overrides.setdefault("app", {})["data_root"] = str(data_root)

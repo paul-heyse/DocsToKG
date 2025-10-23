@@ -18,7 +18,8 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import TYPE_CHECKING, Any, Iterable, List, Mapping
+from collections.abc import Iterable, Mapping
+from typing import TYPE_CHECKING, Any
 
 import httpx
 
@@ -47,7 +48,7 @@ class OpenAireResolver:
 
     name = "openaire"
 
-    def is_enabled(self, config: Any, artifact: "WorkArtifact") -> bool:
+    def is_enabled(self, config: Any, artifact: WorkArtifact) -> bool:
         """Return ``True`` when the work includes a DOI for OpenAIRE queries.
 
         Args:
@@ -63,7 +64,7 @@ class OpenAireResolver:
         self,
         client: httpx.Client,
         config: Any,
-        artifact: "WorkArtifact",
+        artifact: WorkArtifact,
     ) -> Iterable[ResolverResult]:
         """Yield OpenAIRE URLs that point to downloadable PDFs.
 
@@ -174,7 +175,7 @@ class OpenAireResolver:
                     metadata={"error": str(exc), "error_type": type(exc).__name__},
                 )
                 return
-            results: List[str] = []
+            results: list[str] = []
             _collect_candidate_urls(data, results)
             for url in dedupe(results):
                 if url.lower().endswith(".pdf"):

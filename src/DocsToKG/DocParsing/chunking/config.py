@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.chunking.config",
+#   "purpose": "Typed configuration models and presets for the chunking stage.",
+#   "sections": [
+#     {
+#       "id": "chunkercfg",
+#       "name": "ChunkerCfg",
+#       "anchor": "class-chunkercfg",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Typed configuration models and presets for the chunking stage.
 
 The chunking configuration module translates CLI arguments, environment
@@ -11,9 +26,10 @@ and resumability with confidence across both CLI and programmatic entry points.
 from __future__ import annotations
 
 import os
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, ClassVar, Dict, Optional
+from typing import Any, ClassVar
 
 from DocsToKG.DocParsing.cli_errors import ChunkingCLIValidationError
 from DocsToKG.DocParsing.config import StageConfigBase
@@ -28,16 +44,16 @@ class ChunkerCfg(StageConfigBase):
     """Configuration values for the chunking stage."""
 
     log_level: str = "INFO"
-    data_root: Optional[Path] = None
-    in_dir: Optional[Path] = None
-    out_dir: Optional[Path] = None
+    data_root: Path | None = None
+    in_dir: Path | None = None
+    out_dir: Path | None = None
     min_tokens: int = 256
     max_tokens: int = 512
     shard_count: int = 1
     shard_index: int = 0
     tokenizer_model: str = DEFAULT_TOKENIZER
     soft_barrier_margin: int = SOFT_BARRIER_MARGIN
-    structural_markers: Optional[Path] = None
+    structural_markers: Path | None = None
     serializer_provider: str = DEFAULT_SERIALIZER_PROVIDER
     workers: int = 1
     validate_only: bool = False
@@ -46,7 +62,7 @@ class ChunkerCfg(StageConfigBase):
     inject_anchors: bool = False
     format: str = "parquet"
 
-    ENV_VARS: ClassVar[Dict[str, str]] = {
+    ENV_VARS: ClassVar[dict[str, str]] = {
         "log_level": "DOCSTOKG_CHUNK_LOG_LEVEL",
         "data_root": "DOCSTOKG_CHUNK_DATA_ROOT",
         "in_dir": "DOCSTOKG_CHUNK_IN_DIR",
@@ -68,7 +84,7 @@ class ChunkerCfg(StageConfigBase):
         "config": "DOCSTOKG_CHUNK_CONFIG",
     }
 
-    FIELD_PARSERS: ClassVar[Dict[str, Callable[[Any, Optional[Path]], Any]]] = {
+    FIELD_PARSERS: ClassVar[dict[str, Callable[[Any, Path | None], Any]]] = {
         "config": StageConfigBase._coerce_optional_path,
         "log_level": StageConfigBase._coerce_str,
         "data_root": StageConfigBase._coerce_optional_path,
@@ -173,7 +189,7 @@ class ChunkerCfg(StageConfigBase):
             )
 
 
-CHUNK_PROFILE_PRESETS: Dict[str, Dict[str, Any]] = {
+CHUNK_PROFILE_PRESETS: dict[str, dict[str, Any]] = {
     "cpu-small": {
         "workers": 1,
         "min_tokens": 128,

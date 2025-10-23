@@ -1,3 +1,11 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.network.policy",
+#   "purpose": "HTTP policy constants and defaults.",
+#   "sections": []
+# }
+# === /NAVMAP ===
+
 """HTTP policy constants and defaults.
 
 Defines RFC 9111-compliant caching policies, timeout budgets, and connection pooling

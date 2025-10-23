@@ -1,10 +1,31 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.embedding.backends.factory",
+#   "purpose": "Provider factory wiring dense, sparse, and lexical backends.",
+#   "sections": [
+#     {
+#       "id": "providerbundle",
+#       "name": "ProviderBundle",
+#       "anchor": "class-providerbundle",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "providerfactory",
+#       "name": "ProviderFactory",
+#       "anchor": "class-providerfactory",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Provider factory wiring dense, sparse, and lexical backends."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 from DocsToKG.DocParsing.embedding.config import EmbedCfg
 
@@ -31,12 +52,12 @@ from .sparse.splade_st import SpladeSTConfig, SpladeSTProvider
 class ProviderBundle:
     """Context-managed bundle of embedding providers."""
 
-    dense: Optional[DenseEmbeddingBackend]
-    sparse: Optional[SparseEmbeddingBackend]
-    lexical: Optional[LexicalEmbeddingBackend]
+    dense: DenseEmbeddingBackend | None
+    sparse: SparseEmbeddingBackend | None
+    lexical: LexicalEmbeddingBackend | None
     context: ProviderContext
 
-    def __enter__(self) -> "ProviderBundle":
+    def __enter__(self) -> ProviderBundle:
         for provider in (self.dense, self.sparse, self.lexical):
             if provider:
                 provider.open(self.context)
@@ -54,8 +75,8 @@ class ProviderBundle:
             except Exception:  # pragma: no cover - defensive shutdown
                 pass
 
-    def identities(self) -> Dict[str, ProviderIdentity]:
-        identities: Dict[str, ProviderIdentity] = {}
+    def identities(self) -> dict[str, ProviderIdentity]:
+        identities: dict[str, ProviderIdentity] = {}
         if self.dense:
             identities["dense"] = self.dense.identity
         if self.sparse:
@@ -72,7 +93,7 @@ class ProviderFactory:
     def create(
         cfg: EmbedCfg,
         *,
-        telemetry_emitter: Optional[ProviderTelemetryEmitter] = None,
+        telemetry_emitter: ProviderTelemetryEmitter | None = None,
     ) -> ProviderBundle:
         settings = cfg.provider_settings()
         embedding_cfg = settings["embedding"]
@@ -97,9 +118,7 @@ class ProviderFactory:
         )
 
     @staticmethod
-    def _build_dense(
-        cfg: EmbedCfg, dense_settings: Dict[str, Any]
-    ) -> Optional[DenseEmbeddingBackend]:
+    def _build_dense(cfg: EmbedCfg, dense_settings: dict[str, Any]) -> DenseEmbeddingBackend | None:
         fallback_backend = dense_settings.get("fallback")
         try:
             return ProviderFactory._build_dense_inner(cfg, dense_settings)
@@ -113,8 +132,8 @@ class ProviderFactory:
 
     @staticmethod
     def _build_dense_inner(
-        cfg: EmbedCfg, dense_settings: Dict[str, Any]
-    ) -> Optional[DenseEmbeddingBackend]:
+        cfg: EmbedCfg, dense_settings: dict[str, Any]
+    ) -> DenseEmbeddingBackend | None:
         backend = dense_settings.get("backend") or "qwen_vllm"
         backend = backend.lower()
         if backend in {"none", "null"}:
@@ -195,8 +214,8 @@ class ProviderFactory:
 
     @staticmethod
     def _build_sparse(
-        cfg: EmbedCfg, sparse_settings: Dict[str, Any]
-    ) -> Optional[SparseEmbeddingBackend]:
+        cfg: EmbedCfg, sparse_settings: dict[str, Any]
+    ) -> SparseEmbeddingBackend | None:
         backend = sparse_settings.get("backend") or "splade_st"
         backend = backend.lower()
         if backend in {"none", "null"}:
@@ -230,8 +249,8 @@ class ProviderFactory:
 
     @staticmethod
     def _build_lexical(
-        cfg: EmbedCfg, lexical_settings: Dict[str, Any]
-    ) -> Optional[LexicalEmbeddingBackend]:
+        cfg: EmbedCfg, lexical_settings: dict[str, Any]
+    ) -> LexicalEmbeddingBackend | None:
         backend = lexical_settings.get("backend") or "local_bm25"
         backend = backend.lower()
         if backend in {"none", "null"}:
