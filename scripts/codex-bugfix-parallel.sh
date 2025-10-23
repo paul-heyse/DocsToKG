@@ -16,8 +16,8 @@ SUBDIRS=(
   "src/DocsToKG/OntologyDownload"
 )
 
-BATCH_SIZE="${BATCH_SIZE:-120}"          # files per Codex run
-MAX_PASSES="${MAX_PASSES:-2}"            # start small; bump after you’re comfy
+BATCH_SIZE="${BATCH_SIZE:-200}"          # files per Codex run
+MAX_PASSES="${MAX_PASSES:-10}"            # start small; bump after you’re comfy
 INCLUDE_UNTRACKED="${INCLUDE_UNTRACKED:-true}"  # include new files
 
 BASE_BRANCH="${BASE_BRANCH:-main}"
@@ -26,7 +26,7 @@ PR_TOOL="${PR_TOOL:-gh}"                 # needs GitHub CLI for PR fallback
 
 # Safety rails
 MAX_CHANGED_FILES="${MAX_CHANGED_FILES:-500}"    # cap to avoid runaway diffs
-EXEC_TIMEOUT="${EXEC_TIMEOUT:-0}"                # 0 lets Codex decide
+EXEC_TIMEOUT="${EXEC_TIMEOUT:-1500}"                # 0 lets Codex decide
 
 # Logging
 VERBOSE="${VERBOSE:-true}"
