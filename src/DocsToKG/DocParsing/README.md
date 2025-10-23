@@ -219,6 +219,9 @@ sequenceDiagram
   - Worker sizing: DocTags auto-sizes `--workers` to `max(1, min(12, cpu_count - 4))`, ensuring at least one process is scheduled even when `os.cpu_count()` reports very small values.
 - Chunking: `DOCSTOKG_CHUNK_*` toggles for tokenizer, shard count, and validation.
 - Embedding: `DOCSTOKG_EMBED_*` flags plus `DOCSTOKG_QWEN_DIR`, `DOCSTOKG_SPLADE_DIR` for model caches.
+- Manifest telemetry: `DOCSTOKG_MANIFEST_LOCK_TIMEOUT` controls how long manifest writers wait
+  for the advisory `.lock` file before surfacing a structured timeout error. Increase it when
+  manifests are shared across slower filesystems or concurrent pipelines.
 - Vector format: Parquet is the only format for embedding vectors. Environment variable `DOCSTOKG_EMBED_VECTOR_FORMAT` is ignored for embeddings (always uses Parquet).
 - Validate-only runs reuse the configured `--qwen-dim` (or `DOCSTOKG_EMBED_QWEN_DIM`) when present; omit the override to accept previously generated vectors without enforcing a dimension.
 - Validate configuration: run `python -m DocsToKG.DocParsing.core.cli chunk --validate-only` or `... embed --validate-only` before production runs.

@@ -48,18 +48,37 @@ where multiple workers may write concurrently.
 from __future__ import annotations
 
 import json
+import os
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
-from filelock import FileLock
+from filelock import FileLock, Timeout
 
 __all__ = [
     "ManifestSink",
     "JsonlManifestSink",
     "ManifestEntry",
+    "ManifestLockTimeoutError",
 ]
+
+LOCK_TIMEOUT_ENV = "DOCSTOKG_MANIFEST_LOCK_TIMEOUT"
+DEFAULT_LOCK_TIMEOUT_S = 30.0
+
+
+class ManifestLockTimeoutError(RuntimeError):
+    """Raised when the manifest lock cannot be acquired within the timeout."""
+
+    def __init__(self, lock_path: Path, timeout_s: float, hint: str) -> None:
+        self.lock_path = Path(lock_path)
+        self.timeout_s = float(timeout_s)
+        self.hint = hint
+        message = (
+            "Timed out acquiring manifest lock "
+            f"{self.lock_path} after {self.timeout_s:.2f}s. {self.hint}"
+        )
+        super().__init__(message)
 
 
 @runtime_checkable
@@ -173,24 +192,63 @@ class ManifestEntry:
 class JsonlManifestSink:
     """JSONL manifest sink with atomic writes via FileLock."""
 
-    def __init__(self, manifest_path: Path | str) -> None:
+    def __init__(
+        self,
+        manifest_path: Path | str,
+        lock_timeout_s: float | None = None,
+    ) -> None:
         """Initialize sink pointing to manifest JSONL file.
 
         Args:
             manifest_path: Path to manifest JSONL file.
+            lock_timeout_s: Optional timeout override for manifest lock acquisition
+                in seconds. Defaults to ``DEFAULT_LOCK_TIMEOUT_S`` or the value in
+                :data:`DOCSTOKG_MANIFEST_LOCK_TIMEOUT` when provided.
         """
         self.manifest_path = Path(manifest_path)
         self.lock_path = self.manifest_path.with_suffix(self.manifest_path.suffix + ".lock")
+        self.lock_timeout_s = self._resolve_lock_timeout(lock_timeout_s)
+
+    def _resolve_lock_timeout(self, override: float | None) -> float:
+        env_value = os.getenv(LOCK_TIMEOUT_ENV)
+        timeout = DEFAULT_LOCK_TIMEOUT_S
+
+        if env_value:
+            try:
+                timeout = float(env_value)
+            except ValueError as exc:  # pragma: no cover - configuration error
+                raise ValueError(
+                    f"Invalid {LOCK_TIMEOUT_ENV} value {env_value!r}: {exc}"
+                ) from exc
+
+        if override is not None:
+            timeout = float(override)
+
+        if timeout <= 0:
+            raise ValueError("Lock timeout must be greater than zero seconds.")
+
+        return timeout
 
     def _append_entry(self, entry: ManifestEntry) -> None:
         """Append entry to manifest with FileLock for atomicity."""
         self.manifest_path.parent.mkdir(parents=True, exist_ok=True)
 
-        with FileLock(str(self.lock_path), timeout=30.0):
-            with open(self.manifest_path, "a", encoding="utf-8") as f:
-                f.write(entry.to_json())
-                f.write("\n")
-                f.flush()
+        try:
+            with FileLock(str(self.lock_path), timeout=self.lock_timeout_s):
+                with open(self.manifest_path, "a", encoding="utf-8") as f:
+                    f.write(entry.to_json())
+                    f.write("\n")
+                    f.flush()
+        except Timeout as exc:
+            hint = (
+                "Ensure no other DocParsing run is holding the manifest lock or "
+                f"increase the timeout via {LOCK_TIMEOUT_ENV}."
+            )
+            raise ManifestLockTimeoutError(
+                lock_path=self.lock_path,
+                timeout_s=self.lock_timeout_s,
+                hint=hint,
+            ) from exc
 
     def log_success(
         self,
