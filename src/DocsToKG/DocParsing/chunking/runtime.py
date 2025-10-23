@@ -194,6 +194,7 @@ from docling_core.transforms.chunker.base import BaseChunk
 from docling_core.transforms.chunker.hybrid_chunker import HybridChunker
 from docling_core.transforms.chunker.tokenizer.huggingface import HuggingFaceTokenizer
 from docling_core.types.doc.document import DoclingDocument, DocTagsDocument
+import pyarrow.parquet as pq
 from transformers import AutoTokenizer
 
 # --- Globals ---
@@ -279,6 +280,7 @@ from DocsToKG.DocParsing.logging import (
     manifest_log_success,
     telemetry_scope,
 )
+from DocsToKG.DocParsing.storage import parquet_schemas
 from DocsToKG.DocParsing.storage import paths as storage_paths
 from DocsToKG.DocParsing.storage.chunks_writer import ParquetChunksWriter
 from DocsToKG.DocParsing.telemetry import StageTelemetry, TelemetrySink
@@ -819,28 +821,153 @@ def _resolve_serializer_provider(spec: str) -> type[ChunkingSerializerProvider]:
     return provider_cls  # type: ignore[return-value]
 
 
+def _inspect_parquet_chunk_file(path: Path) -> Tuple[int, int, Tuple[str, ...]]:
+    """Return metadata for a Parquet chunk artifact or raise ``ValueError``."""
+
+    try:
+        parquet_file = pq.ParquetFile(path)
+    except Exception as exc:  # pragma: no cover - exercised during error handling
+        raise ValueError(f"Unable to open Parquet file: {exc}") from exc
+
+    schema = parquet_file.schema_arrow
+    expected = parquet_schemas.chunks_schema(include_optional=False)
+    for field in expected:
+        try:
+            actual = schema.field(field.name)
+        except KeyError as exc:  # pragma: no cover - defensive guard
+            raise ValueError(f"Missing required column: {field.name}") from exc
+        if actual.type != field.type:
+            raise ValueError(
+                f"Column {field.name} has type {actual.type}, expected {field.type}"
+            )
+
+    footer = parquet_schemas.validate_parquet_file(str(path))
+    if not footer.ok:
+        detail = "; ".join(footer.errors) or "invalid footer metadata"
+        raise ValueError(detail)
+
+    row_count = int(parquet_file.metadata.num_rows) if parquet_file.metadata else 0
+    row_groups = (
+        int(parquet_file.metadata.num_row_groups) if parquet_file.metadata else 0
+    )
+    return row_count, row_groups, footer.warnings
+
+
+def _normalise_validation_targets(
+    targets: Sequence[Union[Path, Tuple[str, Path]]]
+) -> List[Tuple[str, Path]]:
+    """Coerce validation targets into ``(doc_id, Path)`` tuples."""
+
+    normalised: List[Tuple[str, Path]] = []
+    for entry in targets:
+        if isinstance(entry, tuple):
+            doc_id, path = entry
+            normalised.append((str(doc_id), Path(path)))
+        else:
+            path = Path(entry)
+            normalised.append((path.stem, path))
+    return normalised
+
+
 def _validate_chunk_files(
-    files: Sequence[Path],
+    targets: Sequence[Union[Path, Tuple[str, Path]]],
     logger,
     *,
     data_root: Optional[Path] = None,
     telemetry: Optional[StageTelemetry] = None,
+    format: str = "jsonl",
 ) -> Dict[str, int]:
-    """Validate chunk JSONL rows across supplied files.
+    """Validate chunk artifacts and return aggregate statistics."""
 
-    Returns a dictionary summarising file, row, and quarantine counts. Detailed
-    log events for individual errors are emitted within the function; callers
-    are responsible for logging the aggregate summary so they can attach
-    run-specific context.
-    """
-
+    chunk_format = str(format or "jsonl").lower()
     validated_files = 0
     validated_rows = 0
+    validated_row_groups = 0
     quarantined_files = 0
+    missing_files = 0
 
-    for path in files:
+    for doc_id, path in _normalise_validation_targets(targets):
         if not path.exists():
+            missing_files += 1
+            log_event(
+                logger,
+                "warning",
+                "Chunk artifact missing",
+                status="missing",
+                stage=CHUNK_STAGE,
+                doc_id=doc_id,
+                input_relpath=relative_path(path, data_root),
+            )
             continue
+
+        if chunk_format == "parquet":
+            try:
+                file_rows, row_groups, warnings = _inspect_parquet_chunk_file(path)
+            except ValueError as exc:
+                reason = str(exc)
+                try:
+                    input_hash = compute_content_hash(path)
+                except Exception:
+                    input_hash = ""
+                hash_alg = resolve_hash_algorithm()
+                quarantine_path = quarantine_artifact(path, reason=reason, logger=logger)
+                if telemetry is not None:
+                    telemetry.log_failure(
+                        doc_id=doc_id,
+                        input_path=path,
+                        duration_s=0.0,
+                        reason=reason,
+                        metadata={
+                            "input_path": str(path),
+                            "input_hash": input_hash,
+                            "quarantine": True,
+                            "status": "failure",
+                            "hash_alg": hash_alg,
+                            "format": chunk_format,
+                        },
+                        manifest_metadata={
+                            "output_path": str(quarantine_path),
+                            "schema_version": CHUNK_SCHEMA_VERSION,
+                            "input_path": str(path),
+                            "input_hash": input_hash,
+                            "error": reason,
+                            "quarantine": True,
+                            "status": "failure",
+                            "hash_alg": hash_alg,
+                            "format": chunk_format,
+                        },
+                    )
+                log_event(
+                    logger,
+                    "warning",
+                    "Chunk artifact quarantined",
+                    status="quarantine",
+                    stage=CHUNK_STAGE,
+                    doc_id=doc_id,
+                    input_relpath=relative_path(path, data_root),
+                    output_relpath=relative_path(quarantine_path, data_root),
+                    error_class="ValidationError",
+                    reason=reason,
+                )
+                quarantined_files += 1
+                continue
+
+            validated_files += 1
+            validated_rows += file_rows
+            validated_row_groups += row_groups
+            for warning in warnings:
+                log_event(
+                    logger,
+                    "warning",
+                    "Chunk artifact warning",
+                    status="validate-only-warning",
+                    stage=CHUNK_STAGE,
+                    doc_id=doc_id,
+                    input_relpath=relative_path(path, data_root),
+                    detail=warning,
+                )
+            continue
+
         file_rows = 0
         file_errors: List[str] = []
         with path.open("r", encoding="utf-8", errors="replace") as handle:
@@ -859,7 +986,7 @@ def _validate_chunk_files(
                         "Chunk validation error",
                         status="invalid",
                         stage=CHUNK_STAGE,
-                        doc_id=path.stem,
+                        doc_id=doc_id,
                         input_relpath=relative_path(path, data_root),
                         error_class="ValidationError",
                         detail=message,
@@ -875,7 +1002,6 @@ def _validate_chunk_files(
             except Exception:
                 input_hash = ""
             hash_alg = resolve_hash_algorithm()
-            doc_id = path.stem
             quarantine_path = quarantine_artifact(path, reason=reason, logger=logger)
             if telemetry is not None:
                 telemetry.log_failure(
@@ -889,6 +1015,7 @@ def _validate_chunk_files(
                         "quarantine": True,
                         "status": "failure",
                         "hash_alg": hash_alg,
+                        "format": chunk_format,
                     },
                     manifest_metadata={
                         "output_path": str(quarantine_path),
@@ -899,12 +1026,13 @@ def _validate_chunk_files(
                         "quarantine": True,
                         "status": "failure",
                         "hash_alg": hash_alg,
+                        "format": chunk_format,
                     },
                 )
             log_event(
                 logger,
                 "warning",
-                "Chunk file quarantined",
+                "Chunk artifact quarantined",
                 status="quarantine",
                 stage=CHUNK_STAGE,
                 doc_id=doc_id,
@@ -919,23 +1047,77 @@ def _validate_chunk_files(
         validated_files += 1
         validated_rows += file_rows
 
-    if quarantined_files:
-        log_event(
-            logger,
-            "warning",
-            "Quarantined chunk files",
-            stage=CHUNK_STAGE,
-            doc_id="__aggregate__",
-            input_hash=None,
-            error_code="QUARANTINE_DETECTED",
-            quarantined=quarantined_files,
-        )
-
     return {
         "files": validated_files,
         "rows": validated_rows,
+        "row_groups": validated_row_groups,
         "quarantined": quarantined_files,
+        "missing": missing_files,
     }
+
+
+# --- Defaults ---
+
+
+def _resolve_parquet_chunk_artifact(
+    *, expected_jsonl_path: Path, out_dir: Path, data_root: Optional[Path]
+) -> Path:
+    """Best-effort resolution of a Parquet chunk artifact for validation."""
+
+    if data_root is None:
+        return expected_jsonl_path
+
+    dataset_root = Path(data_root) / "Chunks" / "fmt=parquet"
+    candidates: List[str] = []
+    try:
+        relative = expected_jsonl_path.relative_to(out_dir)
+        candidates.append(storage_paths.normalize_rel_id(relative))
+    except ValueError:
+        pass
+    candidates.append(storage_paths.normalize_rel_id(expected_jsonl_path.stem))
+
+    seen: set[str] = set()
+    for candidate in candidates:
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        rel_pattern = Path(candidate).as_posix()
+        pattern = f"**/{rel_pattern}.parquet"
+        matches = sorted(dataset_root.glob(pattern))
+        if matches:
+            return matches[0]
+
+    if candidates:
+        return dataset_root / Path(candidates[0]).with_suffix(".parquet")
+
+    fallback = storage_paths.normalize_rel_id(expected_jsonl_path.stem)
+    return dataset_root / Path(fallback).with_suffix(".parquet")
+
+
+def _collect_chunk_artifacts(
+    doctag_files: Sequence[Path],
+    *,
+    in_dir: Path,
+    out_dir: Path,
+    data_root: Optional[Path],
+    format: str,
+) -> List[Tuple[str, Path]]:
+    """Return ``(doc_id, chunk_path)`` tuples for downstream validation."""
+
+    chunk_format = str(format or "jsonl").lower()
+    artifacts: List[Tuple[str, Path]] = []
+    for doc_path in doctag_files:
+        doc_id, chunk_jsonl = derive_doc_id_and_chunks_path(doc_path, in_dir, out_dir)
+        if chunk_format == "parquet":
+            chunk_path = _resolve_parquet_chunk_artifact(
+                expected_jsonl_path=chunk_jsonl,
+                out_dir=out_dir,
+                data_root=data_root,
+            )
+        else:
+            chunk_path = chunk_jsonl
+        artifacts.append((doc_id, chunk_path))
+    return artifacts
 
 
 # --- Defaults ---
@@ -1666,8 +1848,17 @@ def _main_inner(
     stage_telemetry = StageTelemetry(telemetry_sink, run_id=run_id, stage=MANIFEST_STAGE)
     with telemetry_scope(stage_telemetry):
         if getattr(args, "validate_only", False):
+            chunk_artifacts = _collect_chunk_artifacts(
+                files,
+                in_dir=in_dir,
+                out_dir=out_dir,
+                data_root=resolved_data_root,
+                format=cfg.format,
+            )
             _run_validate_only(
-                files=files,
+                doctag_files=files,
+                chunk_artifacts=chunk_artifacts,
+                expected_artifacts=len(files),
                 logger=logger,
                 cfg=cfg,
                 tokenizer_model=tokenizer_model,
@@ -1677,6 +1868,7 @@ def _main_inner(
                 in_dir=in_dir,
                 out_dir=out_dir,
                 telemetry=stage_telemetry,
+                format=cfg.format,
             )
             return 0
 
@@ -1786,7 +1978,9 @@ def _main_inner(
 
 def _run_validate_only(
     *,
-    files: Sequence[Path],
+    doctag_files: Sequence[Path],
+    chunk_artifacts: Sequence[Tuple[str, Path]],
+    expected_artifacts: int,
     logger,
     cfg: ChunkerCfg,
     tokenizer_model: str,
@@ -1796,26 +1990,35 @@ def _run_validate_only(
     in_dir: Path,
     out_dir: Path,
     telemetry: StageTelemetry,
+    format: str,
 ) -> None:
-    """Validate chunk inputs and report statistics without writing outputs."""
+    """Validate chunk outputs and report statistics without writing artifacts."""
 
+    chunk_format = str(format or "jsonl").lower()
     stats = _validate_chunk_files(
-        files,
+        chunk_artifacts,
         logger,
         data_root=data_root,
         telemetry=telemetry,
+        format=chunk_format,
     )
-    logger.bind(mode="validate-only")
+    logger.bind(mode="validate-only", chunk_format=chunk_format)
 
-    if not stats["files"]:
+    validated_artifacts = stats["files"]
+    examined_artifacts = validated_artifacts + stats["quarantined"]
+
+    if validated_artifacts == 0:
         log_event(
             logger,
             "info",
-            "No chunk files validated",
+            "No chunk artifacts validated",
             status="validate-only",
             stage=CHUNK_STAGE,
             doc_id="__aggregate__",
             input_hash=None,
+            expected_artifacts=expected_artifacts,
+            examined_artifacts=examined_artifacts,
+            chunk_format=chunk_format,
             **stats,
         )
         return
@@ -1828,6 +2031,9 @@ def _run_validate_only(
         stage=CHUNK_STAGE,
         doc_id="__aggregate__",
         input_hash=None,
+        expected_artifacts=expected_artifacts,
+        examined_artifacts=examined_artifacts,
+        chunk_format=chunk_format,
         **stats,
     )
 
@@ -1849,7 +2055,7 @@ def _run_validate_only(
     heading_hits = 0
     caption_hits = 0
 
-    for path in files:
+    for path in doctag_files:
         if not path.exists():
             continue
         doctags_text = read_utf8(path)
@@ -1913,6 +2119,12 @@ def _run_validate_only(
         stage=CHUNK_STAGE,
         validated_files=validated_files,
         validated_rows=validated_rows,
+        examined_artifacts=examined_artifacts,
+        expected_artifacts=expected_artifacts,
+        missing_artifacts=stats["missing"],
+        quarantined_artifacts=stats["quarantined"],
+        row_groups=stats["row_groups"],
+        chunk_format=chunk_format,
         generated_chunks=total_records,
         avg_tokens=round(avg_tokens, 2),
         min_tokens=min_tokens,
