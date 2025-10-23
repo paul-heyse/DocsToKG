@@ -46,6 +46,7 @@ Provides:
 """
 
 import logging
+from contextlib import closing
 from pathlib import Path
 from typing import Any, Sequence
 
@@ -266,19 +267,18 @@ def obs_stats(
             )
             raise typer.Exit(code=1)
 
-        con = _get_duckdb_connection()
-        result = con.execute(query).fetchall()
-        columns = con.execute(query).description
+        with closing(_get_duckdb_connection()) as con:
+            cursor = con.execute(query)
+            columns = cursor.description or []
 
-        if json_output:
-            df = con.execute(query).df()
-            typer.echo(df.to_json(orient="records"))
-        else:
-            headers = [col[0] for col in columns] if columns else []
-            table = _format_table(result, headers)
-            typer.echo(table)
-
-        con.close()
+            if json_output:
+                df = cursor.df()
+                typer.echo(df.to_json(orient="records"))
+            else:
+                result = cursor.fetchall()
+                headers = [col[0] for col in columns]
+                table = _format_table(result, headers)
+                typer.echo(table)
 
     except Exception as e:
         typer.echo(f"❌ Error: {e}", err=True)
@@ -384,6 +384,23 @@ def obs_export(
         typer.echo(
             f"✅ Exported {row_count} events to {output_path}",
         )
+
+        with closing(_get_duckdb_connection()) as con:
+            df = con.execute(query).df()
+
+            if format_type == ".json":
+                df.to_json(output_path, orient="records", date_format="iso")
+            elif format_type == ".jsonl":
+                df.to_json(output_path, orient="records", lines=True)
+            elif format_type == ".parquet":
+                df.to_parquet(output_path)
+            elif format_type == ".csv":
+                df.to_csv(output_path, index=False)
+
+            row_count = len(df)
+            typer.echo(
+                f"✅ Exported {row_count} events to {output_path}",
+            )
 
     except Exception as e:
         typer.echo(f"❌ Error: {e}", err=True)
