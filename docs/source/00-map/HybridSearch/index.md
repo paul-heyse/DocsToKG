@@ -1,13 +1,7 @@
 # HybridSearch
 
 - Code root: `src/DocsToKG/HybridSearch`
-- Purpose: Build hybrid (BM25/SPLADE + dense) indexes and serve GPU-accelerated retrieval using cuVS/FAISS.
-- Contract: Exposes retrieval APIs, validation tooling, and evaluation utilities.
+- Purpose: Provide GPU-accelerated hybrid retrieval (BM25/SPLADE + dense embedding) and evaluation tooling.
+- Contract: Exposes search APIs, evaluation helpers, and Faiss/cuVS management utilities.
 
-```{toctree}
-:maxdepth: 2
-:glob:
-
-*
-```
-
+See the [HybridSearch API reference](../../04-api/index).

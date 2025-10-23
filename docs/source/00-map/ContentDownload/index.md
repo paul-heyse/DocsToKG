@@ -4,10 +4,4 @@
 - Purpose: Acquire source documents (OpenAlex/DOAJ/CORE/etc.) with resilient retry, policy enforcement, and caching.
 - Contract: Produces raw artifacts (PDF/HTML/metadata) for downstream parsing.
 
-```{toctree}
-:maxdepth: 2
-:glob:
-
-*
-```
-
+See the [ContentDownload API reference](../../04-api/index).

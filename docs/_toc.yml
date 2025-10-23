@@ -1,7 +1,0 @@
-root: index
-entries:
-  - file: overview
-  - file: 00-map/index
-  - title: Architecture
-    glob: architecture/*
-  - file: 04-api/index

@@ -1,3 +1,4 @@
 # Sphinx build outputs
 /build/
 source/04-api/
+source/04-api/generated/

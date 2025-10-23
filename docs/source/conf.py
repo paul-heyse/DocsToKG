@@ -16,6 +16,7 @@ except ModuleNotFoundError:  # pragma: no cover - fallback for older runtimes
 PROJECT_ROOT = os.path.abspath(os.path.join(__file__, "..", "..", ".."))
 SRC_ROOT = os.path.join(PROJECT_ROOT, "src")
 sys.path.insert(0, SRC_ROOT)
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "_ext")))
 
 
 def _read_version() -> str:
@@ -56,17 +57,23 @@ extensions = [
     "sphinx_codeautolink",
     "sphinxcontrib.autodoc_pydantic",
     "sphinxcontrib.mermaid",
-    "sphinx_external_toc",
     "sphinx_issues",
     "sphinxcontrib.spelling",
+    "xref_rescue",
 ]
 
 autosummary_generate = True
 autodoc_typehints = "description"
 autosectionlabel_prefix_document = True
 nitpicky = True
+primary_domain = "py"
+default_role = None
 templates_path = ["_templates"]
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
+nitpick_ignore_regex = [
+    (r"py:.*", r"tenacity\..*"),
+    (r"py:.*", r"httpx\..*"),
+]
 
 source_suffix = {
     ".rst": "restructuredtext",
@@ -85,6 +92,7 @@ myst_enable_extensions = [
     "substitution",
 ]
 myst_heading_anchors = 3
+myst_ref_domains = ["std", "py"]
 
 # --- theme -----------------------------------------------------------------
 html_theme = "pydata_sphinx_theme"
@@ -121,7 +129,8 @@ intersphinx_mapping = {
     "python": ("https://docs.python.org/3/", None),
     "pydantic": ("https://docs.pydantic.dev/latest/", None),
     "numpy": ("https://numpy.org/doc/stable/", None),
-    "httpx": ("https://www.python-httpx.org/en/stable/", None),
+    "httpx": ("https://www.python-httpx.org/en/latest/", None),
+    "tenacity": ("https://tenacity.readthedocs.io/en/stable/", None),
 }
 
 # --- mock heavy optional deps ----------------------------------------------
@@ -141,13 +150,15 @@ autodoc_mock_imports = [
     "docling",
     "bs4",
     "regex",
+    "url_normalize",
+    "pydantic_core",
 ]
 
 # --- AutoAPI ---------------------------------------------------------------
 autoapi_type = "python"
 autoapi_dirs = [SRC_ROOT]
 autoapi_root = "04-api"
-autoapi_keep_files = False
+autoapi_keep_files = True
 autoapi_add_toctree_entry = True
 autoapi_generate_api_docs = True
 autoapi_options = [
@@ -156,6 +167,8 @@ autoapi_options = [
     "undoc-members",
     "show-inheritance",
     "show-module-summary",
+    "special-members",
+    "imported-members",
 ]
 autoapi_include = ["DocsToKG.*"]
 autoapi_ignore = [
@@ -172,9 +185,6 @@ autodoc_pydantic_model_show_config_summary = True
 autodoc_pydantic_model_member_order = "bysource"
 
 # --- External ToC ----------------------------------------------------------
-external_toc_path = "../_toc.yml"
-external_toc_exclude_missing = True
-
 # --- GitHub issues links ---------------------------------------------------
 issues_github_path = "paul-heyse/DocsToKG"
 

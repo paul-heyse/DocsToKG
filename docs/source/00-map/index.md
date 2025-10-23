@@ -1,13 +1,13 @@
 # Map of the Project
 
-This section mirrors the repository so agents (and humans) can navigate by package.
+High-level navigation for each DocsToKG domain. Choose a package below to jump
+into its module-specific notes.
 
 ```{toctree}
-:maxdepth: 2
+:maxdepth: 1
 
 ContentDownload/index
 DocParsing/index
 HybridSearch/index
 OntologyDownload/index
 ```
-

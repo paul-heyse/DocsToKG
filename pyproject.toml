@@ -190,7 +190,6 @@ docs = [
     "autodoc-pydantic>=2.0.0",
     "myst-nb>=1.3.0",
     "sphinxcontrib-mermaid>=0.7.1",
-    "sphinx-external-toc>=1.0.1",
     "sphinx-issues>=5.0.1",
     "sphinxcontrib-spelling>=7.7.0",
     "pyenchant>=3.3.0",
@@ -202,6 +201,7 @@ docs = [
     "ipywidgets>=8.1.1",
     "sphinx-favicon>=0.2.0",
     "sphinx-inline-tabs>=0.3.0",
+    "sphobjinv>=2.3.1.3",
 ]
 
 [project.scripts]
@@ -242,7 +242,6 @@ enabled = [
     "sphinx_codeautolink",
     "sphinxcontrib.autodoc_pydantic",
     "sphinxcontrib.mermaid",
-    "sphinx_external_toc",
     "sphinx_issues",
     "sphinxcontrib.spelling",
 ]
