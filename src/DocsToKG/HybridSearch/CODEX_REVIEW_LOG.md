@@ -101,3 +101,13 @@ No eligible files after excludes.
   - Coerce per-section payloads so `None` maps to an empty dict while non-mapping inputs raise a clear `ValueError`.
   - Reuse the coercion for all config blocks to keep alias translation working with validated data.
 - TODO: None.
+
+<!-- 2025-10-23 07:04:16Z UTC -->
+## Pass 3 — find and fix real bugs
+
+### Batch 0 (Pass 3)
+- Broken: Ingestion accepted blank or malformed chunk UUIDs until FAISS tried to coerce them, raising `ValueError` and misclassifying the data issue as retryable.
+- Fix:
+  - Normalise and validate chunk/vector UUID fields while loading artifacts so bad identifiers raise `IngestError` early.
+  - Canonicalise cached vector IDs and continue flagging entries that omit UUIDs.
+- TODO: None.

@@ -112,6 +112,7 @@ import logging
 import os
 import re
 import time
+import uuid
 from collections import defaultdict, deque
 from contextlib import closing, contextmanager
 from dataclasses import dataclass
@@ -821,6 +822,30 @@ class ChunkIngestionPipeline:
         chunk_iter = self._iter_jsonl(document.chunk_path)
         vector_iter = self._iter_vector_file(document.vector_path)
         vector_cache: Dict[str, Mapping[str, object]] = {}
+        missing_uuid_entries = False
+
+        def _normalise_vector_id(
+            entry: Mapping[str, object],
+            *,
+            allow_missing: bool,
+            source: str,
+        ) -> Optional[str]:
+            raw_uuid = entry.get("uuid")
+            if raw_uuid is None or (isinstance(raw_uuid, str) and not raw_uuid.strip()):
+                raw_uuid = entry.get("UUID")
+            if raw_uuid is None:
+                if allow_missing:
+                    return None
+                raise IngestError(f"{source} is missing a UUID")
+            value = str(raw_uuid).strip()
+            if not value:
+                if allow_missing:
+                    return None
+                raise IngestError(f"{source} is missing a UUID")
+            try:
+                return str(uuid.UUID(value))
+            except (AttributeError, TypeError, ValueError) as exc:
+                raise IngestError(f"{source} has invalid UUID: {value!r}") from exc
 
         def _maybe_track_cache() -> None:
             if self._vector_cache_stats_hook is not None:
@@ -832,13 +857,19 @@ class ChunkIngestionPipeline:
                 )
 
         def _pop_vector(vector_id: str) -> Optional[Mapping[str, object]]:
+            nonlocal missing_uuid_entries
             cached = vector_cache.pop(vector_id, None)
             _maybe_track_cache()
             if cached is not None:
                 return cached
             for entry in vector_iter:
-                current_id = str(entry.get("uuid") or entry.get("UUID"))
-                if not current_id:
+                current_id = _normalise_vector_id(
+                    entry,
+                    allow_missing=True,
+                    source=f"vector artifact {document.vector_path}",
+                )
+                if current_id is None:
+                    missing_uuid_entries = True
                     continue
                 if current_id == vector_id:
                     return entry
@@ -849,7 +880,15 @@ class ChunkIngestionPipeline:
         payloads: List[ChunkPayload] = []
         missing: List[str] = []
         for entry in chunk_iter:
-            vector_id = str(entry.get("uuid") or entry.get("UUID"))
+            chunk_context = (
+                f"chunk artifact {document.chunk_path} "
+                f"(doc_id={document.doc_id}, chunk_id={entry.get('chunk_id')})"
+            )
+            vector_id = _normalise_vector_id(
+                entry,
+                allow_missing=False,
+                source=chunk_context,
+            )
             vector_payload = vector_cache.pop(vector_id, None)
             _maybe_track_cache()
             if vector_payload is None:
@@ -891,19 +930,22 @@ class ChunkIngestionPipeline:
         max_preview = 10
         truncated = False
         if vector_cache:
-            cache_ids = [str(vector_id) for vector_id in vector_cache.keys()]
+            cache_ids = sorted(vector_cache.keys())
             if len(cache_ids) > max_preview:
-                extra_vector_ids.extend(sorted(cache_ids)[:max_preview])
+                extra_vector_ids.extend(cache_ids[:max_preview])
                 truncated = True
             else:
-                extra_vector_ids.extend(sorted(cache_ids))
+                extra_vector_ids.extend(cache_ids)
 
-        missing_uuid_entries = False
         for extra_entry in vector_iter:
-            extra_uuid = extra_entry.get("uuid") or extra_entry.get("UUID")
-            if extra_uuid:
+            extra_uuid = _normalise_vector_id(
+                extra_entry,
+                allow_missing=True,
+                source=f"vector artifact {document.vector_path}",
+            )
+            if extra_uuid is not None:
                 if len(extra_vector_ids) < max_preview:
-                    extra_vector_ids.append(str(extra_uuid))
+                    extra_vector_ids.append(extra_uuid)
                 else:
                     truncated = True
             else:
