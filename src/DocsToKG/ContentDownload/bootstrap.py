@@ -449,6 +449,7 @@ def _build_retry_configs(
             rate_capacity=float(rate_policy.capacity),
             rate_refill_per_sec=float(rate_policy.refill_per_sec),
             rate_burst=float(rate_policy.burst),
+            timeout_read_s=resolver_cfg.timeout_read_s,
         )
 
     return retry_configs

@@ -228,6 +228,7 @@ class DownloadRun:
                 rate_capacity=rate_policy.capacity,
                 rate_refill_per_sec=rate_policy.refill_per_sec,
                 rate_burst=rate_policy.burst,
+                timeout_read_s=resolver_cfg.timeout_read_s,
             )
 
         return resolver_registry, retry_configs
