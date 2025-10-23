@@ -109,3 +109,12 @@ No eligible files after excludes.
 
 <!-- 2025-10-23 06:52:53Z UTC -->
 ## Pass 1 — find and fix real bugs
+
+<!-- 2025-10-23 06:55:41Z UTC -->
+## Pass 2 — find and fix real bugs
+
+### Batch 0 (Pass 2)
+- Broken: Atomic rename path leaked directory file descriptors by calling `os.open()` without closing, eventually exhausting descriptors on long-lived workers.
+- Fix:
+  - Wrap the directory sync in a try/finally that closes the descriptor before performing `os.replace`.
+- TODO: Evaluate adding a post-rename `fsync` once we confirm durability requirements.

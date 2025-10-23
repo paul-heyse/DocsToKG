@@ -156,7 +156,11 @@ def stream_download_to_file(
 
         # Atomic rename
         try:
-            os.fsync(os.open(str(dest.parent), os.O_RDONLY))  # Sync directory
+            dir_fd = os.open(str(dest.parent), os.O_RDONLY)
+            try:
+                os.fsync(dir_fd)  # Sync directory
+            finally:
+                os.close(dir_fd)
             os.replace(temp_path, dest)
         except Exception as e:
             builder.with_error("rename_error", str(e), RequestStatus.ERROR)
