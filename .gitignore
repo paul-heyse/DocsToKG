@@ -91,7 +91,7 @@ Data/HybridScaleFixture/**
 Data/ontology-fetcher/
 Data/ontology-fetcher/**
 reports/
-codex/
+
 
 # Large external dependencies (submodules)
 faiss/

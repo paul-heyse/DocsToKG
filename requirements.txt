@@ -90,7 +90,7 @@ requests>=2.32.5
 psutil>=7.1.0
 
 # ============================================================================
-# OPTIONAL: Cloud & Databases (lazy imports - only install if needed)
+# Cloud & Databases
 # ============================================================================
 # Uncomment only the backends you actually use:
 boto3  # for AWS S3 storage
@@ -100,7 +100,7 @@ sqlalchemy>=2.0.44  # for PostgreSQL via ORM
 redis>=6.4.0  # for Redis caching
 
 # ============================================================================
-# Advanced Analytics (lazy imports - only install if needed)
+# Advanced Analytics 
 # ============================================================================
 polars  # if using Polars DataFrames
 duckdb>=1.4.1  # if using DuckDB analytics
