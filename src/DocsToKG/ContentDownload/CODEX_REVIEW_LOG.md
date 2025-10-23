@@ -31,6 +31,16 @@ No eligible files after excludes.
 <!-- 2025-10-23 04:06:56Z UTC -->
 ## Pass 2 — find and fix real bugs
 
+### Batch 1 (Pass 2)
+- Broken: Dispatcher forced a lease even when the worker queue was full, so `_jobs_queue.put(block=False)` raised `queue.Full` and the dispatcher loop thrashed with errors instead of backoff.
+- Fix: Respect actual free slot count before leasing; skip leasing when at capacity so `put` never runs without space.
+- TODO: Follow up with a lightweight dispatcher unit test that covers full-queue behaviour before the next orchestrator refactor.
+
+### Batch 0 (Pass 2)
+- Broken: String-based `cacheable_methods` left leading spaces (`" HEAD"`), so HEAD revalidation stopped working whenever YAML/env overrides used human-friendly commas.
+- Fix: Strip whitespace from string/list inputs while loading cache controller config and manually verified spaced strings resolve to canonical methods.
+- TODO: Audit env/CLI override parsing for similar whitespace edge cases before widening the configuration surface again.
+
 <!-- 2025-10-23 04:24:41Z UTC -->
 ## Pass 1 — find and fix real bugs
 
@@ -63,3 +73,6 @@ No eligible files after excludes.
 - Per-role limiter never released its `BoundedSemaphore` permit, so concurrency hit zero after a few requests.
 - Added explicit tracking of semaphore acquisition, rolling back on failures and releasing post-request.
 - TODO: Add stress test exercising `max_concurrent` behaviour once concurrency harness is in place.
+
+<!-- 2025-10-23 04:50:48Z UTC -->
+## Pass 2 — find and fix real bugs

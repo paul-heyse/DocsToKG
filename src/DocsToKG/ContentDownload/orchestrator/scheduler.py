@@ -233,13 +233,14 @@ class Orchestrator:
             try:
                 free_slots = self._jobs_queue.maxsize - self._jobs_queue.qsize()
 
-                # Calculate batch size based on feature flag
-                if batching_enabled:
+                if free_slots <= 0:
+                    batch_size = 0
+                elif batching_enabled:
                     max_batch = feature_flags.get_batch_size()  # default 10
-                    batch_size = min(max_batch, max(1, free_slots))
+                    batch_size = min(max_batch, free_slots)
                 else:
                     # No batching: lease 1 job at a time
-                    batch_size = 1 if free_slots > 0 else 0
+                    batch_size = 1
 
                 if batch_size > 0:
                     # Lease jobs (batched or single)

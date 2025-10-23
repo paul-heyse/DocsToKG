@@ -20,6 +20,7 @@ Design Notes
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -418,9 +419,21 @@ def load_cache_config(
 
     # Parse controller
     controller_doc = doc.get("controller", {})
-    cacheable_methods = controller_doc.get("cacheable_methods", ["GET", "HEAD"])
-    if isinstance(cacheable_methods, str):
-        cacheable_methods = cacheable_methods.split(",")
+    cacheable_methods_value = controller_doc.get("cacheable_methods", ["GET", "HEAD"])
+    if isinstance(cacheable_methods_value, str):
+        cacheable_methods_iterable: Iterable = cacheable_methods_value.split(",")
+    elif isinstance(cacheable_methods_value, Iterable):
+        cacheable_methods_iterable = cacheable_methods_value
+    elif cacheable_methods_value is None:
+        cacheable_methods_iterable = []
+    else:
+        cacheable_methods_iterable = [cacheable_methods_value]
+
+    cacheable_methods = [
+        method.strip()
+        for method in cacheable_methods_iterable
+        if isinstance(method, str) and method.strip()
+    ]
     cacheable_statuses = controller_doc.get("cacheable_statuses", [200, 301, 308])
     if isinstance(cacheable_statuses, str):
         cacheable_statuses = [int(s.strip()) for s in cacheable_statuses.split(",")]
