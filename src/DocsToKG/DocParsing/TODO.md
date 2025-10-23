@@ -152,7 +152,7 @@ Files: `planning.py`, `discovery.py`, `runner.py`, `manifest.py`, `manifest_sink
   - [ ] Manifest sink: add optional `attempts` parameter and persist attempts across retries for auditing.
   - [ ] Manifest sink: persist `vector_format` and other stage extras (e.g., qwen dim) in `extras` consistently; document keys.
   - [ ] Manifest sink: configurable FileLock timeout via env/constructor; emit structured error on lock timeout.
-  - [ ] Manifest sink: safe rotation/compaction utilities for large JSONL files (optional maintenance tool).
+  - [x] Manifest sink: safe rotation/compaction utilities for large JSONL files (optional maintenance tool). Expose rotation via `JsonlManifestSink.rotate_if_needed` with optional dedupe snapshot for operations.
   - [ ] HTTP: expose `clone_with_headers` on shared session from `get_http_session` when base headers change per call; validate cookie/auth copying safety.
   - [ ] HTTP: allow per-request override of retry policy (total/backoff/status set) through kwargs or context.
   - [ ] HTTP: optionally honor `Retry-After` date header skew with bounded max wait.
@@ -194,6 +194,7 @@ Files: `planning.py`, `discovery.py`, `runner.py`, `manifest.py`, `manifest_sink
   - [ ] Observability guide: OpenTelemetry spans + metrics; recommended exporters; field dictionary.
   - [ ] Security posture: redaction policy, sandboxing constraints, path normalization rules.
   - [ ] Operations: pause/resume/abort workflow using sentinels; continuous plan watcher usage and limitations.
+  - [x] Operations: document manifest rotation workflow (`rotate_if_needed`) including rotation thresholds, compaction output, and lock safety expectations.
   - [ ] Versioning: manifest schema versioning, migration utilities, backward-compat policies.
 
 ### DocTags Stage (`doctags.py`)
