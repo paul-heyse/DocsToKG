@@ -1,1 +1,0 @@
-{"doc_id": "doc-2", "source_path": "/mock/doc-2.doctags", "chunk_id": 0, "source_chunk_idxs": [0], "num_tokens": 11, "text": "FAISS GPU indexes accelerate dense search with IVFPQ and StandardGpuResources pools.", "doc_items_refs": ["#/texts/0"], "page_nos": [], "uuid": "392f8c6e-1eb3-5015-86e7-653185257beb", "schema_version": "docparse/1.1.0"}

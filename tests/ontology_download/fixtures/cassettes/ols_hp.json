@@ -1,8 +1,0 @@
-{
-  "get_ontology": {
-    "download": "https://example.org/hp.owl",
-    "version": "2024-05-01",
-    "license": "CC BY 4.0",
-    "preferredPrefix": "HP"
-  }
-}

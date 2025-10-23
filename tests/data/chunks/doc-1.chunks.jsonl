@@ -1,1 +1,0 @@
-{"doc_id": "doc-1", "source_path": "/mock/doc-1.doctags", "chunk_id": 0, "source_chunk_idxs": [0], "num_tokens": 13, "text": "Hybrid retrieval combines BM25, SPLADE, and FAISS dense search to deliver accurate answers.", "doc_items_refs": ["#/texts/0"], "page_nos": [], "uuid": "3a6e74ba-5a4d-59f2-98f3-81aeddf98db6", "schema_version": "docparse/1.1.0"}
