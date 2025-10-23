@@ -105,7 +105,7 @@ from DocsToKG.DocParsing.chunking import runtime as chunking_runtime
 from DocsToKG.DocParsing.config_adapter import ConfigurationAdapter
 from DocsToKG.DocParsing.core import detect_mode
 from DocsToKG.DocParsing.embedding import runtime as embedding_runtime
-from DocsToKG.DocParsing.settings import Format
+from DocsToKG.DocParsing.settings import DenseBackend, Format
 
 # ============================================================================
 # CLI Application Setup
@@ -665,10 +665,23 @@ def embed(
             app_ctx.settings.embed.input_chunks_dir = chunks_dir
         if output_dir:
             app_ctx.settings.embed.output_vectors_dir = output_dir
+        if vector_format:
+            try:
+                app_ctx.settings.embed.vectors.format = Format(vector_format.lower())
+            except ValueError as exc:
+                raise typer.BadParameter(
+                    "Format must be 'parquet' or 'jsonl'.",
+                    param_name="format",
+                ) from exc
         if dense_backend:
-            # Note: embed config doesn't have simple dense_backend field,
-            # so we'd need to handle this through config or skip for now
-            pass
+            try:
+                app_ctx.settings.embed.dense.backend = DenseBackend(dense_backend.lower())
+            except ValueError as exc:
+                valid = ", ".join(db.value for db in DenseBackend)
+                raise typer.BadParameter(
+                    f"Dense backend must be one of: {valid}.",
+                    param_name="dense-backend",
+                ) from exc
         if workers:
             app_ctx.settings.runner.workers = workers
         if policy:
@@ -687,8 +700,11 @@ def embed(
         typer.echo(
             f"[dim]📋 Profile: {app_ctx.profile or 'none'} | Hash: {app_ctx.cfg_hashes['embed'][:8]}...[/dim]"
         )
+        effective_backend = app_ctx.settings.embed.dense.backend.value
+        effective_format = app_ctx.settings.embed.vectors.format.value
+
         typer.echo(
-            f"[dim]🔧 Dense backend: {dense_backend or 'qwen_vllm'}, Format: {vector_format or 'parquet'}[/dim]"
+            f"[dim]🔧 Dense backend: {effective_backend}, Format: {effective_format}[/dim]"
         )
 
         # Create adapted config and call stage with it (NEW PATTERN)
