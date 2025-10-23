@@ -303,6 +303,7 @@ __all__ = [
     "ValidationResult",
     "ResumeDecision",
     "DownloadStrategy",
+    "RateLimitError",
     "DownloadStrategyContext",
     "PdfDownloadStrategy",
     "HtmlDownloadStrategy",

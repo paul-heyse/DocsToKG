@@ -36,6 +36,12 @@ from .semantic_scholar import SemanticScholarResolver
 from .unpaywall import UnpaywallResolver
 from .wayback import WaybackResolver
 from .zenodo import ZenodoResolver
+from .registry_v2 import (
+    ResolverProtocol,
+    build_resolvers,
+    get_registry,
+    register_v2,
+)
 
 # Legacy alias maintained for compatibility with older tests
 PmcResolver = EuropePmcResolver
@@ -66,4 +72,8 @@ __all__ = [
     "find_pdf_via_anchor",
     "find_pdf_via_link",
     "find_pdf_via_meta",
+    "build_resolvers",
+    "get_registry",
+    "register_v2",
+    "ResolverProtocol",
 ]

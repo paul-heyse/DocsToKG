@@ -1,4 +1,3 @@
-# === NAVMAP v1 ===
 # {
 #   "module": "DocsToKG.ContentDownload.telemetry_wayback",
 #   "purpose": "Wayback resolver telemetry helpers.",
@@ -25,18 +24,6 @@
 #       "id": "telemetryattemptctx",
 #       "name": "_TelemetryAttemptCtx",
 #       "anchor": "class-telemetryattemptctx",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "attemptcontext",
-#       "name": "AttemptContext",
-#       "anchor": "class-attemptcontext",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "waybacktelemetry",
-#       "name": "WaybackTelemetry",
-#       "anchor": "class-waybacktelemetry",
 #       "kind": "class"
 #     }
 #   ]
@@ -74,7 +61,7 @@ def _ensure_event_buffer(ctx: Any) -> list[dict[str, Any]] | None:
 class TelemetryWaybackAttempt:
     """State container for a single Wayback attempt."""
 
-    _telemetry: TelemetryWayback = field(repr=False)
+    _telemetry: "TelemetryWayback" = field(repr=False)
     _ctx: Any = field(repr=False)
     attempt_id: str
     original_url: str
@@ -187,7 +174,7 @@ class TelemetryWayback:
         *,
         original_url: str,
         canonical_url: str,
-    ) -> _TelemetryAttemptCtx:
+    ) -> "_TelemetryAttemptCtx":
         """Return context manager for telemetry-wrapped attempts."""
 
         return _TelemetryAttemptCtx(self, ctx, original_url, canonical_url)
@@ -233,6 +220,9 @@ class _TelemetryAttemptCtx:
         self._attempt.ensure_completed()
 
 
+<<<<<<< ours
+__all__ = ["TelemetryWayback", "TelemetryWaybackAttempt"]
+=======
 """Telemetry helpers for the Wayback fallback pipeline.
 
 This module provides a very small abstraction that mimics the portions of
@@ -251,8 +241,6 @@ call now receives a fresh context with zeroed counters and a replenished
 sampling budget.  The emitters simply consult and update the context so the
 behaviour is scoped to a single attempt.
 """
-
-from __future__ import annotations
 
 from dataclasses import dataclass, field
 
@@ -370,3 +358,4 @@ class WaybackTelemetry:
 
 
 __all__ = ["AttemptContext", "WaybackTelemetry"]
+>>>>>>> theirs

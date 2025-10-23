@@ -74,10 +74,8 @@ from pathlib import Path
 
 import typer
 
-from DocsToKG.ContentDownload.orchestrator import (
-    OrchestratorConfig,
-    WorkQueue,
-)
+from DocsToKG.ContentDownload.orchestrator.queue import WorkQueue
+from DocsToKG.ContentDownload.orchestrator.scheduler import OrchestratorConfig
 
 __all__ = [
     "app",
@@ -86,6 +84,8 @@ __all__ = [
     "queue_run",
     "queue_stats",
     "queue_retry_failed",
+    "OrchestratorConfig",
+    "WorkQueue",
 ]
 
 logger = logging.getLogger(__name__)

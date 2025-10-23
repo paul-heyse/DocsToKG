@@ -39,7 +39,25 @@ Pre-built SQL queries for DuckDB that answer common operational questions:
 - Rate limiter pressure (top keys)
 - Safety gate rejections (error codes)
 - Zip bomb detection (compression ratios)
+
+The module exposes a registry of named queries that the CLI can reference
+without importing SQL constants directly. The registry lets us attach
+categories, descriptions, and other metadata while keeping SQL definitions
+co-located for easier maintenance.
 """
+
+from dataclasses import dataclass
+from typing import Dict, Iterable
+
+
+@dataclass(frozen=True)
+class QueryDefinition:
+    """Container describing a stock query."""
+
+    name: str
+    sql: str
+    description: str
+    category: str
 
 
 # ============================================================================
@@ -170,8 +188,129 @@ ORDER BY date DESC
 
 
 # ============================================================================
-# Query Functions
+# Query Registry / API
 # ============================================================================
+
+_QUERY_DEFINITIONS: Dict[str, QueryDefinition] = {
+    "net_latency_distribution": QueryDefinition(
+        name="net_latency_distribution",
+        sql=QUERY_SLO_NETWORK_LATENCY,
+        description=(
+            "Latency percentiles (p50/p95/p99) and extrema for network requests "
+            "grouped by service."
+        ),
+        category="slo",
+    ),
+    "net_cache_hit_ratio": QueryDefinition(
+        name="net_cache_hit_ratio",
+        sql=QUERY_CACHE_HIT_RATIO,
+        description="Cache hit ratios for HTTP requests grouped by service.",
+        category="slo",
+    ),
+    "ratelimit_pressure": QueryDefinition(
+        name="ratelimit_pressure",
+        sql=QUERY_RATE_LIMIT_PRESSURE,
+        description=(
+            "Top rate-limiter keys experiencing blocking along with block rates "
+            "and cumulative blocked milliseconds."
+        ),
+        category="ratelimit",
+    ),
+    "ratelimit_cooldowns": QueryDefinition(
+        name="ratelimit_cooldowns",
+        sql=QUERY_RATE_LIMIT_COOLDOWNS,
+        description="Cooldown windows triggered by 429 responses per key.",
+        category="ratelimit",
+    ),
+    "policy_rejections": QueryDefinition(
+        name="policy_rejections",
+        sql=QUERY_POLICY_GATE_REJECTIONS,
+        description="Policy gate error codes ranked by rejection count.",
+        category="policy",
+    ),
+    "policy_heatmap": QueryDefinition(
+        name="policy_heatmap",
+        sql=QUERY_SAFETY_HEATMAP,
+        description="Daily error trends by event type for policy/safety issues.",
+        category="policy",
+    ),
+    "extract_zip_bombs": QueryDefinition(
+        name="extract_zip_bombs",
+        sql=QUERY_ZIP_BOMB_SENTINEL,
+        description=(
+            "Detect potential zip bombs using entry counts, bytes per entry, and "
+            "extraction durations."
+        ),
+        category="extraction",
+    ),
+    "extract_summary": QueryDefinition(
+        name="extract_summary",
+        sql=QUERY_EXTRACTION_STATS,
+        description="Daily aggregate statistics for extraction jobs.",
+        category="extraction",
+    ),
+}
+
+
+def list_queries(category: str | None = None) -> list[str]:
+    """Return the list of registered query names.
+
+    Args:
+        category: Optional category filter (e.g. ``"slo"`` or ``"ratelimit"``).
+
+    Returns:
+        Sorted list of query names matching the filter.
+    """
+
+    names: Iterable[str] = (
+        definition.name
+        for definition in _QUERY_DEFINITIONS.values()
+        if category is None or definition.category == category
+    )
+    return sorted(set(names))
+
+
+def get_query(name: str) -> str:
+    """Retrieve the SQL for a registered query.
+
+    Args:
+        name: Name of the query to load.
+
+    Returns:
+        SQL string belonging to the named query.
+
+    Raises:
+        KeyError: If ``name`` is not registered.
+    """
+
+    try:
+        return _QUERY_DEFINITIONS[name].sql
+    except KeyError as exc:  # pragma: no cover - defensive error path
+        raise KeyError(name) from exc
+
+
+def query_summary(category: str | None = None) -> Dict[str, str]:
+    """Return descriptions for registered queries.
+
+    Args:
+        category: Optional category filter.
+
+    Returns:
+        Mapping of query name to human-readable description.
+    """
+
+    return {
+        definition.name: (
+            f"{definition.description} (category: {definition.category})"
+        )
+        for definition in _QUERY_DEFINITIONS.values()
+        if category is None or definition.category == category
+    }
+
+
+# ---------------------------------------------------------------------------
+# Legacy helpers retained for backwards compatibility
+# ---------------------------------------------------------------------------
 
 
 def get_slo_query(metric: str = "network") -> str | None:
@@ -183,11 +322,13 @@ def get_slo_query(metric: str = "network") -> str | None:
     Returns:
         SQL query string or None
     """
-    queries = {
-        "network": QUERY_SLO_NETWORK_LATENCY,
-        "cache": QUERY_CACHE_HIT_RATIO,
+
+    mapping = {
+        "network": "net_latency_distribution",
+        "cache": "net_cache_hit_ratio",
     }
-    return queries.get(metric)
+    name = mapping.get(metric)
+    return get_query(name) if name else None
 
 
 def get_rate_limit_query(metric: str = "pressure") -> str | None:
@@ -199,11 +340,13 @@ def get_rate_limit_query(metric: str = "pressure") -> str | None:
     Returns:
         SQL query string or None
     """
-    queries = {
-        "pressure": QUERY_RATE_LIMIT_PRESSURE,
-        "cooldowns": QUERY_RATE_LIMIT_COOLDOWNS,
+
+    mapping = {
+        "pressure": "ratelimit_pressure",
+        "cooldowns": "ratelimit_cooldowns",
     }
-    return queries.get(metric)
+    name = mapping.get(metric)
+    return get_query(name) if name else None
 
 
 def get_safety_query(metric: str = "rejections") -> str | None:
@@ -215,11 +358,13 @@ def get_safety_query(metric: str = "rejections") -> str | None:
     Returns:
         SQL query string or None
     """
-    queries = {
-        "rejections": QUERY_POLICY_GATE_REJECTIONS,
-        "heatmap": QUERY_SAFETY_HEATMAP,
+
+    mapping = {
+        "rejections": "policy_rejections",
+        "heatmap": "policy_heatmap",
     }
-    return queries.get(metric)
+    name = mapping.get(metric)
+    return get_query(name) if name else None
 
 
 def get_extraction_query(metric: str = "bombs") -> str | None:
@@ -231,14 +376,17 @@ def get_extraction_query(metric: str = "bombs") -> str | None:
     Returns:
         SQL query string or None
     """
-    queries = {
-        "bombs": QUERY_ZIP_BOMB_SENTINEL,
-        "stats": QUERY_EXTRACTION_STATS,
+
+    mapping = {
+        "bombs": "extract_zip_bombs",
+        "stats": "extract_summary",
     }
-    return queries.get(metric)
+    name = mapping.get(metric)
+    return get_query(name) if name else None
 
 
 __all__ = [
+    "QueryDefinition",
     "QUERY_SLO_NETWORK_LATENCY",
     "QUERY_CACHE_HIT_RATIO",
     "QUERY_RATE_LIMIT_PRESSURE",
@@ -247,6 +395,9 @@ __all__ = [
     "QUERY_SAFETY_HEATMAP",
     "QUERY_ZIP_BOMB_SENTINEL",
     "QUERY_EXTRACTION_STATS",
+    "list_queries",
+    "get_query",
+    "query_summary",
     "get_slo_query",
     "get_rate_limit_query",
     "get_safety_query",

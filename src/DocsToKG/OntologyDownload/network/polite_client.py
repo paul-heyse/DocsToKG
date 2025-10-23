@@ -66,7 +66,10 @@ from urllib.parse import urlparse
 import httpx
 
 from DocsToKG.OntologyDownload.errors import PolicyError
-from DocsToKG.OntologyDownload.network import close_http_client, get_http_client
+from DocsToKG.OntologyDownload.network.client import (
+    close_http_client,
+    get_http_client,
+)
 from DocsToKG.OntologyDownload.ratelimit import (
     emit_acquire_event,
     emit_blocked_event,

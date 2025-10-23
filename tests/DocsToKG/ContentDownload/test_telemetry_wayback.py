@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from DocsToKG.ContentDownload.telemetry_wayback import WaybackTelemetry
+from DocsToKG.ContentDownload.telemetry_wayback_legacy import WaybackTelemetry
 
 
 @pytest.fixture

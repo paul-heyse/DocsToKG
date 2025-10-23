@@ -211,7 +211,10 @@ def obs_tail(
 def obs_stats(
     query_name: str | None = typer.Argument(
         None,
-        help="Name of stock query to run (e.g., 'net_request_p95_latency')",
+        help=(
+            "Name of stock query to run (e.g., 'net_latency_distribution' or "
+            "'ratelimit_pressure')"
+        ),
     ),
     list_all: bool = typer.Option(
         False,
@@ -235,7 +238,7 @@ def obs_stats(
             summary = query_summary()
             typer.echo("📊 Available stock queries:\n")
             for name, description in sorted(summary.items()):
-                typer.echo(f"  {name:<35} - {description}")
+                typer.echo(f"  {name:<24} - {description}")
             return
 
         if not query_name:

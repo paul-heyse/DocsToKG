@@ -117,6 +117,7 @@ from typing import Any
 from uuid import uuid4
 
 from DocsToKG.ContentDownload.config import ContentDownloadConfig
+from DocsToKG.ContentDownload.config.models import OrchestratorConfig
 from DocsToKG.ContentDownload.http_session import HttpConfig
 from DocsToKG.ContentDownload.httpx_transport import (
     configure_http_client,
@@ -586,4 +587,5 @@ __all__ = [
     "RunResult",
     "build_bootstrap_config",
     "run_from_config",
+    "OrchestratorConfig",
 ]
