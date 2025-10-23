@@ -322,11 +322,14 @@ class FaissRouter:
                 elif self._resolver:
                     store.set_id_resolver(self._resolver)
                 payload, meta = self._extract_payload_and_meta(packed)
+                restored = False
                 try:
                     store.restore(payload, meta=meta)
+                    restored = True
                 finally:
                     self._last_used[namespace] = time.time()
-                    self._snapshots.pop(namespace, None)
+                    if restored:
+                        self._snapshots.pop(namespace, None)
 
     @staticmethod
     def _extract_payload_and_meta(

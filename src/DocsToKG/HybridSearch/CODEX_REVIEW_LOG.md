@@ -53,3 +53,11 @@ No eligible files after excludes.
   - Add cross-type comparison helpers in `devtools/opensearch_simulator.py` so filter checks compare both native and string/number representations.
   - Reuse the flexible matcher for multi-valued metadata to keep list filters consistent.
 - TODO: None.
+
+<!-- 2025-10-23 04:58:47Z UTC -->
+## Pass 2 — find and fix real bugs
+### Batch 0 (Pass 2)
+- Broken: `FaissRouter.restore_all` dropped cached namespace snapshots even when `store.restore` raised, permanently discarding the fallback image.
+- Fix:
+  - Track restore success and only clear `_snapshots` once the restore completes without error.
+- TODO: None.
