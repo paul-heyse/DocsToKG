@@ -1,0 +1,6 @@
+sandbox_mode = "workspace-write"
+approval_mode = "auto"          # <- make edits without asking
+model_reasoning_effort = "high"
+
+[[trusted_workspaces]]
+path = "/home/paul/DocsToKG"    # absolute path to your repo
