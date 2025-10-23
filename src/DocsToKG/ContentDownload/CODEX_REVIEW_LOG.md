@@ -127,3 +127,12 @@ No eligible files after excludes.
 
 <!-- 2025-10-23 06:57:04Z UTC -->
 ## Pass 3 — find and fix real bugs
+
+<!-- 2025-10-23 07:00:21Z UTC -->
+## Pass 4 — find and fix real bugs
+### Batch 0 (Pass 4)
+- Broken: `HttpConfig.proxies` never reached the shared `httpx.Client`, so deployments configured with forward proxies sent traffic directly and failed in locked-down networks.
+- Fix:
+  - Plumbed `proxies` through `get_http_session` when constructing the shared client.
+  - Extended the debug log to note whether a proxy mapping is active for easier diagnosis.
+- TODO: Add a smoke test that verifies proxy URLs are honoured by the shared client.

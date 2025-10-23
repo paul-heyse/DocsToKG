@@ -143,11 +143,13 @@ def get_http_session(config: Optional[HttpConfig] = None) -> httpx.Client:
                 max_connections=cfg.pool_maxsize,
                 max_keepalive_connections=cfg.pool_connections,
             ),
+            proxies=cfg.proxies,
         )
 
         LOGGER.debug(
             f"HTTP session created: UA={ua}, timeout={cfg.timeout_read_s}s, "
-            f"pool_size={cfg.pool_connections}/{cfg.pool_maxsize}"
+            f"pool_size={cfg.pool_connections}/{cfg.pool_maxsize}, "
+            f"proxies={'set' if cfg.proxies else 'unset'}"
         )
 
         return _SHARED_SESSION
