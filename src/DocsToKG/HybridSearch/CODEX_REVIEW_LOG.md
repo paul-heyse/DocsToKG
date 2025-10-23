@@ -43,3 +43,13 @@ No eligible files after excludes.
   - Normalise set inputs by sorting their normalised elements with a deterministic key before tuple conversion.
   - Added a helper to generate stable sort keys for signature elements.
 - TODO: None.
+
+<!-- 2025-10-23 04:46:08Z UTC -->
+## Pass 1 — find and fix real bugs
+
+### Batch 0 (Pass 1)
+- Broken: List-valued filters stopped matching numeric metadata because request normalization coerced expected values to strings while registry values stayed numeric.
+- Fix:
+  - Add cross-type comparison helpers in `devtools/opensearch_simulator.py` so filter checks compare both native and string/number representations.
+  - Reuse the flexible matcher for multi-valued metadata to keep list filters consistent.
+- TODO: None.

@@ -617,30 +617,90 @@ class OpenSearchSimulator(LexicalIndex):
 
 
 def matches_filters(chunk: ChunkPayload, filters: Mapping[str, object]) -> bool:
-    """Return ``True`` when ``chunk`` satisfies the provided ``filters``.
+    """Return ``True`` when ``chunk`` satisfies the provided ``filters``."""
 
-    Args:
-        chunk: Chunk payload whose metadata and namespace should be evaluated.
-        filters: Mapping of filter keys to expected values mirroring the production
-            API contract. Values may be scalars or lists of acceptable values.
+    def _stringify_for_match(value: object) -> Optional[str]:
+        if isinstance(value, str):
+            return value
+        if isinstance(value, bytes):
+            try:
+                return value.decode("utf-8")
+            except UnicodeDecodeError:
+                return None
+        if isinstance(value, bool):
+            return "true" if value else "false"
+        if isinstance(value, (int, float)):
+            return str(value)
+        return None
 
-    Returns:
-        ``True`` if ``chunk`` matches all supplied filters, otherwise ``False``.
-    """
+    def _numeric_for_match(value: object) -> Optional[float]:
+        if isinstance(value, bool):
+            return 1.0 if value else 0.0
+        if isinstance(value, (int, float)):
+            return float(value)
+        if isinstance(value, str):
+            try:
+                return float(value)
+            except ValueError:
+                return None
+        if isinstance(value, bytes):
+            try:
+                return float(value.decode("utf-8"))
+            except (UnicodeDecodeError, ValueError):
+                return None
+        return None
+
+    def _value_matches(lhs: object, rhs: object) -> bool:
+        if lhs == rhs:
+            return True
+        lhs_str = _stringify_for_match(lhs)
+        rhs_str = _stringify_for_match(rhs)
+        if lhs_str is not None and rhs_str is not None:
+            if lhs_str == rhs_str:
+                return True
+            if lhs_str.lower() in ("true", "false") and rhs_str.lower() in ("true", "false"):
+                return lhs_str.lower() == rhs_str.lower()
+        lhs_num = _numeric_for_match(lhs)
+        rhs_num = _numeric_for_match(rhs)
+        if lhs_num is not None and rhs_num is not None:
+            if not (math.isnan(lhs_num) or math.isnan(rhs_num)):
+                if math.isclose(lhs_num, rhs_num, rel_tol=1e-9, abs_tol=1e-9):
+                    return True
+        return False
+
+    def _sequence_values(value: object) -> Optional[Sequence[object]]:
+        if isinstance(value, Sequence) and not isinstance(value, (str, bytes, Mapping)):
+            return value
+        return None
+
     for key, expected in filters.items():
         if key == "namespace":
             if chunk.namespace != expected:
                 return False
             continue
         value = chunk.metadata.get(key)
-        if isinstance(expected, list):
-            if isinstance(value, list):
-                if not any(item in value for item in expected):
+        expected_seq = _sequence_values(expected)
+        value_seq = _sequence_values(value)
+        if expected_seq is not None:
+            candidates = tuple(expected_seq)
+            if value_seq is not None:
+                value_candidates = tuple(value_seq)
+                if not any(
+                    _value_matches(candidate_value, candidate_expected)
+                    for candidate_value in value_candidates
+                    for candidate_expected in candidates
+                ):
                     return False
             else:
-                if value not in expected:
+                if not any(_value_matches(value, candidate) for candidate in candidates):
                     return False
         else:
-            if value != expected:
-                return False
+            if value_seq is not None:
+                if not any(
+                    _value_matches(candidate_value, expected) for candidate_value in value_seq
+                ):
+                    return False
+            else:
+                if not _value_matches(value, expected):
+                    return False
     return True
