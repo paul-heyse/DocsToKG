@@ -107,3 +107,10 @@ No eligible files after excludes.
 - Broken: `catalog.prune.list_orphans()` referenced a non-existent `service` column on `extracted_files`, so DuckDB raised a binder error once prune staged or counted orphans.
 - Fix: join `extracted_files` to `versions` when building canonical paths in both the listing and counting queries so the column exists.
 - TODO: add a prune smoke test that exercises `list_orphans()` against a populated in-memory DuckDB catalog.
+
+<!-- 2025-10-23 07:10:15Z UTC -->
+## Pass 5 — find and fix real bugs
+### Batch 0 (Pass 5)
+- Broken: `validate_disk_space()` always used a hard-coded 10% safety margin and truncated the product, so custom `space_safety_margin` values were ignored and tiny downloads could pass without any buffer.
+- Fix: factor in the configured `space_safety_margin` and round up with `ceil()` before comparing to filesystem capacity.
+- TODO: cover disk space validation with a parametrized policy test.

@@ -23,6 +23,7 @@ Implements validators for:
 from __future__ import annotations
 
 import unicodedata
+from math import ceil
 from pathlib import Path, PurePosixPath
 from typing import Optional, Set
 
@@ -448,7 +449,7 @@ def validate_disk_space(
     """Validate that sufficient disk space is available for extraction.
 
     Checks if the destination filesystem has enough free space to accommodate
-    the extracted files with a 10% safety margin.
+    the extracted files with the configured safety margin (default 10%).
 
     Args:
         required_bytes: Total uncompressed size to be extracted
@@ -474,8 +475,9 @@ def validate_disk_space(
         except (AttributeError, OSError):
             pass  # Fallback to st_blocks estimate
 
-        # Require 110% of needed space (10% safety margin)
-        required_with_margin = int(required_bytes * 1.1)
+        # Require policy-configured safety margin (default 10%)
+        margin = policy.space_safety_margin
+        required_with_margin = ceil(required_bytes * margin)
 
         if available_bytes < required_with_margin:
             raise ConfigError(
