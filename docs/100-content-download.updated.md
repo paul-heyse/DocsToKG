@@ -1,5 +1,18 @@
 # DocsToKG • ContentDownload — Subsystem Architecture
 
+> **Go‑Forward Decisions (2025-10-23) — ContentDownload**
+>
+> 1. **CLI alignment.** Keep the current entrypoint `python -m DocsToKG.ContentDownload.cli_v2` (**`run`**, **`print-config`**, **`validate-config`**, **`explain`**, **`schema`**) and **ship a thin alias CLI** with verbs `content pull|resume|report|catalog` for external tooling. Both surfaces are supported; examples in docs show **both** until the alias is ubiquitous.
+> 2. **Default orchestrator.** Make the **SQLite‑backed WorkQueue + Orchestrator + KeyedLimiter** the **default execution mode** (bounded concurrency, tier‑by‑tier). Keep `ResolverPipeline` for **debug/single‑shot** runs.
+> 3. **Politeness, retries & robots.** Use **Tenacity** for backoff/jitter and honor **`Retry‑After`**. **HTTPS required** by default; host allowlist gates exceptions. **robots.txt obeyed** by default (API endpoints may opt out).
+> 4. **HTTP caching & canonicalization.** Use **Hishel (RFC‑9111)** for request/response caching. Canonicalize URLs and strip tracking params to improve cache & rate‑limit keys.
+> 5. **Storage & CAS.** Default to **local FS + SQLite manifest** (JSONL + SQLite). Enable **CAS** by default for dedupe/integrity. **Postgres + S3** remain recommended for multi‑node; keep as first‑class backends.
+> 6. **Telemetry.** Emit structured JSONL + **Prometheus** metrics (`content_*`) and **OpenTelemetry traces**. Provide dashboards and SLOs wired to `429 ratio`, `TTFP`, yield, and rate‑delay.
+> 7. **Resume & idempotency.** Re‑runs with unchanged inputs are **idempotent**. Resume consults **SQLite/JSONL/CSV** (in that order).
+> 8. **Config precedence & env.** Adopt **`DOCSTOKG_CONTENT_*`** env keys going forward; continue to read legacy **`DTKG_*`** for backward compatibility.
+> 9. **Acceptance gates.** Enforce **Yield ≥ 85%**, **TTFP p50 ≤ 3s / p95 ≤ 10s**, **429 ratio < 1%**, **Corruption = 0**, aligning with the end‑to‑end north‑star.
+
+
 ## Purpose & Scope
 
 Acquire scholarly artifacts from OpenAlex-seeded sources using **resolver pipelines** with **centralized rate limiting**, **polite headers**, **robots compliance**, **resume semantics**, **durable telemetry**, and **fallback resilience**.
@@ -99,6 +112,9 @@ orchestrator.run_sync()
 - `DownloadRun`: Main orchestration class for a download session
 - `ResolverPipeline`: Tier-based resolver execution with fallback
 - `CatalogConnector`: Pluggable storage backend (SQLite/Postgres/RDS+S3)
+
+> **Note (go‑forward):** Both the alias CLI (`content pull|resume|report|catalog`) and the module CLI (`python -m DocsToKG.ContentDownload.cli_v2`) are supported. Examples below include both surfaces.
+
 
 ## Inputs & Outputs
 

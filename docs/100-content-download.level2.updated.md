@@ -1,5 +1,18 @@
 # DocsToKG • ContentDownload (Level-2 Spec)
 
+> **Go‑Forward Decisions (2025-10-23) — ContentDownload**
+>
+> 1. **CLI alignment.** Keep the current entrypoint `python -m DocsToKG.ContentDownload.cli_v2` (**`run`**, **`print-config`**, **`validate-config`**, **`explain`**, **`schema`**) and **ship a thin alias CLI** with verbs `content pull|resume|report|catalog` for external tooling. Both surfaces are supported; examples in docs show **both** until the alias is ubiquitous.
+> 2. **Default orchestrator.** Make the **SQLite‑backed WorkQueue + Orchestrator + KeyedLimiter** the **default execution mode** (bounded concurrency, tier‑by‑tier). Keep `ResolverPipeline` for **debug/single‑shot** runs.
+> 3. **Politeness, retries & robots.** Use **Tenacity** for backoff/jitter and honor **`Retry‑After`**. **HTTPS required** by default; host allowlist gates exceptions. **robots.txt obeyed** by default (API endpoints may opt out).
+> 4. **HTTP caching & canonicalization.** Use **Hishel (RFC‑9111)** for request/response caching. Canonicalize URLs and strip tracking params to improve cache & rate‑limit keys.
+> 5. **Storage & CAS.** Default to **local FS + SQLite manifest** (JSONL + SQLite). Enable **CAS** by default for dedupe/integrity. **Postgres + S3** remain recommended for multi‑node; keep as first‑class backends.
+> 6. **Telemetry.** Emit structured JSONL + **Prometheus** metrics (`content_*`) and **OpenTelemetry traces**. Provide dashboards and SLOs wired to `429 ratio`, `TTFP`, yield, and rate‑delay.
+> 7. **Resume & idempotency.** Re‑runs with unchanged inputs are **idempotent**. Resume consults **SQLite/JSONL/CSV** (in that order).
+> 8. **Config precedence & env.** Adopt **`DOCSTOKG_CONTENT_*`** env keys going forward; continue to read legacy **`DTKG_*`** for backward compatibility.
+> 9. **Acceptance gates.** Enforce **Yield ≥ 85%**, **TTFP p50 ≤ 3s / p95 ≤ 10s**, **429 ratio < 1%**, **Corruption = 0**, aligning with the end‑to‑end north‑star.
+
+
 ## Purpose & Non-Goals
 
 **Purpose:** Deterministically acquire open research artifacts with **resume**, **politeness**, **append-only telemetry**, and **fallback resilience**.  
@@ -152,8 +165,7 @@ policies:
 
 The repository includes a SQLite-backed work queue and bounded worker pool in
 `DocsToKG.ContentDownload.orchestrator` (queue leasing, keyed limiters, threaded workers).
-The default CLI currently processes artifacts sequentially via `ResolverPipeline`; adopting the
-queue-based orchestrator is on the roadmap to match the bounded-concurrency design below.
+The default CLI is the **default** execution path (bounded concurrency). The prior sequential `ResolverPipeline` remains available for debug/single‑shot runs.
 
 ```mermaid
 flowchart LR
@@ -302,8 +314,16 @@ sequenceDiagram
 | Disk full | IOError on write | Graceful shutdown, alert | Pre-run disk space check |
 | SQLite lock | sqlite3.OperationalError | Exponential backoff retry | Single writer per database |
 
-## Security
 
+## Networking & Reliability
+
+- **Retries & Backoff**: **Tenacity** with exponential backoff + jitter; **`Retry‑After`** honored (429/5xx).
+- **TLS & Allowlist**: HTTPS required; explicit allowlist for exceptions; HTTP→HTTPS upgrade when possible.
+- **Robots Compliance**: obey robots.txt by default; API endpoints may opt out.
+- **Caching**: **Hishel (RFC 9111)** for HTTP caching.
+
+
+## Security
 - **HTTPS required**: All downloads over HTTPS unless explicitly allowlisted
 - **Redact query params**: Remove tracking params from landing page URLs
 - **Honor robots.txt**: Respect crawl-delay and disallow directives

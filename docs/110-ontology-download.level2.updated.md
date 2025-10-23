@@ -1,5 +1,21 @@
 # DocsToKG • OntologyDownload (Level-2 Spec)
 
+> **Go‑Forward Decisions (2025-10-23) — Alignment with Codebase**
+>
+> The following are *binding decisions* for the OntologyDownload subsystem and supersede any earlier ambiguous wording:
+>
+> 1. **DuckDB‑backed plan caching is mandatory.** Planning requires an initialized DuckDB catalog. Plans, manifests, and lockfiles are produced against the catalog to guarantee reproducibility and `plan-diff` fidelity. Ad‑hoc planning without the catalog is not supported going forward.
+> 2. **Strict validation semantics.** When `--strict` is enabled, any validator failure (rdflib, ROBOT profile, pronto, owlready2, Arelle, **pySHACL**) triggers **full purge** of the staged artifacts for that ontology/release (download/extract/CAS). The run is considered failed and the last good version remains active.
+> 3. **Validator set.** The supported validator suite is: rdflib, ROBOT (profile), pronto, owlready2, Arelle, **pySHACL**. For KG release gates, **pySHACL violations must be 0**.
+> 4. **Networking & retries.** All HTTP fetches use **Tenacity** with exponential backoff and full respect for **`Retry‑After`** (429/503). **HTTPS** is required; source **allowlists** are enforced; HTTP→HTTPS upgrade occurs when possible.
+> 5. **CLI surface.** The supported commands are: `plan`, `pull`, `validate`, `plan-diff`, `show`, `doctor`, `prune`, `plugins`, `config`, `init`, and `db` utilities (`latest`, `versions`, `stats`, `files`, `validations`, **`backup`**).
+> 6. **Content‑addressable storage (CAS).** Local CAS mirroring under `.cas/sha256/aa/bb/...` is supported and recommended for integrity/deduplication. **S3 CAS is optional** and may be enabled in future; local FS remains the source‑of‑truth.
+> 7. **Observability.** Default output is structured **JSONL** logs. A lightweight **Prometheus exporter** may be enabled to emit `ontofetch_*` counters/gauges (e.g., `downloads_total`, `bytes_downloaded_total`, `validator_errors_total`, `validation_seconds_total`, `http_retries_total`, `planning_seconds_total`).
+> 8. **Reproducibility.** Lockfiles pin versions and checksums. `plan-diff` compares *desired* sources to the catalog+lockfile state; any drift is explicit and actionable.
+>
+> **Rationale:** These choices maximize determinism, auditability, and operational safety, directly supporting the end‑to‑end north‑star (ontology‑aligned KG + hybrid retrieval + RAG).
+
+
 ## Purpose & Non-Goals
 
 **Purpose:** Plan, fetch, validate, normalize, and **lock** ontology releases for reproducible downstream builds with **DuckDB catalog**, **checksum enforcement**, and **plugin-based validation**.  
@@ -233,6 +249,12 @@ CREATE INDEX idx_events_timestamp ON events(timestamp);
 
 ## Validation Pipeline
 
+### Strict mode semantics
+
+- Any validator failure purges staged artifacts for that ontology/release (download, extract, CAS) and marks the run failed.
+- The last good version remains active; no partially‑validated state persists.
+
+
 ### Available Validators
 
 **1. rdflib-load** (Built-in, Python)
@@ -445,6 +467,13 @@ sequenceDiagram
 | Archive bomb | Extract > 10× compressed | Abort extraction | Streaming size check |
 | Network timeout | httpx timeout | Retry + backoff | Conservative timeout |
 | Disk full | IOError on write | Abort, cleanup | Pre-flight disk check |
+
+## Networking & Reliability
+
+- **Retries & Backoff**: All outbound HTTP requests (HEAD/GET) are wrapped with **Tenacity** using exponential backoff, jitter, and a bounded max wait. **`Retry-After`** headers from servers (429/503) are honored.
+- **TLS & Allowlist**: HTTPS is required; plain HTTP URLs are upgraded when possible. Source hosts must appear on the configured **allowlist**.
+- **Timeouts**: Per‑stage timeouts are enforced (connect/read). Global budgets may abort a plan early in strict mode.
+- **Identification**: A stable User‑Agent with version/build info is sent to endpoints.
 
 ## Security
 
