@@ -191,6 +191,7 @@ class ConfigurationAdapter:
             cfg.out_dir = Path(embed_settings.output_vectors_dir)
 
         cfg.vector_format = embed_settings.vectors.format.value
+        cfg.dense_backend = embed_settings.dense.backend.value
         cfg.resume = bool(embed_settings.resume)
         cfg.force = bool(embed_settings.force)
 
