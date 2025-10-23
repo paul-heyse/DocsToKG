@@ -55,7 +55,6 @@ extensions = [
     "sphinxext.opengraph",
     "notfound.extension",
     "sphinxext.rediraffe",
-    "sphinx_codeautolink",
     "sphinxcontrib.autodoc_pydantic",
     "sphinxcontrib.mermaid",
     "sphinx_issues",
@@ -74,6 +73,11 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 nitpick_ignore_regex = [
     (r"py:.*", r"tenacity\..*"),
     (r"py:.*", r"httpx\..*"),
+]
+
+nitpick_ignore = [
+    ("py:class", "placeholder"),
+    ("py:obj", "placeholder"),
 ]
 
 source_suffix = {
@@ -121,10 +125,6 @@ notfound_urls_prefix = "/"
 rediraffe_redirects = {}
 rediraffe_redirects_external = {}
 
-# --- Code auto-linking -----------------------------------------------------
-codeautolink_autodoc_inject = False  # autoapi injects its own examples; keep disabled to avoid spurious warnings
-codeautolink_concat_default = True
-
 # --- intersphinx mappings --------------------------------------------------
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3/", None),
@@ -145,14 +145,11 @@ autodoc_mock_imports = [
     "raft",
     "cuvs",
     "pyarrow",
-    "pydantic",
-    "pydantic_settings",
     "docling_core",
     "docling",
     "bs4",
     "regex",
     "url_normalize",
-    "pydantic_core",
     "transformers",
     "transformers.utils",
     "transformers.utils.generic",
@@ -180,7 +177,12 @@ autoapi_include = ["DocsToKG.*"]
 autoapi_ignore = [
     "*/tests/*",
     "*/__pycache__/*",
-    "*/DocParsing/embedding/backends/dense/qwen_vllm.py",
+    "*/DocsToKG/OntologyDownload/cli.py",
+    "*/DocsToKG/OntologyDownload/cli_main.py",
+    "*/DocsToKG/OntologyDownload/cli_settings_commands.py",
+    "*/DocsToKG/OntologyDownload/cli/db_cmd.py",
+    "*/DocsToKG/OntologyDownload/cli/obs_cmd.py",
+    "*/DocsToKG/OntologyDownload/monitoring_cli.py",
 ]
 autoapi_member_order = "bysource"
 autoapi_python_class_content = "both"
