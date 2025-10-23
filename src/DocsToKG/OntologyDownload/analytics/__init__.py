@@ -8,6 +8,36 @@ Core modules:
 
 from __future__ import annotations
 
+from .cli_commands import (
+    cmd_report_growth,
+    cmd_report_latest,
+    cmd_report_validation,
+    format_growth_report,
+    format_latest_report,
+    format_validation_report,
+)
+from .pipelines import (
+    LatestSummary,
+    VersionDelta,
+    arrow_to_lazy_frame,
+    build_latest_summary_pipeline,
+    build_version_delta_pipeline,
+    compute_latest_summary,
+    compute_version_delta,
+    duckdb_to_lazy_frame,
+    lazy_frame_to_arrow,
+)
+from .reports import (
+    GrowthReport,
+    LatestVersionReport,
+    ValidationReport,
+    generate_growth_report,
+    generate_latest_report,
+    generate_validation_report,
+    report_to_dict,
+    report_to_table,
+)
+
 __all__ = [
     "LatestSummary",
     "VersionDelta",
