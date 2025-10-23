@@ -84,9 +84,10 @@ class _SemaphoreEntry:
     so we use this simple wrapper class instead.
     """
 
-    def __init__(self, semaphore: threading.Semaphore, last_access_time: float):
+    def __init__(self, semaphore: threading.Semaphore, last_access_time: float, capacity: int):
         self.semaphore = semaphore
         self.last_access_time = last_access_time
+        self.capacity = capacity
 
 
 def host_key(url: str) -> str:
@@ -167,7 +168,7 @@ class KeyedLimiter:
             f"per_key={per_key}, ttl_sec={semaphore_ttl_sec}"
         )
 
-    def _get_semaphore(self, key: str) -> threading.Semaphore:
+    def _get_semaphore(self, key: str, *, create: bool = True) -> Optional[threading.Semaphore]:
         """Get or create semaphore for key.
 
         Thread-safe creation of semaphores on first access.
@@ -183,12 +184,9 @@ class KeyedLimiter:
         with self._mutex:
             now = time.time()
 
-            # Store both semaphore and last-access time (tuple)
-            # WeakValueDictionary will automatically remove entries when
-            # the value (tuple) has no strong references
-            entry = _SemaphoreEntry(
-                threading.Semaphore(self.per_key.get(key, self.default_limit)), now
-            )
+            entry = self._locks.get(key)
+            if entry is not None:
+                entry.last_access_time = now
 
             # Lazy TTL-based eviction: only if feature enabled
             if (
@@ -201,8 +199,10 @@ class KeyedLimiter:
                 # (WeakValueDictionary doesn't support item deletion well during iteration)
                 stale_keys = [
                     k
-                    for k, entry in self._locks.items()
-                    if now - entry.last_access_time >= self.semaphore_ttl_sec
+                    for k, semaphore_entry in self._locks.items()
+                    if k != key
+                    and now - semaphore_entry.last_access_time >= self.semaphore_ttl_sec
+                    and getattr(semaphore_entry.semaphore, "_value", 0) == semaphore_entry.capacity
                 ]
                 for stale_key in stale_keys:
                     try:
@@ -215,10 +215,11 @@ class KeyedLimiter:
                 )
 
             # Update or create entry (tuple stays same, but we update access time)
-            if key in self._locks:
-                entry = self._locks[key]
-                entry.last_access_time = now
-            else:
+            if entry is None:
+                if not create:
+                    return None
+                limit = self.per_key.get(key, self.default_limit)
+                entry = _SemaphoreEntry(threading.Semaphore(limit), now, limit)
                 self._locks[key] = entry
 
             return entry.semaphore
@@ -242,7 +243,10 @@ class KeyedLimiter:
         Args:
             key: Concurrency key (e.g., resolver name or host)
         """
-        sem = self._get_semaphore(key)
+        sem = self._get_semaphore(key, create=False)
+        if sem is None:
+            logger.error("Attempted to release unknown limiter key '%s'", key)
+            raise KeyError(f"No semaphore tracked for key={key!r}")
         sem.release()
 
     def try_acquire(self, key: str, timeout: Optional[float] = None) -> bool:

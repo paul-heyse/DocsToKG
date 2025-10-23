@@ -43,3 +43,16 @@ No eligible files after excludes.
 - Found resolver HTTP client backoff casting milliseconds to `int`, producing zero-second retries that hammer upstreams and ignore jitter caps.
 - Switched to float math for delay calculations, clamping to configured caps and safeguarding against negative sleeps.
 - TODO: Add a focused retry/backoff unit test covering fractional delays and cache-hit token refunds.
+
+<!-- 2025-10-23 04:29:31Z UTC -->
+## Pass 2 — find and fix real bugs
+
+### Batch 0 (Pass 2)
+- Cache router silently dropped `swrv_s` for non-metadata roles, so landing-page policies never served stale-while-revalidate despite being configured.
+- Removed the metadata-only guard when carrying `swrv_s` into `CacheDecision`, allowing any cached role to honor its configured SWRV window.
+- TODO: Add a regression test covering landing-role SWRV propagation when the test matrix is next updated.
+
+### Batch 1 (Pass 2)
+- Keyed limiter `release` silently created a brand-new semaphore when a key was missing, inflating concurrency caps instead of detecting the logic error.
+- Reworked `_get_semaphore` to optionally skip creation, gate TTL eviction on idle semaphores, and make `release` raise if no tracked semaphore exists.
+- TODO: Consider tracking active permit counts explicitly so TTL eviction can safely reap entries without private attribute checks.

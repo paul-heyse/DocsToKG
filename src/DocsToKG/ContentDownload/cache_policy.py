@@ -112,15 +112,10 @@ class CacheRouter:
         if role in host_policy.role:
             role_policy = host_policy.role[role]
             if role_policy.ttl_s is not None:
-                swrv = (
-                    role_policy.swrv_s
-                    if role == "metadata" and role_policy.swrv_s is not None
-                    else None
-                )
                 return CacheDecision(
                     use_cache=True,
                     ttl_s=role_policy.ttl_s,
-                    swrv_s=swrv,
+                    swrv_s=role_policy.swrv_s,
                     body_key=role_policy.body_key,
                 )
 
