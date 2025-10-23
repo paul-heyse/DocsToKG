@@ -46,6 +46,7 @@ Provides:
 """
 
 import logging
+from contextlib import closing
 from pathlib import Path
 
 import typer
@@ -165,37 +166,33 @@ def obs_tail(
     Shows the N most recent events with optional filtering.
     """
     try:
-        con = _get_duckdb_connection()
+        with closing(_get_duckdb_connection()) as con:
+            # Build query
+            query = "SELECT ts, type, level, service, run_id FROM events"
+            conditions = []
 
-        # Build query
-        query = "SELECT ts, type, level, service, run_id FROM events"
-        conditions = []
+            if level:
+                conditions.append(f"level = '{level}'")
+            if event_type:
+                conditions.append(f"type LIKE '{event_type}%'")
+            if service:
+                conditions.append(f"service = '{service}'")
 
-        if level:
-            conditions.append(f"level = '{level}'")
-        if event_type:
-            conditions.append(f"type LIKE '{event_type}%'")
-        if service:
-            conditions.append(f"service = '{service}'")
+            if conditions:
+                query += " WHERE " + " AND ".join(conditions)
 
-        if conditions:
-            query += " WHERE " + " AND ".join(conditions)
+            query += f" ORDER BY ts DESC LIMIT {count}"
 
-        query += f" ORDER BY ts DESC LIMIT {count}"
+            cursor = con.execute(query)
 
-        result = con.execute(query).fetchall()
-
-        if json_output:
-            # Return as JSON
-            rows = con.execute(query).df()
-            typer.echo(rows.to_json(orient="records", date_format="iso"))
-        else:
-            # Return as table
-            headers = ["ts", "type", "level", "service", "run_id"]
-            table = _format_table(result, headers)
-            typer.echo(table)
-
-        con.close()
+            if json_output:
+                rows_df = cursor.df()
+                typer.echo(rows_df.to_json(orient="records", date_format="iso"))
+            else:
+                headers = ["ts", "type", "level", "service", "run_id"]
+                result = cursor.fetchall()
+                table = _format_table(result, headers)
+                typer.echo(table)
 
     except Exception as e:
         typer.echo(f"❌ Error: {e}", err=True)
@@ -259,19 +256,18 @@ def obs_stats(
             )
             raise typer.Exit(code=1)
 
-        con = _get_duckdb_connection()
-        result = con.execute(query).fetchall()
-        columns = con.execute(query).description
+        with closing(_get_duckdb_connection()) as con:
+            cursor = con.execute(query)
+            columns = cursor.description or []
 
-        if json_output:
-            df = con.execute(query).df()
-            typer.echo(df.to_json(orient="records"))
-        else:
-            headers = [col[0] for col in columns] if columns else []
-            table = _format_table(result, headers)
-            typer.echo(table)
-
-        con.close()
+            if json_output:
+                df = cursor.df()
+                typer.echo(df.to_json(orient="records"))
+            else:
+                result = cursor.fetchall()
+                headers = [col[0] for col in columns]
+                table = _format_table(result, headers)
+                typer.echo(table)
 
     except Exception as e:
         typer.echo(f"❌ Error: {e}", err=True)
@@ -351,24 +347,22 @@ def obs_export(
             query += f" LIMIT {limit}"
 
         # Export
-        con = _get_duckdb_connection()
-        df = con.execute(query).df()
+        with closing(_get_duckdb_connection()) as con:
+            df = con.execute(query).df()
 
-        if format_type == ".json":
-            df.to_json(output_path, orient="records", date_format="iso")
-        elif format_type == ".jsonl":
-            df.to_json(output_path, orient="records", lines=True)
-        elif format_type == ".parquet":
-            df.to_parquet(output_path)
-        elif format_type == ".csv":
-            df.to_csv(output_path, index=False)
+            if format_type == ".json":
+                df.to_json(output_path, orient="records", date_format="iso")
+            elif format_type == ".jsonl":
+                df.to_json(output_path, orient="records", lines=True)
+            elif format_type == ".parquet":
+                df.to_parquet(output_path)
+            elif format_type == ".csv":
+                df.to_csv(output_path, index=False)
 
-        row_count = len(df)
-        typer.echo(
-            f"✅ Exported {row_count} events to {output_path}",
-        )
-
-        con.close()
+            row_count = len(df)
+            typer.echo(
+                f"✅ Exported {row_count} events to {output_path}",
+            )
 
     except Exception as e:
         typer.echo(f"❌ Error: {e}", err=True)
