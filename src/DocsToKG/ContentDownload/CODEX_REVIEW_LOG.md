@@ -171,3 +171,11 @@ No eligible files after excludes.
 - Fix:
   - Short-circuit `should_enable` when `enabled` is false so the toggle reliably disables all strategies.
 - TODO: Add a unit test that registers a canary flag with `enabled=False` and asserts `should_enable` never returns true.
+
+<!-- 2025-10-23 07:18:37Z UTC -->
+## Pass 9 — find and fix real bugs
+### Batch 0 (Pass 9)
+- Broken: `lease_next_job` converted SQLite tuples with `dict(row)`, raising `TypeError` whenever callers used connections without a `sqlite3.Row` factory, so the first successful lease crashed the worker.
+- Fix:
+  - Added a helper to materialize rows using cursor metadata, handling both `sqlite3.Row` and tuple results.
+- TODO: Backfill a unit test covering default `row_factory` behaviour for the leasing helpers.

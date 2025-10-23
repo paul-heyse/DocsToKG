@@ -61,7 +61,19 @@ from __future__ import annotations
 
 import sqlite3
 import time
+from collections.abc import Sequence
 from typing import Any
+
+
+def _row_to_dict(row: Any, description: Sequence[tuple[Any, ...]] | None) -> dict[str, Any]:
+    """Convert sqlite3 rows (Row or tuple) into dictionaries."""
+
+    if isinstance(row, sqlite3.Row):
+        return dict(row)
+    if description:
+        columns = [col[0] for col in description]
+        return {column: value for column, value in zip(columns, row, strict=False)}
+    return {str(index): value for index, value in enumerate(row)}
 
 
 def lease_next_job(
@@ -122,11 +134,12 @@ def lease_next_job(
 
     if cur.rowcount == 1:
         # Successfully leased; fetch and return
-        result_row = cx.execute(
+        result_cursor = cx.execute(
             "SELECT * FROM artifact_jobs WHERE job_id=?",
             (target_job_id,),
-        ).fetchone()
-        return dict(result_row) if result_row else None
+        )
+        result_row = result_cursor.fetchone()
+        return _row_to_dict(result_row, result_cursor.description) if result_row else None
 
     return None
 
