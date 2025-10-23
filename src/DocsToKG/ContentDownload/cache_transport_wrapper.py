@@ -21,8 +21,12 @@ Design Notes
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
+from email.utils import format_datetime
 from pathlib import Path
+from typing import Optional, Sequence
 
+import httpcore
 import httpx
 from hishel import CacheTransport, Controller, FileStorage
 
@@ -310,13 +314,21 @@ class RoleAwareCacheTransport(httpx.BaseTransport):
         """
         cacheable_status_codes = [200, 301, 308]
 
-        # Create controller with explicit arguments
-        controller = Controller(
-            cacheable_status_codes=cacheable_status_codes,
-            cacheable_methods=["GET", "HEAD"],
-            allow_heuristics=False,
-            cache_private=True,
-        )
+        if decision.ttl_s is not None or decision.swrv_s is not None:
+            controller = _PolicyAwareController(
+                ttl_s=decision.ttl_s,
+                swrv_s=decision.swrv_s,
+                cacheable_methods=["GET", "HEAD"],
+                cacheable_status_codes=cacheable_status_codes,
+            )
+        else:
+            # Create controller with explicit arguments
+            controller = Controller(
+                cacheable_status_codes=cacheable_status_codes,
+                cacheable_methods=["GET", "HEAD"],
+                allow_heuristics=False,
+                cache_private=True,
+            )
 
         return controller
 
@@ -374,3 +386,91 @@ def build_role_aware_cache_transport(
         inner_transport=base_transport,
         storage=storage,
     )
+
+
+class _PolicyAwareController(Controller):
+    """Controller that enforces cache policy TTL/SWRV overrides."""
+
+    def __init__(
+        self,
+        *,
+        ttl_s: Optional[int],
+        swrv_s: Optional[int],
+        cacheable_methods: Sequence[str],
+        cacheable_status_codes: Sequence[int],
+    ) -> None:
+        super().__init__(
+            cacheable_methods=list(cacheable_methods),
+            cacheable_status_codes=list(cacheable_status_codes),
+            cache_private=True,
+            allow_heuristics=False,
+            force_cache=False,
+        )
+        self._ttl_s = ttl_s
+        self._swrv_s = swrv_s
+
+    def is_cachable(self, request: httpcore.Request, response: httpcore.Response) -> bool:
+        self._apply_policy_headers(response)
+        return super().is_cachable(request, response)
+
+    def construct_response_from_cache(
+        self,
+        request: httpcore.Request,
+        response: httpcore.Response,
+        original_request: httpcore.Request,
+    ) -> httpcore.Response | httpcore.Request | None:
+        self._apply_policy_headers(response)
+        return super().construct_response_from_cache(request, response, original_request)
+
+    def handle_validation_response(
+        self,
+        old_response: httpcore.Response,
+        new_response: httpcore.Response,
+    ) -> httpcore.Response:
+        updated = super().handle_validation_response(old_response, new_response)
+        self._apply_policy_headers(updated)
+        return updated
+
+    def _apply_policy_headers(self, response: httpcore.Response) -> None:
+        if self._ttl_s is None and (self._swrv_s is None or self._swrv_s <= 0):
+            return
+
+        directives: list[str] = []
+        if self._ttl_s is not None and self._ttl_s >= 0:
+            directives.append(f"max-age={self._ttl_s}")
+        if self._swrv_s is not None and self._swrv_s > 0:
+            directives.append(f"stale-while-revalidate={self._swrv_s}")
+
+        preserved: list[str] = []
+        for key, value in response.headers:
+            if key.lower() != b"cache-control":
+                continue
+            parts = [part.strip() for part in value.decode("latin-1").split(",")]
+            for part in parts:
+                if not part:
+                    continue
+                lower = part.lower()
+                if lower.startswith("max-age=") or lower.startswith("stale-while-revalidate"):
+                    continue
+                if lower in {"no-cache", "no-store"}:
+                    continue
+                preserved.append(part)
+
+        final_directives: list[str] = []
+        seen: set[str] = set()
+        for directive in directives + preserved:
+            key = directive.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            final_directives.append(directive)
+
+        if final_directives:
+            header_value = ", ".join(final_directives).encode("ascii")
+            filtered = [(k, v) for (k, v) in response.headers if k.lower() != b"cache-control"]
+            filtered.append((b"cache-control", header_value))
+            response.headers = filtered
+
+        if not any(key.lower() == b"date" for key, _ in response.headers):
+            now = format_datetime(datetime.now(timezone.utc), usegmt=True)
+            response.headers.append((b"date", now.encode("ascii")))
