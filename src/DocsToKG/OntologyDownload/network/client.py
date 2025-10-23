@@ -237,6 +237,17 @@ def reset_http_client() -> None:
     _client_bind_pid = None
     _config_hash_mismatch_warned = False
 
+    try:
+        from DocsToKG.OntologyDownload.network.polite_client import (
+            reset_polite_http_client,
+        )
+    except ImportError:  # pragma: no cover - optional dependency
+        logger.debug(
+            "Polite HTTP client unavailable during reset; skipping polite reset"
+        )
+    else:
+        reset_polite_http_client()
+
 
 # ============================================================================
 # Implementation Details

@@ -119,7 +119,7 @@ class PoliteHttpClient:
         """
         self._service = service or "default"
         self._host = host
-        self._http_client = get_http_client()
+        self._http_client: httpx.Client | None = get_http_client()
         self._rate_limiter = get_rate_limiter()
 
         logger.debug(
@@ -249,6 +249,9 @@ class PoliteHttpClient:
         service = service or self._service
         host = host or self._host or self._extract_host(url)
 
+        # Refresh the underlying HTTP client if it has been closed by a reset.
+        http_client = self._ensure_http_client()
+
         # Acquire rate limit slot
         ts_acquire_start = time.time()
         try:
@@ -292,7 +295,7 @@ class PoliteHttpClient:
         # Perform HTTP request
         ts_request_start = time.time()
         try:
-            response = self._http_client.request(method=method, url=url, **kwargs)
+            response = http_client.request(method=method, url=url, **kwargs)
             elapsed_ms = int((time.time() - ts_request_start) * 1000)
 
             logger.debug(
@@ -322,6 +325,15 @@ class PoliteHttpClient:
             )
             raise
 
+    def _ensure_http_client(self) -> httpx.Client:
+        """Ensure the underlying HTTP client is open, refreshing if needed."""
+
+        if self._http_client is None or getattr(self._http_client, "is_closed", False):
+            logger.debug("Refreshing polite HTTP client binding after reset")
+            self._http_client = get_http_client()
+        assert self._http_client is not None
+        return self._http_client
+
     @staticmethod
     def _extract_host(url: str) -> str:
         """Extract hostname from URL.
@@ -346,6 +358,7 @@ class PoliteHttpClient:
         logger.debug("PoliteHttpClient closing")
         try:
             close_http_client()
+            self._http_client = None
         except Exception as exc:  # pragma: no cover - defensive logging
             logger.error(
                 "Failed to close underlying HTTP client",
