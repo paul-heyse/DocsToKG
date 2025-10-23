@@ -121,3 +121,6 @@ No eligible files after excludes.
 - Broken: `DocsToKG.OntologyDownload.network` tried to re-export instrumentation helpers that no longer exist, so any `from … import network` call crashed with an `ImportError`.
 - Fix: align the package exports with the current instrumentation API by importing the available `create_http_event_hooks` helper in `network.__init__`.
 - TODO: flesh out network instrumentation hooks (request context helpers, error mapping) or remove them from the public API definitively.
+
+<!-- 2025-10-23 07:14:44Z UTC -->
+## Pass 7 — find and fix real bugs

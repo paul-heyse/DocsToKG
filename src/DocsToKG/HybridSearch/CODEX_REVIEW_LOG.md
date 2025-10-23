@@ -111,3 +111,6 @@ No eligible files after excludes.
   - Normalise and validate chunk/vector UUID fields while loading artifacts so bad identifiers raise `IngestError` early.
   - Canonicalise cached vector IDs and continue flagging entries that omit UUIDs.
 - TODO: None.
+
+<!-- 2025-10-23 07:17:04Z UTC -->
+## Pass 4 — find and fix real bugs

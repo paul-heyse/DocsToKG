@@ -120,3 +120,6 @@ No eligible files after excludes.
 - Fixed:
   - correct the regex to `\w+` so `_tokenize` returns real word tokens under both `regex` and `re`.
 - TODO: add a regression test that exercises LocalBM25Provider tokenisation end-to-end.
+
+<!-- 2025-10-23 07:21:26Z UTC -->
+## Pass 5 — find and fix real bugs

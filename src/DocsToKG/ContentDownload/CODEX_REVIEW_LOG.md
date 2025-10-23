@@ -179,3 +179,6 @@ No eligible files after excludes.
 - Fix:
   - Added a helper to materialize rows using cursor metadata, handling both `sqlite3.Row` and tuple results.
 - TODO: Backfill a unit test covering default `row_factory` behaviour for the leasing helpers.
+
+<!-- 2025-10-23 07:20:35Z UTC -->
+## Pass 10 — find and fix real bugs
