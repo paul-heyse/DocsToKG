@@ -30,10 +30,14 @@ Design:
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:  # pragma: no cover
+    from DocsToKG.ContentDownload.api import DownloadOutcome
+    from DocsToKG.ContentDownload.core import ReasonCode
 
 # ============================================================================
 # EXTENDED ATTEMPT RECORD - Telemetry Internal Type
@@ -84,6 +88,67 @@ class TelemetryAttemptRecord:
             raise ValueError("TelemetryAttemptRecord.url cannot be empty")
 
 
+@dataclass(frozen=True)
+class PipelineResult:
+    """Resolver pipeline result captured for manifest emission.
+
+    Attributes
+    ----------
+    resolver_name:
+        Resolver that produced the terminal outcome. Required.
+    url:
+        Final URL associated with the resolver outcome. ``None`` when
+        no network request was issued.
+    outcome:
+        Finalized :class:`DownloadOutcome` produced by the pipeline.
+    success:
+        Flag indicating whether the pipeline produced a successful
+        outcome.
+    reason:
+        Canonical reason token emitted by the pipeline when no outcome
+        was produced.
+    reason_detail:
+        Optional human readable detail complementing ``reason``.
+    html_paths:
+        Iterable of HTML artefact paths captured during resolution.
+    canonical_url:
+        Canonicalised URL hint propagated into the manifest entry.
+    original_url:
+        Original URL hint propagated into the manifest entry.
+    """
+
+    resolver_name: str
+    url: str | None
+    outcome: "DownloadOutcome | None" = None
+    success: bool = False
+    reason: "ReasonCode | str | None" = None
+    reason_detail: "ReasonCode | str | None" = None
+    html_paths: Iterable[str] = field(default_factory=tuple)
+    canonical_url: str | None = None
+    original_url: str | None = None
+
+    def __post_init__(self) -> None:
+        if not self.resolver_name or not self.resolver_name.strip():
+            raise ValueError("PipelineResult.resolver_name cannot be empty")
+
+        raw_paths = self.html_paths
+        if raw_paths is None:
+            normalized_paths: tuple[str, ...] = ()
+        else:
+            if isinstance(raw_paths, (str, bytes)):
+                raise TypeError("PipelineResult.html_paths must be an iterable of paths")
+            normalized_paths = tuple(str(path) for path in raw_paths)
+        object.__setattr__(self, "html_paths", normalized_paths)
+
+        for attr_name in ("url", "canonical_url", "original_url"):
+            value = getattr(self, attr_name)
+            if value is None:
+                continue
+            text = str(value).strip()
+            object.__setattr__(self, attr_name, text or None)
+
+
 __all__ = [
+    "PipelineResult",
     "TelemetryAttemptRecord",
 ]
