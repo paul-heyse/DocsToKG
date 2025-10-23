@@ -61,3 +61,6 @@ No eligible files after excludes.
 - Broken: `PoliteHttpClient.close()` never released the shared HTTPX client, leaking open connection pools despite callers invoking `close_polite_http_client()`.
 - Fix: delegate client shutdown to `close_http_client()` so connection pools are torn down and the singleton can rebuild cleanly on the next request.
 - TODO: add a shutdown test that asserts `get_http_client()` returns a fresh instance after closing the polite client.
+
+<!-- 2025-10-23 05:59:19Z UTC -->
+## Pass 1 — find and fix real bugs

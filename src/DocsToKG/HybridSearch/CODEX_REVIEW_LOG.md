@@ -61,3 +61,6 @@ No eligible files after excludes.
 - Fix:
   - Track restore success and only clear `_snapshots` once the restore completes without error.
 - TODO: None.
+
+<!-- 2025-10-23 05:59:19Z UTC -->
+## Pass 1 — find and fix real bugs
