@@ -30,3 +30,11 @@ No eligible files after excludes.
 
 <!-- 2025-10-23 04:06:56Z UTC -->
 ## Pass 2 — find and fix real bugs
+
+<!-- 2025-10-23 04:24:41Z UTC -->
+## Pass 1 — find and fix real bugs
+
+### Batch 0 (Pass 1)
+- Broken: `storage.dataset_view.summarize` tried `Path.stat()` on fragment paths, throwing `FileNotFoundError` for remote or non-local filesystems so summaries could not run outside local disk.
+- Fixed: resolve fragment metadata via the Arrow filesystem (fall back to local `Path.stat`), keep partition/doc-id extraction in place, and suppress filesystem lookup errors.
+- TODO: add coverage that simulates non-local filesystems to catch regressions.

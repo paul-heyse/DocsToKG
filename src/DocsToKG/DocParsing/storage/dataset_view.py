@@ -28,6 +28,7 @@ Key Functions:
 
 from __future__ import annotations
 
+import contextlib
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -35,6 +36,7 @@ from typing import Dict, List, Optional
 
 import pyarrow as pa
 import pyarrow.dataset as ds
+import pyarrow.fs as fs
 
 # ============================================================
 # Types
@@ -218,21 +220,37 @@ def summarize(
     sample_doc_ids: List[str] = []
 
     for frag in fragments:
-        if hasattr(frag, "physical_schema"):
-            # Get path if available
-            path = getattr(frag, "path", None)
-            if path:
-                total_bytes += Path(path).stat().st_size
+        path = getattr(frag, "path", None)
+        if not path:
+            continue
 
-                # Extract partition
-                partition = _extract_partition_from_path(path)
-                if partition:
-                    partitions[partition] = partitions.get(partition, 0) + 1
+        path_str = str(path)
+        file_size: Optional[int] = None
 
-                # Extract doc_id from filename
-                doc_id = _extract_doc_id_from_filename(Path(path).name)
-                if doc_id and len(sample_doc_ids) < 20:
-                    sample_doc_ids.append(doc_id)
+        filesystem = getattr(frag, "filesystem", None)
+        if filesystem is not None:
+            with contextlib.suppress(Exception):
+                info = filesystem.get_file_info(path_str)
+                if info.type != fs.FileType.NotFound:
+                    if info.size is not None and info.size >= 0:
+                        file_size = int(info.size)
+                    if info.path:
+                        path_str = info.path
+
+        if file_size is None:
+            with contextlib.suppress(OSError, ValueError):
+                file_size = Path(path_str).stat().st_size
+
+        if file_size is not None:
+            total_bytes += file_size
+
+        partition = _extract_partition_from_path(path_str)
+        if partition:
+            partitions[partition] = partitions.get(partition, 0) + 1
+
+        doc_id = _extract_doc_id_from_filename(Path(path_str).name)
+        if doc_id and doc_id not in sample_doc_ids and len(sample_doc_ids) < 20:
+            sample_doc_ids.append(doc_id)
 
     # Estimate row count from statistics (if available)
     approx_rows = None
