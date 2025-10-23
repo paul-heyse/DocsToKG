@@ -455,6 +455,8 @@ def doctags(
             app_ctx.settings.doctags.mode = mode
         if model_id:
             app_ctx.settings.doctags.model_id = model_id
+        app_ctx.settings.doctags.resume = resume
+        app_ctx.settings.doctags.force = force
         if workers:
             app_ctx.settings.runner.workers = workers
         if policy:
@@ -590,6 +592,8 @@ def chunk(
             app_ctx.settings.chunk.max_tokens = max_tokens
         if tokenizer:
             app_ctx.settings.chunk.tokenizer_model = tokenizer
+        app_ctx.settings.chunk.resume = resume
+        app_ctx.settings.chunk.force = force
         if workers:
             app_ctx.settings.runner.workers = workers
         if policy:
@@ -701,6 +705,11 @@ def embed(
                     param_name="format",
                 ) from exc
         if dense_backend:
+            # Note: embed config doesn't have simple dense_backend field,
+            # so we'd need to handle this through config or skip for now
+            pass
+        app_ctx.settings.embed.resume = resume
+        app_ctx.settings.embed.force = force
             try:
                 app_ctx.settings.embed.dense.backend = DenseBackend(dense_backend.lower())
             except ValueError as exc:
