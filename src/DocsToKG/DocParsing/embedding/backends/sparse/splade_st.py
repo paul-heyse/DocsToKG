@@ -131,9 +131,7 @@ class SpladeSTProvider(SparseEmbeddingBackend):
         cache_dir = env.get("model_dir")
 
         model_dir = self._cfg_spec.model_dir.expanduser().resolve()
-        device_override = (
-            self._cfg_spec.device if self._cfg_spec.device != "auto" else device
-        )
+        device_override = self._cfg_spec.device if self._cfg_spec.device != "auto" else device
 
         self._splade_cfg = SpladeCfg(
             model_dir=model_dir,

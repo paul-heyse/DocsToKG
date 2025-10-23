@@ -4,8 +4,6 @@ Emits ratelimit.acquire, ratelimit.cooldown, and ratelimit.block events
 for observability into rate limiting behavior and pressure.
 """
 
-from typing import Optional
-
 from DocsToKG.OntologyDownload.observability.events import emit_event
 
 

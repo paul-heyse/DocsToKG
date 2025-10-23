@@ -38,7 +38,11 @@ except ImportError as exc:  # pragma: no cover
         "duckdb is required for catalog doctor. Ensure .venv is initialized."
     ) from exc
 
-from .observability_instrumentation import emit_doctor_begin, emit_doctor_complete, emit_doctor_issue_found
+from .observability_instrumentation import (
+    emit_doctor_begin,
+    emit_doctor_complete,
+    emit_doctor_issue_found,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -238,7 +242,8 @@ def detect_db_fs_drifts(
     fs_files_list = list(fs_files or scan_filesystem_files(extracted_root))
 
     fs_artifact_map = {
-        path.resolve().relative_to(artifacts_root).as_posix(): size for path, size in fs_artifacts_list
+        path.resolve().relative_to(artifacts_root).as_posix(): size
+        for path, size in fs_artifacts_list
     }
     fs_file_map = {
         path.resolve().relative_to(extracted_root).as_posix(): size for path, size in fs_files_list
@@ -255,9 +260,7 @@ def detect_db_fs_drifts(
             continue
         expected_path = artifacts_root / fs_relpath
         if not expected_path.exists():
-            description = (
-                f"Artifact {artifact_id} recorded in DB but missing on FS: {fs_relpath}"
-            )
+            description = f"Artifact {artifact_id} recorded in DB but missing on FS: {fs_relpath}"
             issue = DoctorIssue(
                 issue_type="missing_fs_artifact",
                 artifact_id=artifact_id,
@@ -311,9 +314,7 @@ def detect_db_fs_drifts(
         db_file_map[rel_posix] = (file_id, size_bytes)
         expected_path = extracted_root / rel
         if not expected_path.exists():
-            description = (
-                f"Extracted file {file_id} (service={service}, version={version_id}) missing on FS: {rel_posix}"
-            )
+            description = f"Extracted file {file_id} (service={service}, version={version_id}) missing on FS: {rel_posix}"
             issue = DoctorIssue(
                 issue_type="missing_fs_extracted_file",
                 artifact_id=None,
@@ -357,9 +358,7 @@ def detect_db_fs_drifts(
         db_latest_version = latest_result[0]
         latest_json_path = artifacts_root.parent / "LATEST.json"
         if not latest_json_path.exists():
-            description = (
-                f"DB marks {db_latest_version} as latest, but LATEST.json missing on FS"
-            )
+            description = f"DB marks {db_latest_version} as latest, but LATEST.json missing on FS"
             issue = DoctorIssue(
                 issue_type="latest_mismatch",
                 artifact_id=None,
@@ -380,9 +379,7 @@ def detect_db_fs_drifts(
                 payload = json.loads(latest_json_path.read_text(encoding="utf-8"))
                 fs_latest = payload.get("latest") or payload.get("version")
                 if fs_latest and fs_latest != db_latest_version:
-                    description = (
-                        f"LATEST.json points to {fs_latest}, but catalog latest is {db_latest_version}"
-                    )
+                    description = f"LATEST.json points to {fs_latest}, but catalog latest is {db_latest_version}"
                     issue = DoctorIssue(
                         issue_type="latest_mismatch",
                         artifact_id=None,

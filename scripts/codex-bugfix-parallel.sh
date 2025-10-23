@@ -79,20 +79,34 @@ git_commit_push_with_retry() {
 list_candidates() {
   # prints NUL-separated file list for a subdir (tracked + optional untracked) with excludes
   local subdir="$1"
+  local subdir_clean="${subdir%/}"
+
+  local exclude_args=()
+  for pattern in "${EXCLUDES[@]}"; do
+    if [[ "${pattern:0:1}" == ":" ]]; then
+      local trimmed="${pattern#:(exclude,glob)}"
+      trimmed="${trimmed#/}"
+      exclude_args+=( ":(exclude,glob)${subdir_clean}/${trimmed}" )
+    else
+      exclude_args+=( "${subdir_clean}/${pattern}" )
+    fi
+  done
+
   if [[ "${INCLUDE_UNTRACKED}" == "true" ]]; then
-    git ls-files -z -c -o --exclude-standard -- "$subdir" "${EXCLUDES[@]}"
+    git ls-files -z -c -o --exclude-standard -- "$subdir_clean" "${exclude_args[@]}"
   else
-    git ls-files -z -c -- "$subdir" "${EXCLUDES[@]}"
+    git ls-files -z -c -- "$subdir_clean" "${exclude_args[@]}"
   fi
 }
 
 # ===== WORKER =====
 bugfix_one_subdir() {
   local subdir="$1"
-  local lock=".codex-lock.$(slugify "$subdir")"
-  local log="$subdir/CODEX_REVIEW_LOG.md"
+  local subdir_clean="${subdir%/}"
+  local lock=".codex-lock.$(slugify "$subdir_clean")"
+  local log="$subdir_clean/CODEX_REVIEW_LOG.md"
 
-  [[ -d "$subdir" ]] || { echo "⚠ Skipping missing $subdir"; return 0; }
+  [[ -d "$subdir_clean" ]] || { echo "⚠ Skipping missing $subdir"; return 0; }
 
   exec 9> "$lock"; if ! flock -n 9; then echo "⏭  Already running: $subdir"; return 0; fi
 
@@ -102,7 +116,7 @@ This log is maintained by scripts/codex-bugfix-parallel.sh
 EOF
 
   # Collect files
-  mapfile -d '' files < <(list_candidates "$subdir")
+  mapfile -d '' files < <(list_candidates "$subdir_clean")
   if [[ ${#files[@]} -eq 0 ]]; then
     append_log "$log" "No eligible files after excludes."
     rm -f "$lock"; return 0

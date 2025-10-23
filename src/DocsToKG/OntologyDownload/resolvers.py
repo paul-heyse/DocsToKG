@@ -117,7 +117,13 @@ import httpx
 from . import io
 from .cancellation import CancellationToken
 from .errors import ResolverError, UserConfigError
-from .io import get_bucket, get_http_client, is_retryable_error, retry_with_backoff, validate_url_security
+from .io import (
+    get_bucket,
+    get_http_client,
+    is_retryable_error,
+    retry_with_backoff,
+    validate_url_security,
+)
 from .plugins import ensure_resolver_plugins, register_plugin_registry
 from .settings import DownloadConfiguration, ResolvedConfig, get_pystow
 
@@ -632,11 +638,10 @@ class BioPortalResolver(BaseResolver):
         acronym = spec.extras.get("acronym", spec.id.upper())
         api_key = self._load_api_key()
         if not api_key:
-            raise UserConfigError(
-                f"BioPortal resolver requires an API key at {self.api_key_path}."
-            )
+            raise UserConfigError(f"BioPortal resolver requires an API key at {self.api_key_path}.")
 
         client = get_http_client(config.defaults.http)
+
         def _fetch_metadata(endpoint: str) -> httpx.Response:
             response = client.get(
                 endpoint,
@@ -672,9 +677,9 @@ class BioPortalResolver(BaseResolver):
             raise ResolverError(f"No BioPortal submission with download URL for {acronym}")
 
         version = submission_payload.get("version") or submission_payload.get("submissionId")
-        license_value = normalize_license_to_spdx(
-            submission_payload.get("license")
-        ) or license_value
+        license_value = (
+            normalize_license_to_spdx(submission_payload.get("license")) or license_value
+        )
 
         logger.info(
             "resolved download url",

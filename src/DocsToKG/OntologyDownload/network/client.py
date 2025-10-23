@@ -29,14 +29,12 @@ from pathlib import Path
 from typing import Optional
 
 import certifi
-import httpx
 import hishel
+import httpx
 import platformdirs
 
 from DocsToKG.OntologyDownload.network.policy import (
     ALLOW_HEURISTIC_CACHING,
-    CACHE_MAX_AGE_SECONDS,
-    CACHE_MAX_SIZE_BYTES,
     CACHE_SCOPE,
     CACHE_STORAGE_CHECK_INTERVAL_SECONDS,
     CACHE_STORAGE_TTL_SECONDS,
@@ -51,9 +49,7 @@ from DocsToKG.OntologyDownload.network.policy import (
     KEEPALIVE_EXPIRY,
     MAX_CONNECTIONS,
     MAX_KEEPALIVE_CONNECTIONS,
-    PROJECT_URL,
     TLS_VERIFY_ENABLED,
-    USER_AGENT_TEMPLATE,
 )
 
 logger = logging.getLogger(__name__)

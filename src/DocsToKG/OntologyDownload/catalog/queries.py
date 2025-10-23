@@ -660,7 +660,9 @@ class CachedPlanRow:
             url=row[3],
             version_id=row[4],
             checksum=row[5],
-            cached_at=row[6] if isinstance(row[6], datetime) else datetime.fromisoformat(str(row[6])),
+            cached_at=(
+                row[6] if isinstance(row[6], datetime) else datetime.fromisoformat(str(row[6]))
+            ),
         )
 
 
@@ -710,9 +712,7 @@ def cache_plan(
     )
 
 
-def get_cached_plan(
-    conn: duckdb.DuckDBPyConnection, plan_id: str
-) -> Optional[CachedPlanRow]:
+def get_cached_plan(conn: duckdb.DuckDBPyConnection, plan_id: str) -> Optional[CachedPlanRow]:
     """Retrieve a cached plan by ID.
 
     Args:

@@ -122,6 +122,8 @@ def get_owlready2() -> Any:
     """
 
     return _call_with_override(_settings.get_owlready2, "get_owlready2")
+
+
 # === NAVMAP v1 ===
 # {
 #   "module": "DocsToKG.OntologyDownload.optdeps",

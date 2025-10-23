@@ -18,8 +18,8 @@ from .extraction_constraints import (
     validate_disk_space,
     validate_entry_compression_ratio,
     validate_entry_count,
-    validate_file_size,
     validate_entry_type,
+    validate_file_size,
     validate_path_constraints,
     validate_streaming_file_size,
 )

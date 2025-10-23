@@ -9,4 +9,3 @@ commands remain discoverable when tooling expects `DocParsing.cli`.
 from DocsToKG.DocParsing.cli_unified import app
 
 __all__ = ["app"]
-

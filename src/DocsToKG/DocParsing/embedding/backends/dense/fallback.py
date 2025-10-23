@@ -38,4 +38,3 @@ class DenseFallbackProvider(DenseEmbeddingBackend):
 
 
 __all__ = ["DenseFallbackProvider"]
-

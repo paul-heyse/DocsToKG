@@ -24,8 +24,7 @@ from __future__ import annotations
 import logging
 import time
 from contextvars import ContextVar
-from dataclasses import asdict
-from typing import Any, Callable, Optional
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -33,8 +32,9 @@ logger = logging.getLogger(__name__)
 _operation_start_time: ContextVar[float] = ContextVar("operation_start_time", default=0.0)
 
 try:
-    from ..observability.events import emit_event, EventIds, Event
+    from ..observability.events import Event, EventIds, emit_event
 except ImportError:
+
     def emit_event(*args, **kwargs) -> None:  # type: ignore
         """Fallback no-op emitter if observability not available."""
         pass
@@ -214,7 +214,9 @@ def emit_doctor_fixed(issue_type: str, count: int) -> None:
     )
 
 
-def emit_doctor_complete(issues_found: int, critical: int, warnings: int, duration_ms: float) -> None:
+def emit_doctor_complete(
+    issues_found: int, critical: int, warnings: int, duration_ms: float
+) -> None:
     """Emit doctor operation complete event.
 
     Args:

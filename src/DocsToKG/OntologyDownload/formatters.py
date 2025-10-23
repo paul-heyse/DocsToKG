@@ -126,9 +126,7 @@ def format_results_table(results: Iterable[FetchResult]) -> str:
                     )
         content_type = getattr(result, "content_type", "") or ""
         content_length = getattr(result, "content_length", None)
-        bytes_text = (
-            format_bytes(int(content_length)) if isinstance(content_length, int) else ""
-        )
+        bytes_text = format_bytes(int(content_length)) if isinstance(content_length, int) else ""
         etag = getattr(result, "etag", "") or ""
         cache_info = getattr(result, "cache_status", None)
         cache_label = ""
@@ -171,6 +169,8 @@ def format_validation_summary(results: Dict[str, Dict[str, Any]]) -> str:
                 message = ", ".join(f"{key}={value}" for key, value in details.items())
         formatted.append((name, status, message))
     return format_table(VALIDATION_TABLE_HEADERS, formatted)
+
+
 # === NAVMAP v1 ===
 # {
 #   "module": "DocsToKG.OntologyDownload.formatters",

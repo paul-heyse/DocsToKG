@@ -128,6 +128,8 @@ class CancellationTokenGroup:
         """Return the number of tokens in this group."""
         with self._lock:
             return len(self._tokens)
+
+
 # === NAVMAP v1 ===
 # {
 #   "module": "DocsToKG.OntologyDownload.cancellation",

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from contextlib import ExitStack
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -93,14 +92,18 @@ class ProviderFactory:
         sparse_provider = ProviderFactory._build_sparse(cfg, settings["sparse"])
         lexical_provider = ProviderFactory._build_lexical(cfg, settings["lexical"])
 
-        return ProviderBundle(dense=dense_provider, sparse=sparse_provider, lexical=lexical_provider, context=context)
+        return ProviderBundle(
+            dense=dense_provider, sparse=sparse_provider, lexical=lexical_provider, context=context
+        )
 
     @staticmethod
-    def _build_dense(cfg: EmbedCfg, dense_settings: Dict[str, Any]) -> Optional[DenseEmbeddingBackend]:
+    def _build_dense(
+        cfg: EmbedCfg, dense_settings: Dict[str, Any]
+    ) -> Optional[DenseEmbeddingBackend]:
         fallback_backend = dense_settings.get("fallback")
         try:
             return ProviderFactory._build_dense_inner(cfg, dense_settings)
-        except ProviderError as original_error:
+        except ProviderError:
             if not fallback_backend:
                 raise
             fallback_settings = dict(dense_settings)
@@ -109,7 +112,9 @@ class ProviderFactory:
             return ProviderFactory._build_dense(cfg, fallback_settings)
 
     @staticmethod
-    def _build_dense_inner(cfg: EmbedCfg, dense_settings: Dict[str, Any]) -> Optional[DenseEmbeddingBackend]:
+    def _build_dense_inner(
+        cfg: EmbedCfg, dense_settings: Dict[str, Any]
+    ) -> Optional[DenseEmbeddingBackend]:
         backend = dense_settings.get("backend") or "qwen_vllm"
         backend = backend.lower()
         if backend in {"none", "null"}:
@@ -189,7 +194,9 @@ class ProviderFactory:
         )
 
     @staticmethod
-    def _build_sparse(cfg: EmbedCfg, sparse_settings: Dict[str, Any]) -> Optional[SparseEmbeddingBackend]:
+    def _build_sparse(
+        cfg: EmbedCfg, sparse_settings: Dict[str, Any]
+    ) -> Optional[SparseEmbeddingBackend]:
         backend = sparse_settings.get("backend") or "splade_st"
         backend = backend.lower()
         if backend in {"none", "null"}:
@@ -222,7 +229,9 @@ class ProviderFactory:
         return SpladeSTProvider(config)
 
     @staticmethod
-    def _build_lexical(cfg: EmbedCfg, lexical_settings: Dict[str, Any]) -> Optional[LexicalEmbeddingBackend]:
+    def _build_lexical(
+        cfg: EmbedCfg, lexical_settings: Dict[str, Any]
+    ) -> Optional[LexicalEmbeddingBackend]:
         backend = lexical_settings.get("backend") or "local_bm25"
         backend = backend.lower()
         if backend in {"none", "null"}:

@@ -25,7 +25,6 @@ from typing import Dict, List, Tuple
 from DocsToKG.OntologyDownload.settings_schema import (
     generate_settings_schema,
     generate_submodel_schemas,
-    get_schema_summary,
 )
 
 
@@ -74,7 +73,7 @@ def check_schema_drift(
 
     expected_dir = expected_dir.resolve()
 
-    print(f"🔍 Checking schema drift...")
+    print("🔍 Checking schema drift...")
     print(f"   Expected dir: {expected_dir}")
     print()
 
@@ -172,7 +171,7 @@ def check_schema_drift(
             current_lines = len(current_str.splitlines())
             print(f"   Expected: {expected_lines} lines")
             print(f"   Current:  {current_lines} lines")
-            print(f"   Run with --verbose to see detailed diff")
+            print("   Run with --verbose to see detailed diff")
             print()
 
     print("⚠️  Schema drift indicates changes to settings structure.")

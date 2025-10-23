@@ -77,9 +77,7 @@ class StorageBackend(Protocol):
         """
         ...
 
-    def put_file(
-        self, local: Path, remote_rel: str, *, meta: dict | None = None
-    ) -> StoredObject:
+    def put_file(self, local: Path, remote_rel: str, *, meta: dict | None = None) -> StoredObject:
         """Upload a local file to storage.
 
         Performs atomic upload with fsync() to ensure durability.
@@ -98,9 +96,7 @@ class StorageBackend(Protocol):
         """
         ...
 
-    def put_bytes(
-        self, data: bytes, remote_rel: str, *, meta: dict | None = None
-    ) -> StoredObject:
+    def put_bytes(self, data: bytes, remote_rel: str, *, meta: dict | None = None) -> StoredObject:
         """Write bytes to storage.
 
         Performs atomic write with fsync() to ensure durability.

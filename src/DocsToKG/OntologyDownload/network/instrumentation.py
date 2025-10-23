@@ -5,7 +5,7 @@ capturing method, URL, status, timings, and cache state.
 """
 
 import time
-from typing import Any, Callable, Optional
+from typing import Any, Optional
 
 from DocsToKG.OntologyDownload.observability.events import emit_event
 
@@ -62,7 +62,7 @@ def create_http_event_hooks() -> dict:
                     "bytes_read": len(response.content),
                 },
             )
-        except Exception as e:
+        except Exception:
             # Never fail telemetry
             pass
 

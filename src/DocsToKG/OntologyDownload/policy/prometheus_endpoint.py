@@ -12,16 +12,15 @@ Usage:
 """
 
 import logging
-import time
 from typing import Optional
 
 try:
-    from prometheus_client import generate_latest, REGISTRY
+    from prometheus_client import REGISTRY, generate_latest
     from prometheus_client.exposition import (
-        start_http_server,
-        make_wsgi_app,
         ThreadingWSGIServer,
         WSGIRequestHandler,
+        make_wsgi_app,
+        start_http_server,
     )
 except ImportError:
     # Fallback if prometheus_client not available

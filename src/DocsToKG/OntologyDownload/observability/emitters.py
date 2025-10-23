@@ -212,7 +212,8 @@ class DuckDBEmitter(EventEmitter):
             return
 
         try:
-            self.conn.execute("""
+            self.conn.execute(
+                """
                 CREATE TABLE IF NOT EXISTS events (
                     ts TIMESTAMP,
                     type VARCHAR,
@@ -232,7 +233,8 @@ class DuckDBEmitter(EventEmitter):
                     request_id VARCHAR,
                     payload JSON
                 )
-            """)
+            """
+            )
             logger.debug("Created events table in DuckDB")
         except Exception as e:
             logger.error(f"Failed to create events table: {e}")

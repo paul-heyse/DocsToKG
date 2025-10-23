@@ -88,9 +88,10 @@ open_pr() {
 # ===== one worker per folder =====
 review_one_subdir() {
   local subdir="$1"
-  local lock=".codex-lock.$(echo "$subdir" | sed 's#[/ ]#-#g')"
-  local log="$subdir/CODEX_REVIEW_LOG.md"
-  local agents="$subdir/agents.md"
+  local subdir_clean="${subdir%/}"
+  local lock=".codex-lock.$(echo "$subdir_clean" | sed 's#[/ ]#-#g')"
+  local log="$subdir_clean/CODEX_REVIEW_LOG.md"
+  local agents="$subdir_clean/AGENTS.md"
 
   [[ -d "$subdir" ]] || { echo "⚠ Skipping missing $subdir"; return 0; }
 
@@ -104,7 +105,19 @@ This log is maintained by \`scripts/codex-review-parallel.sh\`.
 EOF
 
   # collect reviewable files
-  mapfile -d '' files < <(git ls-files -z "$subdir" "${EXCLUDES[@]}")
+  local subdir_excludes=()
+  for pattern in "${EXCLUDES[@]}"; do
+    if [[ "${pattern:0:1}" == ":" ]]; then
+      # Patterns already use the :(exclude,glob) prefix; scope them to this subdir.
+      local trimmed="${pattern#:(exclude,glob)}"
+      trimmed="${trimmed#/}"
+      subdir_excludes+=( ":(exclude,glob)${subdir_clean}/${trimmed}" )
+    else
+      subdir_excludes+=( "${subdir_clean}/${pattern}" )
+    fi
+  done
+
+  mapfile -d '' files < <(git ls-files -z -- "$subdir_clean" "${subdir_excludes[@]}")
   if [[ ${#files[@]} -eq 0 ]]; then
     append_log "$log" "No eligible files after excludes."
     rm -f "$lock"; return 0

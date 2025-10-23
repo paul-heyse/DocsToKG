@@ -31,7 +31,6 @@ from typing import Optional
 
 import httpx
 from tenacity import (
-    RetryError,
     Retrying,
     before_sleep_log,
     retry_if_exception_type,
@@ -182,9 +181,7 @@ def create_idempotent_retry_policy(
             max=min(60, max_delay_seconds),
         ),
         retry=(
-            retry_if_exception_type(
-                (httpx.ConnectError, httpx.ConnectTimeout, httpx.ReadTimeout)
-            )
+            retry_if_exception_type((httpx.ConnectError, httpx.ConnectTimeout, httpx.ReadTimeout))
             | retry_if_result(retry_on_status_idempotent)
         ),
         before_sleep=before_sleep_log(logger, logging.WARNING, exc_info=True),
@@ -269,9 +266,7 @@ def create_rate_limit_retry_policy(
         stop=stop_after_delay(max_delay_seconds),
         wait=wait_rate_limit,
         # Only retry on 429
-        retry=retry_if_result(
-            lambda r: hasattr(r, "status_code") and r.status_code == 429
-        ),
+        retry=retry_if_result(lambda r: hasattr(r, "status_code") and r.status_code == 429),
         before_sleep=before_sleep_log(logger, logging.WARNING),
         reraise=True,
     )

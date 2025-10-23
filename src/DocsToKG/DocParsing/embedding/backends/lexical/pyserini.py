@@ -40,4 +40,3 @@ class PyseriniBM25Provider(LexicalEmbeddingBackend):
 
 
 __all__ = ["PyseriniBM25Provider"]
-

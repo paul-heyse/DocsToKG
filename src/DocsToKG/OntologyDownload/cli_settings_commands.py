@@ -12,7 +12,6 @@ Example:
 """
 
 import json
-import sys
 from pathlib import Path
 from typing import Optional
 
@@ -20,13 +19,11 @@ import typer
 
 from DocsToKG.OntologyDownload.settings import get_default_config
 from DocsToKG.OntologyDownload.settings_schema import (
-    generate_settings_schema,
-    write_schemas_to_disk,
-    validate_config_file,
     get_schema_summary,
+    validate_config_file,
+    write_schemas_to_disk,
 )
 from DocsToKG.OntologyDownload.settings_sources import get_source_fingerprint
-
 
 # Typer app for settings subcommands
 settings_app = typer.Typer(
@@ -119,8 +116,8 @@ def show(
                 raise typer.Exit(2)
         else:  # table
             try:
-                from rich.table import Table
                 from rich.console import Console
+                from rich.table import Table
 
                 console = Console()
                 table = Table(title="OntologyDownloadSettings - Effective Configuration")
@@ -181,7 +178,6 @@ def schema(
     try:
         if out is None:
             # Use default docs/schemas/
-            import os
 
             cwd = Path.cwd()
             out = cwd / "docs" / "schemas"
@@ -199,7 +195,7 @@ def schema(
         # Show summary
         summary = get_schema_summary()
         typer.echo(
-            f"   • Top-level schema: settings.schema.json",
+            "   • Top-level schema: settings.schema.json",
             err=False,
         )
         typer.echo(

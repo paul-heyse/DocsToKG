@@ -9,15 +9,14 @@ Usage:
 """
 
 import logging
-from typing import Optional
 
 import typer
 
 from DocsToKG.OntologyDownload.policy.prometheus_endpoint import (
+    get_metrics,
+    is_metrics_server_running,
     start_metrics_server,
     stop_metrics_server,
-    is_metrics_server_running,
-    get_metrics,
 )
 
 try:
@@ -46,7 +45,7 @@ def start(
     typer.echo(f"🚀 Starting Prometheus metrics server on {host}:{port}...")
 
     if start_metrics_server(host=host, port=port):
-        typer.echo(f"✅ Metrics server started")
+        typer.echo("✅ Metrics server started")
         typer.echo(f"📊 Access metrics at: http://{host}:{port}/metrics")
     else:
         typer.echo("❌ Failed to start metrics server", err=True)
@@ -87,17 +86,16 @@ def status() -> None:
     typer.echo("\n📈 Current Metrics (sample):")
     metrics = get_metrics()
     # Show first 20 lines of metrics
-    lines = metrics.split('\n')[:20]
+    lines = metrics.split("\n")[:20]
     for line in lines:
-        if line and not line.startswith('#'):
+        if line and not line.startswith("#"):
             typer.echo(f"  {line}")
 
 
 @monitor_app.command()
 def grafana_config(
     output_dir: str = typer.Option(
-        "/etc/grafana/provisioning",
-        help="Output directory for Grafana provisioning files"
+        "/etc/grafana/provisioning", help="Output directory for Grafana provisioning files"
     ),
 ) -> None:
     """Export Grafana provisioning configuration.
@@ -141,6 +139,7 @@ def dashboard() -> None:
         raise typer.Exit(1)
 
     import json
+
     config = get_gates_dashboard_config()
     typer.echo(json.dumps(config, indent=2))
 

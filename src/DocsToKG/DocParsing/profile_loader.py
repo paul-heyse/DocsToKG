@@ -14,9 +14,9 @@ NAVMAP:
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
 import os
+from pathlib import Path
+from typing import Any, Dict, Optional, Tuple
 
 try:
     import tomllib  # Python 3.11+

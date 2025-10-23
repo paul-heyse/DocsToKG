@@ -427,9 +427,11 @@ def results_to_dict(result: FetchResult) -> dict:
         "content_length": getattr(result, "content_length", None),
         "etag": getattr(result, "etag", None),
         "last_modified": getattr(result, "last_modified", None),
-        "cache_status": dict(result.cache_status)
-        if isinstance(getattr(result, "cache_status", None), Mapping)
-        else getattr(result, "cache_status", None),
+        "cache_status": (
+            dict(result.cache_status)
+            if isinstance(getattr(result, "cache_status", None), Mapping)
+            else getattr(result, "cache_status", None)
+        ),
         "expected_checksum": (
             result.expected_checksum.to_known_hash()
             if getattr(result, "expected_checksum", None)

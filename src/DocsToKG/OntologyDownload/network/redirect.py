@@ -53,8 +53,7 @@ class MaxRedirectsExceeded(RedirectError):
         self.max_hops = max_hops
         self.actual_hops = actual_hops
         super().__init__(
-            f"Redirect chain exceeded {max_hops} hops. "
-            f"Hops: {' → '.join(actual_hops)}"
+            f"Redirect chain exceeded {max_hops} hops. " f"Hops: {' → '.join(actual_hops)}"
         )
 
 
@@ -65,18 +64,14 @@ class UnsafeRedirectTarget(RedirectError):
         self.source_url = source_url
         self.target_url = target_url
         self.reason = reason
-        super().__init__(
-            f"Unsafe redirect from {source_url} to {target_url}: {reason}"
-        )
+        super().__init__(f"Unsafe redirect from {source_url} to {target_url}: {reason}")
 
 
 class MissingLocationHeader(RedirectError):
     """Redirect response missing Location header."""
 
     def __init__(self, url: str, status: int):
-        super().__init__(
-            f"Redirect response from {url} (status {status}) missing Location header"
-        )
+        super().__init__(f"Redirect response from {url} (status {status}) missing Location header")
 
 
 # ============================================================================
@@ -115,9 +110,7 @@ class RedirectPolicy:
 
             # Disallow authentication in URL
             if target.userinfo:
-                raise UnsafeRedirectTarget(
-                    source_url, target_url, "URL contains authentication"
-                )
+                raise UnsafeRedirectTarget(source_url, target_url, "URL contains authentication")
 
             # Only allow https (and optionally http)
             if target.scheme not in {"https", "http"}:
@@ -133,9 +126,7 @@ class RedirectPolicy:
         except UnsafeRedirectTarget:
             raise
         except Exception as e:
-            raise UnsafeRedirectTarget(
-                source_url, target_url, f"URL parsing error: {e}"
-            )
+            raise UnsafeRedirectTarget(source_url, target_url, f"URL parsing error: {e}")
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}()"

@@ -71,13 +71,8 @@ from pydantic_core import ValidationError as CoreValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from .errors import (
-    DownloadFailure,
-    OntologyDownloadError,
-    PolicyError,
-    ResolverError,
     UnsupportedPythonError,
     UserConfigError,
-    ValidationError,
 )
 
 if TYPE_CHECKING:  # pragma: no cover - import cycle guard for type checkers only
@@ -588,27 +583,23 @@ _VALID_RESOLVERS = {
 }
 
 
-
 class DuckDBSettings(BaseModel):
     """DuckDB catalog database configuration.
-    
+
     Controls the DuckDB catalog (brain) that tracks ontology versions,
     artifacts, extracted files, and validations.
     """
-    
+
     path: Path = Field(
         default_factory=lambda: Path.home() / ".data" / ".catalog" / "ontofetch.duckdb",
-        description="Path to DuckDB file"
+        description="Path to DuckDB file",
     )
     threads: int = Field(
-        default=8,
-        gt=0,
-        le=256,
-        description="Number of threads for DuckDB query execution"
+        default=8, gt=0, le=256, description="Number of threads for DuckDB query execution"
     )
     readonly: bool = Field(default=False, description="Open in read-only mode")
     writer_lock: bool = Field(default=True, description="Use writer lock")
-    
+
     @field_validator("path", mode="before")
     @classmethod
     def normalize_path(cls, v: Any) -> Path:
@@ -618,17 +609,19 @@ class DuckDBSettings(BaseModel):
         if isinstance(v, Path):
             return v.expanduser().resolve()
         raise ValueError("path must be string or Path")
-    
+
     model_config = {"validate_assignment": True, "extra": "forbid"}
 
 
 class StorageSettings(BaseModel):
     """Storage backend configuration for ontology files."""
-    
-    root: Path = Field(default_factory=lambda: Path.home() / "ontologies", description="Root directory")
+
+    root: Path = Field(
+        default_factory=lambda: Path.home() / "ontologies", description="Root directory"
+    )
     latest_name: str = Field(default="LATEST.json", description="Latest marker filename")
     write_latest_mirror: bool = Field(default=True, description="Write JSON mirror")
-    
+
     @field_validator("root", mode="before")
     @classmethod
     def normalize_root(cls, v: Any) -> Path:
@@ -638,7 +631,7 @@ class StorageSettings(BaseModel):
         if isinstance(v, Path):
             return v.expanduser().resolve()
         raise ValueError("root must be string or Path")
-    
+
     @field_validator("latest_name")
     @classmethod
     def validate_latest_name(cls, v: str) -> str:
@@ -648,7 +641,7 @@ class StorageSettings(BaseModel):
         if not v.strip():
             raise ValueError("latest_name cannot be empty")
         return v.strip()
-    
+
     model_config = {"validate_assignment": True, "extra": "forbid"}
 
 
@@ -665,12 +658,11 @@ class DefaultsConfig(BaseModel):
     validation: ValidationConfig = Field(default_factory=ValidationConfig)
     logging: LoggingConfiguration = Field(default_factory=LoggingConfiguration)
     db: DuckDBSettings = Field(
-        default_factory=DuckDBSettings,
-        description="DuckDB catalog (brain) configuration"
+        default_factory=DuckDBSettings, description="DuckDB catalog (brain) configuration"
     )
     storage: StorageSettings = Field(
         default_factory=StorageSettings,
-        description="Storage backend configuration for ontology files"
+        description="Storage backend configuration for ontology files",
     )
     continue_on_error: bool = Field(default=True)
     resolver_fallback_enabled: bool = Field(default=True)
@@ -726,10 +718,10 @@ class ResolvedConfig(BaseModel):
         _apply_env_overrides(defaults)
         return cls(defaults=defaults, specs=[])
 
-
     def config_hash(self) -> str:
         """Compute a deterministic hash of all configuration for provenance tracking."""
         import hashlib
+
         config_dict = {
             "http": self.defaults.http.model_dump(mode="json"),
             "planner": self.defaults.planner.model_dump(mode="json"),
@@ -2203,4 +2195,3 @@ class ExtractionSettings(BaseModel):
     def validate_policy(cls, v: str) -> str:
         """Validate extraction policies."""
         return v.lower()
-

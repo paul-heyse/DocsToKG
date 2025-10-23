@@ -383,9 +383,7 @@ class TestingEnvironment(contextlib.AbstractContextManager["TestingEnvironment"]
 
         env = self
 
-        def _should_return_not_modified(
-            request: httpx.Request, headers: Mapping[str, str]
-        ) -> bool:
+        def _should_return_not_modified(request: httpx.Request, headers: Mapping[str, str]) -> bool:
             response_etag = headers.get("ETag")
             if_none_match = request.headers.get("if-none-match")
             if if_none_match and response_etag:
@@ -677,6 +675,8 @@ def temporary_validator(name: str, validator: Callable[..., object]):
         unregister_validator(name)
         if existed and previous is not None:
             register_validator(name, previous, overwrite=True)
+
+
 # === NAVMAP v1 ===
 # {
 #   "module": "DocsToKG.OntologyDownload.testing",

@@ -189,11 +189,11 @@ from DocsToKG.DocParsing.core import (
     StageOutcome,
     StagePlan,
     WorkItem,
-    safe_write,
     compute_relative_doc_id,
     compute_stable_shard,
     derive_doc_id_and_vectors_path,
     run_stage,
+    safe_write,
     should_skip_output,
 )
 from DocsToKG.DocParsing.core.discovery import iter_chunks
@@ -1900,9 +1900,7 @@ def _embedding_stage_worker(item: WorkItem) -> ItemOutcome:
                     doc_id=item.item_id,
                     vector_format=effective_vector_format,
                 )
-                result_tuple = _execute_vector_generation(
-                    vectors_path, effective_vector_format
-                )
+                result_tuple = _execute_vector_generation(vectors_path, effective_vector_format)
         except VectorWriterError as exc:
             fallback_error = exc
             fallback_from = vector_format
@@ -1910,9 +1908,7 @@ def _embedding_stage_worker(item: WorkItem) -> ItemOutcome:
 
         if fallback_error is not None and vector_format == "parquet":
             effective_vector_format = "jsonl"
-            fallback_path = _vector_output_path_for_format(
-                original_vectors_path, "jsonl"
-            )
+            fallback_path = _vector_output_path_for_format(original_vectors_path, "jsonl")
             log_event(
                 logger,
                 "warning",
@@ -1940,9 +1936,7 @@ def _embedding_stage_worker(item: WorkItem) -> ItemOutcome:
                         doc_id=item.item_id,
                         vector_format=effective_vector_format,
                     )
-                    result_tuple = _execute_vector_generation(
-                        vectors_path, effective_vector_format
-                    )
+                    result_tuple = _execute_vector_generation(vectors_path, effective_vector_format)
                     fallback_error = None
                 else:
                     raise VectorWriterError(
@@ -2143,14 +2137,10 @@ def _make_embedding_stage_hooks(
                 nnz = list(manifest_meta.get("nnz", []))
                 norms = list(manifest_meta.get("norms", []))
                 resolved_hash = str(manifest_meta.get("resolved_hash", ""))
-                actual_format = str(
-                    manifest_meta.get("vector_format", vector_format)
-                ).lower()
+                actual_format = str(manifest_meta.get("vector_format", vector_format)).lower()
                 fallback_from = manifest_meta.get("vector_format_fallback_from")
                 if fallback_from:
-                    state["vector_format_fallbacks"] = (
-                        state.get("vector_format_fallbacks", 0) + 1
-                    )
+                    state["vector_format_fallbacks"] = state.get("vector_format_fallbacks", 0) + 1
                 state["total_vectors"] = state.get("total_vectors", 0) + vector_count
                 state.setdefault("splade_nnz_all", []).extend(nnz)
                 state.setdefault("dense_norms_all", []).extend(norms)

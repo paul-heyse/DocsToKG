@@ -18,15 +18,15 @@ from typing import Any, Dict, Optional
 
 from pydantic import ValidationError
 
+from .profile_loader import ConfigLoadError, SettingsBuilder
 from .settings import (
-    Settings,
     AppCfg,
-    RunnerCfg,
-    DocTagsCfg,
     ChunkCfg,
+    DocTagsCfg,
     EmbedCfg,
+    RunnerCfg,
+    Settings,
 )
-from .profile_loader import SettingsBuilder, ConfigLoadError
 
 
 @dataclass
@@ -153,9 +153,9 @@ def build_app_context(
     if embed_output_vectors_dir is not None:
         cli_overrides.setdefault("embed", {})["output_vectors_dir"] = str(embed_output_vectors_dir)
     if embed_vector_format is not None:
-        cli_overrides.setdefault("embed", {}).setdefault("vectors", {})["format"] = (
-            embed_vector_format
-        )
+        cli_overrides.setdefault("embed", {}).setdefault("vectors", {})[
+            "format"
+        ] = embed_vector_format
 
     # Add any extra overrides (for extensibility)
     if extra_overrides:
@@ -186,7 +186,7 @@ def build_app_context(
 
     try:
         builder.add_profile(profile, profile_file)
-    except ConfigLoadError as e:
+    except ConfigLoadError:
         if profile is not None:
             raise  # Profile was explicitly requested
         # Silently ignore missing profile if not explicitly set

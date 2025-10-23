@@ -79,4 +79,3 @@ __all__ = [
     "NullSparseProvider",
     "NullLexicalProvider",
 ]
-

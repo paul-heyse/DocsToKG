@@ -8,19 +8,32 @@ chunking, and embedding can rely on a single execution core.
 
 from __future__ import annotations
 
+import concurrent.futures as cf
 import json
 import math
 import random
 import time
-import concurrent.futures as cf
 from collections import deque
-from concurrent.futures import FIRST_COMPLETED, Future, TimeoutError as FutureTimeoutError, wait
+from concurrent.futures import FIRST_COMPLETED, Future, wait
+from concurrent.futures import TimeoutError as FutureTimeoutError
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Deque, Dict, Iterable, Iterator, List, Mapping, Optional, Sequence, Tuple, Union
+from typing import (
+    Any,
+    Callable,
+    Deque,
+    Dict,
+    Iterator,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
+)
 
-from DocsToKG.DocParsing.logging import get_logger, log_event
 from DocsToKG.concurrency.executors import create_executor
+from DocsToKG.DocParsing.logging import get_logger, log_event
 
 __all__ = [
     "ItemFingerprint",
@@ -177,7 +190,9 @@ class StageHooks:
     before_stage: Optional[Callable[["StageContext"], None]] = None
     after_stage: Optional[Callable[[StageOutcome, "StageContext"], None]] = None
     before_item: Optional[Callable[[WorkItem, "StageContext"], None]] = None
-    after_item: Optional[Callable[[WorkItem, Union[ItemOutcome, StageError], "StageContext"], None]] = None
+    after_item: Optional[
+        Callable[[WorkItem, Union[ItemOutcome, StageError], "StageContext"], None]
+    ] = None
 
 
 @dataclass(slots=True)
@@ -521,7 +536,9 @@ def run_stage(
             return
 
         future = executor.submit(_call_worker, worker, item)
-        pending[future] = _Submission(item=item, attempt=attempt, enqueue_time=enqueue_time, future=future)
+        pending[future] = _Submission(
+            item=item, attempt=attempt, enqueue_time=enqueue_time, future=future
+        )
         scheduled += 1
 
     def _drain_completed(blocking: bool) -> None:

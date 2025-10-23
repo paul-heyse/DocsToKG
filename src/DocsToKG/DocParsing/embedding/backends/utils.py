@@ -80,4 +80,3 @@ def coerce_telemetry_tags(tags: Optional[Iterable[tuple[str, str]]]) -> dict[str
     for key, value in tags:
         payload[str(key)] = str(value)
     return payload
-

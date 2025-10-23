@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any, Callable, ClassVar, Dict, Mapping, Optional
 
 from DocsToKG.DocParsing.cli_errors import EmbeddingCLIValidationError
-from DocsToKG.DocParsing.config import ConfigLoadError, StageConfigBase
+from DocsToKG.DocParsing.config import StageConfigBase
 from DocsToKG.DocParsing.env import data_chunks, data_vectors, detect_data_root
 
 SPLADE_SPARSITY_WARN_THRESHOLD_PCT: float = 1.0

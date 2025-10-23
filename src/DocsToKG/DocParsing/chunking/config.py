@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any, Callable, ClassVar, Dict, Optional
 
 from DocsToKG.DocParsing.cli_errors import ChunkingCLIValidationError
-from DocsToKG.DocParsing.config import ConfigLoadError, StageConfigBase
+from DocsToKG.DocParsing.config import StageConfigBase
 from DocsToKG.DocParsing.core import DEFAULT_SERIALIZER_PROVIDER, DEFAULT_TOKENIZER
 from DocsToKG.DocParsing.env import data_chunks, data_doctags, detect_data_root
 

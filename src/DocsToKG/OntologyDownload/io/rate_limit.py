@@ -271,9 +271,7 @@ class _PyrateLimiterManager:
         backend_signature = f"sqlite:{resolved}:{table_name}"
         return bucket, backend_signature
 
-    def _expected_backend_signature(
-        self, shared_dir: Optional[Path], limiter_name: str
-    ) -> str:
+    def _expected_backend_signature(self, shared_dir: Optional[Path], limiter_name: str) -> str:
         normalised = _normalise_shared_dir(shared_dir)
         if normalised is None:
             return "memory"
@@ -301,9 +299,8 @@ class _PyrateLimiterManager:
         self._logged.add(name)
 
 
-
-
 _PYRATE_MANAGER = _PyrateLimiterManager()
+
 
 def get_bucket(
     *,

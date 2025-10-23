@@ -124,7 +124,9 @@ def _get_vllm_components():
     return llm_cls, pooling_cls
 
 
-def _qwen_embed_direct(cfg: QwenCfg, texts: Sequence[str], batch_size: Optional[int]) -> List[List[float]]:
+def _qwen_embed_direct(
+    cfg: QwenCfg, texts: Sequence[str], batch_size: Optional[int]
+) -> List[List[float]]:
     effective_batch = batch_size or cfg.batch_size
     use_cache = bool(getattr(cfg, "cache_enabled", True))
     cache_key = _qwen_cache_key(cfg)

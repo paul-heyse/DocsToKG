@@ -26,9 +26,7 @@ class VectorWriterError(RuntimeError):
     """Raised when a vector artifact cannot be written."""
 
     def __init__(self, fmt: str, output_path: Path, original: BaseException) -> None:
-        super().__init__(
-            f"Failed to write vectors in {fmt} format to {output_path}: {original}"
-        )
+        super().__init__(f"Failed to write vectors in {fmt} format to {output_path}: {original}")
         self.format = fmt
         self.output_path = Path(output_path)
         self.original = original
@@ -67,9 +65,7 @@ class UnifiedVectorWriter:
 
         self.output_path.parent.mkdir(parents=True, exist_ok=True)
         if self.fmt == "jsonl":
-            tmp = self.output_path.with_name(
-                f"{self.output_path.name}.tmp.{uuid.uuid4().hex}"
-            )
+            tmp = self.output_path.with_name(f"{self.output_path.name}.tmp.{uuid.uuid4().hex}")
             self._tmp_path = tmp
             self._jsonl_handle = open(tmp, "w", encoding="utf-8")
         return self
@@ -107,9 +103,7 @@ class UnifiedVectorWriter:
         if not self._rows_buffer:
             return False
 
-        tmp_path = self.output_path.with_name(
-            f"{self.output_path.name}.tmp.{uuid.uuid4().hex}"
-        )
+        tmp_path = self.output_path.with_name(f"{self.output_path.name}.tmp.{uuid.uuid4().hex}")
         try:
             table = self._rows_to_arrow_table(self._rows_buffer)
             import pyarrow.parquet as pq
@@ -152,9 +146,7 @@ class UnifiedVectorWriter:
         if self.fmt == "jsonl":
             handle = self._jsonl_handle
             if handle is None:
-                raise RuntimeError(
-                    "JSONL writer is not initialised; use as a context manager"
-                )
+                raise RuntimeError("JSONL writer is not initialised; use as a context manager")
             for row in rows:
                 handle.write(json.dumps(row, ensure_ascii=False))
                 handle.write("\n")

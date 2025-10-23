@@ -189,12 +189,13 @@ from dataclasses import dataclass, fields
 from types import SimpleNamespace
 from typing import Any, Dict, Iterable, Iterator, List, Mapping, Optional, Sequence, Tuple, Union
 
+import pyarrow.parquet as pq
+
 # Third-party imports
 from docling_core.transforms.chunker.base import BaseChunk
 from docling_core.transforms.chunker.hybrid_chunker import HybridChunker
 from docling_core.transforms.chunker.tokenizer.huggingface import HuggingFaceTokenizer
 from docling_core.types.doc.document import DoclingDocument, DocTagsDocument
-import pyarrow.parquet as pq
 from transformers import AutoTokenizer
 
 # --- Globals ---
@@ -860,9 +861,7 @@ def _inspect_parquet_chunk_file(path: Path) -> Tuple[int, int, Tuple[str, ...]]:
         except KeyError as exc:  # pragma: no cover - defensive guard
             raise ValueError(f"Missing required column: {field.name}") from exc
         if actual.type != field.type:
-            raise ValueError(
-                f"Column {field.name} has type {actual.type}, expected {field.type}"
-            )
+            raise ValueError(f"Column {field.name} has type {actual.type}, expected {field.type}")
 
     footer = parquet_schemas.validate_parquet_file(str(path))
     if not footer.ok:
@@ -870,14 +869,12 @@ def _inspect_parquet_chunk_file(path: Path) -> Tuple[int, int, Tuple[str, ...]]:
         raise ValueError(detail)
 
     row_count = int(parquet_file.metadata.num_rows) if parquet_file.metadata else 0
-    row_groups = (
-        int(parquet_file.metadata.num_row_groups) if parquet_file.metadata else 0
-    )
+    row_groups = int(parquet_file.metadata.num_row_groups) if parquet_file.metadata else 0
     return row_count, row_groups, footer.warnings
 
 
 def _normalise_validation_targets(
-    targets: Sequence[Union[Path, Tuple[str, Path]]]
+    targets: Sequence[Union[Path, Tuple[str, Path]]],
 ) -> List[Tuple[str, Path]]:
     """Coerce validation targets into ``(doc_id, Path)`` tuples."""
 
@@ -1167,9 +1164,7 @@ def _compute_worker_cfg_hash(config: ChunkWorkerConfig) -> str:
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
 
-def _write_fingerprint_for_output(
-    output_path: Path, *, input_sha256: str, cfg_hash: str
-) -> Path:
+def _write_fingerprint_for_output(output_path: Path, *, input_sha256: str, cfg_hash: str) -> Path:
     """Persist the resume fingerprint alongside ``output_path`` and return its location."""
 
     fingerprint_path = output_path.with_name(f"{output_path.name}.fp.json")
@@ -1219,9 +1214,7 @@ def _build_chunk_plan(
         sanitizer_profile = entry.get("sanitizer_profile")
         manifest_output_path_str = entry.get("output_path") if isinstance(entry, Mapping) else None
         manifest_output_path = (
-            Path(str(manifest_output_path_str))
-            if manifest_output_path_str
-            else planned_output_path
+            Path(str(manifest_output_path_str)) if manifest_output_path_str else planned_output_path
         )
         fingerprint_path = manifest_output_path.with_name(f"{manifest_output_path.name}.fp.json")
         metadata: Dict[str, Any] = {

@@ -242,9 +242,9 @@ def get_http_session(
     timeout: Optional[object] = None,
     base_headers: Optional[Mapping[str, str]] = None,
     retry_total: int = 5,
-   retry_backoff: float = 0.5,
-   status_forcelist: Sequence[int] = (429, 500, 502, 503, 504),
-   allowed_methods: Sequence[str] = ("GET", "HEAD", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"),
+    retry_backoff: float = 0.5,
+    status_forcelist: Sequence[int] = (429, 500, 502, 503, 504),
+    allowed_methods: Sequence[str] = ("GET", "HEAD", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"),
 ) -> Tuple[TenacityClient, Tuple[float, float]]:
     """Return a shared :class:`httpx.Client` configured with retries."""
 
@@ -275,7 +275,9 @@ def get_http_session(
         session._set_default_timeout(effective_timeout)
 
         if base_headers:
-            header_map = {str(key): str(value) for key, value in base_headers.items() if value is not None}
+            header_map = {
+                str(key): str(value) for key, value in base_headers.items() if value is not None
+            }
             session_to_return: TenacityClient = session.clone_with_headers(header_map)
             session_to_return._set_default_timeout(effective_timeout)
         else:
