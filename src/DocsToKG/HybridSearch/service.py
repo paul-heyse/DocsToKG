@@ -16,6 +16,12 @@
 #       "kind": "class"
 #     },
 #     {
+#       "id": "adaptivedenseplanner",
+#       "name": "AdaptiveDensePlanner",
+#       "anchor": "class-adaptivedenseplanner",
+#       "kind": "class"
+#     },
+#     {
 #       "id": "channelresults",
 #       "name": "ChannelResults",
 #       "anchor": "class-channelresults",
@@ -82,6 +88,12 @@
 #       "kind": "class"
 #     },
 #     {
+#       "id": "jsonldataset",
+#       "name": "JsonlDataset",
+#       "anchor": "class-jsonldataset",
+#       "kind": "class"
+#     },
+#     {
 #       "id": "load-dataset",
 #       "name": "load_dataset",
 #       "anchor": "function-load-dataset",
@@ -132,6 +144,7 @@ import time
 
 # --- Strategy Helpers ---
 from collections import OrderedDict, defaultdict
+from collections.abc import Iterable, Iterator, Mapping, MutableMapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -140,15 +153,6 @@ from pathlib import Path
 from threading import RLock
 from typing import (
     Any,
-    Dict,
-    Iterable,
-    Iterator,
-    List,
-    Mapping,
-    MutableMapping,
-    Optional,
-    Sequence,
-    Tuple,
 )
 
 import numpy as np
@@ -258,14 +262,14 @@ class DenseSearchStrategy:
         alpha: float = 0.20,
         initial_pass_rate: float = 0.75,
         cache_limit: int = 64,
-        cache_path: Optional[Path] = None,
+        cache_path: Path | None = None,
     ) -> None:
         self._alpha = float(alpha)
         self._pass_rate = max(1e-3, min(1.0, float(initial_pass_rate)))
         self._cache_limit = int(cache_limit)
-        self._cache: "OrderedDict[Tuple[object, ...], int]" = OrderedDict()
+        self._cache: OrderedDict[tuple[object, ...], int] = OrderedDict()
         self._lock = RLock()
-        self._signature_pass: Dict[Tuple[object, ...], float] = {}
+        self._signature_pass: dict[tuple[object, ...], float] = {}
         self._cache_path = Path(cache_path) if cache_path is not None else None
         self._dirty = False
         if self._cache_path is not None:
@@ -273,11 +277,11 @@ class DenseSearchStrategy:
 
     def plan(
         self,
-        signature: Tuple[object, ...],
+        signature: tuple[object, ...],
         *,
         page_size: int,
-        retrieval_cfg: "RetrievalConfig",
-        dense_cfg: "DenseIndexConfig",
+        retrieval_cfg: RetrievalConfig,
+        dense_cfg: DenseIndexConfig,
         min_k: int = 0,
     ) -> tuple[int, float, float]:
         """Return the requested ``k`` and oversampling knobs for a dense search."""
@@ -305,7 +309,7 @@ class DenseSearchStrategy:
 
     def observe_pass_rate(
         self,
-        signature: Tuple[object, ...],
+        signature: tuple[object, ...],
         observed: float,
         *,
         update_global: bool = True,
@@ -327,7 +331,7 @@ class DenseSearchStrategy:
             self._dirty = True
             return local_rate
 
-    def remember(self, signature: Tuple[object, ...], k: int) -> None:
+    def remember(self, signature: tuple[object, ...], k: int) -> None:
         """Cache ``k`` for ``signature`` to seed future requests."""
 
         with self._lock:
@@ -337,7 +341,7 @@ class DenseSearchStrategy:
                 self._cache.popitem(last=False)
             self._dirty = True
 
-    def has_cache(self, signature: Tuple[object, ...]) -> bool:
+    def has_cache(self, signature: tuple[object, ...]) -> bool:
         """Return ``True`` when ``signature`` has a cached ``k`` value."""
 
         with self._lock:
@@ -463,9 +467,9 @@ class ChannelResults:
     downstream GPU deduplication and diversification reuse.
     """
 
-    candidates: List[FusionCandidate]
-    scores: Dict[str, float]
-    embeddings: Optional[np.ndarray] = None
+    candidates: list[FusionCandidate]
+    scores: dict[str, float]
+    embeddings: np.ndarray | None = None
 
 
 class ReciprocalRankFusion:
@@ -479,7 +483,7 @@ class ReciprocalRankFusion:
         self._k0 = k0
         self._weights = dict(channel_weights or {})
 
-    def fuse(self, candidates: Sequence[FusionCandidate]) -> Dict[str, float]:
+    def fuse(self, candidates: Sequence[FusionCandidate]) -> dict[str, float]:
         """Combine channel rankings into fused scores keyed by vector id.
 
         Args:
@@ -488,7 +492,7 @@ class ReciprocalRankFusion:
         Returns:
             Mapping from vector identifiers to fused RRF scores.
         """
-        scores: Dict[str, float] = defaultdict(float)
+        scores: dict[str, float] = defaultdict(float)
         for candidate in candidates:
             weight = float(self._weights.get(candidate.source, 1.0))
             contribution = weight * (1.0 / (self._k0 + candidate.rank))
@@ -505,11 +509,11 @@ class ResultShaper:
         fusion_config: FusionConfig,
         *,
         device: int = 0,
-        resources: Optional["faiss.StandardGpuResources"] = None,
-        channel_weights: Optional[Mapping[str, float]] = None,
+        resources: faiss.StandardGpuResources | None = None,
+        channel_weights: Mapping[str, float] | None = None,
         fp16_enabled: bool = False,
-        cuvs_requested: Optional[bool] = None,
-        registry: Optional[ChunkRegistry] = None,
+        cuvs_requested: bool | None = None,
+        registry: ChunkRegistry | None = None,
     ) -> None:
         self._opensearch = opensearch
         self._fusion_config = fusion_config
@@ -525,10 +529,10 @@ class ResultShaper:
         ordered_chunks: Sequence[ChunkPayload],
         fused_scores: Mapping[str, float],
         request: HybridSearchRequest,
-        channel_scores: Optional[Mapping[str, Dict[str, float]]] = None,
+        channel_scores: Mapping[str, dict[str, float]] | None = None,
         *,
-        precomputed_embeddings: Optional[np.ndarray] = None,
-    ) -> List[HybridSearchResult]:
+        precomputed_embeddings: np.ndarray | None = None,
+    ) -> list[HybridSearchResult]:
         """Shape ranked chunks into API responses with highlights and diagnostics.
 
         Args:
@@ -546,7 +550,7 @@ class ResultShaper:
             return []
 
         include_diagnostics = bool(request.diagnostics)
-        score_lookup: Mapping[str, Dict[str, float]] = channel_scores or {}
+        score_lookup: Mapping[str, dict[str, float]] = channel_scores or {}
 
         if precomputed_embeddings is not None:
             embeddings = np.ascontiguousarray(precomputed_embeddings, dtype=np.float32)
@@ -560,9 +564,9 @@ class ResultShaper:
                 [chunk.vector_id for chunk in ordered_chunks]
             )
 
-        doc_buckets: Dict[str, int] = defaultdict(int)
-        emitted_indices: List[int] = []
-        results: List[HybridSearchResult] = []
+        doc_buckets: dict[str, int] = defaultdict(int)
+        emitted_indices: list[int] = []
+        results: list[HybridSearchResult] = []
         query_tokens = tokenize(request.query)
         token_budget = int(self._fusion_config.token_budget)
         byte_budget = int(self._fusion_config.byte_budget)
@@ -584,7 +588,7 @@ class ResultShaper:
                 break
             if byte_budget and bytes_used + chunk_bytes > byte_budget:
                 break
-            diagnostics: Optional[HybridSearchDiagnostics]
+            diagnostics: HybridSearchDiagnostics | None
             if include_diagnostics:
                 diagnostics = HybridSearchDiagnostics(
                     bm25_score=score_lookup.get("bm25", {}).get(chunk.vector_id),
@@ -648,7 +652,7 @@ class ResultShaper:
         sims = (corpus @ query) / (other_norms * query_norm)
         return float(sims.max()) >= self._fusion_config.cosine_dedupe_threshold
 
-    def _build_highlights(self, chunk: ChunkPayload, query_tokens: Sequence[str]) -> List[str]:
+    def _build_highlights(self, chunk: ChunkPayload, query_tokens: Sequence[str]) -> list[str]:
         highlights = self._opensearch.highlight(chunk, query_tokens)
         if highlights:
             return list(highlights)
@@ -664,14 +668,14 @@ def apply_mmr_diversification(
     lambda_param: float,
     top_k: int,
     *,
-    embeddings: Optional[np.ndarray] = None,
+    embeddings: np.ndarray | None = None,
     device: int = 0,
-    resources: Optional["faiss.StandardGpuResources"] = None,
+    resources: faiss.StandardGpuResources | None = None,
     use_fp16: bool = False,
     block_rows: int = 4096,
-    use_cuvs: Optional[bool] = None,
-    registry: Optional[ChunkRegistry] = None,
-) -> List[FusionCandidate]:
+    use_cuvs: bool | None = None,
+    registry: ChunkRegistry | None = None,
+) -> list[FusionCandidate]:
     """Diversify fused candidates using Maximum Marginal Relevance.
 
     Args:
@@ -716,10 +720,10 @@ def apply_mmr_diversification(
         [fused_scores.get(candidate.chunk.vector_id, 0.0) for candidate in fused_candidates],
         dtype=np.float32,
     )
-    selected: List[int] = []
+    selected: list[int] = []
     remaining = np.arange(total, dtype=np.int64)
     max_sim = np.zeros(total, dtype=np.float32)
-    neighbor_lookup: Optional[List[Dict[int, float]]] = None
+    neighbor_lookup: list[dict[int, float]] | None = None
 
     def _cosine_cpu(query: np.ndarray, pool: np.ndarray) -> np.ndarray:
         norms = np.linalg.norm(pool, axis=1)
@@ -747,7 +751,7 @@ def apply_mmr_diversification(
             for row in range(total):
                 row_scores = scores_block[row]
                 row_indices = indices_block[row]
-                row_map: Dict[int, float] = {}
+                row_map: dict[int, float] = {}
                 for score, idx in zip(row_scores, row_indices):
                     candidate_idx = int(idx)
                     if candidate_idx < 0 or candidate_idx == row:
@@ -847,9 +851,9 @@ class HybridSearchService:
         faiss_index: DenseVectorStore,
         opensearch: LexicalIndex,
         registry: ChunkRegistry,
-        observability: Optional[Observability] = None,
-        faiss_router: Optional[FaissRouter] = None,
-        dense_strategy_cache_path: Optional[Path] = None,
+        observability: Observability | None = None,
+        faiss_router: FaissRouter | None = None,
+        dense_strategy_cache_path: Path | None = None,
     ) -> None:
         """Initialise the hybrid search service.
 
@@ -942,7 +946,7 @@ class HybridSearchService:
         desired = int(getattr(retrieval_cfg, "executor_max_workers", 0) or 3)
         if desired < 1:
             desired = 1
-        old_executor: Optional[ThreadPoolExecutor] = None
+        old_executor: ThreadPoolExecutor | None = None
         with self._executor_lock:
             current = getattr(self, "_executor_max_workers", None)
             if current == desired:
@@ -996,7 +1000,7 @@ class HybridSearchService:
         recall_first = bool(getattr(request, "recall_first", False))
 
         with self._observability.trace("hybrid_search", namespace=request.namespace or "*"):
-            timings: Dict[str, float] = {}
+            timings: dict[str, float] = {}
             total_start = time.perf_counter()
             query_start = time.perf_counter()
             query_features = self._feature_generator.compute_features(request.query)
@@ -1062,8 +1066,8 @@ class HybridSearchService:
                 dense_store,
             )
             futures = {"bm25": f_bm25, "splade": f_splade, "dense": f_dense}
-            channel_results: Dict[str, ChannelResults] = {}
-            failed_channel: Optional[str] = None
+            channel_results: dict[str, ChannelResults] = {}
+            failed_channel: str | None = None
             try:
                 for channel_name in ("bm25", "splade", "dense"):
                     failed_channel = channel_name
@@ -1107,7 +1111,7 @@ class HybridSearchService:
             splade = channel_results["splade"]
             dense = channel_results["dense"]
 
-            embedding_cache: Dict[str, np.ndarray] = {}
+            embedding_cache: dict[str, np.ndarray] = {}
             if dense.embeddings is not None:
                 for candidate, row in zip(dense.candidates, dense.embeddings):
                     embedding_cache[candidate.chunk.vector_id] = row
@@ -1229,7 +1233,7 @@ class HybridSearchService:
                 diversified_embeddings = None
 
             ordered_chunks = [candidate.chunk for candidate in diversified]
-            channel_score_map: Optional[Mapping[str, Dict[str, float]]]
+            channel_score_map: Mapping[str, dict[str, float]] | None
             if request.diagnostics:
                 channel_score_map = {
                     "bm25": bm25.scores,
@@ -1329,7 +1333,7 @@ class HybridSearchService:
             return
         iter_fn = getattr(router, "iter_stores", None)
         if callable(iter_fn):
-            stores: Iterable[Tuple[str, DenseVectorStore]] = iter_fn()
+            stores: Iterable[tuple[str, DenseVectorStore]] = iter_fn()
         else:
             default_store = getattr(router, "default_store", None)
             if default_store is None:
@@ -1350,7 +1354,7 @@ class HybridSearchService:
                     extra={"event": {"namespace": namespace}},
                 )
 
-    def _dense_store(self, namespace: Optional[str]) -> DenseVectorStore:
+    def _dense_store(self, namespace: str | None) -> DenseVectorStore:
         store = self._faiss_router.get(namespace)
         self._assert_managed_store(store)
         return store
@@ -1358,11 +1362,11 @@ class HybridSearchService:
     def _slice_from_cursor(
         self,
         results: Sequence[HybridSearchResult],
-        cursor: Optional[str],
+        cursor: str | None,
         page_size: int,
         fingerprint: str,
         recall_first: bool,
-    ) -> List[HybridSearchResult]:
+    ) -> list[HybridSearchResult]:
         if not cursor:
             return list(results)
         try:
@@ -1407,7 +1411,7 @@ class HybridSearchService:
         page_size: int,
         fingerprint: str,
         recall_first: bool,
-    ) -> Optional[str]:
+    ) -> str | None:
         if len(results) <= page_size:
             return None
         last = results[page_size - 1]
@@ -1430,10 +1434,10 @@ class HybridSearchService:
         self,
         results: Sequence[HybridSearchResult],
         vector_id: str,
-        score: Optional[float],
-        rank: Optional[int],
-    ) -> List[HybridSearchResult]:
-        sliced: List[HybridSearchResult] = []
+        score: float | None,
+        rank: int | None,
+    ) -> list[HybridSearchResult]:
+        sliced: list[HybridSearchResult] = []
         skipping = True
         for result in results:
             if skipping:
@@ -1449,7 +1453,7 @@ class HybridSearchService:
             sliced.append(result)
         return sliced if not skipping else list(results)
 
-    def run_compaction_cycle(self) -> Dict[str, Dict[str, object]]:
+    def run_compaction_cycle(self) -> dict[str, dict[str, object]]:
         """Trigger FAISS maintenance (rebuild/compact) and emit diagnostics."""
 
         start = time.perf_counter()
@@ -1471,7 +1475,7 @@ class HybridSearchService:
             except (TypeError, ValueError):
                 return 0.0
 
-        summary: Dict[str, Dict[str, object]] = {}
+        summary: dict[str, dict[str, object]] = {}
         for namespace, action in actions.items():
             before_dirty = _dirty(before, namespace)
             after_dirty = _dirty(after, namespace)
@@ -1514,14 +1518,14 @@ class HybridSearchService:
         filters: Mapping[str, object],
         config: HybridSearchConfig,
         query_features: ChunkFeatures,
-        timings: Dict[str, float],
+        timings: dict[str, float],
     ) -> ChannelResults:
         start = time.perf_counter()
         use_true_bm25 = getattr(config.retrieval, "bm25_scoring", "compat") == "true" and hasattr(
             self._opensearch, "search_bm25_true"
         )
         if use_true_bm25:
-            hits, _ = getattr(self._opensearch, "search_bm25_true")(
+            hits, _ = self._opensearch.search_bm25_true(
                 query_features.bm25_terms,
                 filters,
                 top_k=config.retrieval.bm25_top_k,
@@ -1560,7 +1564,7 @@ class HybridSearchService:
         filters: Mapping[str, object],
         config: HybridSearchConfig,
         query_features: ChunkFeatures,
-        timings: Dict[str, float],
+        timings: dict[str, float],
     ) -> ChannelResults:
         start = time.perf_counter()
         hits, _ = self._opensearch.search_splade(
@@ -1596,7 +1600,7 @@ class HybridSearchService:
         filters: Mapping[str, object],
         config: HybridSearchConfig,
         query_features: ChunkFeatures,
-        timings: Dict[str, float],
+        timings: dict[str, float],
         store: DenseVectorStore,
     ) -> ChannelResults:
         start = time.perf_counter()
@@ -1612,7 +1616,7 @@ class HybridSearchService:
             dense_cfg=config.dense,
         )
         queries = np.asarray([query_features.embedding], dtype=np.float32)
-        adapter_stats: Optional[AdapterStats]
+        adapter_stats: AdapterStats | None
         try:
             adapter_stats = store.adapter_stats  # type: ignore[attr-defined]
         except AttributeError:
@@ -1671,10 +1675,10 @@ class HybridSearchService:
                 self._observability.metrics.set_gauge(
                     "nprobe_in_effect", float(adapter_stats.nprobe), channel="dense"
                 )
-            candidates: List[FusionCandidate] = []
-            scores: Dict[str, float] = {}
-            embedding_cache_local: Dict[str, np.ndarray] = {}
-            resolved_hits: List[tuple[FaissSearchResult, ChunkPayload]] = []
+            candidates: list[FusionCandidate] = []
+            scores: dict[str, float] = {}
+            embedding_cache_local: dict[str, np.ndarray] = {}
+            resolved_hits: list[tuple[FaissSearchResult, ChunkPayload]] = []
             for hit in bounded_filtered:
                 chunk = payloads.get(hit.vector_id)
                 if chunk is None:
@@ -1789,10 +1793,10 @@ class HybridSearchService:
             self._observability.metrics.set_gauge(
                 "nprobe_in_effect", float(adapter_stats.nprobe), channel="dense"
             )
-        candidates: List[FusionCandidate] = []
-        scores: Dict[str, float] = {}
-        embedding_cache_local: Dict[str, np.ndarray] = {}
-        resolved_hits: List[tuple[FaissSearchResult, ChunkPayload]] = []
+        candidates: list[FusionCandidate] = []
+        scores: dict[str, float] = {}
+        embedding_cache_local: dict[str, np.ndarray] = {}
+        resolved_hits: list[tuple[FaissSearchResult, ChunkPayload]] = []
         for hit in filtered:
             chunk = payloads.get(hit.vector_id)
             if chunk is None:
@@ -1819,7 +1823,7 @@ class HybridSearchService:
         hits: Sequence[FaissSearchResult],
         filters: Mapping[str, object],
         score_floor: float,
-    ) -> tuple[List[FaissSearchResult], Dict[str, ChunkPayload]]:
+    ) -> tuple[list[FaissSearchResult], dict[str, ChunkPayload]]:
         if not hits:
             return [], {}
         vector_ids = [hit.vector_id for hit in hits]
@@ -1889,8 +1893,8 @@ class HybridSearchService:
         self,
         candidates: Sequence[FusionCandidate],
         fused_scores: Mapping[str, float],
-    ) -> List[FusionCandidate]:
-        unique: Dict[str, FusionCandidate] = {}
+    ) -> list[FusionCandidate]:
+        unique: dict[str, FusionCandidate] = {}
         for candidate in candidates:
             vector_id = candidate.chunk.vector_id
             best = unique.get(vector_id)
@@ -1956,9 +1960,9 @@ class HybridSearchAPI:
         except Exception as exc:  # pragma: no cover - defensive guard
             return HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)}
 
-        results: List[Mapping[str, Any]] = []
+        results: list[Mapping[str, Any]] = []
         for result in response.results:
-            item: Dict[str, Any] = {
+            item: dict[str, Any] = {
                 "doc_id": result.doc_id,
                 "chunk_id": result.chunk_id,
                 "namespace": result.namespace,
@@ -2013,7 +2017,7 @@ class HybridSearchAPI:
             recall_first=recall_first,
         )
 
-    def _normalize_filters(self, payload: Optional[Mapping[str, Any]]) -> MutableMapping[str, Any]:
+    def _normalize_filters(self, payload: Mapping[str, Any] | None) -> MutableMapping[str, Any]:
         normalized: MutableMapping[str, Any] = {}
         if not payload:
             return normalized
@@ -2080,7 +2084,7 @@ def verify_pagination(
     service: HybridSearchService,
     request: HybridSearchRequest,
     *,
-    max_pages: Optional[int] = None,
+    max_pages: int | None = None,
 ) -> PaginationCheckResult:
     """Ensure pagination cursors produce non-duplicated results.
 
@@ -2107,9 +2111,9 @@ def verify_pagination(
         except Exception:
             page_size = 1
 
-        mmr_pool_size: Optional[float] = None
+        mmr_pool_size: float | None = None
         try:
-            config_manager = getattr(service, "_config_manager")
+            config_manager = service._config_manager
             config = config_manager.get() if config_manager is not None else None  # type: ignore[attr-defined]
         except Exception:
             config = None
@@ -2123,7 +2127,7 @@ def verify_pagination(
                 if section is None:
                     continue
                 try:
-                    candidate = getattr(section, "mmr_pool_size")
+                    candidate = section.mmr_pool_size
                 except Exception:
                     continue
                 if isinstance(candidate, (int, float)) and candidate > 0:
@@ -2198,7 +2202,7 @@ def should_rebuild_index(
 
 # --- Validation Utilities ---
 
-DEFAULT_SCALE_THRESHOLDS: Dict[str, float] = {
+DEFAULT_SCALE_THRESHOLDS: dict[str, float] = {
     "dense_self_hit": 0.99,
     "dense_recall_at_10": 0.95,
     "dense_perturb_top3": 0.95,
@@ -2263,10 +2267,10 @@ class HybridSearchValidator:
         self._service = service
         self._registry = registry
         self._opensearch = opensearch
-        self._validation_resources: Optional["faiss.StandardGpuResources"] = None
+        self._validation_resources: faiss.StandardGpuResources | None = None
 
     def run(
-        self, dataset: Sequence[Mapping[str, object]], output_root: Optional[Path] = None
+        self, dataset: Sequence[Mapping[str, object]], output_root: Path | None = None
     ) -> ValidationSummary:
         """Execute standard validation against a dataset.
 
@@ -2280,7 +2284,7 @@ class HybridSearchValidator:
         started = datetime.now(UTC)
         documents = [self._to_document(entry["document"]) for entry in dataset]
         self._ingestion.upsert_documents(documents)
-        reports: List[ValidationReport] = []
+        reports: list[ValidationReport] = []
         reports.append(self._check_ingest_integrity())
         reports.append(self._check_dense_self_hit())
         reports.append(self._check_sparse_relevance(dataset))
@@ -2301,8 +2305,8 @@ class HybridSearchValidator:
         self,
         dataset: Sequence[Mapping[str, object]],
         *,
-        output_root: Optional[Path] = None,
-        thresholds: Optional[Mapping[str, float]] = None,
+        output_root: Path | None = None,
+        thresholds: Mapping[str, float] | None = None,
         query_sample_size: int = 120,
     ) -> ValidationSummary:
         """Execute a comprehensive scale validation suite.
@@ -2316,7 +2320,7 @@ class HybridSearchValidator:
         Returns:
             ValidationSummary with detailed per-check reports.
         """
-        merged_thresholds: Dict[str, float] = dict(DEFAULT_SCALE_THRESHOLDS)
+        merged_thresholds: dict[str, float] = dict(DEFAULT_SCALE_THRESHOLDS)
         if thresholds:
             merged_thresholds.update(thresholds)
 
@@ -2326,8 +2330,8 @@ class HybridSearchValidator:
         self._ingestion.upsert_documents(documents)
         rng = random.Random(1337)
 
-        reports: List[ValidationReport] = []
-        extras: Dict[str, Mapping[str, object]] = {}
+        reports: list[ValidationReport] = []
+        extras: dict[str, Mapping[str, object]] = {}
 
         data_report = self._scale_data_sanity(documents, dataset)
         reports.append(data_report)
@@ -2443,7 +2447,7 @@ class HybridSearchValidator:
         """
         total = 0
         hits_met = 0
-        embedding_cache: Dict[str, np.ndarray] = {}
+        embedding_cache: dict[str, np.ndarray] = {}
         for chunk in self._registry.all():
             total += 1
             query_vector = self._registry.resolve_embedding(chunk.vector_id, cache=embedding_cache)
@@ -2626,10 +2630,10 @@ class HybridSearchValidator:
     def _persist_reports(
         self,
         summary: ValidationSummary,
-        output_root: Optional[Path],
-        calibration_details: Optional[Mapping[str, object]],
+        output_root: Path | None,
+        calibration_details: Mapping[str, object] | None,
         *,
-        extras: Optional[Mapping[str, Mapping[str, object]]] = None,
+        extras: Mapping[str, Mapping[str, object]] | None = None,
     ) -> None:
         """Persist validation summaries and detailed metrics to disk.
 
@@ -2673,7 +2677,7 @@ class HybridSearchValidator:
 
     def _collect_queries(
         self, dataset: Sequence[Mapping[str, object]]
-    ) -> List[tuple[Mapping[str, object], Mapping[str, object]]]:
+    ) -> list[tuple[Mapping[str, object], Mapping[str, object]]]:
         """Collect (document, query) pairs from the dataset.
 
         Args:
@@ -2682,7 +2686,7 @@ class HybridSearchValidator:
         Returns:
             List of tuples pairing document payloads with query payloads.
         """
-        pairs: List[tuple[Mapping[str, object], Mapping[str, object]]] = []
+        pairs: list[tuple[Mapping[str, object], Mapping[str, object]]] = []
         for entry in dataset:
             document_payload = entry.get("document", {})
             for query in entry.get("queries", []):
@@ -2694,7 +2698,7 @@ class HybridSearchValidator:
         dataset: Sequence[Mapping[str, object]],
         sample_size: int,
         rng: random.Random,
-    ) -> List[tuple[Mapping[str, object], Mapping[str, object]]]:
+    ) -> list[tuple[Mapping[str, object], Mapping[str, object]]]:
         """Sample a subset of (document, query) pairs for randomized checks.
 
         Args:
@@ -2730,7 +2734,7 @@ class HybridSearchValidator:
         namespaces = sorted({doc.namespace for doc in documents})
         dims: set[int] = set()
         invalid_vectors = 0
-        embedding_cache: Dict[str, np.ndarray] = {}
+        embedding_cache: dict[str, np.ndarray] = {}
         for chunk in self._registry.all():
             vector = self._registry.resolve_embedding(chunk.vector_id, cache=embedding_cache)
             dims.add(vector.shape[0])
@@ -2739,7 +2743,7 @@ class HybridSearchValidator:
         acl_missing = sum(1 for doc in documents if not doc.metadata.get("acl"))
         query_pairs = self._collect_queries(dataset)
         passed = len(dims) == 1 and invalid_vectors == 0 and acl_missing == 0
-        details: Dict[str, object] = {
+        details: dict[str, object] = {
             "total_documents": len(documents),
             "total_queries": len(query_pairs),
             "total_chunks": total_chunks,
@@ -2804,13 +2808,13 @@ class HybridSearchValidator:
             and self._ingestion.faiss_index.ntotal == initial_faiss
         )
 
-        namespace_pairs: Dict[str, List[Mapping[str, object]]] = {}
+        namespace_pairs: dict[str, list[Mapping[str, object]]] = {}
         for document_payload, query_payload in self._collect_queries(dataset):
             namespace = query_payload.get("namespace") or document_payload.get("namespace")
             if namespace:
                 namespace_pairs.setdefault(str(namespace), []).append(query_payload)
 
-        namespace_violations: List[str] = []
+        namespace_violations: list[str] = []
         for namespace, queries in namespace_pairs.items():
             sample = queries[: min(5, len(queries))]
             for query_payload in sample:
@@ -2823,7 +2827,7 @@ class HybridSearchValidator:
                 if namespace_violations:
                     break
 
-        details: Dict[str, object] = {
+        details: dict[str, object] = {
             "updates_tested": update_count,
             "deletes_tested": delete_count,
             "namespaces_checked": sorted(namespace_pairs.keys()),
@@ -2863,10 +2867,10 @@ class HybridSearchValidator:
         top_k = min(10, len(all_chunks))
         self_hits = 0
         perturb_hits = 0
-        recalls: List[float] = []
+        recalls: list[float] = []
 
         # Precompute matrix for brute-force recall estimates.
-        embedding_cache: Dict[str, np.ndarray] = {}
+        embedding_cache: dict[str, np.ndarray] = {}
         vector_ids = [chunk.vector_id for chunk in all_chunks]
         vector_matrix = self._registry.resolve_embeddings(vector_ids, cache=embedding_cache)
         vector_matrix = np.asarray(vector_matrix, dtype=np.float32)
@@ -2896,8 +2900,8 @@ class HybridSearchValidator:
         gpu_resources = resources
         scratch_index = None
         using_gpu_ground_truth = False
-        ordered_vector_ids: List[str] = list(vector_ids)
-        normalized_cpu_vectors: Optional[List[np.ndarray]] = None
+        ordered_vector_ids: list[str] = list(vector_ids)
+        normalized_cpu_vectors: list[np.ndarray] | None = None
         embedding_dim = int(vector_matrix.shape[1]) if vector_matrix.size else 0
         if embedding_dim <= 0:
             embedding_dim = int(
@@ -3047,12 +3051,12 @@ class HybridSearchValidator:
         dense_hits = 0
         rrf_hits = 0
 
-        bm25_ranks: List[int] = []
-        splade_ranks: List[int] = []
-        dense_ranks: List[int] = []
-        rrf_ranks: List[int] = []
+        bm25_ranks: list[int] = []
+        splade_ranks: list[int] = []
+        dense_ranks: list[int] = []
+        rrf_ranks: list[int] = []
 
-        doc_to_embedding: Dict[Tuple[str, str], np.ndarray] = {}
+        doc_to_embedding: dict[tuple[str, str], np.ndarray] = {}
         registry_chunks = self._registry.all()
         if registry_chunks:
             vectors = self._registry.resolve_embeddings(
@@ -3098,7 +3102,7 @@ class HybridSearchValidator:
                 splade_ranks.append(splade_doc_ids.index(expected_doc_id) + 1)
 
             dense_results = self._ingestion.faiss_index.search(dense_query_vector, 10)
-            dense_doc_ids: List[str] = []
+            dense_doc_ids: list[str] = []
             for hit in dense_results:
                 payload = self._registry.get(hit.vector_id)
                 if payload is not None:
@@ -3119,7 +3123,7 @@ class HybridSearchValidator:
         dense_rate = dense_hits / total_queries
         rrf_rate = rrf_hits / total_queries
 
-        details: Dict[str, object] = {
+        details: dict[str, object] = {
             "query_count": total_queries,
             "bm25_hit_rate@10": bm25_rate,
             "splade_hit_rate@10": splade_rate,
@@ -3169,9 +3173,9 @@ class HybridSearchValidator:
             (chunk.namespace, chunk.doc_id, chunk.chunk_id): chunk for chunk in self._registry.all()
         }
 
-        redundancy_reductions: List[float] = []
-        rrf_cosines: List[float] = []
-        mmr_cosines: List[float] = []
+        redundancy_reductions: list[float] = []
+        rrf_cosines: list[float] = []
+        mmr_cosines: list[float] = []
         rrf_hits = 0
         mmr_hits = 0
 
@@ -3316,13 +3320,13 @@ class HybridSearchValidator:
         doc_limit_violations = 0
         dedupe_violations = 0
         highlight_missing = 0
-        embedding_cache: Dict[str, np.ndarray] = {}
+        embedding_cache: dict[str, np.ndarray] = {}
 
         for _, query_payload in sampled_pairs:
             request = self._request_for_query(query_payload, page_size=20)
             response = self._service.search(request)
-            doc_counts: Dict[str, int] = {}
-            embeddings: List[np.ndarray] = []
+            doc_counts: dict[str, int] = {}
+            embeddings: list[np.ndarray] = []
 
             for result in response.results:
                 doc_counts[result.doc_id] = doc_counts.get(result.doc_id, 0) + 1
@@ -3383,7 +3387,7 @@ class HybridSearchValidator:
 
         snapshot = serialize_state(self._ingestion.faiss_index, self._registry)
 
-        baseline_results: List[List[tuple[str, float]]] = []
+        baseline_results: list[list[tuple[str, float]]] = []
         for _, query_payload in sampled_pairs:
             request = self._request_for_query(query_payload, page_size=15)
             response = self._service.search(request)
@@ -3417,8 +3421,8 @@ class HybridSearchValidator:
         Returns:
             ValidationReport listing ACL violations, if discovered.
         """
-        namespace_to_acl: Dict[str, str] = {}
-        namespace_queries: Dict[str, List[Mapping[str, object]]] = {}
+        namespace_to_acl: dict[str, str] = {}
+        namespace_queries: dict[str, list[Mapping[str, object]]] = {}
         for entry in dataset:
             document = entry.get("document", {})
             namespace = str(document.get("namespace", ""))
@@ -3429,7 +3433,7 @@ class HybridSearchValidator:
             for query in entry.get("queries", []):
                 namespace_queries.setdefault(namespace, []).append(query)
 
-        violations: List[str] = []
+        violations: list[str] = []
         checked = 0
         for namespace, queries in namespace_queries.items():
             acl_tag = namespace_to_acl.get(namespace)
@@ -3499,10 +3503,10 @@ class HybridSearchValidator:
                 details={"error": "no queries available"},
             )
 
-        total_timings: List[float] = []
-        bm25_timings: List[float] = []
-        splade_timings: List[float] = []
-        dense_timings: List[float] = []
+        total_timings: list[float] = []
+        bm25_timings: list[float] = []
+        splade_timings: list[float] = []
+        dense_timings: list[float] = []
         wall_start = time.perf_counter()
 
         for _, query_payload in sampled_pairs:
@@ -3561,7 +3565,7 @@ class HybridSearchValidator:
             ValidationReport summarizing calibration accuracy per oversample setting.
         """
         oversamples = [1, 2, 3]
-        results: List[Mapping[str, object]] = []
+        results: list[Mapping[str, object]] = []
         chunks = list(self._registry.all())
         total_chunks = max(1, len(chunks))
 
@@ -3599,7 +3603,7 @@ class HybridSearchValidator:
             batch_size = None
         if batch_size is None or batch_size <= 0:
             batch_size = max(1, len(chunks))
-        embedding_cache: Dict[str, np.ndarray] = {}
+        embedding_cache: dict[str, np.ndarray] = {}
         missing_vectors: set[str] = set()
         for oversample in oversamples:
             hits = 0
@@ -3607,7 +3611,7 @@ class HybridSearchValidator:
             if chunks:
                 for start in range(0, len(chunks), batch_size):
                     batch_chunks = chunks[start : start + batch_size]
-                    candidate_pairs: List[tuple[ChunkPayload, str]] = [
+                    candidate_pairs: list[tuple[ChunkPayload, str]] = [
                         (chunk, chunk.vector_id)
                         for chunk in batch_chunks
                         if chunk.vector_id not in missing_vectors
@@ -3663,7 +3667,7 @@ class HybridSearchValidator:
         results: Sequence[HybridSearchResult],
         chunk_lookup: Mapping[tuple[str, str, str], ChunkPayload],
         limit: int = 10,
-    ) -> List[np.ndarray]:
+    ) -> list[np.ndarray]:
         """Retrieve embeddings for the top-N results using a chunk lookup.
 
         Args:
@@ -3674,8 +3678,8 @@ class HybridSearchValidator:
         Returns:
             List of embedding vectors associated with the results.
         """
-        embeddings: List[np.ndarray] = []
-        cache: Dict[str, np.ndarray] = {}
+        embeddings: list[np.ndarray] = []
+        cache: dict[str, np.ndarray] = {}
         for result in results[:limit]:
             chunk = chunk_lookup.get((result.namespace, result.doc_id, result.chunk_id))
             if chunk is None:
@@ -3707,7 +3711,7 @@ class HybridSearchValidator:
             return 0.0
         return float(np.mean(values))
 
-    def _ensure_validation_resources(self) -> "faiss.StandardGpuResources":
+    def _ensure_validation_resources(self) -> faiss.StandardGpuResources:
         """Lazy-create and cache GPU resources for validation-only cosine checks.
 
         Args:
@@ -3761,7 +3765,7 @@ class HybridSearchValidator:
 
                 temp_memory_raw = getattr(dense_cfg, "gpu_temp_memory_bytes", None)
                 try:
-                    temp_memory: Optional[int] = (
+                    temp_memory: int | None = (
                         int(temp_memory_raw) if temp_memory_raw is not None else None
                     )
                 except (TypeError, ValueError):
@@ -3778,9 +3782,7 @@ class HybridSearchValidator:
 
                 pinned_raw = getattr(dense_cfg, "gpu_pinned_memory_bytes", None)
                 try:
-                    pinned_memory: Optional[int] = (
-                        int(pinned_raw) if pinned_raw is not None else None
-                    )
+                    pinned_memory: int | None = int(pinned_raw) if pinned_raw is not None else None
                 except (TypeError, ValueError):
                     pinned_memory = None
                 if pinned_memory is not None and hasattr(resource, "setPinnedMemory"):
@@ -3965,7 +3967,7 @@ class JsonlDataset(Sequence[Mapping[str, object]]):
             raise FileNotFoundError(path)
         self._path = path
         self._encoding = encoding
-        offsets: List[int] = []
+        offsets: list[int] = []
         offset = 0
         with path.open("rb") as handle:
             for raw in handle:

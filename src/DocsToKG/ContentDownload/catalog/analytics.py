@@ -1,3 +1,30 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.catalog.analytics",
+#   "purpose": "Deduplication analytics and statistics.",
+#   "sections": [
+#     {
+#       "id": "dedupgroup",
+#       "name": "DedupGroup",
+#       "anchor": "class-dedupgroup",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "dedupanalytics",
+#       "name": "DedupAnalytics",
+#       "anchor": "class-dedupanalytics",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "dedupanalyzer",
+#       "name": "DedupAnalyzer",
+#       "anchor": "class-dedupanalyzer",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Deduplication analytics and statistics.
 
 Provides rich dedup insights:

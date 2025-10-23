@@ -1,3 +1,11 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.embedding.__init__",
+#   "purpose": "Embedding stage namespace exposing CLI, config, and runtime adapters.",
+#   "sections": []
+# }
+# === /NAVMAP ===
+
 """Embedding stage namespace exposing CLI, config, and runtime adapters.
 
 Importing this package provides convenient access to the embedding CLI builder,

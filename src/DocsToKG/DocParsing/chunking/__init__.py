@@ -1,3 +1,11 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.chunking.__init__",
+#   "purpose": "Chunking stage package exporting CLI, configuration, and runtime helpers.",
+#   "sections": []
+# }
+# === /NAVMAP ===
+
 """Chunking stage package exporting CLI, configuration, and runtime helpers.
 
 The chunking package stitches together the streaming runtime, CLI surface, and

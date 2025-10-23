@@ -1,3 +1,24 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.chunking.cli",
+#   "purpose": "CLI builder utilities dedicated to the DocParsing chunking stage.",
+#   "sections": [
+#     {
+#       "id": "build-parser",
+#       "name": "build_parser",
+#       "anchor": "function-build-parser",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-args",
+#       "name": "parse_args",
+#       "anchor": "function-parse-args",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """CLI builder utilities dedicated to the DocParsing chunking stage.
 
 IMPORTANT: This module is INTERNAL CLI INFRASTRUCTURE
@@ -32,7 +53,6 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
-from typing import Tuple
 
 from DocsToKG.DocParsing.config import parse_args_with_overrides
 from DocsToKG.DocParsing.core import CLIOption, build_subcommand
@@ -40,7 +60,7 @@ from DocsToKG.DocParsing.doctags import add_data_root_option, add_resume_force_o
 
 from .config import CHUNK_PROFILE_PRESETS, SOFT_BARRIER_MARGIN
 
-CHUNK_CLI_OPTIONS: Tuple[CLIOption, ...] = (
+CHUNK_CLI_OPTIONS: tuple[CLIOption, ...] = (
     CLIOption(
         ("--config",),
         {"type": Path, "default": None, "help": "Path to stage config file (JSON/YAML/TOML)."},

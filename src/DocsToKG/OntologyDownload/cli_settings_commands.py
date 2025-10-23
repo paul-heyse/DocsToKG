@@ -1,3 +1,30 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.cli_settings_commands",
+#   "purpose": "CLI commands for settings management: show, schema, validate.",
+#   "sections": [
+#     {
+#       "id": "show",
+#       "name": "show",
+#       "anchor": "function-show",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "schema",
+#       "name": "schema",
+#       "anchor": "function-schema",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate",
+#       "name": "validate",
+#       "anchor": "function-validate",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """CLI commands for settings management: show, schema, validate.
 
 Provides three commands for managing OntologyDownloadSettings:
@@ -13,7 +40,6 @@ Example:
 
 import json
 from pathlib import Path
-from typing import Optional
 
 import typer
 
@@ -149,7 +175,7 @@ def show(
 
 @settings_app.command()
 def schema(
-    out: Optional[Path] = typer.Option(
+    out: Path | None = typer.Option(
         None,
         "--out",
         "-o",

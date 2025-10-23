@@ -16,7 +16,8 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, Iterable, List
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, Any
 
 import httpx
 
@@ -41,7 +42,7 @@ class DoajResolver(ApiResolverBase):
     name = "doaj"
     api_display_name = "DOAJ"
 
-    def is_enabled(self, config: Any, artifact: "WorkArtifact") -> bool:
+    def is_enabled(self, config: Any, artifact: WorkArtifact) -> bool:
         """Return ``True`` when a DOI is present for DOAJ lookups.
 
         Args:
@@ -57,7 +58,7 @@ class DoajResolver(ApiResolverBase):
         self,
         client: httpx.Client,
         config: Any,
-        artifact: "WorkArtifact",
+        artifact: WorkArtifact,
     ) -> Iterable[ResolverResult]:
         """Yield PDF links surfaced by the DOAJ search API.
 
@@ -77,7 +78,7 @@ class DoajResolver(ApiResolverBase):
                 event_reason=ResolverEventReason.NO_DOI,
             )
             return
-        extra_headers: Dict[str, str] = {}
+        extra_headers: dict[str, str] = {}
         if config.doaj_api_key:
             extra_headers["X-API-KEY"] = config.doaj_api_key
         data, error = self._request_json(
@@ -91,7 +92,7 @@ class DoajResolver(ApiResolverBase):
         if error:
             yield error
             return
-        candidates: List[str] = []
+        candidates: list[str] = []
         for result in data.get("results", []) or []:
             bibjson = (result or {}).get("bibjson", {})
             for link in bibjson.get("link", []) or []:

@@ -1,3 +1,11 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.core.__init__",
+#   "purpose": "Core namespace aggregating shared DocParsing orchestration helpers.",
+#   "sections": []
+# }
+# === /NAVMAP ===
+
 """Core namespace aggregating shared DocParsing orchestration helpers.
 
 This package surface brings together reusable CLI builders, batching and planning

@@ -3,11 +3,54 @@
 #   "module": "DocsToKG.OntologyDownload.checksums",
 #   "purpose": "Normalise and enforce expected checksum metadata for ontology downloads",
 #   "sections": [
-#     {"id": "constants", "name": "Checksum Constants & Patterns", "anchor": "CON", "kind": "constants"},
-#     {"id": "models", "name": "Checksum Models", "anchor": "MOD", "kind": "api"},
-#     {"id": "parsing", "name": "Checksum Parsing Helpers", "anchor": "PRS", "kind": "helpers"},
-#     {"id": "fetching", "name": "Remote Checksum Fetching", "anchor": "FET", "kind": "api"},
-#     {"id": "verification", "name": "Verification Utilities", "anchor": "VER", "kind": "helpers"}
+#     {
+#       "id": "expectedchecksum",
+#       "name": "ExpectedChecksum",
+#       "anchor": "class-expectedchecksum",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "normalize-algorithm",
+#       "name": "_normalize_algorithm",
+#       "anchor": "function-normalize-algorithm",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "normalize-checksum",
+#       "name": "_normalize_checksum",
+#       "anchor": "function-normalize-checksum",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-checksum-extra",
+#       "name": "parse_checksum_extra",
+#       "anchor": "function-parse-checksum-extra",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-checksum-url-extra",
+#       "name": "parse_checksum_url_extra",
+#       "anchor": "function-parse-checksum-url-extra",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "extract-checksum-from-text",
+#       "name": "_extract_checksum_from_text",
+#       "anchor": "function-extract-checksum-from-text",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "fetch-checksum-from-url",
+#       "name": "_fetch_checksum_from_url",
+#       "anchor": "function-fetch-checksum-from-url",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolve-expected-checksum",
+#       "name": "resolve_expected_checksum",
+#       "anchor": "function-resolve-expected-checksum",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===
@@ -29,8 +72,9 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Mapping, Optional, Tuple, Type
+from typing import Any
 from urllib.parse import urlparse
 
 import httpx
@@ -46,7 +90,7 @@ from .io.network import _extract_correlation_id, _parse_retry_after, request_wit
 from .net import get_http_client
 from .settings import DownloadConfiguration
 
-ErrorType = Type[Exception]
+ErrorType = type[Exception]
 
 _DIGEST_PATTERN = re.compile(r"(?i)\b([0-9a-f]{32,128})\b")
 _CHECKSUM_STREAM_CHUNK_SIZE = 8192
@@ -71,7 +115,7 @@ class ExpectedChecksum:
         return {"algorithm": self.algorithm, "value": self.value}
 
 
-def _normalize_algorithm(algorithm: Optional[str], *, context: str, error_cls: ErrorType) -> str:
+def _normalize_algorithm(algorithm: str | None, *, context: str, error_cls: ErrorType) -> str:
     candidate = (algorithm or "sha256").strip().lower()
     if candidate not in {"md5", "sha1", "sha256", "sha512"}:
         raise error_cls(f"{context}: unsupported checksum algorithm '{candidate}'")
@@ -84,7 +128,7 @@ def _normalize_checksum(
     *,
     context: str,
     error_cls: ErrorType,
-) -> Tuple[str, str]:
+) -> tuple[str, str]:
     normalized_algorithm = _normalize_algorithm(algorithm, context=context, error_cls=error_cls)
     if not isinstance(value, str):
         raise error_cls(f"{context}: checksum value must be a string")
@@ -99,7 +143,7 @@ def parse_checksum_extra(
     *,
     context: str,
     error_cls: ErrorType = ConfigError,
-) -> Tuple[Optional[str], Optional[str]]:
+) -> tuple[str | None, str | None]:
     """Normalize checksum extras to ``(algorithm, value)`` tuples."""
 
     if value is None:
@@ -127,7 +171,7 @@ def parse_checksum_url_extra(
     *,
     context: str,
     error_cls: ErrorType = ConfigError,
-) -> Tuple[Optional[str], Optional[str]]:
+) -> tuple[str | None, str | None]:
     """Normalise checksum URL extras to ``(url, algorithm)`` tuples."""
 
     if value is None:
@@ -205,7 +249,7 @@ def _fetch_checksum_from_url(
                     f"HTTP error {status_code}", request=response.request, response=response
                 )
                 if retry_delay is not None and retry_delay > 0:
-                    setattr(http_error, "_retry_after_delay", retry_delay)
+                    http_error._retry_after_delay = retry_delay
                 raise http_error
             response.raise_for_status()
             for chunk in response.iter_bytes(_CHECKSUM_STREAM_CHUNK_SIZE):
@@ -276,12 +320,12 @@ def resolve_expected_checksum(
     download_config: DownloadConfiguration,
     logger: logging.Logger,
     error_cls: ErrorType = ConfigError,
-) -> Optional[ExpectedChecksum]:
+) -> ExpectedChecksum | None:
     """Determine the expected checksum metadata for downstream enforcement."""
 
     context = f"ontology '{getattr(spec, 'id', 'unknown')}'"
 
-    plan_checksum: Optional[Tuple[str, str]] = None
+    plan_checksum: tuple[str, str] | None = None
     if getattr(plan, "checksum", None):
         algorithm = getattr(plan, "checksum_algorithm", None) or "sha256"
         plan_checksum = _normalize_checksum(
@@ -303,14 +347,14 @@ def resolve_expected_checksum(
             f"{context}: conflicting checksum values between resolver and specification extras"
         )
 
-    algorithm: Optional[str] = None
-    value: Optional[str] = None
+    algorithm: str | None = None
+    value: str | None = None
     if plan_checksum is not None:
         algorithm, value = plan_checksum
     if spec_checksum[1] is not None:
         algorithm, value = spec_checksum
 
-    checksum_url_source: Optional[Tuple[str, Optional[str]]] = None
+    checksum_url_source: tuple[str, str | None] | None = None
     plan_checksum_url = getattr(plan, "checksum_url", None)
     if plan_checksum_url:
         checksum_url_source = (plan_checksum_url, getattr(plan, "checksum_algorithm", None))

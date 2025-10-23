@@ -1,3 +1,36 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.catalog.backup",
+#   "purpose": "Catalog backup and recovery utilities.",
+#   "sections": [
+#     {
+#       "id": "backupmetadata",
+#       "name": "BackupMetadata",
+#       "anchor": "class-backupmetadata",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "catalogbackup",
+#       "name": "CatalogBackup",
+#       "anchor": "class-catalogbackup",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "backup-catalog-cli",
+#       "name": "backup_catalog_cli",
+#       "anchor": "function-backup-catalog-cli",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "recover-catalog-cli",
+#       "name": "recover_catalog_cli",
+#       "anchor": "function-recover-catalog-cli",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Catalog backup and recovery utilities.
 
 Provides:
@@ -16,7 +49,6 @@ import sqlite3
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -30,8 +62,8 @@ class BackupMetadata:
     destination_path: str
     file_size_bytes: int
     record_count: int
-    database_version: Optional[str] = None
-    checksum_sha256: Optional[str] = None
+    database_version: str | None = None
+    checksum_sha256: str | None = None
 
 
 class CatalogBackup:
@@ -140,7 +172,7 @@ class CatalogBackup:
     def backup_incremental(
         self,
         destination: Path,
-        last_backup_path: Optional[str] = None,
+        last_backup_path: str | None = None,
     ) -> BackupMetadata:
         """Create incremental backup (stub for future implementation).
 

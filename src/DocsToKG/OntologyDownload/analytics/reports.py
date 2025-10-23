@@ -3,11 +3,54 @@
 #   "module": "DocsToKG.OntologyDownload.analytics.reports",
 #   "purpose": "High-level reports for OntologyDownload analytics",
 #   "sections": [
-#     {"id": "types", "name": "Report Types", "anchor": "TYP", "kind": "models"},
-#     {"id": "latest", "name": "Latest Version Reports", "anchor": "LATEST", "kind": "api"},
-#     {"id": "growth", "name": "Growth Reports", "anchor": "GROWTH", "kind": "api"},
-#     {"id": "validation", "name": "Validation Reports", "anchor": "VAL", "kind": "api"},
-#     {"id": "export", "name": "Export Helpers", "anchor": "EXPORT", "kind": "api"}
+#     {
+#       "id": "latestversionreport",
+#       "name": "LatestVersionReport",
+#       "anchor": "class-latestversionreport",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "growthreport",
+#       "name": "GrowthReport",
+#       "anchor": "class-growthreport",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "validationreport",
+#       "name": "ValidationReport",
+#       "anchor": "class-validationreport",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "generate-latest-report",
+#       "name": "generate_latest_report",
+#       "anchor": "function-generate-latest-report",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "generate-growth-report",
+#       "name": "generate_growth_report",
+#       "anchor": "function-generate-growth-report",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "generate-validation-report",
+#       "name": "generate_validation_report",
+#       "anchor": "function-generate-validation-report",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "report-to-dict",
+#       "name": "report_to_dict",
+#       "anchor": "function-report-to-dict",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "report-to-table",
+#       "name": "report_to_table",
+#       "anchor": "function-report-to-table",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===
@@ -17,7 +60,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 try:  # pragma: no cover
     import polars as pl
@@ -73,7 +115,7 @@ class ValidationReport:
 
 def generate_latest_report(
     files_df: pl.DataFrame | pl.LazyFrame,
-    validations_df: Optional[pl.DataFrame | pl.LazyFrame] = None,
+    validations_df: pl.DataFrame | pl.LazyFrame | None = None,
 ) -> LatestVersionReport:
     """Generate comprehensive latest version report.
 

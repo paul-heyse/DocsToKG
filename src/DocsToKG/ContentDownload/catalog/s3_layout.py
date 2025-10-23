@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.catalog.s3_layout",
+#   "purpose": "S3-based storage layout adapter (stub for future implementation).",
+#   "sections": [
+#     {
+#       "id": "s3layout",
+#       "name": "S3Layout",
+#       "anchor": "class-s3layout",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """S3-based storage layout adapter (stub for future implementation).
 
 This module provides a seam for S3 integration. It allows the catalog system
@@ -13,7 +28,6 @@ Future implementation will:
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +96,7 @@ class S3Layout:
         """
         raise NotImplementedError("S3 upload not yet implemented")
 
-    def verify_object(self, key: str, expected_hash: Optional[str] = None) -> bool:
+    def verify_object(self, key: str, expected_hash: str | None = None) -> bool:
         """Verify S3 object integrity (stub).
 
         Args:

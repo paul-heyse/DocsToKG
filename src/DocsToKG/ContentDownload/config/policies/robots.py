@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.config.policies.robots",
+#   "purpose": "Robots.txt policy configuration.",
+#   "sections": [
+#     {
+#       "id": "robotspolicy",
+#       "name": "RobotsPolicy",
+#       "anchor": "class-robotspolicy",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Robots.txt policy configuration.
 
 Controls respect for robots.txt and cache settings.

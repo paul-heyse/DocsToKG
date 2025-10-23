@@ -1,7 +1,7 @@
 # === NAVMAP v1 ===
 # {
 #   "module": "DocsToKG.ContentDownload.job_reconciler",
-#   "purpose": "Crash recovery and database↔filesystem state healing",
+#   "purpose": "Crash recovery and database\u2194filesystem state healing",
 #   "sections": [
 #     {
 #       "id": "reconcile-jobs",
@@ -63,7 +63,6 @@ from __future__ import annotations
 import sqlite3
 import time
 from pathlib import Path
-from typing import Optional
 
 
 def reconcile_jobs(
@@ -123,7 +122,7 @@ def reconcile_jobs(
 
 def cleanup_stale_leases(
     cx: sqlite3.Connection,
-    now: Optional[float] = None,
+    now: float | None = None,
 ) -> int:
     """Clear expired leases so other workers can claim jobs.
 
@@ -159,7 +158,7 @@ def cleanup_stale_leases(
 
 def cleanup_stale_ops(
     cx: sqlite3.Connection,
-    now: Optional[float] = None,
+    now: float | None = None,
     abandoned_threshold_s: int = 600,
 ) -> int:
     """Mark long-running operations as abandoned for visibility.

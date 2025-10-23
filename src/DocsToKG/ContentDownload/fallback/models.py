@@ -1,3 +1,108 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.fallback.models",
+#   "purpose": "Pydantic v2 Models for Telemetry & Dashboard Integration.",
+#   "sections": [
+#     {
+#       "id": "attemptstatus",
+#       "name": "AttemptStatus",
+#       "anchor": "class-attemptstatus",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "tiername",
+#       "name": "TierName",
+#       "anchor": "class-tiername",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "metrictype",
+#       "name": "MetricType",
+#       "anchor": "class-metrictype",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "telemetryattemptrecord",
+#       "name": "TelemetryAttemptRecord",
+#       "anchor": "class-telemetryattemptrecord",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "telemetrybatchrecord",
+#       "name": "TelemetryBatchRecord",
+#       "anchor": "class-telemetrybatchrecord",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "storageconfig",
+#       "name": "StorageConfig",
+#       "anchor": "class-storageconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "dashboardconfig",
+#       "name": "DashboardConfig",
+#       "anchor": "class-dashboardconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "metricsthreshold",
+#       "name": "MetricsThreshold",
+#       "anchor": "class-metricsthreshold",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "telemetryconfig",
+#       "name": "TelemetryConfig",
+#       "anchor": "class-telemetryconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "performancemetrics",
+#       "name": "PerformanceMetrics",
+#       "anchor": "class-performancemetrics",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "tiermetrics",
+#       "name": "TierMetrics",
+#       "anchor": "class-tiermetrics",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "sourcemetrics",
+#       "name": "SourceMetrics",
+#       "anchor": "class-sourcemetrics",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "dashboardpanel",
+#       "name": "DashboardPanel",
+#       "anchor": "class-dashboardpanel",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "dashboarddefinition",
+#       "name": "DashboardDefinition",
+#       "anchor": "class-dashboarddefinition",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "alertrule",
+#       "name": "AlertRule",
+#       "anchor": "class-alertrule",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "exporttarget",
+#       "name": "ExportTarget",
+#       "anchor": "class-exporttarget",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Pydantic v2 Models for Telemetry & Dashboard Integration
 
@@ -12,7 +117,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -77,19 +182,19 @@ class TelemetryAttemptRecord(BaseModel):
 
     # Outcome
     status: AttemptStatus = Field(..., description="Resolution outcome")
-    reason: Optional[str] = Field(None, description="Why it succeeded/failed")
+    reason: str | None = Field(None, description="Why it succeeded/failed")
 
     # Metrics
     elapsed_ms: int = Field(..., ge=0, description="Elapsed time in milliseconds")
-    http_status: Optional[int] = Field(None, ge=100, le=599, description="HTTP status code")
+    http_status: int | None = Field(None, ge=100, le=599, description="HTTP status code")
 
     # Extended telemetry
     retry_count: int = Field(default=0, ge=0, description="Number of retries")
-    rate_limiter_wait_ms: Optional[int] = Field(None, ge=0, description="Rate limit delay")
-    breaker_state: Optional[str] = Field(None, description="Circuit breaker state")
+    rate_limiter_wait_ms: int | None = Field(None, ge=0, description="Rate limit delay")
+    breaker_state: str | None = Field(None, description="Circuit breaker state")
 
     # Metadata
-    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional context")
+    metadata: dict[str, Any] = Field(default_factory=dict, description="Additional context")
 
     @field_validator("url")
     @classmethod
@@ -114,7 +219,7 @@ class TelemetryBatchRecord(BaseModel):
 
     batch_id: str = Field(..., description="Batch identifier")
     timestamp: datetime = Field(default_factory=datetime.utcnow)
-    records: List[TelemetryAttemptRecord] = Field(..., min_length=1)
+    records: list[TelemetryAttemptRecord] = Field(..., min_length=1)
     count: int = Field(..., ge=1, description="Number of records")
 
     @field_validator("count")
@@ -140,7 +245,7 @@ class StorageConfig(BaseModel):
         default="sqlite", description="Storage backend type"
     )
     path: str = Field(default="Data/Manifests/manifest.sqlite3", description="Storage file path")
-    backup_path: Optional[str] = Field(None, description="Backup file path")
+    backup_path: str | None = Field(None, description="Backup file path")
     auto_backup: bool = Field(default=True, description="Automatic backups enabled")
     batch_size: int = Field(default=100, ge=1, le=10000, description="Batch size for operations")
 
@@ -159,7 +264,7 @@ class DashboardConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     enabled: bool = Field(default=True, description="Dashboard enabled")
-    export_formats: List[Literal["grafana", "prometheus", "json"]] = Field(
+    export_formats: list[Literal["grafana", "prometheus", "json"]] = Field(
         default=["json"], description="Export formats"
     )
     update_interval_s: int = Field(
@@ -171,7 +276,7 @@ class DashboardConfig(BaseModel):
 
     @field_validator("export_formats")
     @classmethod
-    def validate_formats(cls, v: List[str]) -> List[str]:
+    def validate_formats(cls, v: list[str]) -> list[str]:
         """Validate export formats."""
         valid = {"grafana", "prometheus", "json"}
         if not all(f in valid for f in v):
@@ -249,7 +354,7 @@ class TierMetrics(BaseModel):
 
     tier: TierName = Field(...)
     metrics: PerformanceMetrics = Field(...)
-    sources: List[str] = Field(..., min_length=1)
+    sources: list[str] = Field(..., min_length=1)
 
 
 class SourceMetrics(BaseModel):
@@ -275,8 +380,8 @@ class DashboardPanel(BaseModel):
     id: str = Field(...)
     title: str = Field(...)
     type: Literal["gauge", "graph", "table", "stat"] = Field(...)
-    metrics: List[str] = Field(...)
-    thresholds: Optional[Dict[str, float]] = Field(None)
+    metrics: list[str] = Field(...)
+    thresholds: dict[str, float] | None = Field(None)
 
 
 class DashboardDefinition(BaseModel):
@@ -287,9 +392,9 @@ class DashboardDefinition(BaseModel):
     id: str = Field(...)
     title: str = Field(...)
     version: int = Field(default=1, ge=1)
-    panels: List[DashboardPanel] = Field(...)
+    panels: list[DashboardPanel] = Field(...)
     refresh_interval: str = Field(default="30s")
-    tags: List[str] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
 
 
 # ============================================================================
@@ -331,7 +436,7 @@ class ExportTarget(BaseModel):
 
     format: Literal["grafana", "prometheus", "json", "csv"] = Field(...)
     destination: str = Field(..., description="Export destination path or URL")
-    schedule: Optional[str] = Field(None, description="Cron schedule for exports")
+    schedule: str | None = Field(None, description="Cron schedule for exports")
     enabled: bool = Field(default=True)
 
 

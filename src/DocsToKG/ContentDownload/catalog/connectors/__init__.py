@@ -1,3 +1,11 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.catalog.connectors.__init__",
+#   "purpose": "Catalog Connectors Package.",
+#   "sections": []
+# }
+# === /NAVMAP ===
+
 """
 Catalog Connectors Package
 

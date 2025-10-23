@@ -1,10 +1,48 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.catalog.instrumentation",
+#   "purpose": "Database catalog instrumentation and telemetry.",
+#   "sections": [
+#     {
+#       "id": "emit-tx-commit-event",
+#       "name": "emit_tx_commit_event",
+#       "anchor": "function-emit-tx-commit-event",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-tx-rollback-event",
+#       "name": "emit_tx_rollback_event",
+#       "anchor": "function-emit-tx-rollback-event",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-migration-applied-event",
+#       "name": "emit_migration_applied_event",
+#       "anchor": "function-emit-migration-applied-event",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-boundary-check-event",
+#       "name": "emit_boundary_check_event",
+#       "anchor": "function-emit-boundary-check-event",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "emit-latest-mismatch-event",
+#       "name": "emit_latest_mismatch_event",
+#       "anchor": "function-emit-latest-mismatch-event",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Database catalog instrumentation and telemetry.
 
 Emits db.tx.*, db.migrate.*, and db.boundary.* events for observability
 into database operations and transactional boundaries.
 """
 
-from typing import Optional
 
 from DocsToKG.OntologyDownload.observability.events import emit_event
 
@@ -38,7 +76,7 @@ def emit_tx_commit_event(
 
 def emit_tx_rollback_event(
     reason: str,
-    tables_involved: Optional[list[str]] = None,
+    tables_involved: list[str] | None = None,
     duration_ms: float = 0,
 ) -> None:
     """Emit event when database transaction rolls back.
@@ -95,7 +133,7 @@ def emit_migration_applied_event(
 def emit_boundary_check_event(
     check_type: str,
     passed: bool,
-    details: Optional[dict] = None,
+    details: dict | None = None,
 ) -> None:
     """Emit event for database boundary validation.
 

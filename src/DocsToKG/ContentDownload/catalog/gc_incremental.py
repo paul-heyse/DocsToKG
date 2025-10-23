@@ -1,3 +1,36 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.catalog.gc_incremental",
+#   "purpose": "Incremental garbage collection with batching and progress tracking.",
+#   "sections": [
+#     {
+#       "id": "gcbatchresult",
+#       "name": "GCBatchResult",
+#       "anchor": "class-gcbatchresult",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "gcstats",
+#       "name": "GCStats",
+#       "anchor": "class-gcstats",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "incrementalgc",
+#       "name": "IncrementalGC",
+#       "anchor": "class-incrementalgc",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "gc-incremental-cli",
+#       "name": "gc_incremental_cli",
+#       "anchor": "function-gc-incremental-cli",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Incremental garbage collection with batching and progress tracking.
 
 Provides production-safe GC with:
@@ -11,9 +44,9 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Optional
 
 from DocsToKG.ContentDownload.catalog.gc import (
     collect_referenced_paths,
@@ -67,7 +100,7 @@ class IncrementalGC:
         self.catalog = catalog
         self.root_dir = Path(root_dir)
         self.batch_size = batch_size
-        self._orphans_cache: Optional[list[str]] = None
+        self._orphans_cache: list[str] | None = None
 
     def _find_all_orphans(self) -> list[str]:
         """Find all orphaned files (cached)."""
@@ -85,7 +118,7 @@ class IncrementalGC:
     def gc_incremental(
         self,
         dry_run: bool = True,
-        progress_callback: Optional[Callable[[GCBatchResult], None]] = None,
+        progress_callback: Callable[[GCBatchResult], None] | None = None,
     ) -> GCStats:
         """Run incremental GC with batching.
 
@@ -190,7 +223,7 @@ class IncrementalGC:
         self,
         last_batch: int,
         dry_run: bool = True,
-        progress_callback: Optional[Callable[[GCBatchResult], None]] = None,
+        progress_callback: Callable[[GCBatchResult], None] | None = None,
     ) -> GCStats:
         """Resume GC from a specific batch.
 

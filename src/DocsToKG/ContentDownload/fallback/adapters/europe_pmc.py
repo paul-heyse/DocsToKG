@@ -1,8 +1,23 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.fallback.adapters.europe_pmc",
+#   "purpose": "Europe PMC API adapter for PDF resolution.",
+#   "sections": [
+#     {
+#       "id": "adapter-europe-pmc-pdf",
+#       "name": "adapter_europe_pmc_pdf",
+#       "anchor": "function-adapter-europe-pmc-pdf",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Europe PMC API adapter for PDF resolution."""
 
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any
 
 from DocsToKG.ContentDownload.fallback.adapters import head_pdf
 from DocsToKG.ContentDownload.fallback.types import AttemptPolicy, AttemptResult
@@ -10,7 +25,7 @@ from DocsToKG.ContentDownload.fallback.types import AttemptPolicy, AttemptResult
 
 def adapter_europe_pmc_pdf(
     policy: AttemptPolicy,
-    context: Dict[str, Any],
+    context: dict[str, Any],
 ) -> AttemptResult:
     """Query Europe PMC API for PDF.
 

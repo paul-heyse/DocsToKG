@@ -14,6 +14,12 @@
 #       "name": "apply_migration",
 #       "anchor": "function-apply-migration",
 #       "kind": "function"
+#     },
+#     {
+#       "id": "get-schema-version",
+#       "name": "get_schema_version",
+#       "anchor": "function-get-schema-version",
+#       "kind": "function"
 #     }
 #   ]
 # }

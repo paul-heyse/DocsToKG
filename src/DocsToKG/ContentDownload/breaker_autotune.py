@@ -4,9 +4,9 @@
 #   "purpose": "Apply safe, bounded adjustments to live circuit breaker and rate-limiter registries",
 #   "sections": [
 #     {
-#       "id": "autotune-plan",
+#       "id": "autotuneplan",
 #       "name": "AutoTunePlan",
-#       "anchor": "class-autotune-plan",
+#       "anchor": "class-autotuneplan",
 #       "kind": "class"
 #     },
 #     {
@@ -47,7 +47,6 @@ Typical Usage:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import List, Optional
 
 # Deferred imports to avoid circular dependencies
 
@@ -57,7 +56,7 @@ class AutoTunePlan:
     """A tuning plan for a single host."""
 
     host: str
-    changes: List[str] = field(default_factory=list)
+    changes: list[str] = field(default_factory=list)
 
 
 class BreakerAutoTuner:
@@ -100,7 +99,7 @@ class BreakerAutoTuner:
         self._rr = rate_registry
         self._clamp = clamp
 
-    def suggest(self, advisor, run_id: Optional[str] = None) -> List[AutoTunePlan]:
+    def suggest(self, advisor, run_id: str | None = None) -> list[AutoTunePlan]:
         """Produce tuning plans without modifying state.
 
         Parameters
@@ -119,7 +118,7 @@ class BreakerAutoTuner:
         metrics = advisor.read_metrics()
         advice_dict = advisor.advise(metrics)
 
-        plans: List[AutoTunePlan] = []
+        plans: list[AutoTunePlan] = []
         for host, adv in advice_dict.items():
             changes = []
 
@@ -148,7 +147,7 @@ class BreakerAutoTuner:
 
         return plans
 
-    def enforce(self, advisor, run_id: Optional[str] = None) -> List[AutoTunePlan]:
+    def enforce(self, advisor, run_id: str | None = None) -> list[AutoTunePlan]:
         """Apply safe, bounded adjustments to live registries.
 
         This method:
@@ -244,7 +243,7 @@ class BreakerAutoTuner:
         return plans
 
     @staticmethod
-    def _clamp(value: Optional[int], minval: int, maxval: int) -> int:
+    def _clamp(value: int | None, minval: int, maxval: int) -> int:
         """Clamp value to [minval, maxval] range."""
         if value is None:
             return minval

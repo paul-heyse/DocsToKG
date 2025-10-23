@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.interfaces",
+#   "purpose": "Protocol definitions that describe DocParsing extension points.",
+#   "sections": [
+#     {
+#       "id": "chunkingserializerprovider",
+#       "name": "ChunkingSerializerProvider",
+#       "anchor": "class-chunkingserializerprovider",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Protocol definitions that describe DocParsing extension points.
 
 The DocParsing pipeline supports pluggable serializers, chunk sinks, and

@@ -3,8 +3,24 @@
 #   "module": "DocsToKG.ContentDownload.http_session",
 #   "purpose": "Shared HTTP session factory with polite headers, connection pooling, and telemetry hooks",
 #   "sections": [
-#     {"id": "get-http-session", "name": "get_http_session", "anchor": "function-get-http-session", "kind": "function"},
-#     {"id": "http-config", "name": "HttpConfig", "anchor": "class-httpconfig", "kind": "class"}
+#     {
+#       "id": "httpconfig",
+#       "name": "HttpConfig",
+#       "anchor": "class-httpconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "get-http-session",
+#       "name": "get_http_session",
+#       "anchor": "function-get-http-session",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "reset-http-session",
+#       "name": "reset_http_session",
+#       "anchor": "function-reset-http-session",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===
@@ -37,14 +53,13 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Optional
 
 import httpx
 
 LOGGER = logging.getLogger(__name__)
 
 # Singleton session (thread-safe via httpx internals)
-_SHARED_SESSION: Optional[httpx.Client] = None
+_SHARED_SESSION: httpx.Client | None = None
 _SESSION_LOCK = __import__("threading").Lock()
 
 
@@ -55,7 +70,7 @@ class HttpConfig:
     user_agent: str = "DocsToKG/ContentDownload (+mailto:data@example.org)"
     """User-Agent string with mailto contact."""
 
-    mailto: Optional[str] = None
+    mailto: str | None = None
     """Optional email for polite headers (overrides default)."""
 
     timeout_connect_s: float = 10.0
@@ -73,11 +88,11 @@ class HttpConfig:
     verify_tls: bool = True
     """Verify TLS certificates."""
 
-    proxies: Optional[dict] = None
+    proxies: dict | None = None
     """Proxy configuration (HTTP/HTTPS)."""
 
 
-def get_http_session(config: Optional[HttpConfig] = None) -> httpx.Client:
+def get_http_session(config: HttpConfig | None = None) -> httpx.Client:
     """
     Acquire or create the shared HTTP session.
 

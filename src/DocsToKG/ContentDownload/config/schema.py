@@ -1,3 +1,30 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.config.schema",
+#   "purpose": "JSON Schema Export for ContentDownload Configuration.",
+#   "sections": [
+#     {
+#       "id": "get-config-schema",
+#       "name": "get_config_schema",
+#       "anchor": "function-get-config-schema",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "export-config-schema",
+#       "name": "export_config_schema",
+#       "anchor": "function-export-config-schema",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "export-resolver-defaults",
+#       "name": "export_resolver_defaults",
+#       "anchor": "function-export-resolver-defaults",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 JSON Schema Export for ContentDownload Configuration
 
@@ -9,12 +36,12 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 from .models import ContentDownloadConfig
 
 
-def get_config_schema() -> Dict[str, Any]:
+def get_config_schema() -> dict[str, Any]:
     """
     Generate JSON Schema for ContentDownloadConfig.
 
@@ -56,7 +83,7 @@ def export_config_schema(output_path: str | Path) -> None:
     path.write_text(json.dumps(schema, indent=2), encoding="utf-8")
 
 
-def export_resolver_defaults() -> Dict[str, Any]:
+def export_resolver_defaults() -> dict[str, Any]:
     """
     Export default resolver configuration structure.
 

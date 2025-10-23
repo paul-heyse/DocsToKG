@@ -10,14 +10,15 @@ presentation semantics.
 
 from __future__ import annotations
 
-from typing import Any, Dict, Iterable, List, Mapping, Sequence, Tuple
+from collections.abc import Iterable, Mapping, Sequence
+from typing import Any
 
 from .io import format_bytes
 from .planning import FetchResult, PlannedFetch
 
-PlanRow = Tuple[str, str, str, str, str, str, str, str]
+PlanRow = tuple[str, str, str, str, str, str, str, str]
 
-PLAN_TABLE_HEADERS: Tuple[str, ...] = (
+PLAN_TABLE_HEADERS: tuple[str, ...] = (
     "id",
     "resolver",
     "service",
@@ -28,7 +29,7 @@ PLAN_TABLE_HEADERS: Tuple[str, ...] = (
     "url",
 )
 
-RESULT_TABLE_HEADERS: Tuple[str, ...] = (
+RESULT_TABLE_HEADERS: tuple[str, ...] = (
     "id",
     "resolver",
     "status",
@@ -41,7 +42,7 @@ RESULT_TABLE_HEADERS: Tuple[str, ...] = (
     "file",
 )
 
-VALIDATION_TABLE_HEADERS: Tuple[str, ...] = ("validator", "status", "details")
+VALIDATION_TABLE_HEADERS: tuple[str, ...] = ("validator", "status", "details")
 
 __all__ = [
     "PlanRow",
@@ -72,10 +73,10 @@ def format_table(headers: Sequence[str], rows: Sequence[Sequence[str]]) -> str:
     return "\n".join(lines)
 
 
-def format_plan_rows(plans: Iterable[PlannedFetch]) -> List[PlanRow]:
+def format_plan_rows(plans: Iterable[PlannedFetch]) -> list[PlanRow]:
     """Convert planner output into rows for table rendering."""
 
-    rows: List[PlanRow] = []
+    rows: list[PlanRow] = []
     for plan in plans:
         expected_checksum = ""
         checksum = plan.metadata.get("expected_checksum")
@@ -105,7 +106,7 @@ def format_plan_rows(plans: Iterable[PlannedFetch]) -> List[PlanRow]:
 def format_results_table(results: Iterable[FetchResult]) -> str:
     """Render download results as a table summarizing status and file paths."""
 
-    rows: List[Tuple[str, str, str, str, str, str, str, str, str, str]] = []
+    rows: list[tuple[str, str, str, str, str, str, str, str, str, str]] = []
     for result in results:
         checksum_text = ""
         checksum_obj = getattr(result, "expected_checksum", None)
@@ -154,10 +155,10 @@ def format_results_table(results: Iterable[FetchResult]) -> str:
     return format_table(RESULT_TABLE_HEADERS, rows)
 
 
-def format_validation_summary(results: Dict[str, Dict[str, Any]]) -> str:
+def format_validation_summary(results: dict[str, dict[str, Any]]) -> str:
     """Summarise validator outcomes in a compact status table."""
 
-    formatted: List[Tuple[str, str, str]] = []
+    formatted: list[tuple[str, str, str]] = []
     for name, payload in results.items():
         status = "ok" if payload.get("ok") else "error"
         details = payload.get("details", {})
@@ -176,10 +177,30 @@ def format_validation_summary(results: Dict[str, Dict[str, Any]]) -> str:
 #   "module": "DocsToKG.OntologyDownload.formatters",
 #   "purpose": "Turn planning, download, and validation results into reusable table renderings",
 #   "sections": [
-#     {"id": "schema", "name": "Table Schemas", "anchor": "SCH", "kind": "constants"},
-#     {"id": "plan", "name": "Plan Row Formatting", "anchor": "PLN", "kind": "helpers"},
-#     {"id": "results", "name": "Download Result Formatting", "anchor": "RES", "kind": "helpers"},
-#     {"id": "validation", "name": "Validation Summary Formatting", "anchor": "VAL", "kind": "helpers"}
+#     {
+#       "id": "format-table",
+#       "name": "format_table",
+#       "anchor": "function-format-table",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "format-plan-rows",
+#       "name": "format_plan_rows",
+#       "anchor": "function-format-plan-rows",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "format-results-table",
+#       "name": "format_results_table",
+#       "anchor": "function-format-results-table",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "format-validation-summary",
+#       "name": "format_validation_summary",
+#       "anchor": "function-format-validation-summary",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===

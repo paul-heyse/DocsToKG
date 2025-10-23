@@ -1,3 +1,48 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.catalog.consistency",
+#   "purpose": "Deep consistency checking for catalog integrity.",
+#   "sections": [
+#     {
+#       "id": "orphanfile",
+#       "name": "OrphanFile",
+#       "anchor": "class-orphanfile",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "missingfile",
+#       "name": "MissingFile",
+#       "anchor": "class-missingfile",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "hashmismatch",
+#       "name": "HashMismatch",
+#       "anchor": "class-hashmismatch",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "auditissue",
+#       "name": "AuditIssue",
+#       "anchor": "class-auditissue",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "consistencyauditreport",
+#       "name": "ConsistencyAuditReport",
+#       "anchor": "class-consistencyauditreport",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "consistencychecker",
+#       "name": "ConsistencyChecker",
+#       "anchor": "class-consistencychecker",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Deep consistency checking for catalog integrity.
 
 Provides comprehensive validation:
@@ -13,7 +58,6 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 from DocsToKG.ContentDownload.catalog.gc import collect_referenced_paths, find_orphans
 from DocsToKG.ContentDownload.catalog.store import CatalogStore
@@ -48,7 +92,7 @@ class HashMismatch:
     record_id: int
     artifact_id: str
     expected_hash: str
-    computed_hash: Optional[str]
+    computed_hash: str | None
     reason: str = "Hash mismatch"
 
 
@@ -81,7 +125,7 @@ class ConsistencyChecker:
         self,
         catalog: CatalogStore,
         root_dir: str,
-        verifier: Optional[StreamingVerifier] = None,
+        verifier: StreamingVerifier | None = None,
     ):
         """Initialize consistency checker.
 

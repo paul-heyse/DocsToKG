@@ -1,3 +1,11 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.network.__init__",
+#   "purpose": "Network subsystem: HTTP client, caching, rate-limiting, and retry policies.",
+#   "sections": []
+# }
+# === /NAVMAP ===
+
 """Network subsystem: HTTP client, caching, rate-limiting, and retry policies.
 
 This package provides a unified, production-ready HTTP client stack based on:

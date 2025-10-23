@@ -1,3 +1,11 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.config.policies.__init__",
+#   "purpose": "Configuration policy models.",
+#   "sections": []
+# }
+# === /NAVMAP ===
+
 """Configuration policy models.
 
 Provides focused, single-responsibility Pydantic v2 models for each subsystem:

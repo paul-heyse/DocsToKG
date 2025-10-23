@@ -1,3 +1,66 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.storage.writers",
+#   "purpose": "Parquet Writers for DocParsing Artifacts.",
+#   "sections": [
+#     {
+#       "id": "parquetwriter",
+#       "name": "ParquetWriter",
+#       "anchor": "class-parquetwriter",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "chunksparquetwriter",
+#       "name": "ChunksParquetWriter",
+#       "anchor": "class-chunksparquetwriter",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "densevectorwriter",
+#       "name": "DenseVectorWriter",
+#       "anchor": "class-densevectorwriter",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "sparsevectorwriter",
+#       "name": "SparseVectorWriter",
+#       "anchor": "class-sparsevectorwriter",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "lexicalvectorwriter",
+#       "name": "LexicalVectorWriter",
+#       "anchor": "class-lexicalvectorwriter",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "create-chunks-writer",
+#       "name": "create_chunks_writer",
+#       "anchor": "function-create-chunks-writer",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "create-dense-writer",
+#       "name": "create_dense_writer",
+#       "anchor": "function-create-dense-writer",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "create-sparse-writer",
+#       "name": "create_sparse_writer",
+#       "anchor": "function-create-sparse-writer",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "create-lexical-writer",
+#       "name": "create_lexical_writer",
+#       "anchor": "function-create-lexical-writer",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Parquet Writers for DocParsing Artifacts
 
@@ -25,7 +88,7 @@ from __future__ import annotations
 import os
 import uuid
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -64,7 +127,7 @@ class ParquetWriter:
         self.compression_level = compression_level
         self.target_row_group_mb = target_row_group_mb
 
-    def _get_writer_kwargs(self) -> Dict[str, Any]:
+    def _get_writer_kwargs(self) -> dict[str, Any]:
         """Return pyarrow.parquet.write_table kwargs."""
         kwargs = {
             "compression": self.compression,
@@ -108,8 +171,8 @@ class ParquetWriter:
             raise
 
     def write(
-        self, records: List[Dict[str, Any]], footer_metadata: Dict[str, str]
-    ) -> Dict[str, Any]:
+        self, records: list[dict[str, Any]], footer_metadata: dict[str, str]
+    ) -> dict[str, Any]:
         """
         Write records to Parquet with footer metadata.
 
@@ -178,10 +241,10 @@ class ChunksParquetWriter(ParquetWriter):
 
     def write(
         self,
-        records: List[Dict[str, Any]],
+        records: list[dict[str, Any]],
         cfg_hash: str,
         created_by: str = "DocsToKG-DocParsing",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Write chunk records with standard footer.
 
@@ -238,13 +301,13 @@ class DenseVectorWriter(ParquetWriter):
 
     def write(
         self,
-        records: List[Dict[str, Any]],
+        records: list[dict[str, Any]],
         provider: str,
         model_id: str,
         cfg_hash: str,
-        device: Optional[str] = None,
+        device: str | None = None,
         created_by: str = "DocsToKG-DocParsing",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Write dense vector records with standard footer.
 
@@ -301,14 +364,14 @@ class SparseVectorWriter(ParquetWriter):
 
     def write(
         self,
-        records: List[Dict[str, Any]],
+        records: list[dict[str, Any]],
         provider: str,
         model_id: str,
         cfg_hash: str,
-        vocab_id: Optional[str] = None,
-        hash_scheme: Optional[str] = None,
+        vocab_id: str | None = None,
+        hash_scheme: str | None = None,
         created_by: str = "DocsToKG-DocParsing",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Write sparse vector records with standard footer.
 
@@ -375,7 +438,7 @@ class LexicalVectorWriter(ParquetWriter):
 
     def write(
         self,
-        records: List[Dict[str, Any]],
+        records: list[dict[str, Any]],
         tokenizer_id: str,
         k1: float,
         b: float,
@@ -384,7 +447,7 @@ class LexicalVectorWriter(ParquetWriter):
         max_df_ratio: float,
         cfg_hash: str,
         created_by: str = "DocsToKG-DocParsing",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Write lexical vector records with standard footer.
 

@@ -40,14 +40,14 @@ Typical Usage:
 from __future__ import annotations
 
 import argparse
+from collections.abc import Callable, Iterable
 from pathlib import Path
-from typing import Callable, Iterable, Tuple
 
 from DocsToKG.ContentDownload.breaker_advisor import BreakerAdvisor
 from DocsToKG.ContentDownload.breaker_autotune import BreakerAutoTuner
 from DocsToKG.ContentDownload.breakers import BreakerRegistry
 
-RegistryFactory = Callable[[], Tuple[BreakerRegistry, Iterable[str]]]
+RegistryFactory = Callable[[], tuple[BreakerRegistry, Iterable[str]]]
 
 
 def install_breaker_advisor_cli(

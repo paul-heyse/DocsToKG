@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.config_adapter",
+#   "purpose": "Configuration adapter for converting Pydantic settings to stage config dataclasses.",
+#   "sections": [
+#     {
+#       "id": "configurationadapter",
+#       "name": "ConfigurationAdapter",
+#       "anchor": "class-configurationadapter",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Configuration adapter for converting Pydantic settings to stage config dataclasses.
 
 This module provides adapters that bridge the unified Typer CLI (which uses Pydantic
@@ -15,7 +30,7 @@ from __future__ import annotations
 
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from .app_context import AppContext
@@ -40,7 +55,7 @@ class ConfigurationAdapter:
     """
 
     @staticmethod
-    def _normalize_mode(mode: Any) -> Optional[str]:
+    def _normalize_mode(mode: Any) -> str | None:
         """Normalize ``mode`` values from CLI overrides or settings."""
 
         if mode is None:
@@ -191,6 +206,7 @@ class ConfigurationAdapter:
             cfg.out_dir = Path(embed_settings.output_vectors_dir)
 
         cfg.vector_format = embed_settings.vectors.format.value
+        cfg.dense_backend = embed_settings.dense.backend.value
         cfg.resume = bool(embed_settings.resume)
         cfg.force = bool(embed_settings.force)
 

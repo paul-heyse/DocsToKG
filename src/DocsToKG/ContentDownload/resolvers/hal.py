@@ -16,7 +16,8 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Iterable, List
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, Any
 
 import httpx
 
@@ -40,7 +41,7 @@ class HalResolver(ApiResolverBase):
 
     name = "hal"
 
-    def is_enabled(self, config: Any, artifact: "WorkArtifact") -> bool:
+    def is_enabled(self, config: Any, artifact: WorkArtifact) -> bool:
         """Return ``True`` when the work includes a DOI for HAL search.
 
         Args:
@@ -56,7 +57,7 @@ class HalResolver(ApiResolverBase):
         self,
         client: httpx.Client,
         config: Any,
-        artifact: "WorkArtifact",
+        artifact: WorkArtifact,
     ) -> Iterable[ResolverResult]:
         """Yield HAL download URLs referencing ``artifact``.
 
@@ -87,7 +88,7 @@ class HalResolver(ApiResolverBase):
             yield error
             return
         docs = (data.get("response") or {}).get("docs") or []
-        urls: List[str] = []
+        urls: list[str] = []
         for doc in docs:
             if not isinstance(doc, dict):
                 continue

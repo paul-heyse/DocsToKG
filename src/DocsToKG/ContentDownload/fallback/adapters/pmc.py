@@ -1,14 +1,35 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.fallback.adapters.pmc",
+#   "purpose": "PubMed Central adapter for PDF resolution.",
+#   "sections": [
+#     {
+#       "id": "extract-pmcid",
+#       "name": "extract_pmcid",
+#       "anchor": "function-extract-pmcid",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "adapter-pmc-pdf",
+#       "name": "adapter_pmc_pdf",
+#       "anchor": "function-adapter-pmc-pdf",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """PubMed Central adapter for PDF resolution."""
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 from DocsToKG.ContentDownload.fallback.adapters import head_pdf
 from DocsToKG.ContentDownload.fallback.types import AttemptPolicy, AttemptResult
 
 
-def extract_pmcid(pmcid_str: Optional[str]) -> Optional[str]:
+def extract_pmcid(pmcid_str: str | None) -> str | None:
     """Extract numeric PMCID from various formats.
 
     Handles: "PMC1234567", "1234567", "pmc1234567"
@@ -28,7 +49,7 @@ def extract_pmcid(pmcid_str: Optional[str]) -> Optional[str]:
 
 def adapter_pmc_pdf(
     policy: AttemptPolicy,
-    context: Dict[str, Any],
+    context: dict[str, Any],
 ) -> AttemptResult:
     """Query PubMed Central for PDF.
 

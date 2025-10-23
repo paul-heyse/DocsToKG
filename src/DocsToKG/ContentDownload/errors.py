@@ -1,3 +1,54 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.errors",
+#   "purpose": "Actionable error taxonomy and logging helpers for content downloads.",
+#   "sections": [
+#     {
+#       "id": "downloaderror",
+#       "name": "DownloadError",
+#       "anchor": "class-downloaderror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "networkerror",
+#       "name": "NetworkError",
+#       "anchor": "class-networkerror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "contentpolicyerror",
+#       "name": "ContentPolicyError",
+#       "anchor": "class-contentpolicyerror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "ratelimiterror",
+#       "name": "RateLimitError",
+#       "anchor": "class-ratelimiterror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "get-actionable-error-message",
+#       "name": "get_actionable_error_message",
+#       "anchor": "function-get-actionable-error-message",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "log-download-failure",
+#       "name": "log_download_failure",
+#       "anchor": "function-log-download-failure",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "format-download-summary",
+#       "name": "format_download_summary",
+#       "anchor": "function-format-download-summary",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Actionable error taxonomy and logging helpers for content downloads.
 
 Responsibilities
@@ -25,7 +76,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any
 
 __all__ = (
     "DownloadError",
@@ -45,12 +96,12 @@ class DownloadError:
 
     error_type: str
     message: str
-    url: Optional[str] = None
-    work_id: Optional[str] = None
-    http_status: Optional[int] = None
-    reason_code: Optional[str] = None
-    suggestion: Optional[str] = None
-    metadata: Dict[str, Any] = None
+    url: str | None = None
+    work_id: str | None = None
+    http_status: int | None = None
+    reason_code: str | None = None
+    suggestion: str | None = None
+    metadata: dict[str, Any] = None
 
     def __post_init__(self) -> None:
         if self.metadata is None:
@@ -61,7 +112,7 @@ class NetworkError(Exception):
     """Raised when network-related download failures occur."""
 
     def __init__(
-        self, message: str, *, url: Optional[str] = None, details: Optional[Dict[str, Any]] = None
+        self, message: str, *, url: str | None = None, details: dict[str, Any] | None = None
     ):
         super().__init__(message)
         self.url = url
@@ -71,7 +122,7 @@ class NetworkError(Exception):
 class ContentPolicyError(Exception):
     """Raised when content policy violations prevent downloads."""
 
-    def __init__(self, message: str, *, violation: str, policy: Optional[Dict[str, Any]] = None):
+    def __init__(self, message: str, *, violation: str, policy: dict[str, Any] | None = None):
         super().__init__(message)
         self.violation = violation
         self.policy = policy or {}
@@ -84,15 +135,15 @@ class RateLimitError(Exception):
         self,
         message: str,
         *,
-        host: Optional[str] = None,
-        role: Optional[str] = None,
-        waited_ms: Optional[int] = None,
-        next_allowed_at: Optional[datetime] = None,
-        backend: Optional[str] = None,
-        mode: Optional[str] = None,
-        retry_after: Optional[float] = None,
-        domain: Optional[str] = None,
-        details: Optional[Dict[str, Any]] = None,
+        host: str | None = None,
+        role: str | None = None,
+        waited_ms: int | None = None,
+        next_allowed_at: datetime | None = None,
+        backend: str | None = None,
+        mode: str | None = None,
+        retry_after: float | None = None,
+        domain: str | None = None,
+        details: dict[str, Any] | None = None,
     ):
         super().__init__(message)
         self.host = host or domain
@@ -107,10 +158,10 @@ class RateLimitError(Exception):
 
 
 def get_actionable_error_message(
-    http_status: Optional[int],
-    reason_code: Optional[str],
-    url: Optional[str] = None,
-) -> tuple[str, Optional[str]]:
+    http_status: int | None,
+    reason_code: str | None,
+    url: str | None = None,
+) -> tuple[str, str | None]:
     """Generate user-friendly error message with actionable suggestions.
 
     Args:
@@ -225,10 +276,10 @@ def log_download_failure(
     logger: logging.Logger,
     url: str,
     work_id: str,
-    http_status: Optional[int] = None,
-    reason_code: Optional[str] = None,
-    error_details: Optional[str] = None,
-    exception: Optional[Exception] = None,
+    http_status: int | None = None,
+    reason_code: str | None = None,
+    error_details: str | None = None,
+    exception: Exception | None = None,
 ) -> None:
     """Log download failure with structured context and actionable suggestions.
 
@@ -296,7 +347,7 @@ def log_download_failure(
 def format_download_summary(
     total_attempts: int,
     successes: int,
-    failures_by_reason: Dict[str, int],
+    failures_by_reason: dict[str, int],
 ) -> str:
     """Format a human-readable download summary with recommendations.
 

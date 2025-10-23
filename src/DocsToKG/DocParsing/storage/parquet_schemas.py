@@ -1,3 +1,156 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.storage.parquet_schemas",
+#   "purpose": "Describe this module's responsibilities.",
+#   "sections": [
+#     {
+#       "id": "chunks-schema",
+#       "name": "chunks_schema",
+#       "anchor": "function-chunks-schema",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "dense-schema",
+#       "name": "dense_schema",
+#       "anchor": "function-dense-schema",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "sparse-schema-idspace",
+#       "name": "sparse_schema_idspace",
+#       "anchor": "function-sparse-schema-idspace",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "lexical-schema-idspace",
+#       "name": "lexical_schema_idspace",
+#       "anchor": "function-lexical-schema-idspace",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "lexical-schema-terms",
+#       "name": "lexical_schema_terms",
+#       "anchor": "function-lexical-schema-terms",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "utc-now-iso",
+#       "name": "_utc_now_iso",
+#       "anchor": "function-utc-now-iso",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "to-bytes-meta",
+#       "name": "_to_bytes_meta",
+#       "anchor": "function-to-bytes-meta",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-footer-common",
+#       "name": "build_footer_common",
+#       "anchor": "function-build-footer-common",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-footer-dense",
+#       "name": "build_footer_dense",
+#       "anchor": "function-build-footer-dense",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-footer-sparse",
+#       "name": "build_footer_sparse",
+#       "anchor": "function-build-footer-sparse",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-footer-lexical",
+#       "name": "build_footer_lexical",
+#       "anchor": "function-build-footer-lexical",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "footervalidationresult",
+#       "name": "FooterValidationResult",
+#       "anchor": "class-footervalidationresult",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "decode-file-metadata",
+#       "name": "_decode_file_metadata",
+#       "anchor": "function-decode-file-metadata",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-footer-common",
+#       "name": "validate_footer_common",
+#       "anchor": "function-validate-footer-common",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-footer-vectors",
+#       "name": "validate_footer_vectors",
+#       "anchor": "function-validate-footer-vectors",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-footer-dense",
+#       "name": "validate_footer_dense",
+#       "anchor": "function-validate-footer-dense",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-footer-sparse",
+#       "name": "validate_footer_sparse",
+#       "anchor": "function-validate-footer-sparse",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-footer-lexical",
+#       "name": "validate_footer_lexical",
+#       "anchor": "function-validate-footer-lexical",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "attach-footer-metadata",
+#       "name": "attach_footer_metadata",
+#       "anchor": "function-attach-footer-metadata",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "read-parquet-footer",
+#       "name": "read_parquet_footer",
+#       "anchor": "function-read-parquet-footer",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-parquet-file",
+#       "name": "validate_parquet_file",
+#       "anchor": "function-validate-parquet-file",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "assert-table-matches-schema",
+#       "name": "assert_table_matches_schema",
+#       "anchor": "function-assert-table-matches-schema",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "recommended-parquet-writer-options",
+#       "name": "recommended_parquet_writer_options",
+#       "anchor": "function-recommended-parquet-writer-options",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "legacy-vector-schema",
+#       "name": "_legacy_vector_schema",
+#       "anchor": "function-legacy-vector-schema",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 # file: src/DocsToKG/DocParsing/storage/parquet_schemas.py
 # Purpose: Executable Arrow schema declarations + Parquet footer contract
 # Compatible with: pyarrow >= 9 (recommended >= 12)
@@ -5,9 +158,9 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Dict, Mapping, Optional, Tuple
+from datetime import UTC, datetime
 
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -170,7 +323,7 @@ FOOTER_REQ_LEXICAL = (
 
 
 def _utc_now_iso() -> str:
-    return datetime.now(timezone.utc).strftime(ISO_UTC)
+    return datetime.now(UTC).strftime(ISO_UTC)
 
 
 def _to_bytes_meta(meta: Mapping[str, str]) -> Mapping[str, bytes]:
@@ -182,9 +335,9 @@ def build_footer_common(
     schema_version: str,
     cfg_hash: str,
     created_by: str,
-    created_at: Optional[str] = None,
-    extra: Optional[Mapping[str, str]] = None,
-) -> Dict[str, str]:
+    created_at: str | None = None,
+    extra: Mapping[str, str] | None = None,
+) -> dict[str, str]:
     created_at = created_at or _utc_now_iso()
     base = {
         "docparse.schema_version": schema_version,
@@ -203,11 +356,11 @@ def build_footer_dense(
     dim: int,
     cfg_hash: str,
     dtype: str = "float32",
-    device: Optional[str] = None,
+    device: str | None = None,
     created_by: str = "DocsToKG-DocParsing",
-    created_at: Optional[str] = None,
-    extra: Optional[Mapping[str, str]] = None,
-) -> Dict[str, str]:
+    created_at: str | None = None,
+    extra: Mapping[str, str] | None = None,
+) -> dict[str, str]:
     meta = build_footer_common(SCHEMA_VERSION_DENSE, cfg_hash, created_by, created_at, extra)
     meta.update(
         {
@@ -227,13 +380,13 @@ def build_footer_sparse(
     provider: str,
     model_id: str,
     cfg_hash: str,
-    vocab_id: Optional[str] = None,
-    hash_scheme: Optional[str] = None,
+    vocab_id: str | None = None,
+    hash_scheme: str | None = None,
     dtype: str = "float32",
     created_by: str = "DocsToKG-DocParsing",
-    created_at: Optional[str] = None,
-    extra: Optional[Mapping[str, str]] = None,
-) -> Dict[str, str]:
+    created_at: str | None = None,
+    extra: Mapping[str, str] | None = None,
+) -> dict[str, str]:
     meta = build_footer_common(SCHEMA_VERSION_SPARSE, cfg_hash, created_by, created_at, extra)
     meta.update(
         {
@@ -263,9 +416,9 @@ def build_footer_lexical(
     model_id: str = "bm25",
     dtype: str = "float32",
     created_by: str = "DocsToKG-DocParsing",
-    created_at: Optional[str] = None,
-    extra: Optional[Mapping[str, str]] = None,
-) -> Dict[str, str]:
+    created_at: str | None = None,
+    extra: Mapping[str, str] | None = None,
+) -> dict[str, str]:
     meta = build_footer_common(SCHEMA_VERSION_LEXICAL, cfg_hash, created_by, created_at, extra)
     meta.update(
         {
@@ -293,11 +446,11 @@ def build_footer_lexical(
 @dataclass(frozen=True)
 class FooterValidationResult:
     ok: bool
-    errors: Tuple[str, ...] = ()
-    warnings: Tuple[str, ...] = ()
+    errors: tuple[str, ...] = ()
+    warnings: tuple[str, ...] = ()
 
 
-def _decode_file_metadata(md: Optional[Mapping[bytes, bytes]]) -> Dict[str, str]:
+def _decode_file_metadata(md: Mapping[bytes, bytes] | None) -> dict[str, str]:
     if not md:
         return {}
     return {k.decode("utf-8", "replace"): v.decode("utf-8", "replace") for k, v in md.items()}
@@ -436,7 +589,7 @@ def attach_footer_metadata(table: pa.Table, meta: Mapping[str, str]) -> pa.Table
     return table.replace_schema_metadata(merged)
 
 
-def read_parquet_footer(path: str) -> Dict[str, str]:
+def read_parquet_footer(path: str) -> dict[str, str]:
     """
     Read a Parquet file's key_value_metadata as str->str.
     """
@@ -444,7 +597,7 @@ def read_parquet_footer(path: str) -> Dict[str, str]:
     return _decode_file_metadata(pf.metadata.metadata)
 
 
-def validate_parquet_file(path: str, family: Optional[str] = None) -> FooterValidationResult:
+def validate_parquet_file(path: str, family: str | None = None) -> FooterValidationResult:
     """
     Validate a Parquet file against the footer contract.
     If family is None, infer from footer key 'docparse.family' when present.
@@ -508,7 +661,7 @@ def assert_table_matches_schema(table: pa.Table, expected: pa.Schema) -> None:
 # ============================================================
 
 
-def recommended_parquet_writer_options(dataset: str) -> Dict[str, object]:
+def recommended_parquet_writer_options(dataset: str) -> dict[str, object]:
     """
     Returns a dictionary of recommended write options per dataset type.
     You can map these into your actual writer (e.g., pyarrow.parquet.write_table).
@@ -521,14 +674,7 @@ def recommended_parquet_writer_options(dataset: str) -> Dict[str, object]:
             "use_dictionary": {"section": True, "text": False},
             "write_statistics": True,
         }
-    elif dataset == "dense":
-        return {
-            "compression": "zstd",
-            "compression_level": 5,
-            "use_dictionary": {},
-            "write_statistics": True,
-        }
-    elif dataset in ("sparse", "lexical"):
+    elif dataset == "dense" or dataset in ("sparse", "lexical"):
         return {
             "compression": "zstd",
             "compression_level": 5,

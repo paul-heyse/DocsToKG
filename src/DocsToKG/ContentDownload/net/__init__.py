@@ -1,3 +1,11 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.net.__init__",
+#   "purpose": "Network layer for ContentDownload.",
+#   "sections": []
+# }
+# === /NAVMAP ===
+
 """
 Network layer for ContentDownload.
 

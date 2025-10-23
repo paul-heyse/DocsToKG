@@ -55,12 +55,12 @@ from __future__ import annotations
 
 import argparse
 import time
-from typing import Callable, Iterable, Tuple
+from collections.abc import Callable, Iterable
 
 from DocsToKG.ContentDownload.breakers import BreakerRegistry, RequestRole
 
 # Type for dependency injection: factory returns (registry, known_hosts)
-RegistryFactory = Callable[[], Tuple[BreakerRegistry, Iterable[str]]]
+RegistryFactory = Callable[[], tuple[BreakerRegistry, Iterable[str]]]
 
 
 def install_breaker_cli(

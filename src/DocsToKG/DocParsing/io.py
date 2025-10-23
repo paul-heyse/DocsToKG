@@ -1,3 +1,234 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.io",
+#   "purpose": "Low-level I/O helpers shared across DocParsing stages.",
+#   "sections": [
+#     {
+#       "id": "jsonlwriter",
+#       "name": "JsonlWriter",
+#       "anchor": "class-jsonlwriter",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "partition-normalisation-buffer",
+#       "name": "_partition_normalisation_buffer",
+#       "anchor": "function-partition-normalisation-buffer",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "iter-normalised-text-chunks",
+#       "name": "_iter_normalised_text_chunks",
+#       "anchor": "function-iter-normalised-text-chunks",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "atomic-write",
+#       "name": "atomic_write",
+#       "anchor": "function-atomic-write",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "iter-jsonl",
+#       "name": "iter_jsonl",
+#       "anchor": "function-iter-jsonl",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "iter-jsonl-batches",
+#       "name": "iter_jsonl_batches",
+#       "anchor": "function-iter-jsonl-batches",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "dedupe-preserve-order",
+#       "name": "dedupe_preserve_order",
+#       "anchor": "function-dedupe-preserve-order",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "jsonl-load",
+#       "name": "jsonl_load",
+#       "anchor": "function-jsonl-load",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "jsonl-save",
+#       "name": "jsonl_save",
+#       "anchor": "function-jsonl-save",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "jsonl-append-iter",
+#       "name": "jsonl_append_iter",
+#       "anchor": "function-jsonl-append-iter",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-jsonl-split-map",
+#       "name": "build_jsonl_split_map",
+#       "anchor": "function-build-jsonl-split-map",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "iter-doctags",
+#       "name": "iter_doctags",
+#       "anchor": "function-iter-doctags",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "iter-jsonl-stream",
+#       "name": "_iter_jsonl_stream",
+#       "anchor": "function-iter-jsonl-stream",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "sanitise-stage",
+#       "name": "_sanitise_stage",
+#       "anchor": "function-sanitise-stage",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "telemetry-filename",
+#       "name": "_telemetry_filename",
+#       "anchor": "function-telemetry-filename",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "manifest-filename",
+#       "name": "_manifest_filename",
+#       "anchor": "function-manifest-filename",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "manifest-append",
+#       "name": "manifest_append",
+#       "anchor": "function-manifest-append",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolve-manifest-path",
+#       "name": "resolve_manifest_path",
+#       "anchor": "function-resolve-manifest-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolve-attempts-path",
+#       "name": "resolve_attempts_path",
+#       "anchor": "function-resolve-attempts-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "normalise-hash-name",
+#       "name": "_normalise_hash_name",
+#       "anchor": "function-normalise-hash-name",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "hash-algorithms-available",
+#       "name": "_hash_algorithms_available",
+#       "anchor": "function-hash-algorithms-available",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "select-hash-algorithm",
+#       "name": "_select_hash_algorithm",
+#       "anchor": "function-select-hash-algorithm",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "select-hash-algorithm-uncached",
+#       "name": "_select_hash_algorithm_uncached",
+#       "anchor": "function-select-hash-algorithm-uncached",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "clear-hash-algorithm-cache",
+#       "name": "_clear_hash_algorithm_cache",
+#       "anchor": "function-clear-hash-algorithm-cache",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolve-hash-algorithm",
+#       "name": "resolve_hash_algorithm",
+#       "anchor": "function-resolve-hash-algorithm",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "make-hasher",
+#       "name": "make_hasher",
+#       "anchor": "function-make-hasher",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "compute-chunk-uuid",
+#       "name": "compute_chunk_uuid",
+#       "anchor": "function-compute-chunk-uuid",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "relative-path",
+#       "name": "relative_path",
+#       "anchor": "function-relative-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "quarantine-artifact",
+#       "name": "quarantine_artifact",
+#       "anchor": "function-quarantine-artifact",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "streamingcontenthasher",
+#       "name": "StreamingContentHasher",
+#       "anchor": "class-streamingcontenthasher",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "compute-content-hash",
+#       "name": "compute_content_hash",
+#       "anchor": "function-compute-content-hash",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-manifest-index",
+#       "name": "load_manifest_index",
+#       "anchor": "function-load-manifest-index",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "manifestheapkey",
+#       "name": "_ManifestHeapKey",
+#       "anchor": "class-manifestheapkey",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "manifest-timestamp-key",
+#       "name": "_manifest_timestamp_key",
+#       "anchor": "function-manifest-timestamp-key",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "iter-manifest-tail-lines",
+#       "name": "_iter_manifest_tail_lines",
+#       "anchor": "function-iter-manifest-tail-lines",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "iter-manifest-file",
+#       "name": "_iter_manifest_file",
+#       "anchor": "function-iter-manifest-file",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "iter-manifest-entries",
+#       "name": "iter_manifest_entries",
+#       "anchor": "function-iter-manifest-entries",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Low-level I/O helpers shared across DocParsing stages.
 
@@ -38,21 +269,13 @@ import os
 import unicodedata
 import uuid
 import warnings
-from datetime import datetime, timezone
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
+from datetime import UTC, datetime
 from functools import total_ordering
 from itertools import count
 from pathlib import Path
 from typing import (
-    Callable,
-    Dict,
-    Iterable,
-    Iterator,
-    List,
-    Mapping,
-    Optional,
-    Sequence,
     TextIO,
-    Tuple,
 )
 
 import jsonlines
@@ -67,10 +290,8 @@ _MANIFEST_TAIL_MIN_WINDOW = 64 * 1024
 _MANIFEST_TAIL_BYTES_PER_ENTRY = 4096
 
 
-_HASH_ALGORITHMS_AVAILABLE: Optional[frozenset[str]] = None
-_HASH_ALGORITHM_SELECTION_CACHE: Dict[
-    Tuple[Optional[str], Optional[str]], Tuple[Optional[str], str]
-] = {}
+_HASH_ALGORITHMS_AVAILABLE: frozenset[str] | None = None
+_HASH_ALGORITHM_SELECTION_CACHE: dict[tuple[str | None, str | None], tuple[str | None, str]] = {}
 
 
 class JsonlWriter:
@@ -182,8 +403,8 @@ def atomic_write(path: Path) -> Iterator[TextIO]:
 def iter_jsonl(
     path: Path,
     *,
-    start: Optional[int] = None,
-    end: Optional[int] = None,
+    start: int | None = None,
+    end: int | None = None,
     skip_invalid: bool = False,
     max_errors: int = 10,
 ) -> Iterator[dict]:
@@ -204,13 +425,13 @@ def iter_jsonl_batches(
     *,
     skip_invalid: bool = False,
     max_errors: int = 10,
-) -> Iterator[List[dict]]:
+) -> Iterator[list[dict]]:
     """Yield JSONL rows from ``paths`` in batches of ``batch_size`` records."""
 
     if batch_size <= 0:
         raise ValueError("batch_size must be a positive integer")
 
-    buffer: List[dict] = []
+    buffer: list[dict] = []
     for source in paths:
         for record in iter_jsonl(
             source,
@@ -225,11 +446,11 @@ def iter_jsonl_batches(
         yield buffer
 
 
-def dedupe_preserve_order(items: Iterable[str]) -> Tuple[str, ...]:
+def dedupe_preserve_order(items: Iterable[str]) -> tuple[str, ...]:
     """Return ``items`` without duplicates while preserving encounter order."""
 
     seen: set[str] = set()
-    ordered: List[str] = []
+    ordered: list[str] = []
     for item in items:
         if not item:
             continue
@@ -240,7 +461,7 @@ def dedupe_preserve_order(items: Iterable[str]) -> Tuple[str, ...]:
     return tuple(ordered)
 
 
-def jsonl_load(path: Path, skip_invalid: bool = False, max_errors: int = 10) -> List[dict]:
+def jsonl_load(path: Path, skip_invalid: bool = False, max_errors: int = 10) -> list[dict]:
     """Load a JSONL file into memory with optional error tolerance.
 
     .. deprecated:: 0.2.0
@@ -262,7 +483,7 @@ def jsonl_load(path: Path, skip_invalid: bool = False, max_errors: int = 10) -> 
 
 
 def jsonl_save(
-    path: Path, rows: List[dict], validate: Optional[Callable[[dict], None]] = None
+    path: Path, rows: list[dict], validate: Callable[[dict], None] | None = None
 ) -> None:
     """Persist dictionaries to a JSONL file atomically."""
 
@@ -341,7 +562,7 @@ def build_jsonl_split_map(
     *,
     chunk_bytes: int = 32 * 1024 * 1024,
     min_chunk_bytes: int = 1 * 1024 * 1024,
-) -> List[Tuple[int, int]]:
+) -> list[tuple[int, int]]:
     """Return newline-aligned byte ranges that partition ``path``."""
 
     size = path.stat().st_size
@@ -349,7 +570,7 @@ def build_jsonl_split_map(
         return [(0, 0)]
 
     chunk_bytes = max(chunk_bytes, min_chunk_bytes)
-    offsets: List[Tuple[int, int]] = []
+    offsets: list[tuple[int, int]] = []
     with path.open("rb") as handle:
         start = 0
         while start < size:
@@ -377,7 +598,7 @@ def iter_doctags(directory: Path) -> Iterator[Path]:
     """
 
     extensions = ("*.doctags", "*.doctag")
-    resolved_to_logical: Dict[Path, Tuple[Path, str, Tuple[bool, str]]] = {}
+    resolved_to_logical: dict[Path, tuple[Path, str, tuple[bool, str]]] = {}
     for pattern in extensions:
         for candidate in directory.rglob(pattern):
             if not candidate.is_file() or candidate.name.startswith("."):
@@ -408,8 +629,8 @@ def iter_doctags(directory: Path) -> Iterator[Path]:
 def _iter_jsonl_stream(
     path: Path,
     *,
-    start: Optional[int],
-    end: Optional[int],
+    start: int | None,
+    end: int | None,
     skip_invalid: bool,
     max_errors: int,
 ) -> Iterator[dict]:
@@ -512,8 +733,8 @@ def manifest_append(
     status: str,
     *,
     duration_s: float = 0.0,
-    warnings: Optional[List[str]] = None,
-    error: Optional[str] = None,
+    warnings: list[str] | None = None,
+    error: str | None = None,
     schema_version: str = "",
     atomic: bool = True,
     **metadata,
@@ -526,7 +747,7 @@ def manifest_append(
 
     manifest_path = resolve_manifest_path(stage)
     entry = {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "stage": stage,
         "doc_id": doc_id,
         "status": status,
@@ -541,7 +762,7 @@ def manifest_append(
     jsonl_append_iter(manifest_path, [entry], atomic=atomic)
 
 
-def resolve_manifest_path(stage: str, root: Optional[Path] = None) -> Path:
+def resolve_manifest_path(stage: str, root: Path | None = None) -> Path:
     """Return the manifest path for ``stage`` relative to ``root``."""
 
     manifest_dir = data_manifests(root)
@@ -549,7 +770,7 @@ def resolve_manifest_path(stage: str, root: Optional[Path] = None) -> Path:
     return manifest_dir / _manifest_filename(stage)
 
 
-def resolve_attempts_path(stage: str, root: Optional[Path] = None) -> Path:
+def resolve_attempts_path(stage: str, root: Path | None = None) -> Path:
     """Return the attempts log path for ``stage`` relative to ``root``."""
 
     manifest_dir = data_manifests(root)
@@ -557,7 +778,7 @@ def resolve_attempts_path(stage: str, root: Optional[Path] = None) -> Path:
     return manifest_dir / _telemetry_filename(stage, "attempts")
 
 
-def _normalise_hash_name(candidate: Optional[str]) -> Optional[str]:
+def _normalise_hash_name(candidate: str | None) -> str | None:
     """Normalise algorithm names for comparison against hashlib."""
 
     if candidate is None:
@@ -578,7 +799,7 @@ def _hash_algorithms_available() -> frozenset[str]:
     return _HASH_ALGORITHMS_AVAILABLE
 
 
-def _select_hash_algorithm(requested: Optional[str], default: Optional[str]) -> str:
+def _select_hash_algorithm(requested: str | None, default: str | None) -> str:
     """Return a supported hash algorithm honouring env overrides and defaults."""
 
     env_override = os.getenv(_HASH_ALG_ENV_VAR)
@@ -593,9 +814,9 @@ def _select_hash_algorithm(requested: Optional[str], default: Optional[str]) -> 
 
 
 def _select_hash_algorithm_uncached(
-    requested: Optional[str],
-    default: Optional[str],
-    env_override: Optional[str],
+    requested: str | None,
+    default: str | None,
+    env_override: str | None,
 ) -> str:
     """Resolve a hash algorithm without consulting the selection cache."""
 
@@ -651,7 +872,7 @@ def resolve_hash_algorithm(default: str = _SAFE_HASH_ALGORITHM) -> str:
     return _select_hash_algorithm(requested=None, default=default)
 
 
-def make_hasher(name: Optional[str] = None, *, default: Optional[str] = None) -> "hashlib._Hash":
+def make_hasher(name: str | None = None, *, default: str | None = None) -> hashlib._Hash:
     """Return a configured hashlib object with guarded algorithm resolution."""
 
     algorithm = _select_hash_algorithm(requested=name, default=default)
@@ -689,7 +910,7 @@ def compute_chunk_uuid(
     return str(uuid.UUID(bytes=bytes(raw)))
 
 
-def relative_path(path: Path | str, root: Optional[Path]) -> str:
+def relative_path(path: Path | str, root: Path | None) -> str:
     """Return ``path`` rendered relative to ``root`` when feasible."""
 
     candidate = Path(path)
@@ -706,7 +927,7 @@ def quarantine_artifact(
     path: Path,
     reason: str,
     *,
-    logger: Optional[logging.Logger] = None,
+    logger: logging.Logger | None = None,
     create_placeholder: bool = False,
 ) -> Path:
     """Move ``path`` to a ``.quarantine`` sibling for operator review."""
@@ -811,12 +1032,12 @@ def compute_content_hash(path: Path, algorithm: str = _SAFE_HASH_ALGORITHM) -> s
         return hasher.hexdigest()
 
 
-def load_manifest_index(stage: str, root: Optional[Path] = None) -> Dict[str, dict]:
+def load_manifest_index(stage: str, root: Path | None = None) -> dict[str, dict]:
     """Load the latest manifest entries for a specific pipeline stage."""
 
     manifest_dir = data_manifests(root, ensure=False)
     stage_path = manifest_dir / _manifest_filename(stage)
-    index: Dict[str, dict] = {}
+    index: dict[str, dict] = {}
     if not stage_path.exists():
         return index
 
@@ -844,7 +1065,7 @@ class _ManifestHeapKey:
 
     __slots__ = ("timestamp", "order")
 
-    def __init__(self, timestamp: Optional[str], order: int) -> None:
+    def __init__(self, timestamp: str | None, order: int) -> None:
         """Initialize a heap key with the original timestamp and insertion order."""
         self.timestamp = timestamp
         self.order = order
@@ -865,7 +1086,7 @@ class _ManifestHeapKey:
         return self.timestamp == other.timestamp and self.order == other.order
 
 
-def _manifest_timestamp_key(entry: Mapping[str, object]) -> Optional[str]:
+def _manifest_timestamp_key(entry: Mapping[str, object]) -> str | None:
     """Return a sortable timestamp key or ``None`` when unavailable."""
 
     raw = entry.get("timestamp")
@@ -897,7 +1118,7 @@ def _iter_manifest_tail_lines(path: Path, limit: int) -> Iterator[str]:
         chunk_bytes=window_bytes,
         min_chunk_bytes=window_bytes,
     )
-    collected: List[str] = []
+    collected: list[str] = []
     with path.open("rb") as handle:
         for start, end in reversed(offsets):
             handle.seek(start)
@@ -922,7 +1143,7 @@ def _iter_manifest_tail_lines(path: Path, limit: int) -> Iterator[str]:
         yield line
 
 
-def _iter_manifest_file(path: Path, stage: str, *, limit: Optional[int] = None) -> Iterator[dict]:
+def _iter_manifest_file(path: Path, stage: str, *, limit: int | None = None) -> Iterator[dict]:
     """Yield manifest entries for a single stage file."""
 
     if limit is not None and limit > 0:
@@ -950,9 +1171,9 @@ def _iter_manifest_file(path: Path, stage: str, *, limit: Optional[int] = None) 
 
 def iter_manifest_entries(
     stages: Sequence[str],
-    root: Optional[Path] = None,
+    root: Path | None = None,
     *,
-    limit: Optional[int] = None,
+    limit: int | None = None,
 ) -> Iterator[dict]:
     """Yield manifest entries for ``stages`` sorted by timestamp.
 
@@ -962,7 +1183,7 @@ def iter_manifest_entries(
     """
 
     manifest_dir = data_manifests(root, ensure=False)
-    heap: List[Tuple[_ManifestHeapKey, int, dict, Iterator[dict]]] = []
+    heap: list[tuple[_ManifestHeapKey, int, dict, Iterator[dict]]] = []
     unique = count()
 
     def _push_entry(entry: dict, stream: Iterator[dict]) -> None:

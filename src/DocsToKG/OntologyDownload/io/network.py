@@ -3,11 +3,174 @@
 #   "module": "DocsToKG.OntologyDownload.io.network",
 #   "purpose": "Provide secure streaming downloads, DNS validation, and retry-aware HTTP helpers",
 #   "sections": [
-#     {"id": "infrastructure", "name": "Networking Infrastructure & Constants", "anchor": "INF", "kind": "infra"},
-#     {"id": "dns", "name": "DNS & Host Validation", "anchor": "DNS", "kind": "helpers"},
-#     {"id": "httpx", "name": "HTTPX Client & Rate Limiting", "anchor": "HTX", "kind": "api"},
-#     {"id": "streaming", "name": "Streaming Downloader", "anchor": "STR", "kind": "api"},
-#     {"id": "helpers", "name": "Download Helpers & Security Checks", "anchor": "HLP", "kind": "helpers"}
+#     {
+#       "id": "is-documentation-address",
+#       "name": "_is_documentation_address",
+#       "anchor": "function-is-documentation-address",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "enforce-idn-safety",
+#       "name": "_enforce_idn_safety",
+#       "anchor": "function-enforce-idn-safety",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "rebuild-netloc",
+#       "name": "_rebuild_netloc",
+#       "anchor": "function-rebuild-netloc",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "cached-getaddrinfo",
+#       "name": "_cached_getaddrinfo",
+#       "anchor": "function-cached-getaddrinfo",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "prune-dns-cache",
+#       "name": "_prune_dns_cache",
+#       "anchor": "function-prune-dns-cache",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "register-dns-stub",
+#       "name": "register_dns_stub",
+#       "anchor": "function-register-dns-stub",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "clear-dns-stubs",
+#       "name": "clear_dns_stubs",
+#       "anchor": "function-clear-dns-stubs",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-url-security",
+#       "name": "validate_url_security",
+#       "anchor": "function-validate-url-security",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "retry-with-backoff",
+#       "name": "retry_with_backoff",
+#       "anchor": "function-retry-with-backoff",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "log-memory-usage",
+#       "name": "log_memory_usage",
+#       "anchor": "function-log-memory-usage",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "extract-correlation-id",
+#       "name": "_extract_correlation_id",
+#       "anchor": "function-extract-correlation-id",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "downloadresult",
+#       "name": "DownloadResult",
+#       "anchor": "class-downloadresult",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "parse-retry-after",
+#       "name": "_parse_retry_after",
+#       "anchor": "function-parse-retry-after",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "is-retryable-status",
+#       "name": "_is_retryable_status",
+#       "anchor": "function-is-retryable-status",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "is-retryable-error",
+#       "name": "is_retryable_error",
+#       "anchor": "function-is-retryable-error",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "request-with-redirect-audit",
+#       "name": "request_with_redirect_audit",
+#       "anchor": "function-request-with-redirect-audit",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "streamoutcome",
+#       "name": "_StreamOutcome",
+#       "anchor": "class-streamoutcome",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "conditional-headers-from-manifest",
+#       "name": "_conditional_headers_from_manifest",
+#       "anchor": "function-conditional-headers-from-manifest",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-expected-hash",
+#       "name": "_parse_expected_hash",
+#       "anchor": "function-parse-expected-hash",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "initial-progress-state",
+#       "name": "_initial_progress_state",
+#       "anchor": "function-initial-progress-state",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "log-stream-progress",
+#       "name": "_log_stream_progress",
+#       "anchor": "function-log-stream-progress",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "apply-retry-after-from-response",
+#       "name": "_apply_retry_after_from_response",
+#       "anchor": "function-apply-retry-after-from-response",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-media-type",
+#       "name": "_validate_media_type",
+#       "anchor": "function-validate-media-type",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "total-bytes-from-response",
+#       "name": "_total_bytes_from_response",
+#       "anchor": "function-total-bytes-from-response",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "stream-body-to-cache",
+#       "name": "_stream_body_to_cache",
+#       "anchor": "function-stream-body-to-cache",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "download-once",
+#       "name": "_download_once",
+#       "anchor": "function-download-once",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "safe-int",
+#       "name": "_safe_int",
+#       "anchor": "function-safe-int",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "download-stream",
+#       "name": "download_stream",
+#       "anchor": "function-download-stream",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===
@@ -38,20 +201,13 @@ import threading
 import time
 import unicodedata
 from collections import OrderedDict
+from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import (
-    Callable,
-    Dict,
-    Iterator,
-    List,
-    Mapping,
-    Optional,
-    Set,
-    Tuple,
     TypeVar,
 )
 from urllib.parse import ParseResult, urljoin, urlparse, urlunparse
@@ -69,7 +225,7 @@ from .rate_limit import RateLimiterHandle, get_bucket
 
 IPAddress = ipaddress.IPv4Address | ipaddress.IPv6Address
 
-_DOCUMENTATION_NETWORKS: Tuple[ipaddress.IPv4Network | ipaddress.IPv6Network, ...] = (
+_DOCUMENTATION_NETWORKS: tuple[ipaddress.IPv4Network | ipaddress.IPv6Network, ...] = (
     ipaddress.ip_network("192.0.2.0/24"),
     ipaddress.ip_network("198.51.100.0/24"),
     ipaddress.ip_network("203.0.113.0/24"),
@@ -96,9 +252,9 @@ else:
 _DNS_CACHE_TTL = 120.0
 _DNS_CACHE_MAX_ENTRIES = 4096
 _DNS_CACHE_LOCK = threading.Lock()
-_DNS_CACHE: "OrderedDict[str, Tuple[float, List[Tuple]]]" = OrderedDict()
+_DNS_CACHE: OrderedDict[str, tuple[float, list[tuple]]] = OrderedDict()
 _DNS_STUB_LOCK = threading.Lock()
-_DNS_STUBS: Dict[str, Callable[[str], List[Tuple]]] = {}
+_DNS_STUBS: dict[str, Callable[[str], list[tuple]]] = {}
 
 _RDF_FORMAT_LABELS = {
     "application/rdf+xml": "RDF/XML",
@@ -115,7 +271,7 @@ _RDF_ALIAS_GROUPS = {
     "application/ld+json": {"application/ld+json"},
 }
 RDF_MIME_ALIASES: set[str] = set()
-RDF_MIME_FORMAT_LABELS: Dict[str, str] = {}
+RDF_MIME_FORMAT_LABELS: dict[str, str] = {}
 for canonical, aliases in _RDF_ALIAS_GROUPS.items():
     label = _RDF_FORMAT_LABELS[canonical]
     for alias in aliases:
@@ -177,7 +333,7 @@ def _rebuild_netloc(parsed: ParseResult, ascii_host: str) -> str:
     return f"{host_component}{port}"
 
 
-def _cached_getaddrinfo(host: str) -> List[Tuple]:
+def _cached_getaddrinfo(host: str) -> list[tuple]:
     """Resolve *host* using an expiring LRU cache to avoid repeated DNS lookups."""
 
     ascii_host = host.lower()
@@ -227,7 +383,7 @@ def _prune_dns_cache(current_time: float) -> None:
         _DNS_CACHE.popitem(last=False)
 
 
-def register_dns_stub(host: str, handler: Callable[[str], List[Tuple]]) -> None:
+def register_dns_stub(host: str, handler: Callable[[str], list[tuple]]) -> None:
     """Register a DNS stub callable for ``host`` used during testing."""
 
     ascii_host = host.lower()
@@ -252,7 +408,7 @@ def clear_dns_stubs() -> None:
             _DNS_CACHE.pop(ascii_host, None)
 
 
-def validate_url_security(url: str, http_config: Optional[DownloadConfiguration] = None) -> str:
+def validate_url_security(url: str, http_config: DownloadConfiguration | None = None) -> str:
     """Validate URLs to avoid SSRF, enforce HTTPS, normalize IDNs, and honor host allowlists.
 
     This function implements strict RFC-3986 parsing and normalization with security policies:
@@ -355,10 +511,10 @@ def validate_url_security(url: str, http_config: Optional[DownloadConfiguration]
     parsed = parsed._replace(netloc=_rebuild_netloc(parsed, ascii_host), path=normalized_path)
 
     # Compute allowlist structures once
-    allowed_exact: Set[str] = set()
-    allowed_suffixes: Set[str] = set()
-    allowed_host_ports: Dict[str, Set[int]] = {}
-    allowed_ip_literals: Set[str] = set()
+    allowed_exact: set[str] = set()
+    allowed_suffixes: set[str] = set()
+    allowed_host_ports: dict[str, set[int]] = {}
+    allowed_ip_literals: set[str] = set()
     allowed_port_set = http_config.allowed_port_set() if http_config else {80, 443}
 
     if http_config:
@@ -606,8 +762,8 @@ def retry_with_backoff(
     max_attempts: int = 3,
     backoff_base: float = 0.5,
     jitter: float = 0.5,
-    callback: Optional[Callable[[int, Exception, float], None]] = None,
-    retry_after: Optional[Callable[[Exception], Optional[float]]] = None,
+    callback: Callable[[int, Exception, float], None] | None = None,
+    retry_after: Callable[[Exception], float | None] | None = None,
     sleep: Callable[[float], None] = time.sleep,
 ) -> T:
     """Execute ``func`` with exponential backoff until it succeeds."""
@@ -621,11 +777,11 @@ def retry_with_backoff(
             delay = backoff_base * (2 ** (attempt_number - 1))
 
             outcome = retry_state.outcome
-            exc: Optional[Exception] = None
+            exc: Exception | None = None
             if outcome is not None and outcome.failed:
                 exc = outcome.exception()
 
-            candidate_delay: Optional[float] = None
+            candidate_delay: float | None = None
             if exc is not None:
                 attr_delay = getattr(exc, "_retry_after_delay", None)
                 if attr_delay is not None:
@@ -657,7 +813,7 @@ def retry_with_backoff(
             with suppress(TypeError, ValueError):
                 delay = max(float(retry_state.next_action.sleep), 0.0)
 
-        exc: Optional[Exception] = None
+        exc: Exception | None = None
         outcome = retry_state.outcome
         if outcome is not None and outcome.failed:
             exc = outcome.exception()
@@ -686,7 +842,7 @@ def log_memory_usage(
     *,
     stage: str,
     event: str,
-    validator: Optional[str] = None,
+    validator: str | None = None,
 ) -> None:
     """Emit debug-level memory usage snapshots when enabled."""
     is_enabled = getattr(logger, "isEnabledFor", None)
@@ -702,13 +858,13 @@ def log_memory_usage(
         memory_mb = _PROCESS.memory_info().rss / (1024**2)
     except (psutil.Error, OSError):  # pragma: no cover - defensive guard
         return
-    extra: Dict[str, object] = {"stage": stage, "event": event, "memory_mb": round(memory_mb, 2)}
+    extra: dict[str, object] = {"stage": stage, "event": event, "memory_mb": round(memory_mb, 2)}
     if validator:
         extra["validator"] = validator
     logger.debug("memory usage", extra=extra)
 
 
-def _extract_correlation_id(logger: logging.Logger) -> Optional[str]:
+def _extract_correlation_id(logger: logging.Logger) -> str | None:
     """Return the correlation identifier stored on a logger adapter, when present."""
 
     extra = getattr(logger, "extra", None)
@@ -741,14 +897,14 @@ class DownloadResult:
     path: Path
     status: str
     sha256: str
-    etag: Optional[str]
-    last_modified: Optional[str]
-    content_type: Optional[str]
-    content_length: Optional[int]
-    cache_status: Optional[Mapping[str, object]] = None
+    etag: str | None
+    last_modified: str | None
+    content_type: str | None
+    content_length: int | None
+    cache_status: Mapping[str, object] | None = None
 
 
-def _parse_retry_after(value: Optional[str]) -> Optional[float]:
+def _parse_retry_after(value: str | None) -> float | None:
     if not value:
         return None
     candidate = value.strip()
@@ -764,13 +920,13 @@ def _parse_retry_after(value: Optional[str]) -> Optional[float]:
         if retry_time is None:
             return None
         if retry_time.tzinfo is None:
-            retry_time = retry_time.replace(tzinfo=timezone.utc)
-        now = datetime.now(timezone.utc)
+            retry_time = retry_time.replace(tzinfo=UTC)
+        now = datetime.now(UTC)
         seconds = (retry_time - now).total_seconds()
     return max(seconds, 0.0)
 
 
-def _is_retryable_status(status_code: Optional[int]) -> bool:
+def _is_retryable_status(status_code: int | None) -> bool:
     if status_code is None:
         return True
     if status_code >= 500:
@@ -815,14 +971,14 @@ def request_with_redirect_audit(
     stream: bool,
     http_config: DownloadConfiguration,
     assume_url_validated: bool = False,
-    extensions: Optional[Mapping[str, object]] = None,
+    extensions: Mapping[str, object] | None = None,
 ) -> Iterator[httpx.Response]:
     """Issue an HTTP request while validating every redirect target."""
 
     redirects = 0
-    response: Optional[httpx.Response] = None
+    response: httpx.Response | None = None
     current_url = url
-    last_validated_url: Optional[str] = None
+    last_validated_url: str | None = None
     assume_validated_flag = assume_url_validated
     raw_limit = getattr(http_config, "max_redirects", 5)
     try:
@@ -887,7 +1043,7 @@ def request_with_redirect_audit(
                 response.close()
                 raise
 
-            setattr(response, "validated_url", last_validated_url)
+            response.validated_url = last_validated_url
             yield response
             return
     finally:
@@ -901,16 +1057,16 @@ class _StreamOutcome:
 
     status: str
     cache_path: Path
-    etag: Optional[str]
-    last_modified: Optional[str]
-    content_type: Optional[str]
-    content_length: Optional[int]
+    etag: str | None
+    last_modified: str | None
+    content_type: str | None
+    content_length: int | None
     from_cache: bool
-    cache_status: Optional[Mapping[str, object]] = None
+    cache_status: Mapping[str, object] | None = None
 
 
-def _conditional_headers_from_manifest(manifest: Optional[Mapping[str, object]]) -> Dict[str, str]:
-    headers: Dict[str, str] = {}
+def _conditional_headers_from_manifest(manifest: Mapping[str, object] | None) -> dict[str, str]:
+    headers: dict[str, str] = {}
     if not manifest:
         return headers
     etag = manifest.get("etag") if isinstance(manifest, Mapping) else None
@@ -922,7 +1078,7 @@ def _conditional_headers_from_manifest(manifest: Optional[Mapping[str, object]])
     return headers
 
 
-def _parse_expected_hash(expected_hash: Optional[str]) -> tuple[Optional[str], Optional[str]]:
+def _parse_expected_hash(expected_hash: str | None) -> tuple[str | None, str | None]:
     if not expected_hash:
         return None, None
     parts = expected_hash.split(":", 1)
@@ -938,10 +1094,10 @@ def _parse_expected_hash(expected_hash: Optional[str]) -> tuple[Optional[str], O
 def _initial_progress_state(
     *,
     resume_position: int,
-    total_bytes: Optional[int],
+    total_bytes: int | None,
     percent_step: float,
-) -> Dict[str, object]:
-    state: Dict[str, object] = {"last_bytes": resume_position, "next_percent": None}
+) -> dict[str, object]:
+    state: dict[str, object] = {"last_bytes": resume_position, "next_percent": None}
     if total_bytes and total_bytes > 0 and percent_step > 0:
         progress = resume_position / total_bytes
         if progress < 1:
@@ -954,8 +1110,8 @@ def _log_stream_progress(
     *,
     logger: logging.Logger,
     bytes_downloaded: int,
-    total_bytes: Optional[int],
-    state: Dict[str, object],
+    total_bytes: int | None,
+    state: dict[str, object],
     percent_step: float,
     bytes_threshold: int,
 ) -> None:
@@ -1006,9 +1162,9 @@ def _apply_retry_after_from_response(
     *,
     response: httpx.Response,
     http_config: DownloadConfiguration,
-    service: Optional[str],
-    host: Optional[str],
-) -> Optional[float]:
+    service: str | None,
+    host: str | None,
+) -> float | None:
     """Parse Retry-After header and return delay in seconds.
 
     Modern rate-limiting (pyrate_limiter) doesn't mutate buckets on 429;
@@ -1020,8 +1176,8 @@ def _apply_retry_after_from_response(
 
 def _validate_media_type(
     *,
-    actual_content_type: Optional[str],
-    expected_media_type: Optional[str],
+    actual_content_type: str | None,
+    expected_media_type: str | None,
     http_config: DownloadConfiguration,
     logger: logging.Logger,
     url: str,
@@ -1074,7 +1230,7 @@ def _validate_media_type(
     )
 
 
-def _total_bytes_from_response(response: httpx.Response, resume_position: int) -> Optional[int]:
+def _total_bytes_from_response(response: httpx.Response, resume_position: int) -> int | None:
     if response.status_code == 206:
         content_range = response.headers.get("Content-Range")
         if content_range and "/" in content_range:
@@ -1099,11 +1255,11 @@ def _stream_body_to_cache(
     cache_path: Path,
     resume_position: int,
     http_config: DownloadConfiguration,
-    cancellation_token: Optional[CancellationToken],
+    cancellation_token: CancellationToken | None,
     logger: logging.Logger,
     progress_percent_step: float,
     progress_bytes_threshold: int,
-    download_deadline: Optional[float],
+    download_deadline: float | None,
     download_timeout: float,
 ) -> int:
     part_path = cache_path.with_suffix(cache_path.suffix + ".part")
@@ -1201,16 +1357,16 @@ def _download_once(
     destination: Path,
     headers: Mapping[str, str],
     http_config: DownloadConfiguration,
-    bucket: Optional[RateLimiterHandle],
+    bucket: RateLimiterHandle | None,
     logger: logging.Logger,
     correlation_id: str,
-    cancellation_token: Optional[CancellationToken],
-    expected_media_type: Optional[str],
+    cancellation_token: CancellationToken | None,
+    expected_media_type: str | None,
     progress_percent_step: float,
     progress_bytes_threshold: int,
     perform_head: bool,
-    service: Optional[str],
-    host: Optional[str],
+    service: str | None,
+    host: str | None,
 ) -> _StreamOutcome:
     if cancellation_token and cancellation_token.is_cancelled():
         raise DownloadFailure("Download was cancelled", retryable=False)
@@ -1239,10 +1395,10 @@ def _download_once(
         elif cache_path.exists():
             resume_position = 0
 
-    content_type_hint: Optional[str] = None
-    content_length_hint: Optional[int] = None
-    etag_hint: Optional[str] = None
-    last_modified_hint: Optional[str] = None
+    content_type_hint: str | None = None
+    content_length_hint: int | None = None
+    etag_hint: str | None = None
+    last_modified_hint: str | None = None
     raw_download_timeout = getattr(http_config, "download_timeout_sec", None)
     download_timeout_value: float = 0.0
     if raw_download_timeout:
@@ -1295,7 +1451,7 @@ def _download_once(
                         f"HTTP error {status_code}", request=response.request, response=response
                     )
                     if retry_delay is not None:
-                        setattr(http_error, "_retry_after_delay", retry_delay)
+                        http_error._retry_after_delay = retry_delay
                     raise http_error
                 if status_code == 304:
                     return _StreamOutcome(
@@ -1331,7 +1487,7 @@ def _download_once(
     destination_part = Path(str(destination) + ".part")
     range_request = resume_position > 0
     base_headers = dict(headers)
-    download_deadline: Optional[float] = None
+    download_deadline: float | None = None
     if download_timeout_value > 0:
         download_deadline = time.monotonic() + download_timeout_value
 
@@ -1398,7 +1554,7 @@ def _download_once(
                     f"HTTP error {status_code}", request=response.request, response=response
                 )
                 if retry_delay is not None:
-                    setattr(http_error, "_retry_after_delay", retry_delay)
+                    http_error._retry_after_delay = retry_delay
                 raise http_error
             if status_code == 416 and range_request:
                 logger.info(
@@ -1468,7 +1624,7 @@ def _download_once(
             )
 
 
-def _safe_int(value: Optional[str]) -> Optional[int]:
+def _safe_int(value: str | None) -> int | None:
     if value is None:
         return None
     try:
@@ -1481,15 +1637,15 @@ def download_stream(
     *,
     url: str,
     destination: Path,
-    headers: Dict[str, str],
-    previous_manifest: Optional[Dict[str, object]],
+    headers: dict[str, str],
+    previous_manifest: dict[str, object] | None,
     http_config: DownloadConfiguration,
     cache_dir: Path,
     logger: logging.Logger,
-    expected_media_type: Optional[str] = None,
-    service: Optional[str] = None,
-    expected_hash: Optional[str] = None,
-    cancellation_token: Optional[CancellationToken] = None,
+    expected_media_type: str | None = None,
+    service: str | None = None,
+    expected_hash: str | None = None,
+    cancellation_token: CancellationToken | None = None,
     url_already_validated: bool = False,
 ) -> DownloadResult:
     """Download ontology content via HTTPX streaming."""
@@ -1505,8 +1661,8 @@ def download_stream(
 
     polite_headers = http_config.polite_http_headers(correlation_id=correlation_id)
 
-    def _build_headers(manifest: Optional[Dict[str, object]]) -> Dict[str, str]:
-        merged: Dict[str, str] = {str(k): str(v) for k, v in polite_headers.items()}
+    def _build_headers(manifest: dict[str, object] | None) -> dict[str, str]:
+        merged: dict[str, str] = {str(k): str(v) for k, v in polite_headers.items()}
         for key, value in headers.items():
             merged[str(key)] = str(value)
         merged.update(_conditional_headers_from_manifest(manifest))
@@ -1535,7 +1691,7 @@ def download_stream(
     except (TypeError, ValueError):
         checksum_attempts = 3
 
-    manifest_for_attempt: Optional[Dict[str, object]] = previous_manifest
+    manifest_for_attempt: dict[str, object] | None = previous_manifest
 
     def _compute_sha256(path: Path) -> str:
         return sha256_file(path)
@@ -1575,7 +1731,7 @@ def download_stream(
                 failure = DownloadFailure(message, status_code=status_code, retryable=retryable)
                 retry_after_delay = getattr(exc, "_retry_after_delay", None)
                 if retry_after_delay is not None:
-                    setattr(failure, "_retry_after_delay", retry_after_delay)
+                    failure._retry_after_delay = retry_after_delay
                 raise failure from exc
             except httpx.TransportError as exc:
                 raise DownloadFailure(
@@ -1649,7 +1805,7 @@ def download_stream(
         destination_part.unlink(missing_ok=True)
 
         sha256 = _compute_sha256(artifact_path)
-        expected_value: Optional[str] = None
+        expected_value: str | None = None
         if expected_algorithm:
             if expected_algorithm == "sha256":
                 expected_value = sha256

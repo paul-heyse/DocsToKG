@@ -1,3 +1,42 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.core.http",
+#   "purpose": "Shared HTTP session management for DocParsing network interactions.",
+#   "sections": [
+#     {
+#       "id": "retryafterwait",
+#       "name": "_RetryAfterWait",
+#       "anchor": "class-retryafterwait",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "tenacityclient",
+#       "name": "TenacityClient",
+#       "anchor": "class-tenacityclient",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "normalize-http-timeout",
+#       "name": "normalize_http_timeout",
+#       "anchor": "function-normalize-http-timeout",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-retry-after-header",
+#       "name": "_parse_retry_after_header",
+#       "anchor": "function-parse-retry-after-header",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get-http-session",
+#       "name": "get_http_session",
+#       "anchor": "function-get-http-session",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Shared HTTP session management for DocParsing network interactions.
 
 Certain DocParsing stages—particularly DocTags conversion when downloading
@@ -13,10 +52,10 @@ import logging
 import re
 import threading
 import time
+from collections.abc import Mapping, Sequence
 from contextlib import suppress
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
-from typing import Mapping, Optional, Sequence, Tuple
 
 import httpx
 from tenacity import (
@@ -28,11 +67,11 @@ from tenacity import (
 )
 from tenacity.wait import wait_base
 
-DEFAULT_HTTP_TIMEOUT: Tuple[float, float] = (5.0, 30.0)
+DEFAULT_HTTP_TIMEOUT: tuple[float, float] = (5.0, 30.0)
 
 _HTTP_SESSION_LOCK = threading.Lock()
-_HTTP_SESSION: Optional["TenacityClient"] = None
-_HTTP_SESSION_TIMEOUT: Tuple[float, float] = DEFAULT_HTTP_TIMEOUT
+_HTTP_SESSION: TenacityClient | None = None
+_HTTP_SESSION_TIMEOUT: tuple[float, float] = DEFAULT_HTTP_TIMEOUT
 
 __all__ = [
     "DEFAULT_HTTP_TIMEOUT",
@@ -81,11 +120,11 @@ class TenacityClient(httpx.Client):
             httpx.TimeoutException,
             httpx.RequestError,
         )
-        self._default_timeout: Tuple[float, float] = DEFAULT_HTTP_TIMEOUT
+        self._default_timeout: tuple[float, float] = DEFAULT_HTTP_TIMEOUT
         self._logger = logging.getLogger(__name__)
         self._wait_strategy = _RetryAfterWait(backoff_factor=self._retry_backoff)
 
-    def clone_with_headers(self, headers: Mapping[str, str]) -> "TenacityClient":
+    def clone_with_headers(self, headers: Mapping[str, str]) -> TenacityClient:
         clone = TenacityClient(
             retry_total=self._retry_total,
             retry_backoff=self._retry_backoff,
@@ -105,7 +144,7 @@ class TenacityClient(httpx.Client):
         clone._set_default_timeout(clone._default_timeout)
         return clone
 
-    def _coerce_timeout(self, timeout: Optional[object]) -> httpx.Timeout:
+    def _coerce_timeout(self, timeout: object | None) -> httpx.Timeout:
         if isinstance(timeout, httpx.Timeout):
             return timeout
         if isinstance(timeout, dict):
@@ -113,7 +152,7 @@ class TenacityClient(httpx.Client):
         connect, read = normalize_http_timeout(timeout)
         return httpx.Timeout(connect=connect, read=read, write=read, pool=connect)
 
-    def _set_default_timeout(self, timeout: Tuple[float, float]) -> None:
+    def _set_default_timeout(self, timeout: tuple[float, float]) -> None:
         self._default_timeout = timeout
         self.timeout = self._coerce_timeout(timeout)
 
@@ -176,7 +215,7 @@ class TenacityClient(httpx.Client):
         self._logger.debug("DocParsing HTTP retry", extra=extra)
 
 
-def normalize_http_timeout(timeout: Optional[object]) -> Tuple[float, float]:
+def normalize_http_timeout(timeout: object | None) -> tuple[float, float]:
     """Normalize timeout inputs into a ``(connect, read)`` tuple of floats."""
 
     if timeout is None:
@@ -217,7 +256,7 @@ def normalize_http_timeout(timeout: Optional[object]) -> Tuple[float, float]:
         read = _coerce(read_candidate, default=read_default)
         return connect, read
 
-    def _coerce_pair(values: Sequence[object]) -> Tuple[float, float]:
+    def _coerce_pair(values: Sequence[object]) -> tuple[float, float]:
         """Coerce arbitrary iterables into a two-element timeout tuple."""
 
         items = list(values)
@@ -263,7 +302,7 @@ def normalize_http_timeout(timeout: Optional[object]) -> Tuple[float, float]:
     raise TypeError(f"Unsupported timeout type: {type(timeout)!r}")
 
 
-def _parse_retry_after_header(value: Optional[str]) -> Optional[float]:
+def _parse_retry_after_header(value: str | None) -> float | None:
     if not value:
         return None
     candidate = value.strip()
@@ -279,21 +318,21 @@ def _parse_retry_after_header(value: Optional[str]) -> Optional[float]:
         if retry_time is None:
             return None
         if retry_time.tzinfo is None:
-            retry_time = retry_time.replace(tzinfo=timezone.utc)
-        now = datetime.now(timezone.utc)
+            retry_time = retry_time.replace(tzinfo=UTC)
+        now = datetime.now(UTC)
         seconds = (retry_time - now).total_seconds()
     return max(float(seconds), 0.0)
 
 
 def get_http_session(
     *,
-    timeout: Optional[object] = None,
-    base_headers: Optional[Mapping[str, str]] = None,
+    timeout: object | None = None,
+    base_headers: Mapping[str, str] | None = None,
     retry_total: int = 5,
     retry_backoff: float = 0.5,
     status_forcelist: Sequence[int] = (429, 500, 502, 503, 504),
     allowed_methods: Sequence[str] = ("GET", "HEAD", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"),
-) -> Tuple[TenacityClient, Tuple[float, float]]:
+) -> tuple[TenacityClient, tuple[float, float]]:
     """Return a shared :class:`httpx.Client` configured with retries."""
 
     effective_timeout = normalize_http_timeout(timeout)

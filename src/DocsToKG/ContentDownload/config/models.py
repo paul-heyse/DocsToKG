@@ -1,3 +1,198 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.config.models",
+#   "purpose": "Pydantic v2 Configuration Models for ContentDownload.",
+#   "sections": [
+#     {
+#       "id": "retrypolicy",
+#       "name": "RetryPolicy",
+#       "anchor": "class-retrypolicy",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "backoffpolicy",
+#       "name": "BackoffPolicy",
+#       "anchor": "class-backoffpolicy",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "ratelimitpolicy",
+#       "name": "RateLimitPolicy",
+#       "anchor": "class-ratelimitpolicy",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "robotspolicy",
+#       "name": "RobotsPolicy",
+#       "anchor": "class-robotspolicy",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "downloadpolicy",
+#       "name": "DownloadPolicy",
+#       "anchor": "class-downloadpolicy",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "httpclientconfig",
+#       "name": "HttpClientConfig",
+#       "anchor": "class-httpclientconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "telemetryconfig",
+#       "name": "TelemetryConfig",
+#       "anchor": "class-telemetryconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "hishelconfig",
+#       "name": "HishelConfig",
+#       "anchor": "class-hishelconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "resolvercommonconfig",
+#       "name": "ResolverCommonConfig",
+#       "anchor": "class-resolvercommonconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "unpaywallconfig",
+#       "name": "UnpaywallConfig",
+#       "anchor": "class-unpaywallconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "crossrefconfig",
+#       "name": "CrossrefConfig",
+#       "anchor": "class-crossrefconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "arxivconfig",
+#       "name": "ArxivConfig",
+#       "anchor": "class-arxivconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "europepmcconfig",
+#       "name": "EuropePmcConfig",
+#       "anchor": "class-europepmcconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "coreconfig",
+#       "name": "CoreConfig",
+#       "anchor": "class-coreconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "doajconfig",
+#       "name": "DoajConfig",
+#       "anchor": "class-doajconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "semanticscholarconfig",
+#       "name": "SemanticScholarConfig",
+#       "anchor": "class-semanticscholarconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "landingpageconfig",
+#       "name": "LandingPageConfig",
+#       "anchor": "class-landingpageconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "waybackconfig",
+#       "name": "WaybackConfig",
+#       "anchor": "class-waybackconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "openalexconfig",
+#       "name": "OpenAlexConfig",
+#       "anchor": "class-openalexconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "zenodoconfig",
+#       "name": "ZenodoConfig",
+#       "anchor": "class-zenodoconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "osfsconfig",
+#       "name": "OsfsConfig",
+#       "anchor": "class-osfsconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "openaireconfig",
+#       "name": "OpenAireConfig",
+#       "anchor": "class-openaireconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "halconfig",
+#       "name": "HalConfig",
+#       "anchor": "class-halconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "figshareconfig",
+#       "name": "FigshareConfig",
+#       "anchor": "class-figshareconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "resolversconfig",
+#       "name": "ResolversConfig",
+#       "anchor": "class-resolversconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "queueconfig",
+#       "name": "QueueConfig",
+#       "anchor": "class-queueconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "orchestratorconfig",
+#       "name": "OrchestratorConfig",
+#       "anchor": "class-orchestratorconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "storageconfig",
+#       "name": "StorageConfig",
+#       "anchor": "class-storageconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "catalogconfig",
+#       "name": "CatalogConfig",
+#       "anchor": "class-catalogconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "featuregatesconfig",
+#       "name": "FeatureGatesConfig",
+#       "anchor": "class-featuregatesconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "contentdownloadconfig",
+#       "name": "ContentDownloadConfig",
+#       "anchor": "class-contentdownloadconfig",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Pydantic v2 Configuration Models for ContentDownload
 
@@ -17,7 +212,7 @@ and CLI overrides follow: file < env < CLI precedence.
 
 from __future__ import annotations
 
-from typing import ClassVar, Dict, List, Literal, Optional
+from typing import ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -31,7 +226,7 @@ class RetryPolicy(BaseModel):
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid", frozen=True)
 
-    retry_statuses: List[int] = Field(
+    retry_statuses: list[int] = Field(
         default=[429, 500, 502, 503, 504],
         description="HTTP status codes that trigger retry",
     )
@@ -128,7 +323,7 @@ class DownloadPolicy(BaseModel):
     atomic_write: bool = Field(default=True, description="Use atomic writes")
     verify_content_length: bool = Field(default=True, description="Verify Content-Length matches")
     chunk_size_bytes: int = Field(default=1 << 20, description="Stream chunk size")
-    max_bytes: Optional[int] = Field(
+    max_bytes: int | None = Field(
         default=None, description="Maximum download size (None = unlimited)"
     )
 
@@ -141,7 +336,7 @@ class DownloadPolicy(BaseModel):
 
     @field_validator("max_bytes")
     @classmethod
-    def validate_max_bytes(cls, v: Optional[int]) -> Optional[int]:
+    def validate_max_bytes(cls, v: int | None) -> int | None:
         if v is not None and v <= 0:
             raise ValueError("max_bytes must be > 0 or None")
         return v
@@ -184,14 +379,14 @@ class HttpClientConfig(BaseModel):
 
     # Legacy fields (kept for backward compat)
     verify_tls: bool = Field(default=True, description="Verify TLS certificates")
-    proxies: Dict[str, str] = Field(default_factory=dict, description="Proxy dict (deprecated)")
-    polite_headers: Dict[str, str] = Field(
+    proxies: dict[str, str] = Field(default_factory=dict, description="Proxy dict (deprecated)")
+    polite_headers: dict[str, str] = Field(
         default_factory=lambda: {
             "User-Agent": "DocsToKG/ContentDownload (+mailto:research@example.com)"
         },
         description="Polite HTTP headers (deprecated; use user_agent instead)",
     )
-    mailto: Optional[str] = Field(default=None, description="Email for robots.txt compliance")
+    mailto: str | None = Field(default=None, description="Email for robots.txt compliance")
 
     @field_validator("timeout_connect_s", "timeout_read_s", "timeout_write_s", "timeout_pool_s")
     @classmethod
@@ -243,7 +438,7 @@ class TelemetryConfig(BaseModel):
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid", frozen=True)
 
-    sinks: List[str] = Field(
+    sinks: list[str] = Field(
         default_factory=lambda: ["csv"],
         description="Output sinks (csv, jsonl, console, otlp)",
     )
@@ -252,7 +447,7 @@ class TelemetryConfig(BaseModel):
 
     @field_validator("sinks")
     @classmethod
-    def validate_sinks(cls, v: List[str]) -> List[str]:
+    def validate_sinks(cls, v: list[str]) -> list[str]:
         valid = {"csv", "jsonl", "console", "otlp"}
         invalid = set(v) - valid
         if invalid:
@@ -286,11 +481,11 @@ class HishelConfig(BaseModel):
         default="state/hishel-cache.sqlite",
         description="SQLite database file path (used when backend='sqlite')",
     )
-    redis_url: Optional[str] = Field(
+    redis_url: str | None = Field(
         default=None,
         description="Redis connection URL (required if backend='redis'). Format: redis://[:password]@host:port[/db]",
     )
-    s3_bucket: Optional[str] = Field(
+    s3_bucket: str | None = Field(
         default=None,
         description="S3 bucket name (required if backend='s3')",
     )
@@ -328,11 +523,11 @@ class HishelConfig(BaseModel):
         default=True,
         description="Cache private responses (Cache-Control: private) for single-user scenarios",
     )
-    cacheable_methods: List[str] = Field(
+    cacheable_methods: list[str] = Field(
         default_factory=lambda: ["GET"],
         description="HTTP methods that are eligible for caching",
     )
-    cacheable_statuses: List[int] = Field(
+    cacheable_statuses: list[int] = Field(
         default_factory=lambda: [200, 301, 308],
         description="HTTP status codes that are eligible for caching (200 OK, 301 Moved Permanently, 308 Permanent Redirect)",
     )
@@ -347,7 +542,7 @@ class HishelConfig(BaseModel):
 
     @field_validator("cacheable_methods")
     @classmethod
-    def validate_methods(cls, v: List[str]) -> List[str]:
+    def validate_methods(cls, v: list[str]) -> list[str]:
         """Validate HTTP methods against RFC 7231."""
         if not v:
             raise ValueError("cacheable_methods must not be empty")
@@ -359,7 +554,7 @@ class HishelConfig(BaseModel):
 
     @field_validator("cacheable_statuses")
     @classmethod
-    def validate_statuses(cls, v: List[int]) -> List[int]:
+    def validate_statuses(cls, v: list[int]) -> list[int]:
         """Validate HTTP status codes per RFC 7231."""
         if not v:
             raise ValueError("cacheable_statuses must not be empty")
@@ -393,19 +588,19 @@ class ResolverCommonConfig(BaseModel):
     rate_limit: RateLimitPolicy = Field(
         default_factory=RateLimitPolicy, description="Rate limit policy"
     )
-    timeout_read_s: Optional[float] = Field(default=None, description="Override HTTP read timeout")
+    timeout_read_s: float | None = Field(default=None, description="Override HTTP read timeout")
 
 
 class UnpaywallConfig(ResolverCommonConfig):
     """Unpaywall resolver configuration."""
 
-    email: Optional[str] = Field(default=None, description="Email for Unpaywall API")
+    email: str | None = Field(default=None, description="Email for Unpaywall API")
 
 
 class CrossrefConfig(ResolverCommonConfig):
     """Crossref resolver configuration."""
 
-    mailto: Optional[str] = Field(default=None, description="Email for Crossref API")
+    mailto: str | None = Field(default=None, description="Email for Crossref API")
 
 
 class ArxivConfig(ResolverCommonConfig):
@@ -496,7 +691,7 @@ class ResolversConfig(BaseModel):
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid", frozen=True)
 
-    order: List[str] = Field(
+    order: list[str] = Field(
         default_factory=lambda: [
             "unpaywall",
             "crossref",
@@ -542,7 +737,7 @@ class ResolversConfig(BaseModel):
 
     @field_validator("order")
     @classmethod
-    def validate_order(cls, v: List[str]) -> List[str]:
+    def validate_order(cls, v: list[str]) -> list[str]:
         if not v:
             raise ValueError("order must not be empty")
         return v
@@ -588,7 +783,7 @@ class OrchestratorConfig(BaseModel):
         le=256,
         description="Maximum concurrent worker threads",
     )
-    max_per_resolver: Dict[str, int] = Field(
+    max_per_resolver: dict[str, int] = Field(
         default_factory=dict,
         description="Per-resolver concurrency limits (e.g., {'unpaywall': 2, 'crossref': 4})",
     )
@@ -625,7 +820,7 @@ class OrchestratorConfig(BaseModel):
 
     @field_validator("max_per_resolver")
     @classmethod
-    def validate_per_resolver(cls, v: Dict[str, int]) -> Dict[str, int]:
+    def validate_per_resolver(cls, v: dict[str, int]) -> dict[str, int]:
         """Validate per-resolver limits are positive."""
         for resolver, limit in v.items():
             if limit <= 0:
@@ -678,7 +873,7 @@ class StorageConfig(BaseModel):
         default=True,
         description="Enable hardlink deduplication on POSIX systems",
     )
-    s3_bucket: Optional[str] = Field(
+    s3_bucket: str | None = Field(
         default=None,
         description="S3 bucket name (required if backend='s3')",
     )
@@ -756,7 +951,7 @@ class FeatureGatesConfig(BaseModel):
         default=False,
         description="Enable per-provider rate limit learning with progressive reduction",
     )
-    provider_learning_path: Optional[str] = Field(
+    provider_learning_path: str | None = Field(
         default=None,
         description="Optional path to persist provider learning state (JSON file)",
     )
@@ -781,9 +976,7 @@ class ContentDownloadConfig(BaseModel):
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid", frozen=True)
 
-    run_id: Optional[str] = Field(
-        default=None, description="Unique run identifier for traceability"
-    )
+    run_id: str | None = Field(default=None, description="Unique run identifier for traceability")
     http: HttpClientConfig = Field(
         default_factory=HttpClientConfig, description="HTTP client configuration"
     )

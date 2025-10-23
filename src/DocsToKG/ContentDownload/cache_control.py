@@ -1,3 +1,42 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.cache_control",
+#   "purpose": "RFC 9111 cache-control directive parsing and interpretation.",
+#   "sections": [
+#     {
+#       "id": "cachecontroldirective",
+#       "name": "CacheControlDirective",
+#       "anchor": "class-cachecontroldirective",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "parse-cache-control",
+#       "name": "parse_cache_control",
+#       "anchor": "function-parse-cache-control",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "is-fresh",
+#       "name": "is_fresh",
+#       "anchor": "function-is-fresh",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "can-serve-stale",
+#       "name": "can_serve_stale",
+#       "anchor": "function-can-serve-stale",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "should-cache",
+#       "name": "should_cache",
+#       "anchor": "function-should-cache",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """RFC 9111 cache-control directive parsing and interpretation.
 
 Responsibilities
@@ -21,8 +60,8 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Mapping, Optional
 
 LOGGER = logging.getLogger(__name__)
 
@@ -55,8 +94,8 @@ class CacheControlDirective:
     no_store: bool = False
     public: bool = False
     private: bool = False
-    max_age: Optional[int] = None
-    s_maxage: Optional[int] = None
+    max_age: int | None = None
+    s_maxage: int | None = None
     must_revalidate: bool = False
     proxy_revalidate: bool = False
     stale_while_revalidate: int = 0

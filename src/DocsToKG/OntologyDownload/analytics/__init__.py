@@ -1,3 +1,11 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.analytics.__init__",
+#   "purpose": "Analytics package for OntologyDownload.",
+#   "sections": []
+# }
+# === /NAVMAP ===
+
 """Analytics package for OntologyDownload.
 
 Core modules:

@@ -1,14 +1,8 @@
-## Table of Contents
+## Environment Setup
 
-- [0) Guard rails (set once per session)](#0-guard-rails-set-once-per-session)
-- [1) Verify the environment exists (no install)](#1-verify-the-environment-exists-no-install)
-- [2) Run commands strictly from the project `.venv`](#2-run-commands-strictly-from-the-project-venv)
-- [3) Quick health checks (no network)](#3-quick-health-checks-no-network)
-- [4) Typical tasks (all no-install)](#4-typical-tasks-all-no-install)
-- [5) Troubleshooting (stay no-install)](#5-troubleshooting-stay-no-install)
-- [6) "Absolutely no installs" policy (what you may do)](#6-absolutely-no-installs-policy-what-you-may-do)
-- [7) Fallback (only with **explicit approval** to install)](#7-fallback-only-with-explicit-approval-to-install)
-- [8) One-page quick reference (copy/paste safe)](#8-one-page-quick-reference-copy-paste-safe)
+## Table of Contents
+- [Environment Setup](#environment-setup)
+- [Code Style & Architecture References](#code-style-architecture-references)
 - [Mission & Scope](#mission-scope)
 - [Quickstart (same as README)](#quickstart-same-as-readme)
 - [Architecture & Flow](#architecture-flow)
@@ -17,239 +11,30 @@
 - [Telemetry, Data Contracts & Error Handling](#telemetry-data-contracts-error-handling)
 - [Networking, Rate Limiting & Politeness](#networking-rate-limiting-politeness)
 - [Operational Playbooks](#operational-playbooks)
+- [Circuit Breaker Operations](#circuit-breaker-operations)
+- [Fallback & Resiliency Strategy Operations](#fallback-resiliency-strategy-operations)
+- [Migration Checklist](#migration-checklist)
 - [Invariants & Safe Change Surfaces](#invariants-safe-change-surfaces)
-- [Work Orchestration (PR #8)](#work-orchestration-pr-8)
 - [Test Matrix & Diagnostics](#test-matrix-diagnostics)
+- [P1 (Observability & Integrity)](#p1-observability-integrity)
+- [Observability & SLOs (Phase 4)](#observability-slos-phase-4)
 - [Reference Docs](#reference-docs)
 - [Coding Standards & Module Organization](#coding-standards-module-organization)
-- [Idempotency & Job Coordination](#idempotency--job-coordination)
-- [Observability & SLOs](#observability-slos)
+- [Idempotency & Job Coordination](#idempotency-job-coordination)
+- [Work Orchestration (PR #8)](#work-orchestration-pr-8)
 
-# Project Environment — **No-Install** Runbook (for AI agents)
+Use the uv bootstrap to stand up the project environment:
+1. Optionally run `direnv allow` once per machine to trust `.envrc`.
+2. For CPU-only work, run `./scripts/bootstrap_env.sh`.
+3. For GPU work (requires wheels in `.wheelhouse/`), run `./scripts/bootstrap_env.sh --gpu`.
+4. Activate with `direnv exec . <command>` or `source .venv/bin/activate`.
 
-> **Prime directive:** **Use the packages already installed in `./.venv`.**
-> Do **not** fetch or install anything unless you are explicitly told to. The project `.venv` includes custom wheels and GPU-specific builds that must not be disturbed.
+The script installs uv if it is missing, respects `UV_PROJECT_ENVIRONMENT`, and installs DocsToKG in editable mode. After activation, use the tools in `.venv/bin/` (for example `pytest -q`, `ruff check`, or `python -m DocsToKG.<module>`).
 
----
+## Code Style & Architecture References
 
-## 0) Guard rails (set once per session)
-
-To make accidental installs impossible:
-
-```bash
-# Always run inside the project venv (enforced)
-export PIP_REQUIRE_VIRTUALENV=1
-
-# Never hit the network/package index unless explicitly allowed
-export PIP_NO_INDEX=1
-
-# Don't read user site-packages (avoid leakage)
-export PYTHONNOUSERSITE=1
-```
-
-> If you later receive explicit approval to install, temporarily unset `PIP_NO_INDEX` (and only follow the "Fallback (with approval)" section at the end).
-
----
-
-## 1) Verify the environment exists (no install)
-
-```bash
-# from repo root
-test -x .venv/bin/python || { echo "ERROR: .venv is missing — STOP (no installs)."; exit 1; }
-```
-
-If missing or broken: **stop and report**. Do **not** create or modify the environment without authorization.
-
----
-
-## 2) Run commands strictly from the project `.venv`
-
-Pick **one** method below. All of them resolve **imports and console scripts from `./.venv`** and avoid installs.
-
-### A) Most explicit (activation-free; recommended for agents)
-
-```bash
-# Call tools by absolute path inside the venv
-./.venv/bin/python -m pip --version      # proves you're on ./.venv/bin/python
-./.venv/bin/python -m DocsToKG.ContentDownload.cli --help
-./.venv/bin/pytest -q
-./.venv/bin/ruff check .
-./.venv/bin/mypy src
-```
-
-### B) `direnv` (auto-env; if available)
-
-```bash
-direnv allow                             # trust once per machine
-direnv exec . python -m pip --version
-direnv exec . python -m DocsToKG.ContentDownload.cli --help
-direnv exec . pytest -q
-```
-
-### C) `./scripts/dev.sh` (portable wrapper; no direnv needed)
-
-```bash
-./scripts/dev.sh doctor                  # prints interpreter/env and importability
-./scripts/dev.sh python -m DocsToKG.ContentDownload.cli --help
-./scripts/dev.sh exec pytest -q
-./scripts/dev.sh pip list                # safe: listing does not install
-```
-
-### D) Classic activation (if explicitly requested)
-
-```bash
-# Linux/macOS
-source .venv/bin/activate
-export PYTHONPATH="\$PWD/src:${PYTHONPATH:-}"    # mirrors project behavior
-python -m pip --version
-python -m DocsToKG.ContentDownload.cli --help
-pytest -q
-```
-
-> Prefer **A–C** for automation. **D** is acceptable in interactive shells but easier to get wrong.
-
----
-
-## 3) Quick health checks (no network)
-
-Run these **before** heavy work:
-
-```bash
-# 1) Interpreter identity (must be the project venv)
-./.venv/bin/python - <<'PY'
-import sys
-assert sys.executable.endswith("/.venv/bin/python"), sys.executable
-print("OK: using", sys.executable)
-PY
-
-# 2) Package presence WITHOUT installing (examples)
-./.venv/bin/python -c "import DocsToKG, pkgutil; print('DocsToKG OK');"
-./.venv/bin/python -c "import faiss; print('FAISS OK')"
-./.venv/bin/python -c "import cupy; import numpy; print('CuPy OK', cupy.__version__)"
-```
-
-If any import fails: **do not install**. Go to Troubleshooting.
-
----
-
-## 4) Typical tasks (all no-install)
-
-```bash
-# CLIs (module form)
-./.venv/bin/python -m DocsToKG.ContentDownload.cli --help
-
-# Tests
-./.venv/bin/pytest -q
-
-# Lint/format
-./.venv/bin/ruff check .
-./.venv/bin/black --check .
-
-# Type check
-./.venv/bin/mypy src
-```
-
-> Always prefer `python -m <module>` and `.venv/bin/<tool>` — these guarantee resolution from the project environment.
-
----
-
-## 5) Troubleshooting (stay no-install)
-
-**Symptom → Action (no installs):**
-
-- **`ModuleNotFoundError`**
-  You're not using the project interpreter. Re-run via one of §2 methods, then re-check `sys.executable`.
-
-- **GPU/FAISS/CuPy errors** (e.g., missing `.so`/DLL)
-  Do **not** build or fetch wheels. Report the exact error. These packages are customized; replacing them may break GPU paths.
-
-- **`pip` tries to fetch**
-  You forgot the guard rails. Ensure `PIP_REQUIRE_VIRTUALENV=1` and `PIP_NO_INDEX=1` are set. Never pass `-U/--upgrade`.
-
-- **Stale HTTP cache / unexpected 304 hits**
-  Call `DocsToKG.ContentDownload.httpx_transport.purge_http_cache()` (or delete `${DOCSTOKG_DATA_ROOT}/cache/http/ContentDownload`) and re-run. Cache keys are derived from `urls.canonical_for_index`; normalize any direct calls before comparing.
-
-- **Telemetry shows `cache_hit=true` but payload missing**
-  Confirm the cached path still exists; `ConditionalRequestHelper` raises when metadata is incomplete. Recompute manifests with `--verify-cache-digest` to refresh SHA-256 and mtime fields.
-
-- **Legacy tests patch `create_session` / `ThreadLocalSessionFactory`**
-  Those shims now raise `RuntimeError`. Patch `DocsToKG.ContentDownload.httpx_transport.configure_http_client()` or `DocsToKG.ContentDownload.networking.time.sleep` instead.
-
----
-
-## 6) "Absolutely no installs" policy (what you may do)
-
-- You **may**:
-
-  - Inspect environment: `./.venv/bin/pip list`, `./.venv/bin/pip show <pkg>`.
-  - Run any console script from `./.venv/bin/…`.
-  - Read code and run module CLIs with `python -m …`.
-
-- You **must not**:
-
-  - Run `pip install`, `pip wheel`, `pip cache purge`, or `pip uninstall`.
-  - Upgrade/downgrade packages (including `pip` itself).
-  - Recreate or modify `./.venv` without explicit approval.
-
----
-
-## 7) Fallback (only with **explicit approval** to install)
-
-If (and only if) you have written approval to modify the environment, apply the **smallest necessary** action **inside** the venv:
-
-```bash
-# ensure you are in the project venv first:
-source .venv/bin/activate  # or use ./.venv/bin/python -m pip ...
-unset PIP_NO_INDEX         # allow index access if instructed
-
-# project code (editable) and pinned deps ONLY:
-pip install -e .
-pip install -r requirements.txt
-
-# If a local wheelhouse exists (to avoid network):
-# pip install --no-index --find-links ./ci/wheels -r requirements.txt
-```
-
-> Never "try versions" or compile GPU libs. If a wheel is missing, escalate.
-
----
-
-## 8) One-page quick reference (copy/paste safe)
-
-```bash
-# Guard rails (no accidental installs)
-export PIP_REQUIRE_VIRTUALENV=1 PIP_NO_INDEX=1 PYTHONNOUSERSITE=1
-
-# Verify venv exists (stop if missing)
-test -x .venv/bin/python || { echo "Missing .venv — STOP (no installs)."; exit 1; }
-
-# Preferred run patterns (choose ONE)
-./.venv/bin/python -m DocsToKG.ContentDownload.cli --help
-./.venv/bin/pytest -q
-# or
-direnv exec . python -m DocsToKG.ContentDownload.cli --help
-direnv exec . pytest -q
-# or
-./scripts/dev.sh doctor
-./scripts/dev.sh python -m DocsToKG.ContentDownload.cli --help
-./scripts/dev.sh exec pytest -q
-
-# Health checks (no network)
-./.venv/bin/python - <<'PY'
-import sys; assert sys.executable.endswith("/.venv/bin/python"); print("OK:", sys.executable)
-PY
-./.venv/bin/python -c "import DocsToKG, faiss, cupy; print('Core imports OK')"
-```
-
----
-
-### Final note for agents
-
-This repository's environment includes **custom wheels and GPU-optimized packages**. Treat the `.venv` as **immutable** unless you are explicitly told to modify it. Your default posture is **execute only**: run what's already installed, verify, and report issues rather than "fixing" them by installing.
-
-# Agents Guide - ContentDownload
-
-Last updated: 2025-10-21
+- Follow the shared guidelines in [docs/Formats%20and%20Standards/CODESTYLE.md](<../../../../docs/Formats%20and%20Standards/CODESTYLE.md>) for Python 3.12+ support, uv-powered tooling, and Google-style docstrings + NAVMAP requirements.
+- Architecture deep dives: [Content Download overview](<../../../../docs/architecture/100-content-download.updated.md>) and [Level 2 design notes](<../../../../docs/architecture/100-content-download.level2.updated.md>).
 
 ## Mission & Scope
 

@@ -1,6 +1,6 @@
 """Tests for role-aware cache transport TTL enforcement."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from email.utils import format_datetime
 
 import httpcore
@@ -20,7 +20,7 @@ def _make_request() -> httpcore.Request:
 
 def _set_date_header(response: httpcore.Response, *, age_seconds: int) -> None:
     """Mutate the response Date header to simulate cached age."""
-    target_time = datetime.now(timezone.utc) - timedelta(seconds=age_seconds)
+    target_time = datetime.now(UTC) - timedelta(seconds=age_seconds)
     http_date = format_datetime(target_time, usegmt=True).encode("ascii")
     filtered = [(name, value) for name, value in response.headers if name.lower() != b"date"]
     filtered.append((b"date", http_date))
@@ -46,7 +46,9 @@ def test_policy_controller_injects_cache_control_and_date() -> None:
     cache_control = ", ".join(cache_control_values)
     assert "max-age=60" in cache_control
     assert "stale-while-revalidate=30" in cache_control
-    assert any(name.lower() == b"date" for name, _ in response.headers), "Date header should be present"
+    assert any(
+        name.lower() == b"date" for name, _ in response.headers
+    ), "Date header should be present"
 
 
 def test_policy_controller_construct_response_respects_ttl() -> None:
@@ -69,4 +71,3 @@ def test_policy_controller_construct_response_respects_ttl() -> None:
 
     stale_result = controller.construct_response_from_cache(request, stale_response, request)
     assert isinstance(stale_result, httpcore.Request)
-

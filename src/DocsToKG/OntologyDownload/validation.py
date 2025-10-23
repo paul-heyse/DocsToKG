@@ -3,11 +3,198 @@
 #   "module": "DocsToKG.OntologyDownload.validation",
 #   "purpose": "Coordinate ontology validation budgets, plugin loading, execution, and CLI entrypoints",
 #   "sections": [
-#     {"id": "infrastructure", "name": "Validation Infrastructure", "anchor": "INF", "kind": "infra"},
-#     {"id": "dataclasses", "name": "Validation Models", "anchor": "MOD", "kind": "api"},
-#     {"id": "plugin-management", "name": "Validator Plugin Management", "anchor": "PLG", "kind": "helpers"},
-#     {"id": "execution", "name": "Validation Execution Pipeline", "anchor": "EXE", "kind": "api"},
-#     {"id": "cli", "name": "CLI Utilities & Entrypoint", "anchor": "CLI", "kind": "api"}
+#     {
+#       "id": "current-memory-mb",
+#       "name": "_current_memory_mb",
+#       "anchor": "function-current-memory-mb",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "ensure-validator-budget-manager",
+#       "name": "_ensure_validator_budget_manager",
+#       "anchor": "function-ensure-validator-budget-manager",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "sharedvalidatorbudget",
+#       "name": "_SharedValidatorBudget",
+#       "anchor": "class-sharedvalidatorbudget",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "validatorbudget",
+#       "name": "_ValidatorBudget",
+#       "anchor": "class-validatorbudget",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "acquire-validator-slot",
+#       "name": "_acquire_validator_slot",
+#       "anchor": "function-acquire-validator-slot",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-validator-plugins",
+#       "name": "load_validator_plugins",
+#       "anchor": "function-load-validator-plugins",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validationrequest",
+#       "name": "ValidationRequest",
+#       "anchor": "class-validationrequest",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "validationresult",
+#       "name": "ValidationResult",
+#       "anchor": "class-validationresult",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "validationtimeout",
+#       "name": "ValidationTimeout",
+#       "anchor": "class-validationtimeout",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "write-validation-json",
+#       "name": "_write_validation_json",
+#       "anchor": "function-write-validation-json",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "python-merge-sort",
+#       "name": "_python_merge_sort",
+#       "anchor": "function-python-merge-sort",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "term-to-string",
+#       "name": "_term_to_string",
+#       "anchor": "function-term-to-string",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "canonicalize-turtle",
+#       "name": "_canonicalize_turtle",
+#       "anchor": "function-canonicalize-turtle",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "canonicalize-blank-nodes-line",
+#       "name": "_canonicalize_blank_nodes_line",
+#       "anchor": "function-canonicalize-blank-nodes-line",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "sort-triple-file",
+#       "name": "_sort_triple_file",
+#       "anchor": "function-sort-triple-file",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "normalize-streaming",
+#       "name": "normalize_streaming",
+#       "anchor": "function-normalize-streaming",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validatorsubprocesserror",
+#       "name": "ValidatorSubprocessError",
+#       "anchor": "class-validatorsubprocesserror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "worker-pronto",
+#       "name": "_worker_pronto",
+#       "anchor": "function-worker-pronto",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "worker-owlready2",
+#       "name": "_worker_owlready2",
+#       "anchor": "function-worker-owlready2",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "run-validator-subprocess",
+#       "name": "_run_validator_subprocess",
+#       "anchor": "function-run-validator-subprocess",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "run-with-timeout",
+#       "name": "_run_with_timeout",
+#       "anchor": "function-run-with-timeout",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "prepare-xbrl-package",
+#       "name": "_prepare_xbrl_package",
+#       "anchor": "function-prepare-xbrl-package",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-rdflib",
+#       "name": "validate_rdflib",
+#       "anchor": "function-validate-rdflib",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-pronto",
+#       "name": "validate_pronto",
+#       "anchor": "function-validate-pronto",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-owlready2",
+#       "name": "validate_owlready2",
+#       "anchor": "function-validate-owlready2",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-robot",
+#       "name": "validate_robot",
+#       "anchor": "function-validate-robot",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate-arelle",
+#       "name": "validate_arelle",
+#       "anchor": "function-validate-arelle",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "run-validator-task",
+#       "name": "_run_validator_task",
+#       "anchor": "function-run-validator-task",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "run-validator-in-process",
+#       "name": "_run_validator_in_process",
+#       "anchor": "function-run-validator-in-process",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "run-validators",
+#       "name": "run_validators",
+#       "anchor": "function-run-validators",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "run-worker-cli",
+#       "name": "_run_worker_cli",
+#       "anchor": "function-run-worker-cli",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "main",
+#       "name": "main",
+#       "anchor": "function-main",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===
@@ -39,6 +226,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from collections.abc import Callable, Iterable, Iterator, MutableMapping
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 from dataclasses import dataclass
@@ -50,15 +238,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     BinaryIO,
-    Callable,
-    Dict,
-    Iterable,
-    Iterator,
-    List,
-    MutableMapping,
-    Optional,
-    Tuple,
-    Union,
 )
 
 try:  # pragma: no cover - psutil may be unavailable in minimal environments
@@ -83,11 +262,11 @@ metadata = _plugins.metadata
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from .plugins import ValidatorPlugin
 
-_VALIDATOR_SEMAPHORE_CACHE: Dict[int, BoundedSemaphore] = {}
-_VALIDATOR_BUDGET_MANAGER: Optional[SyncManager] = None
+_VALIDATOR_SEMAPHORE_CACHE: dict[int, BoundedSemaphore] = {}
+_VALIDATOR_BUDGET_MANAGER: SyncManager | None = None
 _VALIDATOR_BUDGET_MANAGER_LOCK = RLock()
 _VALIDATOR_LOAD_LOCK = RLock()
-_VALIDATOR_REGISTRY_CACHE: Optional[MutableMapping[str, "ValidatorPlugin"]] = None
+_VALIDATOR_REGISTRY_CACHE: MutableMapping[str, ValidatorPlugin] | None = None
 
 
 def _current_memory_mb() -> float:
@@ -130,7 +309,7 @@ class _SharedValidatorBudget:
 
         return self._limit
 
-    def acquire(self, timeout: Optional[float]) -> bool:
+    def acquire(self, timeout: float | None) -> bool:
         """Acquire a budget slot, respecting an optional timeout."""
 
         if timeout is None:
@@ -184,9 +363,9 @@ owlready2 = get_owlready2()
 
 
 def load_validator_plugins(
-    registry: MutableMapping[str, "ValidatorPlugin"],
+    registry: MutableMapping[str, ValidatorPlugin],
     *,
-    logger: Optional[logging.Logger] = None,
+    logger: logging.Logger | None = None,
     reload: bool = False,
 ) -> None:
     """Load validator plugins while tracking module-level load state."""
@@ -249,10 +428,10 @@ class ValidationResult:
     """
 
     ok: bool
-    details: Dict[str, object]
-    output_files: List[str]
+    details: dict[str, object]
+    output_files: list[str]
 
-    def to_dict(self) -> Dict[str, object]:
+    def to_dict(self) -> dict[str, object]:
         """Represent the validation result as a JSON-serializable dict.
 
         Args:
@@ -303,7 +482,7 @@ def _python_merge_sort(source: Path, destination: Path, *, chunk_size: int = 100
     """
 
     with tempfile.TemporaryDirectory(prefix="ontology-sort-") as tmp_dir:
-        chunk_paths: List[Path] = []
+        chunk_paths: list[Path] = []
         with source.open("r", encoding="utf-8") as reader:
             while True:
                 lines = list(islice(reader, chunk_size))
@@ -320,7 +499,7 @@ def _python_merge_sort(source: Path, destination: Path, *, chunk_size: int = 100
             return
 
         with contextlib.ExitStack() as stack:
-            iterators: List[Iterator[str]] = []
+            iterators: list[Iterator[str]] = []
             for chunk_path in chunk_paths:
                 handle = stack.enter_context(chunk_path.open("r", encoding="utf-8"))
                 iterators.append(iter(handle))
@@ -368,7 +547,7 @@ def _canonicalize_turtle(graph) -> str:
     except Exception as exc:  # pragma: no cover - defensive fallback
         raise AttributeError("unable to iterate namespaces") from exc
 
-    prefix_map: Dict[str, str] = {}
+    prefix_map: dict[str, str] = {}
     for prefix, namespace in namespace_items:
         key = prefix or ""
         prefix_map[key] = str(namespace)
@@ -390,7 +569,7 @@ def _canonicalize_turtle(graph) -> str:
         )
     ]
 
-    bnode_map: Dict[str, str] = {}
+    bnode_map: dict[str, str] = {}
     triple_lines = [_canonicalize_blank_nodes_line(line, bnode_map) for line in triple_lines]
 
     prefix_lines = []
@@ -398,7 +577,7 @@ def _canonicalize_turtle(graph) -> str:
         label = f"{key}:" if key else ":"
         prefix_lines.append(f"@prefix {label} <{prefix_map[key]}> .")
 
-    lines: List[str] = []
+    lines: list[str] = []
     lines.extend(prefix_lines)
     if prefix_lines and triple_lines:
         lines.append("")
@@ -409,7 +588,7 @@ def _canonicalize_turtle(graph) -> str:
 _BNODE_PATTERN = re.compile(r"_:[A-Za-z0-9]+")
 
 
-def _canonicalize_blank_nodes_line(line: str, mapping: Dict[str, str]) -> str:
+def _canonicalize_blank_nodes_line(line: str, mapping: dict[str, str]) -> str:
     """Replace blank node identifiers with deterministic sequential labels.
 
     Args:
@@ -459,12 +638,12 @@ def _sort_triple_file(source: Path, destination: Path) -> None:
 
 def normalize_streaming(
     source: Path,
-    output_path: Optional[Path] = None,
+    output_path: Path | None = None,
     *,
     graph=None,
     chunk_bytes: int = 1 << 20,
     return_header_hash: bool = False,
-) -> Union[str, Tuple[str, str]]:
+) -> str | tuple[str, str]:
     """Normalize ontologies using streaming canonical Turtle serialization.
 
     The streaming path serializes triples to a temporary file, leverages the
@@ -498,7 +677,7 @@ def normalize_streaming(
     except Exception as exc:  # pragma: no cover - defensive fallback
         raise AttributeError("unable to iterate namespaces") from exc
 
-    prefix_map: Dict[str, str] = {}
+    prefix_map: dict[str, str] = {}
     for prefix, namespace in namespace_items:
         key = prefix or ""
         prefix_map[key] = str(namespace)
@@ -514,7 +693,7 @@ def normalize_streaming(
     buffer = bytearray()
     sha256 = hashlib.sha256()
 
-    def _flush(writer: Optional[BinaryIO]) -> None:
+    def _flush(writer: BinaryIO | None) -> None:
         if not buffer:
             return
         sha256.update(buffer)
@@ -538,7 +717,7 @@ def normalize_streaming(
         _sort_triple_file(unsorted_path, sorted_path)
 
         with contextlib.ExitStack() as stack:
-            writer: Optional[BinaryIO] = None
+            writer: BinaryIO | None = None
             if output_path is not None:
                 output_path.parent.mkdir(parents=True, exist_ok=True)
                 writer = stack.enter_context(output_path.open("wb"))
@@ -553,7 +732,7 @@ def normalize_streaming(
                 _emit(line)
                 wrote_any = True
 
-            bnode_map: Dict[str, str] = {}
+            bnode_map: dict[str, str] = {}
             blank_line_pending = bool(prefix_lines)
 
             with sorted_path.open("r", encoding="utf-8") as reader:
@@ -594,13 +773,13 @@ class ValidatorSubprocessError(RuntimeError):
     """
 
 
-def _worker_pronto(payload: Dict[str, Any]) -> Dict[str, Any]:
+def _worker_pronto(payload: dict[str, Any]) -> dict[str, Any]:
     """Execute Pronto validation logic and emit JSON-friendly results."""
 
     file_path = Path(payload["file_path"])
     ontology = pronto.Ontology(file_path.as_posix())
     terms = len(list(ontology.terms()))
-    result: Dict[str, Any] = {"ok": True, "terms": terms}
+    result: dict[str, Any] = {"ok": True, "terms": terms}
 
     normalized_path = payload.get("normalized_path")
     if normalized_path:
@@ -612,7 +791,7 @@ def _worker_pronto(payload: Dict[str, Any]) -> Dict[str, Any]:
     return result
 
 
-def _worker_owlready2(payload: Dict[str, Any]) -> Dict[str, Any]:
+def _worker_owlready2(payload: dict[str, Any]) -> dict[str, Any]:
     """Execute Owlready2 validation logic and emit JSON-friendly results."""
 
     file_path = Path(payload["file_path"])
@@ -628,8 +807,8 @@ _WORKER_DISPATCH = {
 
 
 def _run_validator_subprocess(
-    name: str, payload: Dict[str, object], *, timeout: int
-) -> Dict[str, object]:
+    name: str, payload: dict[str, object], *, timeout: int
+) -> dict[str, object]:
     """Execute a validator worker module within a subprocess.
 
     The subprocess workflow enforces parser timeouts, returns JSON payloads,
@@ -732,7 +911,7 @@ def _run_with_timeout(func, timeout_sec: int) -> None:
 
 def _prepare_xbrl_package(
     request: ValidationRequest, logger: logging.Logger
-) -> tuple[Path, List[str]]:
+) -> tuple[Path, list[str]]:
     """Extract XBRL taxonomy archives for downstream validation.
 
     Supports ZIP and other libarchive-supported formats (tar, tar.gz, etc.).
@@ -816,7 +995,7 @@ def validate_rdflib(request: ValidationRequest, logger: logging.Logger) -> Valid
         ValidationTimeout: Propagated when parsing exceeds configured timeout.
     """
     graph = rdflib.Graph()
-    payload: Dict[str, object] = {"ok": False}
+    payload: dict[str, object] = {"ok": False}
     timeout = request.config.defaults.validation.parser_timeout_sec
 
     def _parse() -> None:
@@ -829,7 +1008,7 @@ def validate_rdflib(request: ValidationRequest, logger: logging.Logger) -> Valid
         log_memory_usage(logger, stage="validate", event="after", validator="rdflib")
         triple_count = len(graph)
         payload = {"ok": True, "triples": triple_count}
-        output_files: List[str] = []
+        output_files: list[str] = []
         normalization_mode = "in-memory"
 
         if "ttl" in request.config.defaults.normalize_to:
@@ -842,9 +1021,9 @@ def validate_rdflib(request: ValidationRequest, logger: logging.Logger) -> Valid
                 * 1024
             )
             file_size = request.file_path.stat().st_size
-            streaming_hash: Optional[str] = None
-            streaming_header_hash: Optional[str] = None
-            normalized_sha: Optional[str] = None
+            streaming_hash: str | None = None
+            streaming_header_hash: str | None = None
+            normalized_sha: str | None = None
             if file_size >= threshold_bytes:
                 normalization_mode = "streaming"
                 try:
@@ -944,8 +1123,8 @@ def validate_pronto(request: ValidationRequest, logger: logging.Logger) -> Valid
 
     try:
         timeout = request.config.defaults.validation.parser_timeout_sec
-        payload: Dict[str, object] = {"file_path": str(request.file_path)}
-        normalized_path: Optional[Path] = None
+        payload: dict[str, object] = {"file_path": str(request.file_path)}
+        normalized_path: Path | None = None
         if "obographs" in request.config.defaults.normalize_to:
             request.normalized_dir.mkdir(parents=True, exist_ok=True)
             normalized_path = request.normalized_dir / (request.file_path.stem + ".json")
@@ -955,7 +1134,7 @@ def validate_pronto(request: ValidationRequest, logger: logging.Logger) -> Valid
         result_payload = _run_validator_subprocess("pronto", payload, timeout=timeout)
         log_memory_usage(logger, stage="validate", event="after", validator="pronto")
         result_payload.setdefault("ok", True)
-        output_files: List[str] = []
+        output_files: list[str] = []
         if normalized_path and result_payload.get("normalized_written"):
             output_files.append(str(normalized_path))
         _write_validation_json(request.validation_dir / "pronto_parse.json", result_payload)
@@ -1047,8 +1226,8 @@ def validate_robot(request: ValidationRequest, logger: logging.Logger) -> Valida
         None
     """
     robot_path = shutil.which("robot")
-    result_payload: Dict[str, object]
-    output_files: List[str] = []
+    result_payload: dict[str, object]
+    output_files: list[str] = []
     if not robot_path:
         result_payload = {"ok": True, "skipped": True, "reason": "robot binary not found"}
         _write_validation_json(request.validation_dir / "robot_report.json", result_payload)
@@ -1074,8 +1253,8 @@ def validate_robot(request: ValidationRequest, logger: logging.Logger) -> Valida
         report_cmd = [robot_path, "report", "-i", str(request.file_path), "-o", str(report_path)]
         subprocess.run(convert_cmd, check=True, capture_output=True)
         subprocess.run(report_cmd, check=True, capture_output=True)
-        normalized_sha: Optional[str] = None
-        streaming_prefix_hash: Optional[str] = None
+        normalized_sha: str | None = None
+        streaming_prefix_hash: str | None = None
         try:
             streaming_hash, streaming_prefix_hash = normalize_streaming(
                 normalized_path,
@@ -1188,7 +1367,7 @@ def _run_validator_task(
     request: ValidationRequest,
     logger: logging.Logger,
     *,
-    budget: Optional[_SharedValidatorBudget] = None,
+    budget: _SharedValidatorBudget | None = None,
     use_semaphore: bool = True,
 ) -> ValidationResult:
     """Execute a single validator with exception guards."""
@@ -1196,7 +1375,7 @@ def _run_validator_task(
     start_time = time.perf_counter()
     before_mb = _current_memory_mb()
     log_memory_usage(logger, stage="validate", event="before", validator=request.name)
-    concurrency_guard: Optional[Any] = None
+    concurrency_guard: Any | None = None
     acquired = False
     timeout = getattr(
         request.config.defaults.validation,
@@ -1263,7 +1442,7 @@ def _run_validator_task(
 def _run_validator_in_process(
     name: str,
     request: ValidationRequest,
-    budget: Optional[_SharedValidatorBudget] = None,
+    budget: _SharedValidatorBudget | None = None,
 ) -> ValidationResult:
     """Execute a validator inside a worker process."""
 
@@ -1290,7 +1469,7 @@ def _run_validator_in_process(
 
 def run_validators(
     requests: Iterable[ValidationRequest], logger: logging.Logger
-) -> Dict[str, ValidationResult]:
+) -> dict[str, ValidationResult]:
     """Execute registered validators and aggregate their results.
 
     Args:
@@ -1306,7 +1485,7 @@ def run_validators(
         return {}
 
     def _determine_max_workers() -> int:
-        limits: List[int] = []
+        limits: list[int] = []
         for request in request_list:
             validation_config = getattr(request.config.defaults, "validation", None)
             if validation_config is None or not hasattr(
@@ -1320,7 +1499,7 @@ def run_validators(
         return 2
 
     max_workers = _determine_max_workers()
-    results: Dict[str, ValidationResult] = {}
+    results: dict[str, ValidationResult] = {}
     budget = _ValidatorBudget(max_workers)
     shared_budget = budget.share()
 
@@ -1336,10 +1515,10 @@ def run_validators(
                 if isinstance(name, str):
                     process_validator_names.add(name.strip().lower())
 
-    thread_jobs: List[
-        Tuple[Callable[[ValidationRequest, logging.Logger], ValidationResult], ValidationRequest]
+    thread_jobs: list[
+        tuple[Callable[[ValidationRequest, logging.Logger], ValidationResult], ValidationRequest]
     ] = []
-    process_requests: List[ValidationRequest] = []
+    process_requests: list[ValidationRequest] = []
     for request in request_list:
         validator = VALIDATORS.get(request.name)
         if not validator:
@@ -1350,8 +1529,8 @@ def run_validators(
         else:
             thread_jobs.append((validator, request))
 
-    futures: Dict[Any, ValidationRequest] = {}
-    executors: List[Any] = []
+    futures: dict[Any, ValidationRequest] = {}
+    executors: list[Any] = []
 
     try:
         if thread_jobs:

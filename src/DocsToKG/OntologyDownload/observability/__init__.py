@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.observability.__init__",
+#   "purpose": "Observability: Event system, telemetry, and queryable storage.",
+#   "sections": [
+#     {
+#       "id": "initialize-events",
+#       "name": "initialize_events",
+#       "anchor": "function-initialize-events",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Observability: Event system, telemetry, and queryable storage.
 
 This package provides a unified event schema, emission system, and sinks that
@@ -52,9 +67,9 @@ __all__ = [
 def initialize_events(
     enable_stdout: bool = True,
     enable_duckdb: bool = False,
-    db_path: Optional[Path] = None,
+    db_path: Path | None = None,
     enable_file: bool = False,
-    file_path: Optional[Path] = None,
+    file_path: Path | None = None,
 ) -> None:
     """Initialize event sinks for production deployment.
 
