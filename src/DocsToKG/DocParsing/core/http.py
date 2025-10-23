@@ -182,6 +182,41 @@ def normalize_http_timeout(timeout: Optional[object]) -> Tuple[float, float]:
     if timeout is None:
         return DEFAULT_HTTP_TIMEOUT
 
+    if isinstance(timeout, httpx.Timeout):
+        connect = timeout.connect if timeout.connect is not None else timeout.read
+        read = timeout.read if timeout.read is not None else timeout.connect
+        connect = DEFAULT_HTTP_TIMEOUT[0] if connect is None else float(connect)
+        read = DEFAULT_HTTP_TIMEOUT[1] if read is None else float(read)
+        return connect, read
+
+    if isinstance(timeout, Mapping):
+        connect_candidate = timeout.get("connect", timeout.get("connect_timeout"))
+        read_candidate = timeout.get("read", timeout.get("read_timeout"))
+        fallback = timeout.get("default") or timeout.get("timeout")
+
+        def _coerce(value: object, *, default: float) -> float:
+            if value is None:
+                return default
+            try:
+                return float(value)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"Invalid timeout value {value!r}") from exc
+
+        fallback_connect = fallback_read = None
+        if fallback is not None:
+            fallback_value = _coerce(fallback, default=DEFAULT_HTTP_TIMEOUT[0])
+            fallback_connect = fallback_value
+            fallback_read = fallback_value
+
+        connect_default = (
+            fallback_connect if fallback_connect is not None else DEFAULT_HTTP_TIMEOUT[0]
+        )
+        read_default = fallback_read if fallback_read is not None else DEFAULT_HTTP_TIMEOUT[1]
+
+        connect = _coerce(connect_candidate, default=connect_default)
+        read = _coerce(read_candidate, default=read_default)
+        return connect, read
+
     def _coerce_pair(values: Sequence[object]) -> Tuple[float, float]:
         """Coerce arbitrary iterables into a two-element timeout tuple."""
 

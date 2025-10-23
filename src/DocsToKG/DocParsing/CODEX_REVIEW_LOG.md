@@ -25,6 +25,13 @@ No eligible files after excludes.
 <!-- 2025-10-23 04:04:17Z UTC -->
 ## Pass 1 — find and fix real bugs
 
+### Batch 0 (Pass 1)
+- Broken: `core.http.normalize_http_timeout` treated mapping inputs as iterables of keys, triggering `ValueError` when callers passed httpx-style timeout dicts so `get_http_session(timeout={...})` crashed.
+- Fixed:
+  - detect `httpx.Timeout` instances and coerce their connect/read timeouts safely
+  - accept mapping inputs by coercing `connect`/`read`/`timeout` fields with sane defaults
+- TODO: add focused coverage for mapping/Timeout inputs to `normalize_http_timeout`.
+
 <!-- 2025-10-23 04:06:49Z UTC -->
 ## Pass 1 — find and fix real bugs
 
@@ -46,3 +53,6 @@ No eligible files after excludes.
 - Broken: `storage.dataset_view._extract_partition_from_path` only matched POSIX-style separators, so Windows/UNC fragment paths never surfaced partition buckets during dataset summaries.
 - Fixed: Accept both `/` and `\` when parsing partition components so summaries stay accurate on Windows and shared-network mounts.
 - TODO: Add regression coverage with Windows-style fragment paths once a cross-platform fixture harness lands.
+
+<!-- 2025-10-23 04:46:08Z UTC -->
+## Pass 1 — find and fix real bugs
