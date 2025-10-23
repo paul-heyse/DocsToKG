@@ -92,3 +92,12 @@ No eligible files after excludes.
 
 <!-- 2025-10-23 06:52:53Z UTC -->
 ## Pass 1 — find and fix real bugs
+
+<!-- 2025-10-23 07:04:13Z UTC -->
+## Pass 2 — find and fix real bugs
+
+### Batch 0 (Pass 2)
+- Broken: `embedding.backends.dense.tei` rejected valid TEI responses that wrap embeddings in an object, so inference runs crashed with a validation error instead of returning vectors.
+- Fixed:
+  - accept TEI payloads exposing an `embeddings` list or OpenAI-style `data[*].embedding` entries before coercing to floats.
+- TODO: Cover TEI response-shape variants in unit tests.

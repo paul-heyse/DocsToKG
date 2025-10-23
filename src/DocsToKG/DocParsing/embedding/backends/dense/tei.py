@@ -99,7 +99,7 @@ class TEIProvider(DenseEmbeddingBackend):
                 retryable=False,
             )
         try:
-            vectors_raw = response.json()
+            payload = response.json()
         except ValueError as exc:
             raise ProviderError(
                 provider=self.identity.name,
@@ -108,7 +108,30 @@ class TEIProvider(DenseEmbeddingBackend):
                 retryable=False,
                 wrapped=exc,
             ) from exc
-        if not isinstance(vectors_raw, list):
+        if isinstance(payload, dict):
+            if isinstance(payload.get("embeddings"), list):
+                vectors_raw = payload["embeddings"]
+            elif isinstance(payload.get("data"), list):
+                vectors_raw = []
+                for index, item in enumerate(payload["data"]):
+                    if not isinstance(item, dict) or "embedding" not in item:
+                        raise ProviderError(
+                            provider=self.identity.name,
+                            category="validation",
+                            detail="TEI response data entries must include an 'embedding' list.",
+                            retryable=False,
+                        )
+                    vectors_raw.append(item["embedding"])
+            else:
+                raise ProviderError(
+                    provider=self.identity.name,
+                    category="validation",
+                    detail="TEI response did not include 'embeddings' or 'data' keys.",
+                    retryable=False,
+                )
+        elif isinstance(payload, list):
+            vectors_raw = payload
+        else:
             raise ProviderError(
                 provider=self.identity.name,
                 category="validation",
