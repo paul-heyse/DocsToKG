@@ -163,3 +163,11 @@ No eligible files after excludes.
 
 <!-- 2025-10-23 07:10:59Z UTC -->
 ## Pass 7 — find and fix real bugs
+
+<!-- 2025-10-23 07:15:02Z UTC -->
+## Pass 8 — find and fix real bugs
+### Batch 0 (Pass 8)
+- Broken: Deployment `FeatureFlag.should_enable` ignored the `enabled` toggle, so flags marked disabled still rolled out when their strategy hashed users into treatment buckets.
+- Fix:
+  - Short-circuit `should_enable` when `enabled` is false so the toggle reliably disables all strategies.
+- TODO: Add a unit test that registers a canary flag with `enabled=False` and asserts `should_enable` never returns true.

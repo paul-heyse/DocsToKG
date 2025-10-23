@@ -37,6 +37,8 @@ class FeatureFlag:
 
     def should_enable(self, user_id: Optional[str] = None) -> bool:
         """Determine if feature should be enabled for user."""
+        if not self.enabled:
+            return False
         if self.strategy == RolloutStrategy.DISABLED:
             return False
         if self.strategy == RolloutStrategy.ENABLED:
