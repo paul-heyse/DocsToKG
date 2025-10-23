@@ -237,6 +237,23 @@ def _parse_policy_value(value_str: str) -> Dict[str, Any]:
     return result
 
 
+def _coerce_bool(value: Any) -> bool:
+    """Normalize arbitrary truthy/falsey values into a canonical bool."""
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"true", "1", "yes", "on"}:
+            return True
+        if normalized in {"false", "0", "no", "off", ""}:
+            return False
+    if isinstance(value, (int, float)):
+        return value != 0
+    return bool(value)
+
+
 def _apply_env_overlays(doc: Dict[str, Any], env: Mapping[str, str]) -> Dict[str, Any]:
     """Apply environment variable overlays to configuration.
 
@@ -410,7 +427,7 @@ def load_cache_config(
     controller = CacheControllerDefaults(
         cacheable_methods=cacheable_methods,
         cacheable_statuses=cacheable_statuses,
-        allow_heuristics=bool(controller_doc.get("allow_heuristics", False)),
+        allow_heuristics=_coerce_bool(controller_doc.get("allow_heuristics", False)),
         default=CacheDefault(controller_doc.get("default", "DO_NOT_CACHE")),
     )
 
@@ -424,7 +441,7 @@ def load_cache_config(
             role_policies[role_name] = CacheRolePolicy(
                 ttl_s=role_doc.get("ttl_s"),
                 swrv_s=role_doc.get("swrv_s"),
-                body_key=bool(role_doc.get("body_key", False)),
+                body_key=_coerce_bool(role_doc.get("body_key", False)),
             )
         hosts[normalized] = CacheHostPolicy(ttl_s=host_ttl, role=role_policies)
 

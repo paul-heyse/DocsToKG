@@ -344,19 +344,19 @@ class PerResolverHttpClient:
                         retry_after_hdr = resp.headers.get("Retry-After")
                         if retry_after_hdr:
                             try:
-                                sleep_s = int(retry_after_hdr)
-                                sleep_s = min(sleep_s, self.config.retry_after_cap_s)
+                                sleep_s = float(retry_after_hdr)
+                                sleep_s = min(sleep_s, float(self.config.retry_after_cap_s))
                             except ValueError:
-                                sleep_s = int(
-                                    self.config.base_delay_ms * (2 ** (attempt_count - 1)) / 1000.0
+                                sleep_s = (
+                                    self.config.base_delay_ms / 1000.0 * (2 ** (attempt_count - 1))
                                 )
                         else:
-                            sleep_s = int(
-                                self.config.base_delay_ms * (2 ** (attempt_count - 1)) / 1000.0
+                            sleep_s = (
+                                self.config.base_delay_ms / 1000.0 * (2 ** (attempt_count - 1))
                             )
 
-                        sleep_s = min(sleep_s, self.config.max_delay_ms // 1000)
-                        time.sleep(sleep_s)
+                        sleep_s = min(sleep_s, self.config.max_delay_ms / 1000.0)
+                        time.sleep(max(0.0, sleep_s))
                         continue
 
                 # Success or non-retryable error
@@ -369,9 +369,9 @@ class PerResolverHttpClient:
                     )
 
                     # Sleep before retry
-                    sleep_s = int(self.config.base_delay_ms * (2 ** (attempt_count - 1)) / 1000.0)
-                    sleep_s = min(sleep_s, self.config.max_delay_ms // 1000)
-                    time.sleep(sleep_s)
+                    sleep_s = self.config.base_delay_ms / 1000.0 * (2 ** (attempt_count - 1))
+                    sleep_s = min(sleep_s, self.config.max_delay_ms / 1000.0)
+                    time.sleep(max(0.0, sleep_s))
                     continue
 
                 # Exhausted retries
