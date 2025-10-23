@@ -181,22 +181,6 @@ class ParquetChunksWriter:
         output_path = paths.chunks_output_path(data_root, rel_id, fmt="parquet", ts=dt_utc)
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # Collect and validate rows in batches
-        all_rows: List[Dict[str, Any]] = []
-        for row in rows_iter:
-            self._validate_row(row)
-            all_rows.append(row)
-
-        if not all_rows:
-            raise ValueError(f"No rows to write for {rel_id}")
-
-        # Convert to Arrow table and write
-        table = pa.Table.from_pylist(all_rows, schema=self.schema)
-
-        # Validate schema match
-        parquet_schemas.assert_table_matches_schema(table, self.schema)
-
-        # Build footer metadata
         footer_meta = parquet_schemas.build_footer_common(
             schema_version=parquet_schemas.SCHEMA_VERSION_CHUNKS,
             cfg_hash=cfg_hash,
@@ -204,66 +188,83 @@ class ParquetChunksWriter:
             created_at=dt_utc.strftime(parquet_schemas.ISO_UTC),
         )
 
-        # Attach footer
-        table = parquet_schemas.attach_footer_metadata(table, footer_meta)
+        schema_with_footer = self._schema_with_footer_metadata(footer_meta)
+        row_group_size = self._target_row_group_rows()
 
-        # Atomic write
-        file_size = self._atomic_write(table, output_path)
-
-        return WriteResult(
-            paths=[output_path],
-            rows_written=len(all_rows),
-            row_group_count=self._estimate_row_group_count(file_size),
-            parquet_bytes=file_size,
-        )
-
-    def _atomic_write(self, table: pa.Table, output_path: Path) -> int:
-        """
-        Atomically write table to output_path: temp → fsync → rename.
-
-        Args:
-            table: PyArrow table to write.
-            output_path: Final output path.
-
-        Returns:
-            File size in bytes.
-        """
         tmp_path = output_path.with_name(f"{output_path.name}.tmp.{uuid.uuid4().hex}")
+        rows_written = 0
+        buffer: List[Dict[str, Any]] = []
+
         try:
-            kwargs = {
-                "compression": self.compression,
-                "compression_level": self.compression_level,
-                "write_statistics": True,
-                "row_group_size": max(1, int(self.target_row_group_mb * 1024 * 1024 / 8)),
-            }
-            pq.write_table(table, str(tmp_path), **kwargs)
+            with pq.ParquetWriter(
+                str(tmp_path),
+                schema_with_footer,
+                compression=self.compression,
+                compression_level=self.compression_level,
+                write_statistics=True,
+            ) as writer:
+                for row in rows_iter:
+                    self._validate_row(row)
+                    buffer.append(row)
+                    if len(buffer) >= self.batch_size:
+                        rows_written += self._flush_buffer(writer, buffer, row_group_size)
 
-            # Fsync for durability
-            try:
-                with open(tmp_path, "rb") as f:
-                    os.fsync(f.fileno())
-            except OSError:
-                # Fallback if fsync fails (e.g., on some filesystems)
-                pass
+                if buffer:
+                    rows_written += self._flush_buffer(writer, buffer, row_group_size)
 
-            # Atomic rename
+            if rows_written == 0:
+                raise ValueError(f"No rows to write for {rel_id}")
+
+            self._fsync_path(tmp_path)
             tmp_path.replace(output_path)
-            return output_path.stat().st_size
+
+            file_size = output_path.stat().st_size
+            row_group_count = pq.ParquetFile(str(output_path)).metadata.num_row_groups
+
+            return WriteResult(
+                paths=[output_path],
+                rows_written=rows_written,
+                row_group_count=row_group_count,
+                parquet_bytes=file_size,
+            )
         except Exception:
             tmp_path.unlink(missing_ok=True)
             raise
 
+    def _flush_buffer(
+        self,
+        writer: pq.ParquetWriter,
+        buffer: List[Dict[str, Any]],
+        row_group_size: int,
+    ) -> int:
+        """Convert the buffered rows to a table, write, and clear the buffer."""
+
+        table = pa.Table.from_pylist(buffer, schema=self.schema)
+        parquet_schemas.assert_table_matches_schema(table, self.schema)
+        writer.write_table(table, row_group_size=row_group_size)
+        written = len(buffer)
+        buffer.clear()
+        return written
+
+    def _schema_with_footer_metadata(self, footer_meta: Dict[str, str]) -> pa.Schema:
+        """Attach footer metadata to the writer schema."""
+
+        empty_table = pa.Table.from_pylist([], schema=self.schema)
+        table_with_footer = parquet_schemas.attach_footer_metadata(empty_table, footer_meta)
+        return table_with_footer.schema
+
+    def _target_row_group_rows(self) -> int:
+        """Approximate target row-group size expressed in rows."""
+
+        return max(1, int(self.target_row_group_mb * 1024 * 1024 / 8))
+
     @staticmethod
-    def _estimate_row_group_count(file_size: int, avg_row_group_mb: int = 32) -> int:
-        """
-        Estimate row group count based on file size.
+    def _fsync_path(path: Path) -> None:
+        """Best-effort fsync for durability before atomic rename."""
 
-        Args:
-            file_size: File size in bytes.
-            avg_row_group_mb: Average row group size in MB.
-
-        Returns:
-            Estimated row group count.
-        """
-        avg_row_group_bytes = avg_row_group_mb * 1024 * 1024
-        return max(1, file_size // avg_row_group_bytes)
+        try:
+            with open(path, "rb") as file_obj:
+                os.fsync(file_obj.fileno())
+        except OSError:
+            # Some filesystems may not support fsync; ignore in that case.
+            pass
