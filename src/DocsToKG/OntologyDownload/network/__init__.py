@@ -31,15 +31,7 @@ from DocsToKG.OntologyDownload.network.client import (
     get_http_client,
     reset_http_client,
 )
-from DocsToKG.OntologyDownload.network.instrumentation import (
-    clear_request_context,
-    emit_event,
-    get_on_error_hook,
-    get_on_request_hook,
-    get_on_response_hook,
-    get_or_create_request_id,
-    map_httpx_exception_to_error_type,
-)
+from DocsToKG.OntologyDownload.network.instrumentation import create_http_event_hooks
 from DocsToKG.OntologyDownload.network.policy import (
     HTTP2_ENABLED,
     HTTP_CONNECT_TIMEOUT,
@@ -92,13 +84,7 @@ __all__ = [
     "KEEPALIVE_EXPIRY",
     "HTTP2_ENABLED",
     # Instrumentation
-    "emit_event",
-    "get_or_create_request_id",
-    "clear_request_context",
-    "get_on_request_hook",
-    "get_on_response_hook",
-    "get_on_error_hook",
-    "map_httpx_exception_to_error_type",
+    "create_http_event_hooks",
     # Retry policies
     "create_http_retry_policy",
     "create_idempotent_retry_policy",

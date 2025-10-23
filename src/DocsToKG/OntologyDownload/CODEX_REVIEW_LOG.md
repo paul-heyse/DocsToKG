@@ -114,3 +114,10 @@ No eligible files after excludes.
 - Broken: `validate_disk_space()` always used a hard-coded 10% safety margin and truncated the product, so custom `space_safety_margin` values were ignored and tiny downloads could pass without any buffer.
 - Fix: factor in the configured `space_safety_margin` and round up with `ceil()` before comparing to filesystem capacity.
 - TODO: cover disk space validation with a parametrized policy test.
+
+<!-- 2025-10-23 07:12:11Z UTC -->
+## Pass 6 — find and fix real bugs
+### Batch 0 (Pass 6)
+- Broken: `DocsToKG.OntologyDownload.network` tried to re-export instrumentation helpers that no longer exist, so any `from … import network` call crashed with an `ImportError`.
+- Fix: align the package exports with the current instrumentation API by importing the available `create_http_event_hooks` helper in `network.__init__`.
+- TODO: flesh out network instrumentation hooks (request context helpers, error mapping) or remove them from the public API definitively.
