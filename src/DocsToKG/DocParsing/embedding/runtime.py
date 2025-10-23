@@ -807,6 +807,10 @@ class BM25StatsAccumulator:
         """
 
         avgdl = self.total_tokens / max(self.N, 1)
+        if avgdl <= 0:
+            # Guard against division-by-zero in BM25 weighting when the corpus
+            # contains no lexical tokens (for example, all input rows are empty).
+            avgdl = 1.0
         return BM25Stats(N=self.N, avgdl=avgdl, df=dict(self.df))
 
 
@@ -847,12 +851,13 @@ def bm25_vector(
     """
     toks = tokens(text)
     dl = len(toks) or 1
+    avgdl = stats.avgdl if stats.avgdl > 0 else 1.0
     tf = Counter(toks)
     terms, weights = [], []
     for t, f in tf.items():
         n_qi = stats.df.get(t, 0)
         idf = math.log((stats.N - n_qi + 0.5) / (n_qi + 0.5) + 1.0)  # RSJ-smoothed IDF
-        denom = f + k1 * (1.0 - b + b * (dl / stats.avgdl))
+        denom = f + k1 * (1.0 - b + b * (dl / avgdl))
         w = idf * (f * (k1 + 1.0)) / denom
         if w > 0:
             terms.append(t)

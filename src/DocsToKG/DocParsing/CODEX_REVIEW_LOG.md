@@ -101,3 +101,13 @@ No eligible files after excludes.
 - Fixed:
   - accept TEI payloads exposing an `embeddings` list or OpenAI-style `data[*].embedding` entries before coercing to floats.
 - TODO: Cover TEI response-shape variants in unit tests.
+
+<!-- 2025-10-23 07:12:42Z UTC -->
+## Pass 3 — find and fix real bugs
+
+### Batch 0 (Pass 3)
+- Broken: empty-token corpora yielded `avgdl=0`, causing `bm25_vector` to raise `ZeroDivisionError` when normalising lengths.
+- Fixed:
+  - clamp the accumulated average doc length to a positive floor during finalisation.
+  - reuse the guarded average length inside `bm25_vector` to keep per-chunk weighting safe.
+- TODO: Add coverage for empty-token chunk inputs to ensure BM25 stays stable.
