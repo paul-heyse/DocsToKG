@@ -92,6 +92,12 @@ No eligible files after excludes.
 <!-- 2025-10-23 05:59:25Z UTC -->
 ## Pass 3 — find and fix real bugs
 
+### Batch 0 (Pass 3)
+- Broken: `is_fresh` treated responses exactly at `max-age` (and stale grace cutoffs) as stale, forcing unnecessary revalidation despite RFC 7234 permitting equality.
+- Fix:
+  - Relaxed the freshness and stale-serving comparisons in `CacheControlDirective` helpers to honor equality with configured TTLs.
+- TODO: Backfill a boundary-condition test to lock in the `<=` behaviour for `max-age` and stale extension windows.
+
 <!-- 2025-10-23 05:59:31Z UTC -->
 ## Pass 4 — find and fix real bugs
 
@@ -118,3 +124,6 @@ No eligible files after excludes.
 - Fix:
   - Wrap the directory sync in a try/finally that closes the descriptor before performing `os.replace`.
 - TODO: Evaluate adding a post-rename `fsync` once we confirm durability requirements.
+
+<!-- 2025-10-23 06:57:04Z UTC -->
+## Pass 3 — find and fix real bugs

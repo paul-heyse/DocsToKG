@@ -186,8 +186,8 @@ def is_fresh(directive: CacheControlDirective, age_seconds: float) -> bool:
     if freshness_lifetime is None:
         return False
 
-    # Response is fresh if age < freshness_lifetime
-    return age_seconds < freshness_lifetime
+    # Response is fresh if age <= freshness_lifetime per RFC 7234 §4.2.4
+    return age_seconds <= freshness_lifetime
 
 
 def can_serve_stale(
@@ -228,7 +228,7 @@ def can_serve_stale(
         if freshness_lifetime is None:
             return False
         grace_period = directive.stale_if_error
-        return age_seconds < (freshness_lifetime + grace_period)
+        return age_seconds <= (freshness_lifetime + grace_period)
 
     # Normal stale-while-revalidate
     freshness_lifetime = directive.max_age
@@ -236,7 +236,7 @@ def can_serve_stale(
         return False
 
     grace_period = directive.stale_while_revalidate
-    return age_seconds < (freshness_lifetime + grace_period)
+    return age_seconds <= (freshness_lifetime + grace_period)
 
 
 def should_cache(directive: CacheControlDirective) -> bool:
