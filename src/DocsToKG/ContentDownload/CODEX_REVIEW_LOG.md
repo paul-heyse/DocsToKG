@@ -85,3 +85,6 @@ No eligible files after excludes.
 
 <!-- 2025-10-23 05:59:25Z UTC -->
 ## Pass 3 — find and fix real bugs
+
+<!-- 2025-10-23 05:59:31Z UTC -->
+## Pass 4 — find and fix real bugs
