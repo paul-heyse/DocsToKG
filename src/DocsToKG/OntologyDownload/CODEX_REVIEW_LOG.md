@@ -45,3 +45,11 @@ No eligible files after excludes.
 - Broken: HTTP retry policies ignored `Retry-After` guidance, causing immediate reattempts that violate polite backoff promises under 429/503 responses.
 - Fix: Added a `_RetryAfterOrBackoff` wait strategy that parses `Retry-After` hints and wired it into the default, idempotent, aggressive, and rate-limit retry builders so they fall back to jittered exponential waits when no header is present.
 - TODO: Add a retry-policy unit test that asserts we honour header and HTTP-date variants of `Retry-After`.
+
+<!-- 2025-10-23 04:46:08Z UTC -->
+## Pass 1 — find and fix real bugs
+
+### Batch 0 (Pass 1)
+- Broken: `retry_http_request` retried every `HTTPStatusError`, so 4xx responses were needlessly reissued and non-idempotent calls could run multiple times.
+- Fix: limit the decorator's stop condition with `stop_after_attempt` and reuse the existing predicate so only connection faults and 5xx responses trigger retries.
+- TODO: add decorator-focused tests that emulate 4xx and 5xx responses to confirm retry boundaries.

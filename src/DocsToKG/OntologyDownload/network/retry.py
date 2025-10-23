@@ -34,8 +34,10 @@ from tenacity import (
     RetryCallState,
     Retrying,
     before_sleep_log,
+    retry_if_exception,
     retry_if_exception_type,
     retry_if_result,
+    stop_after_attempt,
     stop_after_delay,
     wait_random_exponential,
 )
@@ -348,9 +350,9 @@ def retry_http_request(
         return False
 
     return retry(
-        stop=stop_after_delay(max_delay_seconds),
+        stop=stop_after_attempt(max_attempts) | stop_after_delay(max_delay_seconds),
         wait=wait_random_exponential(multiplier=0.5, max=min(60, max_delay_seconds)),
-        retry=retry_if_exception_type((httpx.RequestError, httpx.HTTPStatusError)),
+        retry=retry_if_exception(retry_on_http_error),
         before_sleep=before_sleep_log(logger, logging.WARNING),
         reraise=True,
     )
