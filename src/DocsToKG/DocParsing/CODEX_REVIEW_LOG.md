@@ -123,3 +123,15 @@ No eligible files after excludes.
 
 <!-- 2025-10-23 07:21:26Z UTC -->
 ## Pass 5 — find and fix real bugs
+
+<!-- 2025-10-23 07:21:46Z UTC -->
+## Pass 6 — find and fix real bugs
+
+### Batch 0 (Pass 6)
+- Broken: `telemetry.StageTelemetry.write_manifest` and `.log_success` defined keyword-only defaults before required parameters, triggering a `SyntaxError` during module import and disabling DocParsing telemetry.
+- Fixed:
+  - reorder the keyword-only arguments so required parameters precede optional ones without changing runtime behaviour.
+- TODO: add a lightweight import/usage smoke test for `DocParsing.telemetry` to detect signature regressions.
+
+<!-- 2025-10-23 07:23:56Z UTC -->
+## Pass 7 — find and fix real bugs

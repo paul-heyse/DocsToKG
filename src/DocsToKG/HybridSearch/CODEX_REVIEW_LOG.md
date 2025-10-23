@@ -114,3 +114,14 @@ No eligible files after excludes.
 
 <!-- 2025-10-23 07:17:04Z UTC -->
 ## Pass 4 — find and fix real bugs
+
+<!-- 2025-10-23 07:21:44Z UTC -->
+## Pass 5 — find and fix real bugs
+### Batch 0 (Pass 5)
+- Broken: Sparse weight parsing short-circuited on numpy arrays, raising `ValueError: truth value of an array with more than one element is ambiguous` and crashing ingestion when DocParsing emitted ndarray payloads.
+- Fix:
+  - Materialise candidate sequences without relying on truthiness so numpy arrays and other iterables become concrete lists before zipping.
+- TODO: None.
+
+<!-- 2025-10-23 07:28:04Z UTC -->
+## Pass 6 — find and fix real bugs

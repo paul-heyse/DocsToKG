@@ -244,9 +244,9 @@ class StageTelemetry:
         *,
         doc_id: str,
         output_path: Path | str,
-        tokens: Optional[int] = None,
         schema_version: Optional[str],
         duration_s: float,
+        tokens: Optional[int] = None,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Append a manifest row for ``doc_id`` and optional metadata."""
@@ -269,9 +269,9 @@ class StageTelemetry:
         doc_id: str,
         input_path: Path | str,
         output_path: Path | str,
-        tokens: Optional[int] = None,
         schema_version: str,
         duration_s: float,
+        tokens: Optional[int] = None,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Record a successful attempt and mirror the manifest entry."""

@@ -1093,8 +1093,27 @@ class ChunkIngestionPipeline:
         Returns:
             Dictionary mapping each term to its corresponding weight.
         """
-        terms = payload.get("terms") or payload.get("tokens") or []
-        weights = payload.get("weights") or []
+
+        def _materialise(value: object) -> list[object]:
+            if value is None:
+                return []
+            if isinstance(value, np.ndarray):
+                return value.reshape(-1).tolist()
+            if isinstance(value, Mapping):
+                return list(value.values())
+            if isinstance(value, (list, tuple, set)):
+                return list(value)
+            if isinstance(value, (str, bytes)):
+                return [value] if value else []
+            try:
+                return list(value)  # type: ignore[arg-type]
+            except TypeError:
+                return [value]
+
+        terms = _materialise(payload.get("terms"))
+        if not terms:
+            terms = _materialise(payload.get("tokens"))
+        weights = _materialise(payload.get("weights"))
         return {str(term): float(weight) for term, weight in zip(terms, weights)}
 
     def _read_vector_file(self, path: Path) -> List[Dict[str, object]]:

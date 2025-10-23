@@ -124,3 +124,13 @@ No eligible files after excludes.
 
 <!-- 2025-10-23 07:14:44Z UTC -->
 ## Pass 7 — find and fix real bugs
+
+<!-- 2025-10-23 07:21:46Z UTC -->
+## Pass 8 — find and fix real bugs
+### Batch 0 (Pass 8)
+- Broken: `safe_get_with_redirect()` forwarded raw `Location` headers, so common relative redirects (e.g. `/login`) triggered httpx URL parsing failures instead of following the hop.
+- Fix: resolve redirect targets against the previous response URL before validation, log the canonical target, and keep auditing unchanged.
+- TODO: add a redirect-following test with relative and absolute `Location` headers to guard the join logic.
+
+<!-- 2025-10-23 07:24:32Z UTC -->
+## Pass 9 — find and fix real bugs

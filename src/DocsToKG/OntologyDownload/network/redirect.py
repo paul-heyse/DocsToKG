@@ -206,15 +206,26 @@ def safe_get_with_redirect(
         if not location:
             raise MissingLocationHeader(current_url, response.status_code)
 
+        try:
+            # Resolve relative locations against the response URL as per RFC 7231.
+            resolved_url = response.url.join(location)
+            target_url = resolved_url.human_repr()
+        except Exception as exc:
+            raise UnsafeRedirectTarget(
+                current_url,
+                location,
+                f"Invalid redirect location: {exc}",
+            ) from exc
+
         # Validate redirect target
         try:
-            policy.validate_target(current_url, location)
+            policy.validate_target(current_url, target_url)
         except UnsafeRedirectTarget as e:
             logger.warning(
                 "Unsafe redirect detected",
                 extra={
                     "source": current_url,
-                    "target": location,
+                    "target": target_url,
                     "reason": e.reason,
                     "hops": len(audit_trail),
                 },
@@ -222,13 +233,13 @@ def safe_get_with_redirect(
             raise
 
         # Record hop and continue
-        current_url = location
+        current_url = target_url
         hop_count += 1
         logger.debug(
             "Following redirect",
             extra={
                 "from": audit_trail[-1][0],
-                "to": location,
+                "to": target_url,
                 "status": response.status_code,
                 "hop": hop_count,
             },

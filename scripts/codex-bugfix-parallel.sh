@@ -16,9 +16,10 @@ SUBDIRS=(
   "src/DocsToKG/OntologyDownload"
 )
 
-BATCH_SIZE="${BATCH_SIZE:-200}"          # files per Codex run
+BATCH_SIZE="${BATCH_SIZE:-40}"          # seed files per Codex run (explore remainder on demand)
 MAX_PASSES="${MAX_PASSES:-10}"            # start small; bump after you’re comfy
 INCLUDE_UNTRACKED="${INCLUDE_UNTRACKED:-true}"  # include new files
+RECENT_COMMITS="${RECENT_COMMITS:-30}"   # prioritise files touched in the last N commits
 
 BASE_BRANCH="${BASE_BRANCH:-main}"
 PUSH_TO_MAIN="${PUSH_TO_MAIN:-true}"     # false -> always PR
@@ -26,7 +27,7 @@ PR_TOOL="${PR_TOOL:-gh}"                 # needs GitHub CLI for PR fallback
 
 # Safety rails
 MAX_CHANGED_FILES="${MAX_CHANGED_FILES:-500}"    # cap to avoid runaway diffs
-EXEC_TIMEOUT="${EXEC_TIMEOUT:-1500}"                # 0 lets Codex decide
+EXEC_TIMEOUT="${EXEC_TIMEOUT:-1500}"             # retained for backwards compatibility; Codex CLI ignores per-run timeout overrides
 
 # Logging
 VERBOSE="${VERBOSE:-true}"
@@ -122,63 +123,101 @@ EOF
     rm -f "$lock"; return 0
   fi
 
+  if (( RECENT_COMMITS > 0 )); then
+    declare -A remaining=()
+    for f in "${files[@]}"; do
+      remaining["$f"]=1
+    done
+    local recent_paths=()
+    while IFS= read -r path; do
+      [[ -z "$path" ]] && continue
+      if [[ -n "${remaining["$path"]:-}" ]]; then
+        recent_paths+=( "$path" )
+        unset "remaining[$path]"
+      fi
+    done < <(git log --name-only --pretty=format: -n "$RECENT_COMMITS" -- "$subdir_clean" 2>/dev/null || true)
+    if (( ${#recent_paths[@]} > 0 )); then
+      local ordered=( "${recent_paths[@]}" )
+      for f in "${files[@]}"; do
+        if [[ -n "${remaining["$f"]:-}" ]]; then
+          ordered+=( "$f" )
+        fi
+      done
+      files=( "${ordered[@]}" )
+    fi
+  fi
+
+  local files_len=${#files[@]}
+  local offset=0
   local pass=1
   while (( pass <= MAX_PASSES )); do
     local tmpdir; tmpdir="$(mktemp -d)"
     append_log "$log" "## Pass $pass — find and fix real bugs"
 
-    # Batch the files
-    local idx=0 batch=0
-    while (( idx < ${#files[@]} )); do
-      local chunk=( )
-      for (( i=0; i < BATCH_SIZE && idx < ${#files[@]}; i++, idx++ )); do
+    local focus_count="$BATCH_SIZE"
+    if ! [[ "$focus_count" =~ ^[0-9]+$ ]]; then
+      focus_count=40
+    fi
+    focus_count=$((focus_count))
+    local chunk=()
+    if (( focus_count > 0 && files_len > 0 )); then
+      local end=$(( offset + focus_count ))
+      if (( end > files_len )); then
+        end=$files_len
+      fi
+      for (( idx=offset; idx < end; idx++ )); do
         chunk+=( "${files[$idx]}" )
       done
+    fi
 
-      # Build the prompt
-      local pf="$tmpdir/prompt-${batch}.txt"
-      {
-        echo "You are a senior Python engineer. Goal: **find a real bug and fix it** in the files listed below, limited to '$subdir'."
-        echo
-        echo "Prioritize concrete, high-signal issues over style:"
-        echo "- exceptions that can be thrown (None/KeyError/IndexError/ValueError),"
-        echo "- incorrect edge-case logic or off-by-one,"
-        echo "- resource leaks (files, processes),"
-        echo "- concurrency/async misuse,"
-        echo "- incorrect API usage (httpx/requests, DuckDB, FAISS, etc.),"
-        echo "- invalid types/return values, bad default mutables."
-        echo
-        echo "Rules:"
-        echo "- **Stay strictly inside** '$subdir' (read/write only those files)."
-        echo "- **Do NOT run network commands** (git push/pull/fetch, curl, pip, apt). Local edits only."
-        echo "- Keep changes minimal and reversible; preserve public behavior unless the fix demands it."
-        echo "- Add/adjust targeted unit tests only if trivial; otherwise leave TODOs."
-        echo
-        echo "FILES:"
+    local batch=0
+    local pf="$tmpdir/prompt-pass${pass}.txt"
+    {
+      echo "You are a senior Python engineer. Goal: **find a real bug and fix it** in the files listed below, limited to '$subdir'."
+      echo
+      echo "Prioritize concrete, high-signal issues over style:"
+      echo "- exceptions that can be thrown (None/KeyError/IndexError/ValueError),"
+      echo "- incorrect edge-case logic or off-by-one,"
+      echo "- resource leaks (files, processes),"
+      echo "- concurrency/async misuse,"
+      echo "- incorrect API usage (httpx/requests, DuckDB, FAISS, etc.),"
+      echo "- invalid types/return values, bad default mutables."
+      echo
+      echo "Rules:"
+      echo "- **Stay strictly inside** '$subdir' (read/write only those files)."
+      echo "- Prioritise the focus files below first. If you need more context, explore other files under '$subdir' using repo-friendly commands (e.g. rg, ls, fd) before editing."
+      echo "- **Do NOT run network commands** (git push/pull/fetch, curl, pip, apt). Local edits only."
+      echo "- Keep changes minimal and reversible; preserve public behavior unless the fix demands it."
+      echo "- Add/adjust targeted unit tests only if trivial; otherwise leave TODOs."
+      echo
+      echo "FILES:"
+      if (( ${#chunk[@]} > 0 )); then
         printf ' - %s\n' "${chunk[@]}"
-        echo
-        echo "OUTPUT:"
-        echo "1) Apply the fix directly to the workspace files above (no confirmations)."
-        echo "2) Append a short Markdown section '### Batch ${batch} (Pass ${pass})' to $log summarizing:"
-        echo "   - what was broken,"
-        echo "   - how you fixed it (1–3 bullets),"
-        echo "   - any follow-ups as TODOs."
-      } > "$pf"
-
-      # Run Codex
-      local run_log="$LOG_DIR/$(slugify "$subdir")/pass${pass}-batch${batch}.log"
-      mkdir -p "$(dirname "$run_log")"
-      local cmd=(codex exec --full-auto -s workspace-write -c 'approval_policy="never"')
-      (( EXEC_TIMEOUT > 0 )) && cmd+=(--timeout "$EXEC_TIMEOUT")
-      if [[ "$VERBOSE" == "true" ]]; then
-        echo "[codex][$subdir][pass $pass][batch $batch] starting…"
-        "${cmd[@]}" -- "$(cat "$pf")" 2>&1 | tee -a "$run_log" || true
       else
-        "${cmd[@]}" -- "$(cat "$pf")" >"$run_log" 2>&1 || true
+        echo " - (no seeded focus files; explore within '$subdir')"
       fi
+      echo
+      echo "OUTPUT:"
+      echo "1) Apply the fix directly to the workspace files above (no confirmations)."
+      echo "2) Append a short section '### Batch ${batch} (Pass ${pass})' to $log summarizing:"
+      echo "   - what was broken,"
+      echo "   - how you fixed it (1–3 bullets),"
+      echo "   - any follow-ups as TODOs."
+    } > "$pf"
 
-      batch=$((batch+1))
-    done
+    local run_log="$LOG_DIR/$(slugify "$subdir")/pass${pass}-batch${batch}.log"
+    mkdir -p "$(dirname "$run_log")"
+    local cmd=(codex exec --full-auto -s workspace-write -c 'approval_policy="never"')
+    if [[ "$VERBOSE" == "true" ]]; then
+      echo "[codex][$subdir][pass $pass][batch $batch] starting…"
+      "${cmd[@]}" -- "$(cat "$pf")" 2>&1 | tee -a "$run_log" || true
+    else
+      "${cmd[@]}" -- "$(cat "$pf")" >"$run_log" 2>&1 || true
+    fi
+
+    if (( focus_count > 0 && files_len > 0 )); then
+      offset=$(( (offset + focus_count) % files_len ))
+    fi
 
     # Optional local gates (never fail the script)
     command -v ruff  >/dev/null && ruff check --fix "$subdir" || true
