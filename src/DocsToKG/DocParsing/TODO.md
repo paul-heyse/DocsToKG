@@ -160,7 +160,7 @@ Files: `planning.py`, `discovery.py`, `runner.py`, `manifest.py`, `manifest_sink
   - [ ] Batching: expose helper to compute lengths from metadata to avoid pre-materializing when not needed.
   - [ ] Concurrency: add atomic write pattern (write to temp file + fsync + rename) to `safe_write`; preserve current behavior under flag.
   - [ ] Concurrency: include `log_event` on lock acquisition and contention (with wait duration) for observability.
-  - [ ] Concurrency: add option to keep `.lock` files on failure for forensics.
+  - [x] Concurrency: add option to keep `.lock` files on failure for forensics.
 
 - Tests:
   - [ ] Runner: budget exhaustion aborts promptly; counts consistent; after_stage invoked once.

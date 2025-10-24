@@ -32,6 +32,40 @@ core_pkg.__path__ = [str(CORE_DIR)]
 
 logging_stub = types.ModuleType("DocsToKG.DocParsing.logging")
 
+filelock_stub = types.ModuleType("filelock")
+
+
+class _StubTimeout(Exception):
+    """Stub Timeout exception matching filelock's API."""
+
+
+class _StubFileLock:
+    """Minimal FileLock stub that serialises access via sentinel files."""
+
+    def __init__(self, path: str) -> None:
+        self._path = Path(path)
+        self._acquired = False
+
+    def acquire(self, timeout: float | None = None) -> None:  # noqa: D401 - parity with filelock
+        """Acquire the stub lock by creating the sentinel."""
+
+        del timeout
+        self._path.touch(exist_ok=True)
+        self._acquired = True
+
+    def release(self) -> None:
+        """Release the stub lock by removing the sentinel."""
+
+        if not self._acquired:
+            raise RuntimeError("Lock not acquired")
+        self._path.unlink(missing_ok=True)
+        self._acquired = False
+
+
+filelock_stub.FileLock = _StubFileLock
+filelock_stub.Timeout = _StubTimeout
+sys.modules.setdefault("filelock", filelock_stub)
+
 
 def _get_logger(name: str, base_fields: dict[str, object] | None = None) -> logging.Logger:
     return logging.getLogger(name)
@@ -120,6 +154,63 @@ def test_safe_write_retain_lock(monkeypatch: pytest.MonkeyPatch, tmp_path: Path)
     assert wrote
     assert lock_path.exists()
     assert target.read_text(encoding="utf-8") == "second"
+
+
+def test_safe_write_retain_lock_on_error_env(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Retain lock sentinels on failure when env flag is enabled."""
+
+    monkeypatch.setenv("DOCSTOKG_RETAIN_LOCK_FILES_ON_ERROR", "true")
+    target = tmp_path / "forensic.txt"
+
+    def _write_then_fail(path: Path) -> None:
+        path.write_text("partial", encoding="utf-8")
+        raise RuntimeError("boom")
+
+    with pytest.raises(RuntimeError):
+        safe_write(target, _write_then_fail, skip_if_exists=False, atomic=False)
+
+    lock_path = target.with_suffix(target.suffix + ".lock")
+    assert lock_path.exists()
+
+
+def test_safe_write_retain_lock_on_error_kwarg(tmp_path: Path) -> None:
+    """Keyword argument retains lock files on exceptions only."""
+
+    target = tmp_path / "forensic_kwarg.txt"
+
+    def _write_then_fail(path: Path) -> None:
+        path.write_text("partial", encoding="utf-8")
+        raise RuntimeError("boom")
+
+    with pytest.raises(RuntimeError):
+        safe_write(
+            target,
+            _write_then_fail,
+            skip_if_exists=False,
+            atomic=False,
+            retain_lock_on_error=True,
+        )
+
+    lock_path = target.with_suffix(target.suffix + ".lock")
+    assert lock_path.exists()
+
+    lock_path.unlink()
+
+    def _write_success(path: Path) -> None:
+        path.write_text("ok", encoding="utf-8")
+
+    wrote = safe_write(
+        target,
+        _write_success,
+        skip_if_exists=False,
+        atomic=False,
+        retain_lock_on_error=True,
+    )
+
+    assert wrote
+    assert not lock_path.exists()
 
 
 def test_safe_write_atomic_requires_path(

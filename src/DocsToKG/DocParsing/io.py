@@ -293,12 +293,27 @@ _MANIFEST_TAIL_BYTES_PER_ENTRY = 4096
 _HASH_ALGORITHMS_AVAILABLE: frozenset[str] | None = None
 _HASH_ALGORITHM_SELECTION_CACHE: dict[tuple[str | None, str | None], tuple[str | None, str]] = {}
 _RETAIN_LOCKS_ENV = "DOCSTOKG_RETAIN_LOCK_FILES"
+_RETAIN_LOCKS_ON_ERROR_ENV = "DOCSTOKG_RETAIN_LOCK_FILES_ON_ERROR"
 
 
 def _should_retain_lock_files() -> bool:
     """Return True when ``.lock`` sentinels should remain after release."""
 
     value = os.getenv(_RETAIN_LOCKS_ENV)
+    if value is None:
+        return False
+    text = value.strip().lower()
+    if text in {"1", "true", "t", "yes", "y", "on"}:
+        return True
+    if text in {"0", "false", "f", "no", "n", "off"}:
+        return False
+    return False
+
+
+def _should_retain_lock_files_on_error() -> bool:
+    """Return True when ``.lock`` sentinels should remain on failure."""
+
+    value = os.getenv(_RETAIN_LOCKS_ON_ERROR_ENV)
     if value is None:
         return False
     text = value.strip().lower()
@@ -341,8 +356,11 @@ class JsonlWriter:
         lock_path = Path(f"{path}.lock")
         lock_path.parent.mkdir(parents=True, exist_ok=True)
         lock = FileLock(str(lock_path))
+        encountered_error = False
+        acquired = False
         try:
             lock.acquire(timeout=self.lock_timeout_s)
+            acquired = True
             # Delegate to the existing atomic append path.
             return jsonl_append_iter(path, rows, atomic=True)
         except Timeout as e:
@@ -350,13 +368,20 @@ class JsonlWriter:
                 f"Timed out acquiring lock {lock_path} after {self.lock_timeout_s}s "
                 f"while appending to {path}. Another writer may be stalled."
             ) from e
+        except Exception:
+            if acquired:
+                encountered_error = True
+            raise
         finally:
-            try:
-                lock.release()
-            except Exception:
-                # Best-effort; FileLock cleans up on process exit as well.
-                pass
-            if _should_retain_lock_files():
+            if acquired:
+                try:
+                    lock.release()
+                except Exception:
+                    # Best-effort; FileLock cleans up on process exit as well.
+                    pass
+            if _should_retain_lock_files() or (
+                _should_retain_lock_files_on_error() and encountered_error
+            ):
                 with contextlib.suppress(OSError):
                     lock_path.touch(exist_ok=True)
             else:
