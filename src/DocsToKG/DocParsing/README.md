@@ -150,6 +150,10 @@ direnv exec . python -m DocsToKG.DocParsing.core.cli plan-diff --lock-output bas
   etc.). Larger plans keep the counts accurate while truncating previews with a
   `... (+N more)` suffix so operators can gauge scale without loading thousands
   of identifiers.
+- `--output json` returns a machine-friendly payload with per-stage bucket
+  counts, previews, and path metadata. Use this when integrating DocParsing
+  planning into orchestration tooling or dashboards (`pretty` remains the
+  default human-readable mode).
 
 ## Folder map
 
