@@ -74,6 +74,7 @@ computing plan hashes used by dry-run workflows.
 from __future__ import annotations
 
 import sys
+import json
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, TextIO
@@ -162,6 +163,104 @@ def _render_preview(preview: list[str], count: int) -> str:
     if remainder:
         items.append(f"... (+{remainder} more)")
     return ", ".join(items)
+
+
+def _extract_bucket(entry: Mapping[str, Any], key: str) -> dict[str, Any]:
+    """Return a JSON-ready bucket summary for ``key`` within ``entry``."""
+
+    value = entry.get(key)
+    if isinstance(value, Mapping):
+        count = int(value.get("count", 0))
+        preview_source = value.get("preview", [])
+        if isinstance(preview_source, (list, tuple)):
+            preview = [str(item) for item in preview_source[:PLAN_PREVIEW_LIMIT]]
+        else:
+            preview = []
+    elif isinstance(value, (list, tuple)):
+        preview = [str(item) for item in value[:PLAN_PREVIEW_LIMIT]]
+        count = len(value)
+    else:
+        preview = []
+        count = 0
+    return {"count": count, "preview": preview}
+
+
+def _serialize_stage(entry: dict[str, Any]) -> dict[str, Any]:
+    """Convert a raw plan entry to a stable JSON payload."""
+
+    stage_name = str(entry.get("stage", "unknown"))
+    payload: dict[str, Any] = {"stage": stage_name}
+    action = entry.get("action")
+    if action:
+        payload["action"] = action
+    mode = entry.get("mode")
+    if mode:
+        payload["mode"] = mode
+
+    path_aliases = {
+        "input_dir": "input",
+        "output_dir": "output",
+        "chunks_dir": "chunks",
+        "vectors_dir": "vectors",
+    }
+    paths: dict[str, str] = {}
+    for key, alias in path_aliases.items():
+        path_value = entry.get(key)
+        if path_value:
+            paths[alias] = str(path_value)
+    if paths:
+        payload["paths"] = paths
+
+    log_level = entry.get("log_level")
+    if log_level:
+        payload["log_level"] = log_level
+
+    vector_format = entry.get("vector_format")
+    if vector_format:
+        payload["vector_format"] = vector_format
+
+    buckets: dict[str, Any] = {}
+    for bucket_name in ("process", "skip", "validate", "missing"):
+        bucket = _extract_bucket(entry, bucket_name)
+        if bucket["count"] or bucket["preview"]:
+            buckets[bucket_name] = bucket
+    if buckets:
+        payload["buckets"] = buckets
+
+    notes = entry.get("notes", [])
+    payload["notes"] = [str(note) for note in notes] if notes else []
+
+    return payload
+
+
+def _aggregate_totals(stages: Sequence[Mapping[str, Any]]) -> dict[str, dict[str, int]]:
+    """Compute bucket totals for each stage."""
+
+    totals: dict[str, dict[str, int]] = {}
+    for stage in stages:
+        stage_name = str(stage.get("stage", "unknown"))
+        buckets = stage.get("buckets", {})
+        if not isinstance(buckets, Mapping):
+            continue
+        stage_totals: dict[str, int] = {}
+        for bucket_name, bucket in buckets.items():
+            if isinstance(bucket, Mapping):
+                stage_totals[bucket_name] = int(bucket.get("count", 0))
+        if stage_totals:
+            totals[stage_name] = stage_totals
+    return totals
+
+
+def _serialize_plans(plans: Sequence[dict[str, Any]]) -> dict[str, Any]:
+    """Return the structured JSON payload for ``plans``."""
+
+    stages = [_serialize_stage(entry) for entry in plans]
+    return {
+        "docparse": {
+            "stages": stages,
+            "totals": _aggregate_totals(stages),
+        }
+    }
 
 
 __all__ = [
@@ -521,8 +620,23 @@ def plan_embed(argv: Sequence[str]) -> dict[str, Any]:
     }
 
 
-def display_plan(plans: Sequence[dict[str, Any]], stream: TextIO | None = None) -> list[str]:
-    """Pretty-print plan summaries and return the rendered lines."""
+def display_plan(
+    plans: Sequence[dict[str, Any]],
+    stream: TextIO | None = None,
+    *,
+    output_mode: str = "pretty",
+) -> list[str]:
+    """Render ``plans`` according to ``output_mode`` and return the emitted lines."""
+
+    output = stream or sys.stdout
+    normalized_mode = (output_mode or "pretty").lower()
+    if normalized_mode == "json":
+        payload = _serialize_plans(plans)
+        json_payload = json.dumps(payload, indent=2, sort_keys=True)
+        print(json_payload, file=output)
+        return [json_payload]
+    if normalized_mode != "pretty":
+        raise ValueError(f"Unsupported output mode: {output_mode}")
 
     lines: list[str] = ["docparse all plan"]
     for entry in plans:
@@ -591,7 +705,6 @@ def display_plan(plans: Sequence[dict[str, Any]], stream: TextIO | None = None) 
             lines.append("  notes: " + "; ".join(notes))
     lines.append("")
 
-    output = stream or sys.stdout
     for line in lines:
         print(line, file=output)
     return lines
