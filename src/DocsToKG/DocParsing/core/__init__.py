@@ -111,6 +111,7 @@ from .discovery import (
 )
 from .http import DEFAULT_HTTP_TIMEOUT, get_http_session, normalize_http_timeout
 from .manifest import ResumeController, should_skip_output
+from .paths import normalize_output_path
 from .models import (
     DEFAULT_SERIALIZER_PROVIDER,
     DEFAULT_TOKENIZER,
@@ -181,6 +182,7 @@ __all__ = [
     "compute_stable_shard",
     "vector_artifact_name",
     "should_skip_output",
+    "normalize_output_path",
     "relative_path",
     "init_hf_env",
     "ensure_model_environment",

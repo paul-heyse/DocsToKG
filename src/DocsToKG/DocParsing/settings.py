@@ -167,7 +167,7 @@
 Unified Pydantic v2 Settings for DocParsing configuration management.
 
 This module provides typed, reproducible settings for all DocParsing stages
-using Pydantic v2 BaseSettings with consistent ENV prefix (DOCSTOKG_) and
+using Pydantic v2 BaseSettings with a consistent ENV prefix (``DOCSTOKG_``) and
 field validators. The models support layering (CLI > ENV > profile > defaults)
 and provide clear separation of concerns across stages.
 
@@ -336,6 +336,13 @@ class AppCfg(BaseSettings):
         description=(
             "Glob patterns ignored during discovery (use !pattern to drop defaults)."
         ),
+    atomic_writes: bool = Field(
+        False,
+        description="Write outputs via temporary files and atomic os.replace",
+    )
+    retain_lock_files: bool = Field(
+        False,
+        description="Retain .lock sentinels after releasing FileLock handles",
     )
 
     @field_validator("data_root", "manifests_root", "models_root", "log_dir", mode="before")

@@ -379,7 +379,7 @@ from DocsToKG.DocParsing.core import (
     run_stage,
     set_spawn_or_warn,
 )
-from DocsToKG.DocParsing.core.concurrency import _acquire_lock
+from DocsToKG.DocParsing.core.concurrency import safe_write
 from DocsToKG.DocParsing.env import (
     PDF_MODEL_SUBDIR,
     data_doctags,
@@ -793,12 +793,20 @@ def _make_pdf_stage_hooks(
             stage_logger,
             "info",
             "DocTags PDF summary",
+            planned=outcome.planned,
             scheduled=outcome.scheduled,
             succeeded=outcome.succeeded,
             failed=outcome.failed,
             skipped=total_skipped,
             cancelled=outcome.cancelled,
+            cancel_reason=outcome.cancelled_reason,
             wall_ms=round(outcome.wall_ms, 3),
+            queue_p50_ms=round(outcome.queue_p50_ms, 3),
+            queue_p95_ms=round(outcome.queue_p95_ms, 3),
+            exec_p50_ms=round(outcome.exec_p50_ms, 3),
+            exec_p95_ms=round(outcome.exec_p95_ms, 3),
+            exec_p99_ms=round(outcome.exec_p99_ms, 3),
+            cpu_time_total_ms=round(outcome.cpu_time_total_ms, 3),
             stage=MANIFEST_STAGE,
             doc_id="__summary__",
         )
@@ -1981,18 +1989,13 @@ def pdf_convert_one(task: PdfTask) -> PdfConversionResult:
                 error="empty-document",
             )
 
+        def _write_pdf_doctags(target_path: Path) -> None:
+            """Persist the DocTags payload to ``target_path``."""
+
+            result.document.save_as_doctags(target_path)
+
         try:
-            with _acquire_lock(out_path):
-                if out_path.exists():
-                    return PdfConversionResult(
-                        doc_id=task.doc_id,
-                        status="skip",
-                        duration_s=time.perf_counter() - start,
-                        input_path=str(pdf_path),
-                        input_hash=task.input_hash,
-                        output_path=str(out_path),
-                    )
-                result.document.save_as_doctags(out_path)
+            wrote = safe_write(out_path, _write_pdf_doctags, skip_if_exists=True)
         except TimeoutError as exc:
             return PdfConversionResult(
                 doc_id=task.doc_id,
@@ -2002,6 +2005,15 @@ def pdf_convert_one(task: PdfTask) -> PdfConversionResult:
                 input_hash=task.input_hash,
                 output_path=str(out_path),
                 error=str(exc),
+            )
+        if not wrote:
+            return PdfConversionResult(
+                doc_id=task.doc_id,
+                status="skip",
+                duration_s=time.perf_counter() - start,
+                input_path=str(pdf_path),
+                input_hash=task.input_hash,
+                output_path=str(out_path),
             )
         return PdfConversionResult(
             doc_id=task.doc_id,
@@ -2324,6 +2336,10 @@ def pdf_main(args: argparse.Namespace | None = None, config_adapter=None) -> int
                             "ok": 0,
                             "skip": skip,
                             "fail": 0,
+                            "planned": 0,
+                            "scheduled": 0,
+                            "cancelled": False,
+                            "cancel_reason": None,
                         }
                     },
                 )
@@ -2341,6 +2357,7 @@ def pdf_main(args: argparse.Namespace | None = None, config_adapter=None) -> int
                 force=cfg.force,
                 diagnostics_interval_s=30.0,
                 dry_run=False,
+                resume_controller=resume_controller,
             )
 
             # Get stage hooks for lifecycle management
@@ -2359,9 +2376,17 @@ def pdf_main(args: argparse.Namespace | None = None, config_adapter=None) -> int
                         "ok": outcome.succeeded,
                         "skip": outcome.skipped,
                         "fail": outcome.failed,
+                        "planned": outcome.planned,
+                        "scheduled": outcome.scheduled,
+                        "cancelled": outcome.cancelled,
+                        "cancel_reason": outcome.cancelled_reason,
                         "total_wall_ms": outcome.wall_ms,
+                        "queue_p50_ms": outcome.queue_p50_ms,
+                        "queue_p95_ms": outcome.queue_p95_ms,
                         "exec_p50_ms": outcome.exec_p50_ms,
                         "exec_p95_ms": outcome.exec_p95_ms,
+                        "exec_p99_ms": outcome.exec_p99_ms,
+                        "cpu_time_total_ms": outcome.cpu_time_total_ms,
                     }
                 },
             )
@@ -2369,7 +2394,7 @@ def pdf_main(args: argparse.Namespace | None = None, config_adapter=None) -> int
             stop_vllm(proc, owns, grace=10)
             logger.info("All done")
 
-        return 0 if outcome.failed == 0 else 1
+        return 0 if outcome.failed == 0 and not outcome.cancelled else 1
 
 
 # --- HTML Pipeline ---
@@ -2796,29 +2821,18 @@ def html_convert_one(task: HtmlTask) -> HtmlConversionResult:
             )
 
         out_path.parent.mkdir(parents=True, exist_ok=True)
-        tmp_path = out_path.with_suffix(out_path.suffix + ".tmp")
-        # Serialize under a lock to avoid partial writes when workers race
+
+        def _write_html_doctags(target_path: Path) -> None:
+            """Persist HTML-derived DocTags to ``target_path``."""
+
+            result.document.save_as_doctags(target_path)
+
         try:
-            with _acquire_lock(out_path):
-                if out_path.exists() and not task.overwrite:
-                    return HtmlConversionResult(
-                        doc_id=task.relative_id,
-                        status="skip",
-                        duration_s=time.perf_counter() - start,
-                        input_path=str(task.html_path),
-                        input_hash=task.input_hash,
-                        output_path=str(out_path),
-                        sanitizer_profile=task.sanitizer_profile,
-                    )
-                result.document.save_as_doctags(tmp_path)
-                try:
-                    tmp_path.replace(out_path)
-                finally:
-                    if tmp_path.exists():
-                        try:
-                            tmp_path.unlink()
-                        except Exception:
-                            pass
+            wrote = safe_write(
+                out_path,
+                _write_html_doctags,
+                skip_if_exists=not task.overwrite,
+            )
         except TimeoutError as exc:
             return HtmlConversionResult(
                 doc_id=task.relative_id,
@@ -2828,6 +2842,16 @@ def html_convert_one(task: HtmlTask) -> HtmlConversionResult:
                 input_hash=task.input_hash,
                 output_path=str(out_path),
                 error=str(exc),
+                sanitizer_profile=task.sanitizer_profile,
+            )
+        if not wrote:
+            return HtmlConversionResult(
+                doc_id=task.relative_id,
+                status="skip",
+                duration_s=time.perf_counter() - start,
+                input_path=str(task.html_path),
+                input_hash=task.input_hash,
+                output_path=str(out_path),
                 sanitizer_profile=task.sanitizer_profile,
             )
         return HtmlConversionResult(
@@ -3092,6 +3116,10 @@ def html_main(args: argparse.Namespace | None = None, config_adapter=None) -> in
                         "ok": 0,
                         "skip": skip,
                         "fail": 0,
+                        "planned": 0,
+                        "scheduled": 0,
+                        "cancelled": False,
+                        "cancel_reason": None,
                     }
                 },
             )
@@ -3110,6 +3138,7 @@ def html_main(args: argparse.Namespace | None = None, config_adapter=None) -> in
                 force=cfg.force,
                 diagnostics_interval_s=30.0,
                 dry_run=False,
+                resume_controller=resume_controller,
             )
 
             # Get stage hooks for lifecycle management
@@ -3129,14 +3158,22 @@ def html_main(args: argparse.Namespace | None = None, config_adapter=None) -> in
                     "ok": outcome.succeeded,
                     "skip": outcome.skipped,
                     "fail": outcome.failed,
+                    "planned": outcome.planned,
+                    "scheduled": outcome.scheduled,
+                    "cancelled": outcome.cancelled,
+                    "cancel_reason": outcome.cancelled_reason,
                     "total_wall_ms": outcome.wall_ms,
+                    "queue_p50_ms": outcome.queue_p50_ms,
+                    "queue_p95_ms": outcome.queue_p95_ms,
                     "exec_p50_ms": outcome.exec_p50_ms,
                     "exec_p95_ms": outcome.exec_p95_ms,
+                    "exec_p99_ms": outcome.exec_p99_ms,
+                    "cpu_time_total_ms": outcome.cpu_time_total_ms,
                 }
             },
         )
 
-        return 0 if outcome.failed == 0 else 1
+        return 0 if outcome.failed == 0 and not outcome.cancelled else 1
 
 
 # --- Docling Test Stubs ---

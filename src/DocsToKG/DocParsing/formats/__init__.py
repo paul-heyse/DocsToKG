@@ -300,13 +300,13 @@ __all__ = [
 class ProvenanceMetadata(BaseModel):
     """Stores provenance metadata extracted during chunk parsing.
 
-    Attributes:
-        parse_engine: Parser identifier such as ``"docling-html"`` or ``"docling-vlm"``.
-        docling_version: Installed Docling package version string.
-        has_image_captions: Flag indicating whether caption text accompanies the chunk.
-        has_image_classification: Flag indicating whether image classification labels exist.
-        num_images: Count of images referenced by the chunk.
-        image_confidence: Optional confidence score associated with image annotations.
+    Key fields:
+    - ``parse_engine``: Parser identifier such as ``"docling-html"`` or ``"docling-vlm"``.
+    - ``docling_version``: Installed Docling package version string.
+    - ``has_image_captions``: Flag signalling caption text accompanies the chunk.
+    - ``has_image_classification``: Flag signalling image classification labels exist.
+    - ``num_images``: Count of images referenced by the chunk.
+    - ``image_confidence``: Optional confidence score associated with image annotations.
 
     Examples:
         >>> ProvenanceMetadata(parse_engine="docling-html", docling_version="1.2.3")
@@ -356,23 +356,21 @@ class ProvenanceMetadata(BaseModel):
 class ChunkRow(BaseModel):
     """Schema for chunk JSONL rows describing processed document segments.
 
-    Attributes:
-        doc_id: Document identifier shared across chunk rows.
-        source_path: Path to the originating DocTags file.
-        chunk_id: Sequential chunk index within the document.
-        source_chunk_idxs: Original chunk indices prior to coalescence.
-        num_tokens: Token count for the chunk's text body.
-        text: Extracted text for the chunk.
-        doc_items_refs: References to downstream document item metadata.
-        page_nos: List of 1-based page numbers touched by the chunk.
-        schema_version: Version identifier for the chunk schema.
-        start_offset: Character offset of the chunk text within the source document.
-        provenance: Optional provenance metadata describing parsing context.
-        uuid: Optional stable identifier for the chunk.
-        has_image_captions: Optional duplicate of provenance flag for convenience.
-        has_image_classification: Optional duplicate of provenance flag for convenience.
-        num_images: Optional duplicate of provenance image count for convenience.
-        image_confidence: Optional duplicate of provenance image confidence for convenience.
+    Records metadata such as:
+    - ``doc_id``: Document identifier shared across chunk rows.
+    - ``source_path``: Path to the originating DocTags file.
+    - ``chunk_id``: Sequential chunk index within the document.
+    - ``source_chunk_idxs``: Original chunk indices prior to coalescence.
+    - ``num_tokens``: Token count for the chunk's text body.
+    - ``text``: Extracted text for the chunk.
+    - ``doc_items_refs``: References to downstream document item metadata.
+    - ``page_nos``: List of 1-based page numbers touched by the chunk.
+    - ``schema_version``: Version identifier for the chunk schema.
+    - ``start_offset``: Character offset of the chunk text within the source document.
+    - ``provenance``: Optional provenance metadata describing parsing context.
+    - ``uuid``: Optional stable identifier for the chunk.
+    - ``has_image_captions`` / ``has_image_classification``: Convenience duplicates of provenance flags.
+    - ``num_images`` / ``image_confidence``: Image metadata mirrors.
 
     Examples:
         >>> chunk = ChunkRow(
@@ -492,13 +490,12 @@ class ChunkRow(BaseModel):
 class BM25Vector(BaseModel):
     """Encapsulates BM25 sparse vector statistics for a chunk.
 
-    Attributes:
-        terms: Token vocabulary used in the sparse representation.
-        weights: BM25 weight assigned to each token.
-        k1: Tunable BM25 parameter controlling term frequency saturation.
-        b: Tunable BM25 parameter controlling length normalisation.
-        avgdl: Average document length across the source corpus.
-        N: Total document count in the source corpus.
+    Captures:
+    - ``terms``: Token vocabulary used in the sparse representation.
+    - ``weights``: BM25 weight assigned to each token.
+    - ``k1`` / ``b``: Tunable BM25 parameters controlling saturation and length normalisation.
+    - ``avgdl``: Average document length across the source corpus.
+    - ``N``: Total document count in the source corpus.
 
     Examples:
         >>> BM25Vector(terms=["doc"], weights=[1.2], avgdl=100.0, N=10)
@@ -533,10 +530,10 @@ class BM25Vector(BaseModel):
 class SPLADEVector(BaseModel):
     """Represents a SPLADE-v3 sparse activation vector.
 
-    Attributes:
-        model_id: Identifier of the SPLADE model that produced the vector.
-        tokens: Token vocabulary included in the activation map.
-        weights: Normalised activation weight for each token.
+    Stores:
+    - ``model_id``: Identifier of the SPLADE model that produced the vector.
+    - ``tokens``: Token vocabulary included in the activation map.
+    - ``weights``: Normalised activation weight for each token.
 
     Examples:
         >>> SPLADEVector(tokens=["term"], weights=[0.5])
@@ -570,10 +567,10 @@ class SPLADEVector(BaseModel):
 class DenseVector(BaseModel):
     """Stores dense embedding output from a neural encoder.
 
-    Attributes:
-        model_id: Identifier for the originating embedding model.
-        vector: Vector of numeric embedding values.
-        dimension: Expected dimensionality for the vector, if known.
+    Fields include:
+    - ``model_id``: Identifier for the originating embedding model.
+    - ``vector``: Numeric embedding values.
+    - ``dimension``: Expected dimensionality for the vector, if known.
 
     Examples:
         >>> DenseVector(model_id="encoder", vector=[0.1, 0.2], dimension=2)
@@ -623,13 +620,13 @@ class DenseVector(BaseModel):
 class VectorRow(BaseModel):
     """Schema for vector JSONL rows storing embedding artefacts.
 
-    Attributes:
-        UUID: Stable chunk identifier referenced by vector data.
-        BM25: Sparse BM25 representation for lexical retrieval.
-        SPLADEv3: SPLADE sparse activations supporting neural lexical search.
-        Qwen3_4B: Dense embedding produced by the Qwen3-4B encoder.
-        model_metadata: Additional metadata describing embedding provenance.
-        schema_version: Version identifier for the vector schema.
+    Key fields:
+    - ``UUID``: Stable chunk identifier referenced by vector data.
+    - ``BM25``: Sparse BM25 representation for lexical retrieval.
+    - ``SPLADEv3``: SPLADE sparse activations supporting neural lexical search.
+    - ``Qwen3_4B``: Dense embedding produced by the Qwen3-4B encoder.
+    - ``model_metadata``: Additional metadata describing embedding provenance.
+    - ``schema_version``: Version identifier for the vector schema.
 
     Examples:
         >>> vector = VectorRow(
@@ -782,8 +779,7 @@ def get_docling_version() -> str:
 class CaptionPlusAnnotationPictureSerializer(MarkdownPictureSerializer):
     """Serialize picture items with captions and rich annotation metadata.
 
-    Attributes:
-        image_placeholder: Fallback marker inserted when an image lacks metadata.
+    Provides ``image_placeholder`` defaults when pictures lack metadata.
 
     Examples:
         >>> serializer = CaptionPlusAnnotationPictureSerializer()
@@ -947,8 +943,7 @@ class CaptionPlusAnnotationPictureSerializer(MarkdownPictureSerializer):
 class RichSerializerProvider(ChunkingSerializerProvider):
     """Provide a serializer that augments tables and pictures with Markdown.
 
-    Attributes:
-        markdown_params: Default Markdown parameters passed to serializers.
+    Holds ``markdown_params`` defaults passed to serializers.
 
     Examples:
         >>> provider = RichSerializerProvider()

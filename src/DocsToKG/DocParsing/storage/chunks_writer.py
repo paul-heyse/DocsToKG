@@ -24,11 +24,13 @@ Atomic Parquet Writer for Chunks
 
 Encapsulates write logic for Chunks Parquet datasets with:
 - Schema validation and enforcement
-- Atomic writes (temp → fsync → rename) for safe concurrent access
-  * Write to temporary file in same directory
-  * Fsync to ensure durability
-  * Atomic rename to final destination (no explicit locking needed; rename is atomic at OS level)
-  * Concurrent readers are safe via temp-file pattern
+- Atomic writes (temp → fsync → rename) for safe concurrent access:
+
+  - Write to a temporary file in the same directory.
+  - Fsync to ensure durability.
+  - Atomically rename to the final destination (rename is atomic at the OS level).
+  - Concurrent readers remain safe thanks to the temp-file pattern.
+
 - Batched row accumulation to control memory
 - Parquet footer metadata for provenance
 - Deterministic span hashing for reproducible chunks
