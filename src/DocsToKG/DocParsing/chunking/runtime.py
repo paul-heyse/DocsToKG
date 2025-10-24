@@ -326,6 +326,7 @@ from DocsToKG.DocParsing.core import (
     StageOptions,
     StageOutcome,
     StagePlan,
+    ResumeController,
     WorkItem,
     compute_relative_doc_id,
     compute_stable_shard,
@@ -2089,6 +2090,12 @@ def _main_inner(
         set_spawn_or_warn(logger)
 
         hash_alg = resolve_hash_algorithm()
+        chunk_manifest_index = (
+            load_manifest_index(MANIFEST_STAGE, resolved_data_root) if args.resume else {}
+        )
+        resume_controller = ResumeController(
+            bool(args.resume), bool(args.force), chunk_manifest_index
+        )
         manifest_lookup: dict[str, Mapping[str, Any]] = dict(html_manifest_index)
         manifest_lookup.update(pdf_manifest_index)
         plan = _build_chunk_plan(
@@ -2110,6 +2117,7 @@ def _main_inner(
             resume=bool(args.resume),
             force=bool(args.force),
             diagnostics_interval_s=15.0,
+            resume_controller=resume_controller,
         )
 
         outcome = run_stage(plan, _chunk_stage_worker, options, hooks)

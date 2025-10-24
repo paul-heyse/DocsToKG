@@ -71,7 +71,11 @@ def should_skip_output(
 
 @dataclass(slots=True)
 class ResumeController:
-    """Centralize resume/force decisions using manifest metadata."""
+    """Centralize resume/force decisions using manifest metadata.
+
+    Stage adapters attach instances to :class:`DocsToKG.DocParsing.core.runner.StageOptions`
+    so the runner can query :meth:`should_skip` before scheduling work items.
+    """
 
     resume: bool
     force: bool

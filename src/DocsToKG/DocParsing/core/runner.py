@@ -136,9 +136,9 @@ from concurrent.futures import FIRST_COMPLETED, Future, wait
 from concurrent.futures import TimeoutError as FutureTimeoutError
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import (
-    Any,
-)
+from typing import Any
+
+from DocsToKG.DocParsing.core.manifest import ResumeController
 
 from DocsToKG.concurrency.executors import create_executor
 from DocsToKG.DocParsing.logging import get_logger, log_event
@@ -247,6 +247,7 @@ class StageOptions:
     diagnostics_interval_s: float = 30.0
     seed: int | None = None
     dry_run: bool = False
+    resume_controller: ResumeController | None = None
 
 
 @dataclass(slots=True)
@@ -367,23 +368,38 @@ def _call_worker(worker: Callable[[WorkItem], ItemOutcome], item: WorkItem) -> _
 
 
 def _should_skip(item: WorkItem, options: StageOptions) -> bool:
-    """Return ``True`` when resume semantics allow skipping ``item``."""
+    """Return ``True`` when resume manifests allow skipping ``item``.
+
+    The runner delegates skip decisions to :class:`ResumeController`, which
+    compares the manifest metadata associated with ``item`` against the
+    recorded input hash. Stage adapters are responsible for attaching the
+    controller to :class:`StageOptions` and populating ``item.metadata`` with
+    the ``input_hash`` and resolved output path so the check can be performed
+    without touching the worker implementation.
+    """
 
     if options.force or not options.resume:
         return False
 
-    for path in item.outputs.values():
-        try:
-            stat = Path(path).stat()
-            if stat.st_size <= 0:
-                return False
-        except FileNotFoundError:
-            return False
-
-    fingerprint = item.fingerprint
-    if fingerprint is None:
+    controller = options.resume_controller
+    if controller is None:
         return False
-    return fingerprint.matches()
+
+    metadata = item.metadata
+    output_candidate = metadata.get("resume_output_path") or metadata.get("output_path")
+    if output_candidate is None:
+        try:
+            output_candidate = next(iter(item.outputs.values()))
+        except StopIteration:
+            return False
+    output_path = Path(output_candidate)
+
+    if not output_path.exists():
+        return False
+
+    input_hash = str(metadata.get("input_hash", ""))
+    skip, _ = controller.should_skip(item.item_id, output_path, input_hash)
+    return skip
 
 
 def _apply_backoff(base: float, attempt: int) -> float:
