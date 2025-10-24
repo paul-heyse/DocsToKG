@@ -53,9 +53,12 @@ import re
 import threading
 import time
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from contextlib import suppress
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
+
+from typing import Any
 
 import httpx
 from tenacity import (
@@ -67,16 +70,131 @@ from tenacity import (
 )
 from tenacity.wait import wait_base
 
+@dataclass(frozen=True)
+class _RetryConfig:
+    """Immutable retry policy configuration."""
+
+    retry_total: int
+    retry_backoff: float
+    status_forcelist: tuple[int, ...]
+    allowed_methods: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class RetryOverrides:
+    """Field-level overrides for retry policy configuration."""
+
+    retry_total: int | None = None
+    retry_backoff: float | None = None
+    status_forcelist: Sequence[int] | None = None
+    allowed_methods: Sequence[str] | None = None
+
+
+def _normalize_status_codes(status_codes: Sequence[int]) -> tuple[int, ...]:
+    normalized: list[int] = []
+    seen: set[int] = set()
+    for code in status_codes:
+        coerced = int(code)
+        if coerced not in seen:
+            seen.add(coerced)
+            normalized.append(coerced)
+    return tuple(sorted(normalized))
+
+
+def _normalize_methods(methods: Sequence[str]) -> tuple[str, ...]:
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for method in methods:
+        coerced = str(method).upper()
+        if coerced not in seen:
+            seen.add(coerced)
+            normalized.append(coerced)
+    return tuple(normalized)
+
+
+def _create_retry_config(
+    *,
+    retry_total: int,
+    retry_backoff: float,
+    status_forcelist: Sequence[int],
+    allowed_methods: Sequence[str],
+) -> _RetryConfig:
+    return _RetryConfig(
+        retry_total=max(0, int(retry_total)),
+        retry_backoff=max(float(retry_backoff), 0.0),
+        status_forcelist=_normalize_status_codes(status_forcelist),
+        allowed_methods=_normalize_methods(allowed_methods),
+    )
+
+
+def _coerce_overrides(
+    overrides: RetryOverrides | Mapping[str, object] | None,
+) -> RetryOverrides | None:
+    if overrides is None:
+        return None
+    if isinstance(overrides, RetryOverrides):
+        return overrides
+    if isinstance(overrides, Mapping):
+        recognized: dict[str, Any] = {}
+        for key in ("retry_total", "retry_backoff", "status_forcelist", "allowed_methods"):
+            if key in overrides:
+                recognized[key] = overrides[key]
+        return RetryOverrides(**recognized)
+    raise TypeError("retry overrides must be a RetryOverrides instance or mapping")
+
+
+def _merge_retry_config(
+    base: _RetryConfig,
+    overrides: RetryOverrides | Mapping[str, object] | None,
+) -> _RetryConfig:
+    override_obj = _coerce_overrides(overrides)
+    if override_obj is None:
+        return base
+
+    retry_total = base.retry_total
+    if override_obj.retry_total is not None:
+        retry_total = max(0, int(override_obj.retry_total))
+
+    retry_backoff = base.retry_backoff
+    if override_obj.retry_backoff is not None:
+        retry_backoff = max(float(override_obj.retry_backoff), 0.0)
+
+    status_forcelist = base.status_forcelist
+    if override_obj.status_forcelist is not None:
+        status_forcelist = _normalize_status_codes(override_obj.status_forcelist)
+
+    allowed_methods = base.allowed_methods
+    if override_obj.allowed_methods is not None:
+        allowed_methods = _normalize_methods(override_obj.allowed_methods)
+
+    return _RetryConfig(
+        retry_total=retry_total,
+        retry_backoff=retry_backoff,
+        status_forcelist=status_forcelist,
+        allowed_methods=allowed_methods,
+    )
+
+
 DEFAULT_HTTP_TIMEOUT: tuple[float, float] = (5.0, 30.0)
+
+_DEFAULT_RETRY_CONFIG = _create_retry_config(
+    retry_total=5,
+    retry_backoff=0.5,
+    status_forcelist=(429, 500, 502, 503, 504),
+    allowed_methods=("GET", "HEAD", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"),
+)
 
 _HTTP_SESSION_LOCK = threading.Lock()
 _HTTP_SESSION: TenacityClient | None = None
 _HTTP_SESSION_TIMEOUT: tuple[float, float] = DEFAULT_HTTP_TIMEOUT
+_HTTP_SESSION_CONFIG: _RetryConfig | None = None
 
 __all__ = [
     "DEFAULT_HTTP_TIMEOUT",
     "get_http_session",
     "normalize_http_timeout",
+    "request_with_retries",
+    "RetryOverrides",
 ]
 
 
@@ -112,10 +230,17 @@ class TenacityClient(httpx.Client):
     ) -> None:
         timeout = self._coerce_timeout(DEFAULT_HTTP_TIMEOUT)
         super().__init__(timeout=timeout, follow_redirects=True)
-        self._retry_total = max(0, int(retry_total))
-        self._retry_backoff = float(retry_backoff)
-        self._status_forcelist = {int(code) for code in status_forcelist}
-        self._allowed_methods = {method.upper() for method in allowed_methods}
+        config = _create_retry_config(
+            retry_total=retry_total,
+            retry_backoff=retry_backoff,
+            status_forcelist=status_forcelist,
+            allowed_methods=allowed_methods,
+        )
+        self._retry_config = config
+        self._retry_total = config.retry_total
+        self._retry_backoff = config.retry_backoff
+        self._status_forcelist = set(config.status_forcelist)
+        self._allowed_methods = set(config.allowed_methods)
         self._retryable_exceptions = (
             httpx.TimeoutException,
             httpx.RequestError,
@@ -126,10 +251,10 @@ class TenacityClient(httpx.Client):
 
     def clone_with_headers(self, headers: Mapping[str, str]) -> TenacityClient:
         clone = TenacityClient(
-            retry_total=self._retry_total,
-            retry_backoff=self._retry_backoff,
-            status_forcelist=tuple(self._status_forcelist),
-            allowed_methods=tuple(self._allowed_methods),
+            retry_total=self._retry_config.retry_total,
+            retry_backoff=self._retry_config.retry_backoff,
+            status_forcelist=self._retry_config.status_forcelist,
+            allowed_methods=self._retry_config.allowed_methods,
         )
         clone._default_timeout = self._default_timeout
         clone.headers.update(self.headers)
@@ -157,13 +282,17 @@ class TenacityClient(httpx.Client):
         self.timeout = self._coerce_timeout(timeout)
 
     def request(self, method: str, url: str, **kwargs):
+        retry_override = kwargs.pop("retry_override", None)
         timeout = kwargs.get("timeout", self._default_timeout)
         kwargs["timeout"] = self._coerce_timeout(timeout)
 
-        if self._retry_total <= 0 or method.upper() not in self._allowed_methods:
+        base_config = self._retry_config
+        effective_config = _merge_retry_config(base_config, retry_override)
+        allowed_methods = {m.upper() for m in effective_config.allowed_methods}
+        if effective_config.retry_total <= 0 or method.upper() not in allowed_methods:
             return super().request(method, url, **kwargs)
 
-        retrying = self._build_retrying(method)
+        retrying = self._build_retrying(method, effective_config)
 
         def _send():
             response = super().request(method, url, **kwargs)
@@ -171,18 +300,24 @@ class TenacityClient(httpx.Client):
 
         return retrying(_send)
 
-    def _build_retrying(self, method: str) -> Retrying:
+    def _build_retrying(self, method: str, config: _RetryConfig) -> Retrying:
         retry_predicate = retry_if_exception_type(self._retryable_exceptions)
-        if self._status_forcelist:
+        status_forcelist = {int(code) for code in config.status_forcelist}
+        if status_forcelist:
             retry_predicate = retry_predicate | retry_if_result(
                 lambda response: isinstance(response, httpx.Response)
-                and response.status_code in self._status_forcelist
+                and response.status_code in status_forcelist
             )
 
+        wait_strategy = (
+            self._wait_strategy
+            if config.retry_backoff == self._retry_config.retry_backoff
+            else _RetryAfterWait(backoff_factor=config.retry_backoff)
+        )
         return Retrying(
             retry=retry_predicate,
-            wait=self._wait_strategy,
-            stop=stop_after_attempt(self._retry_total + 1),
+            wait=wait_strategy,
+            stop=stop_after_attempt(config.retry_total + 1),
             sleep=time.sleep,
             reraise=True,
             before_sleep=self._before_sleep,
@@ -332,33 +467,58 @@ def get_http_session(
     retry_backoff: float = 0.5,
     status_forcelist: Sequence[int] = (429, 500, 502, 503, 504),
     allowed_methods: Sequence[str] = ("GET", "HEAD", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"),
+    retry_override: RetryOverrides | Mapping[str, object] | None = None,
 ) -> tuple[TenacityClient, tuple[float, float]]:
     """Return a shared :class:`httpx.Client` configured with retries."""
 
     effective_timeout = normalize_http_timeout(timeout)
 
     with _HTTP_SESSION_LOCK:
-        global _HTTP_SESSION, _HTTP_SESSION_TIMEOUT
+        global _HTTP_SESSION, _HTTP_SESSION_TIMEOUT, _HTTP_SESSION_CONFIG
         if _HTTP_SESSION is None:
-            _HTTP_SESSION = TenacityClient(
+            base_config = _create_retry_config(
                 retry_total=retry_total,
                 retry_backoff=retry_backoff,
                 status_forcelist=status_forcelist,
                 allowed_methods=allowed_methods,
             )
+            _HTTP_SESSION = TenacityClient(
+                retry_total=base_config.retry_total,
+                retry_backoff=base_config.retry_backoff,
+                status_forcelist=base_config.status_forcelist,
+                allowed_methods=base_config.allowed_methods,
+            )
+            _HTTP_SESSION_CONFIG = base_config
             logging.getLogger(__name__).debug(
                 "Created Tenacity-backed DocParsing HTTP session",
                 extra={
                     "extra_fields": {
-                        "retry_total": retry_total,
-                        "retry_backoff": retry_backoff,
-                        "status_forcelist": [int(code) for code in status_forcelist],
-                        "allowed_methods": [method.upper() for method in allowed_methods],
+                        "retry_total": _HTTP_SESSION._retry_total,
+                        "retry_backoff": _HTTP_SESSION._retry_backoff,
+                        "status_forcelist": [int(code) for code in _HTTP_SESSION._status_forcelist],
+                        "allowed_methods": sorted(_HTTP_SESSION._allowed_methods),
                     }
                 },
             )
 
+        base_config = _HTTP_SESSION_CONFIG or _DEFAULT_RETRY_CONFIG
         session: TenacityClient = _HTTP_SESSION
+
+        effective_config = _merge_retry_config(base_config, retry_override)
+        if effective_config != base_config:
+            session = TenacityClient(
+                retry_total=effective_config.retry_total,
+                retry_backoff=effective_config.retry_backoff,
+                status_forcelist=effective_config.status_forcelist,
+                allowed_methods=effective_config.allowed_methods,
+            )
+            session.headers.update(_HTTP_SESSION.headers)
+            with suppress(Exception):
+                session.cookies.update(_HTTP_SESSION.cookies)  # type: ignore[arg-type]
+            session.auth = _HTTP_SESSION.auth
+            with suppress(Exception):
+                session.params.update(_HTTP_SESSION.params)  # type: ignore[arg-type]
+
         session._set_default_timeout(effective_timeout)
 
         if base_headers:
@@ -372,3 +532,38 @@ def get_http_session(
 
         _HTTP_SESSION_TIMEOUT = effective_timeout
         return session_to_return, _HTTP_SESSION_TIMEOUT
+
+
+def request_with_retries(
+    method: str,
+    url: str,
+    *,
+    session: TenacityClient | None = None,
+    timeout: object | None = None,
+    base_headers: Mapping[str, str] | None = None,
+    retry_override: RetryOverrides | Mapping[str, object] | None = None,
+    **kwargs: Any,
+) -> httpx.Response:
+    """Execute an HTTP request honouring the shared retry policy."""
+
+    if session is not None and base_headers:
+        raise ValueError("base_headers cannot be provided when session is supplied")
+
+    if session is None:
+        session, request_timeout = get_http_session(
+            timeout=timeout,
+            base_headers=base_headers,
+            retry_override=retry_override,
+        )
+        timeout_to_use = timeout if timeout is not None else request_timeout
+    else:
+        timeout_to_use = timeout
+
+    if timeout_to_use is not None:
+        kwargs.setdefault("timeout", timeout_to_use)
+
+    if retry_override is not None:
+        kwargs.setdefault("retry_override", retry_override)
+
+    response = session.request(method, url, **kwargs)
+    return response
