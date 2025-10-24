@@ -280,10 +280,12 @@ class StageOutcome:
     """Summary returned by :func:`run_stage`."""
 
     scheduled: int
+    planned: int
     skipped: int
     succeeded: int
     failed: int
     cancelled: bool
+    cancelled_reason: str | None
     wall_ms: float
     queue_p50_ms: float
     exec_p50_ms: float
@@ -454,6 +456,7 @@ def run_stage(
     succeeded = 0
     failed = 0
     cancelled = False
+    cancelled_reason: str | None = None
     queue_ms: list[float] = []
     exec_ms: list[float] = []
     errors: list[StageError] = []
@@ -498,16 +501,23 @@ def run_stage(
         wall_ms = (_now() - wall_start) * 1000.0
         outcome = StageOutcome(
             scheduled=0,
+            planned=total_to_run,
             skipped=skipped,
             succeeded=0,
             failed=0,
             cancelled=False,
+            cancelled_reason=None,
             wall_ms=wall_ms,
             queue_p50_ms=0.0,
             exec_p50_ms=0.0,
             exec_p95_ms=0.0,
             errors=tuple(),
         )
+        context.metadata["stage_planned_items"] = total_to_run
+        context.metadata["stage_scheduled_items"] = 0
+        context.metadata["stage_completed_items"] = skipped
+        context.metadata["stage_cancelled"] = False
+        context.metadata["stage_cancel_reason"] = None
         if hooks.after_stage:
             try:
                 hooks.after_stage(outcome, context)
@@ -744,6 +754,7 @@ def run_stage(
                 )
     except KeyboardInterrupt:  # pragma: no cover - interactive safety
         cancelled = True
+        cancelled_reason = "keyboard-interrupt"
         for future in list(pending.keys()):
             submission = pending.pop(future)
             future.cancel()
@@ -769,6 +780,7 @@ def run_stage(
                     )
     except _BudgetExceeded:
         cancelled = True
+        cancelled_reason = "error-budget"
         for future in list(pending.keys()):
             submission = pending.pop(future)
             future.cancel()
@@ -798,17 +810,25 @@ def run_stage(
 
     wall_ms = (_now() - wall_start) * 1000.0
     outcome = StageOutcome(
-        scheduled=total_to_run,
+        scheduled=scheduled,
+        planned=total_to_run,
         skipped=skipped,
         succeeded=succeeded,
         failed=failed,
         cancelled=cancelled,
+        cancelled_reason=cancelled_reason,
         wall_ms=wall_ms,
         queue_p50_ms=_percentile(queue_ms, 50.0),
         exec_p50_ms=_percentile(exec_ms, 50.0),
         exec_p95_ms=_percentile(exec_ms, 95.0),
         errors=tuple(errors),
     )
+
+    context.metadata["stage_planned_items"] = total_to_run
+    context.metadata["stage_scheduled_items"] = scheduled
+    context.metadata["stage_completed_items"] = succeeded + failed + skipped
+    context.metadata["stage_cancelled"] = cancelled
+    context.metadata["stage_cancel_reason"] = cancelled_reason
 
     if hooks.after_stage:
         try:

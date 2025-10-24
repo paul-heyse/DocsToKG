@@ -3227,11 +3227,13 @@ def _main_inner(args: argparse.Namespace | None = None, config_adapter=None) -> 
             "Embedding runner outcome",
             stage=EMBED_STAGE,
             doc_id="__system__",
+            planned=outcome.planned,
             scheduled=outcome.scheduled,
             succeeded=outcome.succeeded,
             failed=outcome.failed,
             skipped=outcome.skipped,
             cancelled=outcome.cancelled,
+            cancel_reason=outcome.cancelled_reason,
         )
         if outcome.failed > 0 or outcome.cancelled:
             return 1
