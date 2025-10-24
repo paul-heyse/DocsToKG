@@ -39,6 +39,8 @@ from typing import Any
 
 from pydantic import ValidationError
 
+from DocsToKG.DocParsing.core import discovery as discovery_utils
+
 from .profile_loader import ConfigLoadError, SettingsBuilder
 from .settings import (
     AppCfg,
@@ -80,6 +82,7 @@ def build_app_context(
     data_root: Path | None = None,
     log_level: str | None = None,
     log_format: str | None = None,
+    discovery_ignore: tuple[str, ...] | None = None,
     # Runner overrides
     workers: int | None = None,
     policy: str | None = None,
@@ -113,6 +116,7 @@ def build_app_context(
         data_root: Override global data root
         log_level: Override log level
         log_format: Override log format
+        discovery_ignore: Additional glob patterns ignored by discovery
         workers: Override runner workers
         policy: Override runner policy
         doctags_input_dir: Override doctags input
@@ -145,6 +149,8 @@ def build_app_context(
         cli_overrides.setdefault("app", {})["log_level"] = log_level
     if log_format is not None:
         cli_overrides.setdefault("app", {})["log_format"] = log_format
+    if discovery_ignore is not None:
+        cli_overrides.setdefault("app", {})["discovery_ignore"] = list(discovery_ignore)
 
     if workers is not None:
         cli_overrides.setdefault("runner", {})["workers"] = workers
@@ -253,13 +259,16 @@ def build_app_context(
     cfg_hashes = settings.compute_stage_hashes()
 
     # Build context
-    return AppContext(
+    context = AppContext(
         settings=settings,
         cfg_hashes=cfg_hashes,
         profile=profile,
         strict_config=strict_config,
         source_tracking=sources if track_sources else {},
     )
+
+    discovery_utils.configure_discovery_ignore(context.settings.app.discovery_ignore)
+    return context
 
 
 __all__ = [

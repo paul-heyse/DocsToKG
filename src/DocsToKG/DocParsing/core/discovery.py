@@ -92,8 +92,11 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Iterator
+import os
+import re
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
+from fnmatch import fnmatch
 from pathlib import Path
 
 from DocsToKG.DocParsing.config import load_toml_markers, load_yaml_markers
@@ -109,17 +112,39 @@ DEFAULT_CAPTION_MARKERS: tuple[str, ...] = (
 __all__ = [
     "DEFAULT_CAPTION_MARKERS",
     "DEFAULT_HEADING_MARKERS",
+    "DEFAULT_DISCOVERY_IGNORE",
     "ChunkDiscovery",
+    "configure_discovery_ignore",
     "compute_relative_doc_id",
     "compute_stable_shard",
+    "get_discovery_ignore_patterns",
     "derive_doc_id_and_chunks_path",
     "derive_doc_id_and_doctags_path",
     "derive_doc_id_and_vectors_path",
     "vector_artifact_name",
     "iter_chunks",
+    "parse_discovery_ignore",
+    "split_discovery_ignore",
     "load_structural_marker_config",
     "load_structural_marker_profile",
 ]
+
+
+DEFAULT_DISCOVERY_IGNORE: tuple[str, ...] = (
+    "__pycache__",
+    "tmp",
+    "temp",
+    "*.tmp",
+    "*.temp",
+    "*~",
+)
+"""Default glob patterns ignored by discovery traversal."""
+
+_IGNORE_ENV_VAR = "DOCSTOKG_DISCOVERY_IGNORE"
+_IGNORE_SPLIT_PATTERN = re.compile(r"[,;:\n]+")
+
+_RUNTIME_IGNORE_OVERRIDE: tuple[str, ...] = ()
+_HAS_RUNTIME_OVERRIDE = False
 
 
 @dataclass(frozen=True)
@@ -148,6 +173,83 @@ def _ensure_str_sequence(value: object, label: str) -> list[str]:
     if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
         raise ValueError(f"Expected a list of strings for '{label}'")
     return [item for item in value if item]
+
+
+def split_discovery_ignore(value: str | Sequence[str] | None) -> tuple[str, ...]:
+    """Split ``value`` into normalized ignore pattern tokens."""
+
+    if value is None:
+        return ()
+    if isinstance(value, str):
+        tokens = _IGNORE_SPLIT_PATTERN.split(value)
+    elif isinstance(value, Sequence):
+        tokens = list(value)
+    else:
+        raise TypeError("Ignore patterns must be a string or a sequence of strings")
+
+    normalized: list[str] = []
+    for token in tokens:
+        if token is None:
+            continue
+        item = str(token).strip()
+        if item:
+            normalized.append(item)
+    return tuple(normalized)
+
+
+def parse_discovery_ignore(
+    value: str | Sequence[str] | None, *, base: Sequence[str] | None = None
+) -> tuple[str, ...]:
+    """Return ignore patterns with ``value`` applied on top of ``base``."""
+
+    base_list = list(base or ())
+    tokens = split_discovery_ignore(value)
+    if not tokens:
+        return tuple(dict.fromkeys(base_list))
+
+    removals: set[str] = set()
+    additions: list[str] = []
+
+    for token in tokens:
+        if token.startswith("!"):
+            candidate = token[1:].strip()
+            if candidate:
+                removals.add(candidate)
+            continue
+        additions.append(token)
+
+    result: list[str] = [pattern for pattern in base_list if pattern not in removals]
+    for pattern in additions:
+        if pattern not in result:
+            result.append(pattern)
+    return tuple(result)
+
+
+def configure_discovery_ignore(patterns: Sequence[str] | None) -> None:
+    """Set runtime discovery ignore patterns overriding env/defaults when provided."""
+
+    global _RUNTIME_IGNORE_OVERRIDE, _HAS_RUNTIME_OVERRIDE
+    if patterns is None:
+        _RUNTIME_IGNORE_OVERRIDE = ()
+        _HAS_RUNTIME_OVERRIDE = False
+        return
+
+    normalized = [str(item).strip() for item in patterns if str(item).strip()]
+    _RUNTIME_IGNORE_OVERRIDE = tuple(dict.fromkeys(normalized))
+    _HAS_RUNTIME_OVERRIDE = True
+
+
+def get_discovery_ignore_patterns() -> tuple[str, ...]:
+    """Return the active ignore patterns for discovery traversal."""
+
+    if _HAS_RUNTIME_OVERRIDE:
+        return _RUNTIME_IGNORE_OVERRIDE
+
+    env_value = os.getenv(_IGNORE_ENV_VAR)
+    if env_value is not None:
+        return parse_discovery_ignore(env_value, base=DEFAULT_DISCOVERY_IGNORE)
+
+    return DEFAULT_DISCOVERY_IGNORE
 
 
 def load_structural_marker_profile(path: Path) -> tuple[list[str], list[str]]:
@@ -306,7 +408,25 @@ def compute_stable_shard(identifier: str, shard_count: int) -> int:
     return int.from_bytes(digest[:8], "big") % shard_count
 
 
-def iter_chunks(directory: Path) -> Iterator[ChunkDiscovery]:
+def _should_ignore_entry(entry: Path, root: Path, patterns: tuple[str, ...]) -> bool:
+    """Return True when ``entry`` should be ignored based on discovery rules."""
+
+    name = entry.name
+    if name.startswith("."):
+        return True
+
+    relative = entry.relative_to(root).as_posix()
+    for pattern in patterns:
+        if not pattern:
+            continue
+        if fnmatch(name, pattern) or fnmatch(relative, pattern):
+            return True
+    return False
+
+
+def iter_chunks(
+    directory: Path, *, ignore_patterns: Sequence[str] | None = None
+) -> Iterator[ChunkDiscovery]:
     """Yield :class:`ChunkDiscovery` records for chunk files under ``directory``."""
 
     if not directory.exists():
@@ -319,6 +439,11 @@ def iter_chunks(directory: Path) -> Iterator[ChunkDiscovery]:
         return
 
     root = directory.resolve()
+    active_patterns = (
+        tuple(ignore_patterns)
+        if ignore_patterns is not None
+        else get_discovery_ignore_patterns()
+    )
     yielded_symlink_targets: set[Path] = set()
 
     def _walk(current: Path) -> Iterator[ChunkDiscovery]:
@@ -329,7 +454,7 @@ def iter_chunks(directory: Path) -> Iterator[ChunkDiscovery]:
         except FileNotFoundError:  # pragma: no cover - defensive guard
             return
         for entry in entries:
-            if entry.name.startswith("."):
+            if _should_ignore_entry(entry, root, active_patterns):
                 continue
             if entry.is_dir() and not entry.is_symlink():
                 yield from _walk(entry)
