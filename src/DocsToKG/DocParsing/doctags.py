@@ -793,11 +793,13 @@ def _make_pdf_stage_hooks(
             stage_logger,
             "info",
             "DocTags PDF summary",
+            planned=outcome.planned,
             scheduled=outcome.scheduled,
             succeeded=outcome.succeeded,
             failed=outcome.failed,
             skipped=total_skipped,
             cancelled=outcome.cancelled,
+            cancel_reason=outcome.cancelled_reason,
             wall_ms=round(outcome.wall_ms, 3),
             queue_p50_ms=round(outcome.queue_p50_ms, 3),
             queue_p95_ms=round(outcome.queue_p95_ms, 3),
@@ -2334,6 +2336,10 @@ def pdf_main(args: argparse.Namespace | None = None, config_adapter=None) -> int
                             "ok": 0,
                             "skip": skip,
                             "fail": 0,
+                            "planned": 0,
+                            "scheduled": 0,
+                            "cancelled": False,
+                            "cancel_reason": None,
                         }
                     },
                 )
@@ -2370,6 +2376,10 @@ def pdf_main(args: argparse.Namespace | None = None, config_adapter=None) -> int
                         "ok": outcome.succeeded,
                         "skip": outcome.skipped,
                         "fail": outcome.failed,
+                        "planned": outcome.planned,
+                        "scheduled": outcome.scheduled,
+                        "cancelled": outcome.cancelled,
+                        "cancel_reason": outcome.cancelled_reason,
                         "total_wall_ms": outcome.wall_ms,
                         "queue_p50_ms": outcome.queue_p50_ms,
                         "queue_p95_ms": outcome.queue_p95_ms,
@@ -2384,7 +2394,7 @@ def pdf_main(args: argparse.Namespace | None = None, config_adapter=None) -> int
             stop_vllm(proc, owns, grace=10)
             logger.info("All done")
 
-        return 0 if outcome.failed == 0 else 1
+        return 0 if outcome.failed == 0 and not outcome.cancelled else 1
 
 
 # --- HTML Pipeline ---
@@ -3106,6 +3116,10 @@ def html_main(args: argparse.Namespace | None = None, config_adapter=None) -> in
                         "ok": 0,
                         "skip": skip,
                         "fail": 0,
+                        "planned": 0,
+                        "scheduled": 0,
+                        "cancelled": False,
+                        "cancel_reason": None,
                     }
                 },
             )
@@ -3144,6 +3158,10 @@ def html_main(args: argparse.Namespace | None = None, config_adapter=None) -> in
                     "ok": outcome.succeeded,
                     "skip": outcome.skipped,
                     "fail": outcome.failed,
+                    "planned": outcome.planned,
+                    "scheduled": outcome.scheduled,
+                    "cancelled": outcome.cancelled,
+                    "cancel_reason": outcome.cancelled_reason,
                     "total_wall_ms": outcome.wall_ms,
                     "queue_p50_ms": outcome.queue_p50_ms,
                     "queue_p95_ms": outcome.queue_p95_ms,
@@ -3155,7 +3173,7 @@ def html_main(args: argparse.Namespace | None = None, config_adapter=None) -> in
             },
         )
 
-        return 0 if outcome.failed == 0 else 1
+        return 0 if outcome.failed == 0 and not outcome.cancelled else 1
 
 
 # --- Docling Test Stubs ---
