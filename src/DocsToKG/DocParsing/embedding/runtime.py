@@ -970,10 +970,10 @@ def tokens(text: str) -> list[str]:
 class BM25StatsAccumulator:
     """Streaming accumulator for BM25 corpus statistics.
 
-    Attributes:
-        N: Number of documents processed so far.
-        total_tokens: Total token count across processed documents.
-        df: Document frequency map collected to date.
+    Maintains the following counters:
+    - ``N``: Number of documents processed so far.
+    - ``total_tokens``: Total token count across processed documents.
+    - ``df``: Document frequency map collected to date.
 
     Examples:
         >>> acc = BM25StatsAccumulator()
@@ -1082,10 +1082,10 @@ def bm25_vector(
 class SPLADEValidator:
     """Track SPLADE sparsity metrics across the corpus.
 
-    Attributes:
-        total_chunks: Total number of chunks inspected.
-        zero_nnz_chunks: UUIDs whose SPLADE vector has zero active terms.
-        nnz_counts: Non-zero counts per processed chunk.
+    The validator records:
+    - ``total_chunks``: Total number of chunks inspected.
+    - ``zero_nnz_chunks``: UUIDs whose SPLADE vector has zero active terms.
+    - ``nnz_counts``: Non-zero counts per processed chunk.
 
     Examples:
         >>> validator = SPLADEValidator()
@@ -2542,6 +2542,13 @@ def _make_embedding_stage_hooks(
             quarantined_files=quarantined_files,
             total_vectors=total_vectors,
             vector_format_fallbacks=fallback_total,
+            wall_ms=round(outcome.wall_ms, 3),
+            queue_p50_ms=round(outcome.queue_p50_ms, 3),
+            queue_p95_ms=round(outcome.queue_p95_ms, 3),
+            exec_p50_ms=round(outcome.exec_p50_ms, 3),
+            exec_p95_ms=round(outcome.exec_p95_ms, 3),
+            exec_p99_ms=round(outcome.exec_p99_ms, 3),
+            cpu_time_total_ms=round(outcome.cpu_time_total_ms, 3),
         )
 
         if exit_stack is not None:
@@ -3221,6 +3228,7 @@ def _main_inner(args: argparse.Namespace | None = None, config_adapter=None) -> 
             force=bool(cfg.force),
             error_budget=0,
             diagnostics_interval_s=15.0,
+            resume_controller=resume_controller,
         )
 
         outcome = run_stage(plan, _embedding_stage_worker, options, hooks)

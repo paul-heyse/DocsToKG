@@ -20,10 +20,11 @@ settings) with stage runtimes (which expect legacy argparse-based config datacla
 
 The adapter pattern eliminates the need for removed from_args() classmethods by
 directly building stage config objects from Pydantic settings, enabling:
-  - Direct configuration injection (testable, no sys.argv re-parsing)
-  - Single source of truth (unified settings)
-  - Backward compatibility (stages still work with old paths)
-  - Clean architecture (clear separation of concerns)
+
+- Direct configuration injection (testable, no sys.argv re-parsing)
+- Single source of truth (unified settings)
+- Backward compatibility (stages still work with old paths)
+- Clean architecture (clear separation of concerns)
 """
 
 from __future__ import annotations

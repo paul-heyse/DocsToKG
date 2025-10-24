@@ -150,6 +150,10 @@ direnv exec . python -m DocsToKG.DocParsing.core.cli plan-diff --lock-output bas
   etc.). Larger plans keep the counts accurate while truncating previews with a
   `... (+N more)` suffix so operators can gauge scale without loading thousands
   of identifiers.
+- `--output json` returns a machine-friendly payload with per-stage bucket
+  counts, previews, and path metadata. Use this when integrating DocParsing
+  planning into orchestration tooling or dashboards (`pretty` remains the
+  default human-readable mode).
 
 ## Folder map
 
@@ -219,6 +223,9 @@ sequenceDiagram
   - Worker sizing: DocTags auto-sizes `--workers` to `max(1, min(12, cpu_count - 4))`, ensuring at least one process is scheduled even when `os.cpu_count()` reports very small values.
 - Chunking: `DOCSTOKG_CHUNK_*` toggles for tokenizer, shard count, and validation.
 - Embedding: `DOCSTOKG_EMBED_*` flags plus `DOCSTOKG_QWEN_DIR`, `DOCSTOKG_SPLADE_DIR` for model caches.
+- Manifest telemetry: `DOCSTOKG_MANIFEST_LOCK_TIMEOUT` controls how long manifest writers wait
+  for the advisory `.lock` file before surfacing a structured timeout error. Increase it when
+  manifests are shared across slower filesystems or concurrent pipelines.
 - Vector format: Parquet is the only format for embedding vectors. Environment variable `DOCSTOKG_EMBED_VECTOR_FORMAT` is ignored for embeddings (always uses Parquet).
 - Validate-only runs reuse the configured `--qwen-dim` (or `DOCSTOKG_EMBED_QWEN_DIM`) when present; omit the override to accept previously generated vectors without enforcing a dimension.
 - Validate configuration: run `python -m DocsToKG.DocParsing.core.cli chunk --validate-only` or `... embed --validate-only` before production runs.
@@ -256,7 +263,7 @@ sequenceDiagram
   }
   ```
 
-- Resume contract: [`core.manifest.ResumeController`](core/manifest.py) compares `status` and `input_hash` to decide whether to skip work, so metadata fields supplied by `StageTelemetry` (for example, `vector_format` in embedding runs) must stay in sync with their corresponding writers.
+- Resume contract: [`core.manifest.ResumeController`](core/manifest.py) compares `status` and `input_hash` to decide whether to skip work, so metadata fields supplied by `StageTelemetry` (for example, `vector_format` in embedding runs) must stay in sync with their corresponding writers. Stage adapters surface the controller via `StageOptions.resume_controller`, allowing the shared runner to invoke `_should_skip` before a worker is scheduled.
 - `telemetry.StageTelemetry` writes through a lock-aware writer (default `DEFAULT_JSONL_WRITER` from `io.py`) before appending JSON lines, guaranteeing atomic writes even with concurrent processes.
 
 ## Interactions with other packages

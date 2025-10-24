@@ -49,6 +49,7 @@ Provides a singleton, thread-safe HTTP client with RFC 9111-compliant caching,
 connection pooling, automatic keepalives, and comprehensive instrumentation hooks.
 
 Key design:
+
 - **Lazy initialization**: Client created on first use, not at import time.
 - **Config binding**: Client is bound to the first loaded Settings/config_hash for the
   process lifetime. If Settings change post-bind, a warning is logged once and the
@@ -60,10 +61,14 @@ Key design:
 - **Streaming**: All responses are streamed; never buffer entire bodies.
 
 Example:
-    >>> from DocsToKG.OntologyDownload.network import get_http_client, close_http_client
-    >>> client = get_http_client()
-    >>> response = client.get("https://api.example.com/data", stream=True)
-    >>> close_http_client()  # at process shutdown or test cleanup
+
+    .. code-block:: python
+
+        from DocsToKG.OntologyDownload.network import get_http_client, close_http_client
+
+        client = get_http_client()
+        response = client.get("https://api.example.com/data", stream=True)
+        close_http_client()  # at process shutdown or test cleanup
 """
 
 import logging

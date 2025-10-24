@@ -2034,11 +2034,11 @@ class HybridSearchAPI:
 class PaginationCheckResult:
     """Result of a pagination verification run.
 
-    Attributes:
-        cursor_chain: Sequence of pagination cursors encountered.
-        duplicate_detected: True when duplicate results were observed.
-        termination_reason: Description explaining why pagination inspection
-            stopped.
+    Notes:
+        - ``cursor_chain``: Sequence of pagination cursors encountered.
+        - ``duplicate_detected``: True when duplicate results were observed.
+        - ``termination_reason``: Description explaining why pagination inspection
+          stopped.
 
     Examples:
         >>> result = PaginationCheckResult(cursor_chain=["cursor1"], duplicate_detected=False)

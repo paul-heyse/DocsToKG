@@ -129,16 +129,17 @@ import concurrent.futures as cf
 import json
 import math
 import random
+import statistics
 import time
 from collections import deque
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from concurrent.futures import FIRST_COMPLETED, Future, wait
-from concurrent.futures import TimeoutError as FutureTimeoutError
+from concurrent.futures import CancelledError
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import (
-    Any,
-)
+from typing import Any
+
+from DocsToKG.DocParsing.core.manifest import ResumeController
 
 from DocsToKG.concurrency.executors import create_executor
 from DocsToKG.DocParsing.logging import get_logger, log_event
@@ -247,6 +248,7 @@ class StageOptions:
     diagnostics_interval_s: float = 30.0
     seed: int | None = None
     dry_run: bool = False
+    resume_controller: ResumeController | None = None
 
 
 @dataclass(slots=True)
@@ -286,8 +288,11 @@ class StageOutcome:
     cancelled: bool
     wall_ms: float
     queue_p50_ms: float
+    queue_p95_ms: float
     exec_p50_ms: float
     exec_p95_ms: float
+    exec_p99_ms: float
+    cpu_time_total_ms: float
     errors: Sequence[StageError]
 
 
@@ -321,7 +326,9 @@ class _Submission:
     item: WorkItem
     attempt: int
     enqueue_time: float
-    future: Future
+    future: Future | None = None
+    started_at: float | None = None
+    deadline: float | None = None
 
 
 @dataclass(slots=True)
@@ -367,31 +374,48 @@ def _call_worker(worker: Callable[[WorkItem], ItemOutcome], item: WorkItem) -> _
 
 
 def _should_skip(item: WorkItem, options: StageOptions) -> bool:
-    """Return ``True`` when resume semantics allow skipping ``item``."""
+    """Return ``True`` when resume manifests allow skipping ``item``.
+
+    The runner delegates skip decisions to :class:`ResumeController`, which
+    compares the manifest metadata associated with ``item`` against the
+    recorded input hash. Stage adapters are responsible for attaching the
+    controller to :class:`StageOptions` and populating ``item.metadata`` with
+    the ``input_hash`` and resolved output path so the check can be performed
+    without touching the worker implementation.
+    """
 
     if options.force or not options.resume:
         return False
 
-    for path in item.outputs.values():
-        try:
-            stat = Path(path).stat()
-            if stat.st_size <= 0:
-                return False
-        except FileNotFoundError:
-            return False
-
-    fingerprint = item.fingerprint
-    if fingerprint is None:
+    controller = options.resume_controller
+    if controller is None:
         return False
-    return fingerprint.matches()
+
+    metadata = item.metadata
+    output_candidate = metadata.get("resume_output_path") or metadata.get("output_path")
+    if output_candidate is None:
+        try:
+            output_candidate = next(iter(item.outputs.values()))
+        except StopIteration:
+            return False
+    output_path = Path(output_candidate)
+
+    if not output_path.exists():
+        return False
+
+    input_hash = str(metadata.get("input_hash", ""))
+    skip, _ = controller.should_skip(item.item_id, output_path, input_hash)
+    return skip
 
 
-def _apply_backoff(base: float, attempt: int) -> float:
+def _apply_backoff(
+    base: float, attempt: int, rng: random.Random | None = None
+) -> float:
     if base <= 0:
         return 0.0
     exponent = max(0, attempt - 1)
     delay = base * (2**exponent)
-    jitter = delay * random.uniform(0.0, 0.25)
+    jitter = delay * (rng.uniform(0.0, 0.25) if rng is not None else 0.0)
     return delay + jitter
 
 
@@ -400,10 +424,20 @@ def _percentile(values: Sequence[float], pct: float) -> float:
         return 0.0
     if len(values) == 1:
         return float(values[0])
-    ordered = sorted(values)
-    index = int(math.ceil(pct / 100.0 * len(ordered))) - 1
-    index = max(0, min(index, len(ordered) - 1))
-    return float(ordered[index])
+    pct = float(pct)
+    if pct <= 0.0:
+        return float(min(values))
+    if pct >= 100.0:
+        return float(max(values))
+    try:
+        quantiles = statistics.quantiles(values, n=100, method="inclusive")
+        index = max(1, min(99, int(math.ceil(pct)))) - 1
+        return float(quantiles[index])
+    except (ValueError, statistics.StatisticsError):
+        ordered = sorted(values)
+        index = int(math.ceil(pct / 100.0 * len(ordered))) - 1
+        index = max(0, min(index, len(ordered) - 1))
+        return float(ordered[index])
 
 
 def _create_executor(options: StageOptions) -> tuple[cf.Executor | None, bool]:
@@ -424,8 +458,9 @@ def run_stage(
     options = options or StageOptions()
     hooks = hooks or StageHooks()
 
-    if options.seed is not None:
-        random.seed(options.seed)
+    backoff_rng: random.Random | None = None
+    if options.retry_backoff_s > 0 and options.seed is not None:
+        backoff_rng = random.Random(options.seed)
 
     logger = get_logger(
         f"DocsToKG.DocParsing.core.runner.{plan.stage_name}",
@@ -433,6 +468,7 @@ def run_stage(
     )
     context = StageContext(plan=plan, options=options)
 
+    cpu_start = time.process_time()
     items = [item.materialize() for item in plan]
     total_items = plan.total_items if plan.total_items >= 0 else len(items)
 
@@ -496,6 +532,7 @@ def run_stage(
 
     if options.dry_run:
         wall_ms = (_now() - wall_start) * 1000.0
+        cpu_total_ms = max(0.0, (time.process_time() - cpu_start) * 1000.0)
         outcome = StageOutcome(
             scheduled=0,
             skipped=skipped,
@@ -504,8 +541,11 @@ def run_stage(
             cancelled=False,
             wall_ms=wall_ms,
             queue_p50_ms=0.0,
+            queue_p95_ms=0.0,
             exec_p50_ms=0.0,
             exec_p95_ms=0.0,
+            exec_p99_ms=0.0,
+            cpu_time_total_ms=cpu_total_ms,
             errors=tuple(),
         )
         if hooks.after_stage:
@@ -624,6 +664,15 @@ def run_stage(
     class _BudgetExceeded(RuntimeError):
         """Signal that the error budget has been exhausted."""
 
+    def _submit_with_retry(item: WorkItem, attempt: int, err: StageError | None) -> None:
+        nonlocal failed
+        if err is not None and err.retryable and attempt <= options.retries:
+            failed = max(0, failed - 1)
+            delay = _apply_backoff(options.retry_backoff_s, attempt, backoff_rng)
+            if delay > 0:
+                time.sleep(delay)
+            submission_queue.appendleft((item, attempt + 1))
+
     def _submit(item: WorkItem, attempt: int) -> None:
         nonlocal scheduled, failed
         enqueue_time = _now()
@@ -631,60 +680,102 @@ def run_stage(
             scheduled += 1
             payload = _call_worker(worker, item)
             error = _handle_worker_payload(item, attempt, payload, enqueue_time)
-            if error is not None and error.retryable and attempt <= options.retries:
-                failed = max(0, failed - 1)
-                delay = _apply_backoff(options.retry_backoff_s, attempt)
-                if delay > 0:
-                    time.sleep(delay)
-                submission_queue.appendleft((item, attempt + 1))
+            _submit_with_retry(item, attempt, error)
             if options.error_budget and len(errors) > options.error_budget:
                 raise _BudgetExceeded()
             return
 
-        future = executor.submit(_call_worker, worker, item)
-        pending[future] = _Submission(
-            item=item, attempt=attempt, enqueue_time=enqueue_time, future=future
-        )
+        submission = _Submission(item=item, attempt=attempt, enqueue_time=enqueue_time)
+
+        timeout_s = options.per_item_timeout_s if options.per_item_timeout_s > 0 else None
+
+        def _execute_item() -> _WorkerPayload:
+            submission.started_at = _now()
+            if timeout_s is not None:
+                submission.deadline = submission.started_at + timeout_s
+            else:
+                submission.deadline = None
+            return _call_worker(worker, item)
+
+        future = executor.submit(_execute_item)
+        submission.future = future
+        pending[future] = submission
         scheduled += 1
+
+    def _expire_timeouts(now: float) -> None:
+        nonlocal failed
+        if options.per_item_timeout_s <= 0:
+            return
+        for future, submission in list(pending.items()):
+            deadline = submission.deadline
+            if deadline is None or submission.future is None:
+                continue
+            if future.done() or submission.started_at is None:
+                continue
+            if now < deadline:
+                continue
+            pending.pop(future, None)
+            future.cancel()
+            started = submission.started_at
+            queue_ms.append(max(0.0, (started - submission.enqueue_time) * 1000.0))
+            exec_ms.append(max(0.0, (now - started) * 1000.0))
+            failed += 1
+            err = StageError(
+                stage=plan.stage_name,
+                item_id=submission.item.item_id,
+                category="timeout",
+                message=f"Operation exceeded {options.per_item_timeout_s}s",
+                retryable=True,
+            )
+            errors.append(err)
+            if hooks.after_item:
+                try:
+                    hooks.after_item(submission.item, err, context)
+                except Exception as hook_exc:
+                    log_event(
+                        logger.logger,
+                        "warning",
+                        "after_item hook raised",
+                        stage=plan.stage_name,
+                        doc_id=submission.item.item_id,
+                        error=str(hook_exc),
+                    )
+            _submit_with_retry(submission.item, submission.attempt, err)
+            if options.error_budget and len(errors) > options.error_budget:
+                raise _BudgetExceeded()
 
     def _drain_completed(blocking: bool) -> None:
         nonlocal failed
         if not pending:
             return
+        now = _now()
+        _expire_timeouts(now)
+        if not pending:
+            return
+
+        futures = tuple(pending.keys())
         timeout = None if blocking else 0.0
-        done, _ = wait(pending.keys(), timeout=timeout, return_when=FIRST_COMPLETED)
+        if blocking and options.per_item_timeout_s > 0:
+            deadlines = [
+                submission.deadline
+                for submission in pending.values()
+                if submission.deadline is not None
+                and submission.future is not None
+                and not submission.future.done()
+            ]
+            if deadlines:
+                min_deadline = max(0.0, min(deadlines) - now)
+                timeout = min_deadline if timeout is None else min(timeout, min_deadline)
+
+        done, _ = wait(futures, timeout=timeout, return_when=FIRST_COMPLETED)
         for future in done:
             submission = pending.pop(future, None)
             if submission is None:
                 continue
-            timeout_s = options.per_item_timeout_s if options.per_item_timeout_s > 0 else None
             try:
-                payload = future.result(timeout=timeout_s)
-            except FutureTimeoutError:
-                future.cancel()
-                finished = _now()
-                err = StageError(
-                    stage=plan.stage_name,
-                    item_id=submission.item.item_id,
-                    category="timeout",
-                    message=f"Operation exceeded {options.per_item_timeout_s}s",
-                    retryable=False,
-                )
-                errors.append(err)
-                exec_ms.append(0.0)
-                queue_ms.append(max(0.0, (finished - submission.enqueue_time) * 1000.0))
-                if hooks.after_item:
-                    try:
-                        hooks.after_item(submission.item, err, context)
-                    except Exception as hook_exc:
-                        log_event(
-                            logger.logger,
-                            "warning",
-                            "after_item hook raised",
-                            stage=plan.stage_name,
-                            doc_id=submission.item.item_id,
-                            error=str(hook_exc),
-                        )
+                payload = future.result()
+            except CancelledError:
+                # Already handled via timeout cancellation.
                 continue
             except Exception as exc:  # pragma: no cover - defensive
                 payload = _WorkerPayload(
@@ -700,14 +791,12 @@ def run_stage(
                 payload,
                 submission.enqueue_time,
             )
-            if error is not None and error.retryable and submission.attempt <= options.retries:
-                failed = max(0, failed - 1)
-                delay = _apply_backoff(options.retry_backoff_s, submission.attempt)
-                if delay > 0:
-                    time.sleep(delay)
-                submission_queue.appendleft((submission.item, submission.attempt + 1))
+            _submit_with_retry(submission.item, submission.attempt, error)
             if options.error_budget and len(errors) > options.error_budget:
                 raise _BudgetExceeded()
+
+        if pending:
+            _expire_timeouts(_now())
 
     try:
         while submission_queue or pending:
@@ -797,6 +886,7 @@ def run_stage(
             executor.shutdown(wait=True, cancel_futures=True)
 
     wall_ms = (_now() - wall_start) * 1000.0
+    cpu_total_ms = max(0.0, (time.process_time() - cpu_start) * 1000.0)
     outcome = StageOutcome(
         scheduled=total_to_run,
         skipped=skipped,
@@ -805,8 +895,11 @@ def run_stage(
         cancelled=cancelled,
         wall_ms=wall_ms,
         queue_p50_ms=_percentile(queue_ms, 50.0),
+        queue_p95_ms=_percentile(queue_ms, 95.0),
         exec_p50_ms=_percentile(exec_ms, 50.0),
         exec_p95_ms=_percentile(exec_ms, 95.0),
+        exec_p99_ms=_percentile(exec_ms, 99.0),
+        cpu_time_total_ms=cpu_total_ms,
         errors=tuple(errors),
     )
 
