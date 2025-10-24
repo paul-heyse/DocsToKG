@@ -110,6 +110,7 @@ LOGGER = get_logger(__name__, base_fields={"stage": "core"})
 
 _ATOMIC_WRITES_ENV = "DOCSTOKG_ATOMIC_WRITES"
 _RETAIN_LOCKS_ENV = "DOCSTOKG_RETAIN_LOCK_FILES"
+_RETAIN_LOCKS_ON_ERROR_ENV = "DOCSTOKG_RETAIN_LOCK_FILES_ON_ERROR"
 _TMP_SUFFIX = ".tmp"
 _CONTENTED_WAIT_THRESHOLD_SECONDS = 1e-3
 
@@ -149,6 +150,14 @@ def _resolve_retain_lock(explicit: bool | None) -> bool:
     if explicit is not None:
         return bool(explicit)
     return _parse_bool_env(os.getenv(_RETAIN_LOCKS_ENV), False)
+
+
+def _resolve_retain_lock_on_error(explicit: bool | None) -> bool:
+    """Return whether ``.lock`` sentinels should persist after failures."""
+
+    if explicit is not None:
+        return bool(explicit)
+    return _parse_bool_env(os.getenv(_RETAIN_LOCKS_ON_ERROR_ENV), False)
 
 
 def _fsync_path(path: Path) -> None:
@@ -259,6 +268,7 @@ def _acquire_lock(
     *,
     timeout: float = 60.0,
     retain_lock_file: bool | None = None,
+    retain_lock_on_error: bool | None = None,
 ) -> Iterator[bool]:
     """Acquire a process-safe lock for ``path``.
 
@@ -268,7 +278,9 @@ def _acquire_lock(
     simple boolean placeholder to preserve historical semantics. When
     ``retain_lock_file`` or ``DOCSTOKG_RETAIN_LOCK_FILES`` is truthy, the lock
     sentinel remains on disk after releasing the FileLock, allowing callers to
-    inspect recent lock usage.
+    inspect recent lock usage. When ``retain_lock_on_error`` (or
+    ``DOCSTOKG_RETAIN_LOCK_FILES_ON_ERROR``) evaluates to True, lock sentinels
+    are retained only when an exception escapes the guarded block.
     """
 
     lock_path = _lock_path_for(path)
@@ -292,6 +304,7 @@ def _acquire_lock(
         )
         raise TimeoutError(f"Could not acquire lock on {path} after {timeout}s") from exc
 
+    error_raised = False
     waited = time.monotonic() - start
     if waited >= _CONTENTED_WAIT_THRESHOLD_SECONDS:
         log_event(
@@ -306,10 +319,15 @@ def _acquire_lock(
 
     try:
         yield True
+    except Exception:
+        error_raised = True
+        raise
     finally:
         with contextlib.suppress(RuntimeError):
             file_lock.release()
-        should_retain = _resolve_retain_lock(retain_lock_file)
+        should_retain_always = _resolve_retain_lock(retain_lock_file)
+        should_retain_on_error = _resolve_retain_lock_on_error(retain_lock_on_error)
+        should_retain = should_retain_always or (should_retain_on_error and error_raised)
         if should_retain:
             with contextlib.suppress(OSError):
                 lock_path.touch(exist_ok=True)
@@ -326,6 +344,7 @@ def safe_write(
     skip_if_exists: bool = True,
     atomic: bool | None = None,
     retain_lock_file: bool | None = None,
+    retain_lock_on_error: bool | None = None,
 ) -> bool:
     """Atomically write a file with process-safe locking.
 
@@ -343,6 +362,9 @@ def safe_write(
         retain_lock_file: When True (or configured via ``DOCSTOKG_RETAIN_LOCK_FILES``),
             leave the ``.lock`` sentinel on disk after releasing the FileLock for
             post-mortem inspection.
+        retain_lock_on_error: When True (or configured via
+            ``DOCSTOKG_RETAIN_LOCK_FILES_ON_ERROR``), retain the ``.lock`` sentinel
+            only when ``write_fn`` raises an exception.
 
     Returns:
         True if write occurred, False otherwise
@@ -354,8 +376,14 @@ def safe_write(
 
     use_atomic = _resolve_atomic_flag(atomic)
     retain_lock = _resolve_retain_lock(retain_lock_file)
+    retain_on_error = _resolve_retain_lock_on_error(retain_lock_on_error)
 
-    with _acquire_lock(path, timeout=timeout, retain_lock_file=retain_lock):
+    with _acquire_lock(
+        path,
+        timeout=timeout,
+        retain_lock_file=retain_lock,
+        retain_lock_on_error=retain_on_error,
+    ):
         if skip_if_exists and path.exists():
             return False
         path.parent.mkdir(parents=True, exist_ok=True)

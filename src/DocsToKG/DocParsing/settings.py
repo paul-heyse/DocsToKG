@@ -344,6 +344,10 @@ class AppCfg(BaseSettings):
         False,
         description="Retain .lock sentinels after releasing FileLock handles",
     )
+    retain_lock_files_on_error: bool = Field(
+        False,
+        description="Retain .lock sentinels only when writes raise exceptions",
+    )
 
     @field_validator("data_root", "manifests_root", "models_root", "log_dir", mode="before")
     @classmethod
