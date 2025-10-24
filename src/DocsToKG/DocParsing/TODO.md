@@ -65,7 +65,7 @@ Files: `core/batching.py`, `core/concurrency.py`, `core/runner.py`
 
 - Items:
   - Profiling tools
-    - [ ] cProfile integration: add `--profile-cpu` CLI flag per stage; capture `.prof` output per run.
+    - [x] cProfile integration: `docparse perf run` emits `.pstats` and collapsed stacks for each stage (see docs/06-operations/docparsing-performance-monitoring.md).
     - [ ] pstats rendering: helper to print top-N cumulative/self time; export TSV for CI artifacts.
     - [ ] line_profiler: optional dependency; annotate hotspots (runner dispatch, planning walkers) with `@profile` guards.
     - [ ] memory_profiler: optional `--profile-mem` sampling around `run_stage`; record peak RSS; guard overhead.
@@ -83,7 +83,7 @@ Files: `core/batching.py`, `core/concurrency.py`, `core/runner.py`
   - Best practices
     - [ ] Realistic workloads: fixture generator mirroring `Data/` scale tiers (S, M, L) for local benchmarking.
     - [ ] Hotspot focus: 80/20 rule checklist; only optimize top offenders from profiles.
-    - [ ] Continuous monitoring: optional nightly profiling job storing artifacts; compare to baselines.
+    - [x] Continuous monitoring: `docparse perf run --baseline` enforces regression budgets with exit code 2 and documented cron recipe.
     - [ ] Regression budget: define acceptable deltas per stage; fail builds over threshold.
 
 - Benchmarks:
