@@ -199,17 +199,87 @@ Files: `planning.py`, `discovery.py`, `runner.py`, `manifest.py`, `manifest_sink
 
 ### DocTags Stage (`doctags.py`)
 
-- Items: <!-- add items here -->
-- Tests: <!-- add items here -->
-- Docs: <!-- add items here -->
+- Items:
+  - Functionality
+    - [ ] PDF mode: harden vLLM bootstrap (health probe, timeout, retries) and surface clear errors when model not ready.
+    - [ ] HTML mode: ensure `list_htmls/iter_htmls` parity with PDFs (sorted traversal, ignore patterns, symlink guards).
+    - [ ] Auto mode: decide resolution strategy (prefer PDFs when both present?); document behavior.
+    - [ ] Standardize DocTags schema version (`docparse/*`) and ensure manifest writes include version for both modes.
+    - [ ] Expose tokenizer/profile knobs via CLI profiles; snapshot config into `__config__` manifest.
+  - Integration
+    - [ ] Use `ResumeController` consistently for skip decisions (hash + manifest) across pdf/html paths.
+    - [ ] Ensure `run_stage` hooks are wired for per-item telemetry and error budgeting in both modes.
+    - [ ] Align attempts/manifest sinks to `MANIFEST_STAGE` and `HTML_MANIFEST_STAGE` with consistent extras (parse_engine, model).
+  - Error Handling
+    - [ ] Convert docling exceptions and vLLM startup failures into `StageError` categories with actionable messages.
+    - [ ] Skip malformed inputs with structured reasons; continue pipeline without aborting.
+  - Performance
+    - [ ] Batch-friendly worker sizing (GPU threads, port reuse) configurable by profile; avoid CPU oversubscription.
+    - [ ] Reduce directory traversal overhead (reuse generators; avoid repeated stat calls).
+  - Security & Compliance
+    - [ ] Validate input paths reside under `${DOCSTOKG_DATA_ROOT}`; reject traversal; redact absolute paths in logs.
+    - [ ] Sanitize HTML inputs to avoid script execution or unsafe includes during parsing.
+  - Future Enhancements
+    - [ ] Add support for additional formats (DOCX, TXT) via docling where feasible; guard with feature flags.
+    - [ ] Explore ML-assisted tag refinement; plug-in hook for postprocessing.
+
+- Tests:
+  - [ ] vLLM bootstrap: unhealthy server yields clear failure, retries honored; metrics probe recorded.
+  - [ ] Resume: unchanged inputs skip via manifest+hash; changed inputs reprocess; html/pdf parity.
+  - [ ] Traversal: deterministic order; symlink dedupe; ignore patterns.
+  - [ ] Worker: success/skip/failure outcomes produce correct manifest attempts and extras.
+  - [ ] Error mapping: docling exceptions categorized; helpful messages bubbled to CLI.
+  - [ ] Security: path sandbox enforced; HTML sanitization tested on malicious fixtures.
+  - [ ] Performance: profile baseline for N PDFs/HTMLs; no >10% regression across releases.
+
+- Docs:
+  - [ ] DocTags schema reference (fields, versions, examples) and compatibility notes.
+  - [ ] CLI usage for pdf/html/auto modes; profiles and environment variables.
+  - [ ] Operational guidance: vLLM lifecycle, ports, GPU utilization, troubleshooting.
 
 ### Chunking Stage (`chunking/`)
 
 Files: `config.py`, `runtime.py`, `cli.py`
 
-- Items: <!-- add items here -->
-- Tests: <!-- add items here -->
-- Docs: <!-- add items here -->
+- Items:
+  - Implement chunking strategies
+    - [ ] Fixed-size windows: calibrate `min_tokens`/`max_tokens` per tokenizer profile; guard against mid-sentence splits via hybrid coalescence.
+    - [ ] Semantic-aware: tune `is_structural_boundary` markers (headings/captions) and `soft_barrier_margin` for coherence.
+    - [ ] Hybrid: validate `coalesce_small_runs` behavior across diverse documents; ensure token ceilings respected.
+  - Overlap & anchors
+    - [ ] Optional overlap policy (N tokens) between consecutive chunks; expose via CLI; reflect in `ChunkRow` metadata.
+    - [ ] Anchor injection: ensure unique `<<chunk:...>>` anchors; document stability and off-by-one guards.
+  - Metadata & schema
+    - [ ] Preserve refs/pages/image metadata; verify `ChunkRow` completeness and provenance population.
+    - [ ] Maintain deterministic `uuid` per chunk (span hashing) across runs; document invariants.
+  - Performance & scalability
+    - [ ] Avoid repeated `stat()`/sorting during traversal; reuse lists and iterators.
+    - [ ] Guard tokenizer initialisation once per worker; share across tasks.
+    - [ ] Sharding correctness: stable shard mapping via `compute_stable_shard`; add fairness note.
+  - Integration
+    - [ ] Resume: unify fingerprint usage and `ResumeController` decisions; ensure `.fp.json` written for Parquet primary paths.
+    - [ ] Format routing: Parquet default via `ParquetChunksWriter`; JSONL fallback path maintained; persist `chunks_format`.
+    - [ ] Validate-only: ensure parquet path resolution via dataset layout; quarantine invalid artifacts.
+  - Error handling & security
+    - [ ] Map worker exceptions to `StageError` with actionable messages; continue pipeline.
+    - [ ] Enforce data-root sandbox; redact absolute paths in logs.
+
+- Tests:
+  - [ ] Strategy: fixed/semantic/hybrid produce coherent chunks and respect token limits on varied fixtures.
+  - [ ] Overlap: adjacent chunk boundaries include expected token overlap; metadata reflects overlap.
+  - [ ] Metadata: `refs/pages/image` counters populated; `uuid` deterministic across runs.
+  - [ ] Perf: single init of tokenizer per worker; traversal not quadratic; basic timing guard.
+  - [ ] Sharding: stable assignment across runs; empty shard yields warning and exit 0.
+  - [ ] Resume: skip when input hash unchanged; fingerprint path respected; force overrides.
+  - [ ] Format: parquet write success path; parquet failure → JSONL fallback; `chunks_format` recorded.
+  - [ ] Validate-only: quarantines bad artifacts; reports rows/row_groups; logs warnings.
+  - [ ] Errors: exceptions categorized; manifests reflect failure with schema fields.
+  - [ ] Security: sandbox prevents writes outside data root; redaction leaves no PII.
+
+- Docs:
+  - [ ] Strategy guide: choosing min/max tokens, barrier margin, markers; examples.
+  - [ ] CLI reference and profiles; sharding usage and caveats.
+  - [ ] Parquet dataset layout and JSONL fallback; validate-only workflow and quarantine.
 
 ### Embedding Stage (`embedding/`)
 

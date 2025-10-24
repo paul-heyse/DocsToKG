@@ -299,7 +299,7 @@ class SettingsBuilder:
         Extract environment variable overrides.
 
         Args:
-            env_prefix: Prefix for env vars to consider (e.g., 'DOCSTOKG_')
+            env_prefix: Prefix for env vars to consider (e.g., ``DOCSTOKG_``)
 
         Returns:
             Self for chaining

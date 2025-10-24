@@ -167,7 +167,7 @@
 Unified Pydantic v2 Settings for DocParsing configuration management.
 
 This module provides typed, reproducible settings for all DocParsing stages
-using Pydantic v2 BaseSettings with consistent ENV prefix (DOCSTOKG_) and
+using Pydantic v2 BaseSettings with a consistent ENV prefix (``DOCSTOKG_``) and
 field validators. The models support layering (CLI > ENV > profile > defaults)
 and provide clear separation of concerns across stages.
 

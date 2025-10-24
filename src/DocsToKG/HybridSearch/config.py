@@ -276,11 +276,11 @@ class HybridSearchConfig:
     This class aggregates all configuration for hybrid search functionality,
     providing a single source of truth for all search-related parameters.
 
-    Attributes:
-        chunking: Document chunking configuration
-        dense: Dense vector indexing configuration
-        fusion: Result fusion and ranking configuration
-        retrieval: Individual retrieval method configuration
+    Components:
+    - ``chunking``: Document chunking configuration.
+    - ``dense``: Dense vector indexing configuration.
+    - ``fusion``: Result fusion and ranking configuration.
+    - ``retrieval``: Individual retrieval method configuration.
 
     Examples:
         >>> config = HybridSearchConfig(
@@ -350,10 +350,10 @@ class HybridSearchConfig:
 class HybridSearchConfigManager:
     """File-backed configuration manager with reload support.
 
-    Attributes:
-        _path: Path to the JSON/YAML configuration file.
-        _lock: Threading lock guarding concurrent reloads.
-        _config: Cached HybridSearchConfig instance.
+    Internals:
+    - ``_path``: Path to the JSON/YAML configuration file.
+    - ``_lock``: Threading lock guarding concurrent reloads.
+    - ``_config``: Cached :class:`HybridSearchConfig` instance.
 
     Examples:
         >>> manager = HybridSearchConfigManager(Path("config.json"))  # doctest: +SKIP
