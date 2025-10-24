@@ -132,13 +132,13 @@ Files: `planning.py`, `discovery.py`, `runner.py`, `manifest.py`, `manifest_sink
 - Items:
   - [ ] Runner: unify resume semantics with manifests. Decide contract: (a) rely on `ResumeController` everywhere, or (b) require worker-written `fingerprint` JSON for `_should_skip`. Document the invariant and enforce in all stages.
   - [ ] Runner: expose hook for error-budget exhaustion (e.g., `on_error_budget_exceeded`) and include `errors` snapshot.
-  - [ ] Runner: propagate `cancelled=True` when budget or Ctrl-C aborts before all items complete; verify counts (`scheduled`, `succeeded`, `failed`, `skipped`).
+  - [x] Runner: propagate `cancelled=True` when budget or Ctrl-C aborts before all items complete; verify counts (`scheduled`, `succeeded`, `failed`, `skipped`).
   - [ ] Runner: extend metrics to include `queue_p95_ms`, `exec_p99_ms`, and total CPU time if available.
   - [ ] Runner: clarify `max_queue` behavior for single-threaded mode (no executor). Either ignore gracefully or emulate bounded queueing; document behavior.
   - [ ] Runner: deterministic jitter seeding. Gate `random.seed` with namespace to avoid global PRNG side effects across stages.
   - [ ] Runner: structured progress events for each diagnostics interval; include `throughput_docs_per_min`, `ETA`, and `pending`.
   - [ ] Runner: standardize item outcome statuses to enum-like constants; validate in `_handle_worker_payload`.
-  - [ ] Runner: ensure `skip` reported by workers increments `skipped` without double-count in resume path; add guard.
+  - [x] Runner: ensure `skip` reported by workers increments `skipped` without double-count in resume path; add guard.
   - [ ] Planning: make `PLAN_PREVIEW_LIMIT` configurable via env (`DOCSTOKG_PLAN_PREVIEW`) and CLI flag.
   - [ ] Planning: align default vector format with runtime/CLI env (`DOCSTOKG_EMBED_VECTOR_FORMAT`) instead of hard-coded `jsonl`.
   - [ ] Planning: add `--format parquet|jsonl` to `plan` subcommands and ensure mismatch notes explain remediation.
@@ -146,14 +146,14 @@ Files: `planning.py`, `discovery.py`, `runner.py`, `manifest.py`, `manifest_sink
   - [ ] Planning: support `--limit` across doctags/chunk/embed plans to cap traversal work for previews.
   - [ ] Discovery: honor ignore patterns (e.g., `_tmp`, `_invalid`, dot-directories) via env and optional args.
   - [ ] Discovery: add case-insensitive suffix handling and guard for mixed extensions.
-  - [ ] Discovery: expand `vector_artifact_name` to validate/normalize format; provide helpful error with known values.
+  - [x] Discovery: expand `vector_artifact_name` to validate/normalize format; provide helpful error with known values.
   - [ ] Manifest: extend `should_skip_output` to consider vector format/dimension mismatches when `manifest_entry` provides hints.
   - [ ] Manifest: `ResumeController.can_skip_without_hash` should prefer `output_path` normalization (resolve symlinks) before existence check.
   - [ ] Manifest sink: add optional `attempts` parameter and persist attempts across retries for auditing.
   - [ ] Manifest sink: persist `vector_format` and other stage extras (e.g., qwen dim) in `extras` consistently; document keys.
   - [ ] Manifest sink: configurable FileLock timeout via env/constructor; emit structured error on lock timeout.
   - [x] Manifest sink: safe rotation/compaction utilities for large JSONL files (optional maintenance tool). Expose rotation via `JsonlManifestSink.rotate_if_needed` with optional dedupe snapshot for operations.
-  - [ ] HTTP: expose `clone_with_headers` on shared session from `get_http_session` when base headers change per call; validate cookie/auth copying safety.
+  - [x] HTTP: expose `clone_with_headers` on shared session from `get_http_session` when base headers change per call; validate cookie/auth copying safety.
   - [ ] HTTP: allow per-request override of retry policy (total/backoff/status set) through kwargs or context.
   - [ ] HTTP: optionally honor `Retry-After` date header skew with bounded max wait.
   - [ ] Batching: add policy `balanced_length` to more evenly distribute long items across batches.
@@ -196,6 +196,18 @@ Files: `planning.py`, `discovery.py`, `runner.py`, `manifest.py`, `manifest_sink
   - [ ] Operations: pause/resume/abort workflow using sentinels; continuous plan watcher usage and limitations.
   - [x] Operations: document manifest rotation workflow (`rotate_if_needed`) including rotation thresholds, compaction output, and lock safety expectations.
   - [ ] Versioning: manifest schema versioning, migration utilities, backward-compat policies.
+
+- Status (pending commentary):
+  - P1 focus
+    - Runner diagnostics: add `throughput_docs_per_min`, ETA, and `queue_p95_ms`/`exec_p99_ms` in summaries.
+    - Planner outputs: `--output json` + `--limit` and env override for preview; align default vector format.
+    - Concurrency durability: add temp+rename atomic path to `safe_write`; emit lock contention duration logs.
+    - Plugin hooks: formal `SchedulerStrategy` and `RetryPolicy` selection via options/env.
+  - P2 focus
+    - HTTP tuning: per-request retry overrides and bounded `Retry-After` wait.
+    - Dynamic concurrency: adjust workers based on latency/backlog; respect min/max bounds.
+    - Manifest sink: persist attempts count and standardize stage `extras` (e.g., vector metadata).
+  - Owners: Core/DocParsing. Target: next minor release window.
 
 ### DocTags Stage (`doctags.py`)
 
@@ -304,24 +316,98 @@ Files: `paths.py`, `writers.py`, `readers.py`, `chunks_writer.py`, `embedding_in
 Note: `schemas.py` is a deprecated shim; track removal window.
 Files: `formats/markers.py`, `schemas.py`
 
-- Items: <!-- add items here -->
-- Migration/Deprecation: <!-- add items here -->
-- Tests: <!-- add items here -->
+- Items:
+  - Data models & versions
+    - [ ] Canonical Pydantic models for `ChunkRow` and `VectorRow` with strict types and defaults.
+    - [ ] Centralize `CHUNK_SCHEMA_VERSION`/`VECTORS_SCHEMA_VERSION` and embed in Parquet footers + JSONL fields.
+    - [ ] Footer metadata: include `created_by`, `cfg_hash`, `hash_alg`, `docling_version` consistently.
+  - Validation
+    - [ ] Strengthen `validate_chunk_row`/vector validation with clear error messages and fast-path option.
+    - [ ] Parquet validation via `parquet_schemas.validate_parquet_file` for required columns/types.
+  - Structural markers
+    - [ ] Unify `load_structural_marker_profile` formats (JSON/YAML/TOML) and document precedence/merging rules.
+    - [ ] Provide defaults and sanity checks (non-empty, printable markers) and warnings on invalid entries.
+  - Hashing/IDs
+    - [ ] Declare allowed hash algorithms; ensure stable `uuid` computation and record algorithm in manifests.
+
+- Migration/Deprecation:
+  - [ ] Announce `DocsToKG.DocParsing.schemas` removal (v0.3.0); emit deprecation warning from import shim.
+  - [ ] Add temporary adapter in `formats.__init__` for legacy imports; search-and-replace guidance for users.
+  - [ ] Release notes: breaking-window timeline, migration steps, code samples.
+
+- Tests:
+  - [ ] Golden fixtures for chunk/vector rows (JSONL + Parquet) validated against models and parquet schema.
+  - [ ] Footer metadata presence and correctness; version bumps reflected in artifacts.
+  - [ ] Marker loader accepts JSON/YAML/TOML and rejects invalid structures with actionable errors.
+  - [ ] Backward-compat: older artifacts still validate when version policy allows.
+
+- Docs:
+  - [ ] Schema reference (fields, types, constraints, footers) with examples.
+  - [ ] Marker profile format and merging policy; recommended headings/captions.
+  - [ ] Versioning policy and migration guide; compatibility matrix.
 
 ### CLI Layer (`cli.py`, `cli_unified.py`, `cli_errors.py`)
 
-- Items: <!-- add items here -->
-- UX/Help Text: <!-- add items here -->
-- Tests: <!-- add items here -->
+- Items:
+  - Command structure
+    - [ ] Ensure unified commands: `doctags`, `chunk`, `embed`, `plan`, `manifest`, `token-profiles`, `all`.
+    - [ ] Normalize shared flags (`--resume`, `--force`, `--data-root`, `--log-level`) across stages.
+  - Argument parsing & outputs
+    - [ ] Standardize exit codes (0 ok, 1 failure, 2 CLI validation error) via `cli_errors` helpers.
+    - [ ] Add `--output json|table` for plan/manifest listings; JSON schema documented.
+    - [ ] Add `--dry-run` to eligible commands; avoid side effects.
+    - [ ] Add `--profile` consistency across stages; print applied defaults.
+    - [ ] Add `--version` and shell completion artifacts.
+  - Environment & precedence
+    - [ ] Print effective configuration (`--show-config`) with masked secrets; show source (CLI/env/file/default).
+    - [ ] Enforce precedence: CLI > env > config file > defaults; document per-stage overrides.
+
+- UX/Help Text:
+  - [ ] Curate help text with examples for common flows; group options logically; cross-link to docs.
+  - [ ] Provide troubleshooting hints in error messages (e.g., missing dirs, dependency import failures).
+
+- Tests:
+  - [ ] Parse smoke for all commands; invalid args surface `cli_errors` with exit 2.
+  - [ ] Help text generation stable and mentions core flags; examples compile.
+  - [ ] `--output json` emits valid JSON; schema verified; table mode human-readable.
+  - [ ] Precedence tests: flags override env which override file; `--show-config` masks secrets.
+  - [ ] `--dry-run` executes without writes; exit codes correct.
 
 ### Configuration & Context
 
 Files: `config.py`, `config_loaders.py`, `config_adapter.py`, `settings.py`, `env.py`, `app_context.py`, `context.py`, `profile_loader.py`
 
-- Items: <!-- add items here -->
-- Validation: <!-- add items here -->
-- Tests: <!-- add items here -->
-- Docs: <!-- add items here -->
+- Items:
+  - Configuration management
+    - [ ] Unify stage adapters (DoctagsCfg/ChunkerCfg/EmbedCfg) behind `ConfigurationAdapter` interface.
+    - [ ] Support JSON/YAML/TOML via `config_loaders`; env var expansion; relative-path resolution from file.
+    - [ ] Precedence policy: CLI > env > file > defaults; per-field source tracking for `to_manifest()`.
+    - [ ] Mask sensitive values in snapshots/logs (tokens, URLs, absolute paths) with stable redaction.
+  - Context propagation
+    - [ ] `ParsingContext` carries run_id, data_root, dirs, resume/force, profile, workers; thread/process-safe.
+    - [ ] `app_context` init helpers for one-time setup; avoid global mutable state leaks across forks.
+    - [ ] Stable `cfg_hash` computation for manifests; include only semantically relevant fields.
+  - Profiles & presets
+    - [ ] `profile_loader` supports per-stage named presets; merging strategy and validation.
+    - [ ] Provide builtin profiles (cpu-small, gpu-default, gpu-max, bert-compat) and allow user overrides.
+  - Security & sandbox
+    - [ ] Enforce data-root sandbox; normalize/resolve paths; reject traversal; document escape hatches.
+
+- Validation:
+  - [ ] Precedence unit tests (CLI/env/file/default) for all major fields; source tracking verified.
+  - [ ] Path normalization and sandbox checks; missing file detection; helpful messages.
+  - [ ] Invalid combinations (min>max, shard index range, unknown format) produce `ChunkingCLIValidationError`.
+  - [ ] Snapshot manifests contain masked secrets and expected fields across stages.
+
+- Tests:
+  - [ ] Adapter roundtrip: from args/env/file → cfg → context → manifest snapshot.
+  - [ ] Profile overlays apply correctly; defaults respected; error on unknown profile.
+  - [ ] Concurrency safety: no cross-process leakage of context/config; worker init idempotent.
+
+- Docs:
+  - [ ] Configuration reference per stage with examples; precedence chart and env var mapping tables.
+  - [ ] Profiles guide (when to use which); adding custom profiles.
+  - [ ] Security guidance for sandboxing and secret redaction; troubleshooting config errors.
 
 ### Interfaces & Contracts (`interfaces.py`)
 
