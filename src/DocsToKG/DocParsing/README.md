@@ -263,7 +263,7 @@ sequenceDiagram
   }
   ```
 
-- Resume contract: [`core.manifest.ResumeController`](core/manifest.py) compares `status` and `input_hash` to decide whether to skip work, so metadata fields supplied by `StageTelemetry` (for example, `vector_format` in embedding runs) must stay in sync with their corresponding writers.
+- Resume contract: [`core.manifest.ResumeController`](core/manifest.py) compares `status` and `input_hash` to decide whether to skip work, so metadata fields supplied by `StageTelemetry` (for example, `vector_format` in embedding runs) must stay in sync with their corresponding writers. Stage adapters surface the controller via `StageOptions.resume_controller`, allowing the shared runner to invoke `_should_skip` before a worker is scheduled.
 - `telemetry.StageTelemetry` writes through a lock-aware writer (default `DEFAULT_JSONL_WRITER` from `io.py`) before appending JSON lines, guaranteeing atomic writes even with concurrent processes.
 
 ## Interactions with other packages

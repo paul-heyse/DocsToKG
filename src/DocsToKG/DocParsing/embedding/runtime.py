@@ -3225,6 +3225,7 @@ def _main_inner(args: argparse.Namespace | None = None, config_adapter=None) -> 
             force=bool(cfg.force),
             error_budget=0,
             diagnostics_interval_s=15.0,
+            resume_controller=resume_controller,
         )
 
         outcome = run_stage(plan, _embedding_stage_worker, options, hooks)

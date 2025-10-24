@@ -2347,6 +2347,7 @@ def pdf_main(args: argparse.Namespace | None = None, config_adapter=None) -> int
                 force=cfg.force,
                 diagnostics_interval_s=30.0,
                 dry_run=False,
+                resume_controller=resume_controller,
             )
 
             # Get stage hooks for lifecycle management
@@ -3120,6 +3121,7 @@ def html_main(args: argparse.Namespace | None = None, config_adapter=None) -> in
                 force=cfg.force,
                 diagnostics_interval_s=30.0,
                 dry_run=False,
+                resume_controller=resume_controller,
             )
 
             # Get stage hooks for lifecycle management
