@@ -67,6 +67,7 @@ from tenacity import (
     stop_after_attempt,
     wait_random_exponential,
 )
+from dataclasses import dataclass
 from tenacity.wait import wait_base
 
 
@@ -252,7 +253,6 @@ def _coerce_allowed_methods(values: Sequence[str] | tuple[str, ...]) -> tuple[st
             seen.add(method)
             coerced.append(method)
     return tuple(coerced)
-
 
 _HTTP_SESSION_LOCK = threading.Lock()
 _HTTP_SESSION: TenacityClient | None = None
