@@ -23,6 +23,7 @@ last_updated: 2025-02-15
   - [Data contracts & schemas](#data-contracts--schemas)
   - [Interactions with other packages](#interactions-with-other-packages)
   - [Observability](#observability)
+  - [Performance monitoring](#performance-monitoring)
   - [Security & data handling](#security--data-handling)
   - [Development tasks](#development-tasks)
   - [Agent guardrails](#agent-guardrails)
@@ -280,6 +281,13 @@ sequenceDiagram
 - Metrics: `logging.telemetry_scope` and `telemetry.StageTelemetry` expose counters and histograms suitable for ingestion by dashboard jobs (see `tests/docparsing/test_chunk_manifest_resume.py` for usage).
 - SLO tracking: maintain ≥99.5 % manifest success across stages and keep embedding validation (`--validate-only`) under 2.2 s P50 per document based on synthetic benchmark fixtures.
 - Health checks: prefer `docparse chunk --validate-only` / `docparse embed --validate-only` when validating environments—these commands read existing JSONL artifacts without mutating outputs.
+
+## Performance monitoring
+
+- Use `docparse perf run` to execute deterministic HTML→DocTags→Chunk→BM25 embedding stages against synthetic fixtures. The command emits metrics, stdout/stderr logs, and optional cProfile dumps under `${DOCSTOKG_DATA_ROOT}/Profiles/<fixture>/runs/<timestamp>/` (override with `--output-dir`).
+- Each stage writes `<stage>.metrics.json` with wall time, CPU time, and RSS estimates. When `--profile` is enabled (default), the command also stores `<stage>.pstats` plus `<stage>.collapsed.txt`, a flamegraph-compatible stack sample derived from the cProfile output.
+- Pass `--baseline baseline.json` to compare the current run to a previous summary. Regressions beyond the configured thresholds (`--wall-threshold`, `--cpu-threshold`, `--rss-threshold`) raise exit code 2 so CI and nightly jobs can fail fast. Improvements and steady-state runs are printed for operator awareness.
+- For automation guidance (nightly cron examples, artifact retention, and baseline rotation) see [docs/06-operations/docparsing-performance-monitoring.md](../../docs/06-operations/docparsing-performance-monitoring.md).
 
 ## Security & data handling
 

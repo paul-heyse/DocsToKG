@@ -112,6 +112,7 @@ _LAZY_ATTR_MODULES: dict[str, str] = {
     "doctags": "DocsToKG.DocParsing.doctags",
     "embedding": "DocsToKG.DocParsing.embedding",
     "formats": "DocsToKG.DocParsing.formats",
+    "perf": "DocsToKG.DocParsing.perf",
     "token_profiles": "DocsToKG.DocParsing.token_profiles",
 }
 

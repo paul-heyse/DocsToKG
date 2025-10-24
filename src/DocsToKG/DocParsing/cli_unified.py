@@ -105,6 +105,7 @@ from DocsToKG.DocParsing.chunking import runtime as chunking_runtime
 from DocsToKG.DocParsing.config_adapter import ConfigurationAdapter
 from DocsToKG.DocParsing.core import detect_mode, split_discovery_ignore
 from DocsToKG.DocParsing.embedding import runtime as embedding_runtime
+from DocsToKG.DocParsing.perf import app as perf_app
 from DocsToKG.DocParsing.settings import DenseBackend, Format
 
 # ============================================================================
@@ -128,6 +129,7 @@ inspect_app = typer.Typer(
     help="Inspect generated datasets (chunks and vector stores).",
 )
 app.add_typer(inspect_app, name="inspect", help="Inspect datasets (chunks|vectors-*)")
+app.add_typer(perf_app, name="perf", help="Profile DocParsing stages")
 
 
 # ============================================================================
