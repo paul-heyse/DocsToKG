@@ -516,14 +516,6 @@ manifest_log_failure = _logging_manifest_log_failure
 manifest_log_success = _logging_manifest_log_success
 manifest_log_skip = _logging_manifest_log_skip
 manifest_append = _manifest_append
-
-
-def _embed_write_vectors() -> None:
-    """Placeholder used with :func:`safe_write` for vector artefacts."""
-
-    return None
-
-
 def _build_bm25_vector(**kwargs):
     """Construct a BM25 vector."""
 
@@ -978,10 +970,10 @@ def tokens(text: str) -> list[str]:
 class BM25StatsAccumulator:
     """Streaming accumulator for BM25 corpus statistics.
 
-    Attributes:
-        N: Number of documents processed so far.
-        total_tokens: Total token count across processed documents.
-        df: Document frequency map collected to date.
+    Maintains the following counters:
+    - ``N``: Number of documents processed so far.
+    - ``total_tokens``: Total token count across processed documents.
+    - ``df``: Document frequency map collected to date.
 
     Examples:
         >>> acc = BM25StatsAccumulator()
@@ -1090,10 +1082,10 @@ def bm25_vector(
 class SPLADEValidator:
     """Track SPLADE sparsity metrics across the corpus.
 
-    Attributes:
-        total_chunks: Total number of chunks inspected.
-        zero_nnz_chunks: UUIDs whose SPLADE vector has zero active terms.
-        nnz_counts: Non-zero counts per processed chunk.
+    The validator records:
+    - ``total_chunks``: Total number of chunks inspected.
+    - ``zero_nnz_chunks``: UUIDs whose SPLADE vector has zero active terms.
+    - ``nnz_counts``: Non-zero counts per processed chunk.
 
     Examples:
         >>> validator = SPLADEValidator()
@@ -2115,19 +2107,30 @@ def _embedding_stage_worker(item: WorkItem) -> ItemOutcome:
             content_hasher=hasher,
         )
 
+    def _make_vector_write_fn(fmt: str, message: str) -> Callable[[Path], None]:
+        """Return a safe_write-compatible writer that emits structured logs."""
+
+        def _write(target_path: Path) -> None:
+            nonlocal result_tuple
+            log_event(
+                logger,
+                "debug",
+                message,
+                stage=EMBED_STAGE,
+                doc_id=item.item_id,
+                vector_format=fmt,
+            )
+            result_tuple = _execute_vector_generation(target_path, fmt)
+
+        return _write
+
     try:
         try:
-            # Use safe_write for atomic vector writes
-            if safe_write(vectors_path, _embed_write_vectors):
-                log_event(
-                    logger,
-                    "debug",
-                    "Embedding worker invoke process_chunk_file_vectors",
-                    stage=EMBED_STAGE,
-                    doc_id=item.item_id,
-                    vector_format=effective_vector_format,
-                )
-                result_tuple = _execute_vector_generation(vectors_path, effective_vector_format)
+            write_vectors = _make_vector_write_fn(
+                effective_vector_format,
+                "Embedding worker invoke process_chunk_file_vectors",
+            )
+            safe_write(vectors_path, write_vectors)
         except VectorWriterError as exc:
             fallback_error = exc
             fallback_from = vector_format
@@ -2154,16 +2157,16 @@ def _embedding_stage_worker(item: WorkItem) -> ItemOutcome:
             vectors_path = fallback_path
             original_vectors_path = fallback_path
             try:
-                if safe_write(vectors_path, _embed_write_vectors, skip_if_exists=False):
-                    log_event(
-                        logger,
-                        "debug",
-                        "Embedding worker retry with JSONL",
-                        stage=EMBED_STAGE,
-                        doc_id=item.item_id,
-                        vector_format=effective_vector_format,
-                    )
-                    result_tuple = _execute_vector_generation(vectors_path, effective_vector_format)
+                write_vectors = _make_vector_write_fn(
+                    effective_vector_format,
+                    "Embedding worker retry with JSONL",
+                )
+                wrote = safe_write(
+                    vectors_path,
+                    write_vectors,
+                    skip_if_exists=False,
+                )
+                if wrote:
                     fallback_error = None
                 else:
                     raise VectorWriterError(
@@ -2539,6 +2542,13 @@ def _make_embedding_stage_hooks(
             quarantined_files=quarantined_files,
             total_vectors=total_vectors,
             vector_format_fallbacks=fallback_total,
+            wall_ms=round(outcome.wall_ms, 3),
+            queue_p50_ms=round(outcome.queue_p50_ms, 3),
+            queue_p95_ms=round(outcome.queue_p95_ms, 3),
+            exec_p50_ms=round(outcome.exec_p50_ms, 3),
+            exec_p95_ms=round(outcome.exec_p95_ms, 3),
+            exec_p99_ms=round(outcome.exec_p99_ms, 3),
+            cpu_time_total_ms=round(outcome.cpu_time_total_ms, 3),
         )
 
         if exit_stack is not None:
@@ -3218,6 +3228,7 @@ def _main_inner(args: argparse.Namespace | None = None, config_adapter=None) -> 
             force=bool(cfg.force),
             error_budget=0,
             diagnostics_interval_s=15.0,
+            resume_controller=resume_controller,
         )
 
         outcome = run_stage(plan, _embedding_stage_worker, options, hooks)

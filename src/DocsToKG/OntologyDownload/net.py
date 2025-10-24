@@ -95,6 +95,7 @@ handled transparently, and event hooks stamp polite telemetry headers while
 recording cache metadata for downstream consumers.
 
 Key Features:
+
 - Deterministic client construction with explicit timeout, pool, HTTP/2, and SSL
   settings sourced from :class:`~DocsToKG.OntologyDownload.settings.DownloadConfiguration`.
 - Hishel ``CacheTransport`` storage rooted at ``CACHE_DIR / "http" / "ontology"``
@@ -103,16 +104,20 @@ Key Features:
   factories (for example, :class:`httpx.MockTransport` during tests).
 
 Dependencies:
+
 - ``httpx`` for the HTTP client implementation.
 - ``hishel`` for RFC-9111 compliant caching.
 - ``certifi`` to seed the default SSL trust store.
 
 Usage:
-    from DocsToKG.OntologyDownload.net import get_http_client
 
-    client = get_http_client()
-    response = client.get("https://example.org/ontology.owl")
-    response.raise_for_status()
+    .. code-block:: python
+
+        from DocsToKG.OntologyDownload.net import get_http_client
+
+        client = get_http_client()
+        response = client.get("https://example.org/ontology.owl")
+        response.raise_for_status()
 """
 
 from __future__ import annotations

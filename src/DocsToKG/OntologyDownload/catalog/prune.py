@@ -117,6 +117,7 @@ def load_staging_from_fs(
     Walk filesystem under <root> and populate staging_fs_listing table.
 
     Pre-requisites:
+
     - Table staging_fs_listing must exist (created by migration 0005_staging_prune.sql)
       Schema: (scope TEXT, relpath TEXT, size_bytes BIGINT, mtime TIMESTAMP)
 
@@ -166,6 +167,7 @@ def list_orphans(
     Query v_fs_orphans view to find files on disk not referenced by DB.
 
     Pre-requisites:
+
     - staging_fs_listing table populated (call load_staging_from_fs first)
     - v_fs_orphans view must exist (created by migration 0005_staging_prune.sql)
 
@@ -217,6 +219,7 @@ def delete_orphans(
     Delete orphaned files from filesystem in safe batches.
 
     Design:
+
     - DB is the source of truth; FS rows are never mutated in this function
     - Deletion happens outside of transactions to avoid hold-locks
     - Errors are logged but don't halt the prune operation

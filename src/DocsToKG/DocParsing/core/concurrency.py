@@ -65,26 +65,32 @@ dependencies. The safe_write() function is the recommended way to atomically
 write files when multiple processes may access them concurrently.
 
 Example:
-    from DocsToKG.DocParsing.core import safe_write
-    from pathlib import Path
+    .. code-block:: python
 
-    # Atomically write a file with process-safe locking
-    wrote = safe_write(
-        Path("output.json"),
-        lambda: save_json_to_output(),
-        timeout=60.0,
-        skip_if_exists=True
-    )
+        from DocsToKG.DocParsing.core import safe_write
+        from pathlib import Path
+
+        # Atomically write a file with process-safe locking
+        wrote = safe_write(
+            Path("output.json"),
+            lambda: save_json_to_output(),
+            timeout=60.0,
+            skip_if_exists=True,
+        )
 """
 
 from __future__ import annotations
 
 import contextlib
+import inspect
 import logging
+import os
 import socket
+import tempfile
 import time
 from collections.abc import Callable, Iterator
 from pathlib import Path
+from typing import Any
 
 from filelock import FileLock, Timeout
 
@@ -102,20 +108,166 @@ __all__ = [
 LOGGER = get_logger(__name__, base_fields={"stage": "core"})
 
 
+_ATOMIC_WRITES_ENV = "DOCSTOKG_ATOMIC_WRITES"
+_RETAIN_LOCKS_ENV = "DOCSTOKG_RETAIN_LOCK_FILES"
+_TMP_SUFFIX = ".tmp"
+
+
 def _lock_path_for(path: Path) -> Path:
     """Return the canonical lock path for a given payload file."""
 
     return path.with_suffix(path.suffix + ".lock")
 
 
+def _parse_bool_env(value: str | None, default: bool) -> bool:
+    """Interpret ``value`` as a boolean flag."""
+
+    if value is None:
+        return default
+    text = value.strip().lower()
+    if not text:
+        return default
+    if text in {"1", "true", "t", "yes", "y", "on"}:
+        return True
+    if text in {"0", "false", "f", "no", "n", "off"}:
+        return False
+    return default
+
+
+def _resolve_atomic_flag(explicit: bool | None) -> bool:
+    """Return whether safe_write should use atomic temp-file replacement."""
+
+    if explicit is not None:
+        return bool(explicit)
+    return _parse_bool_env(os.getenv(_ATOMIC_WRITES_ENV), False)
+
+
+def _resolve_retain_lock(explicit: bool | None) -> bool:
+    """Return whether ``.lock`` sentinels should remain on disk."""
+
+    if explicit is not None:
+        return bool(explicit)
+    return _parse_bool_env(os.getenv(_RETAIN_LOCKS_ENV), False)
+
+
+def _fsync_path(path: Path) -> None:
+    """Flush ``path`` to disk if it exists."""
+
+    if not path.exists():
+        return
+    fd = os.open(path, os.O_RDONLY)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+
+def _fsync_directory(directory: Path) -> None:
+    """Flush directory metadata for ``directory``."""
+
+    fd = os.open(directory, os.O_RDONLY)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+
+def _write_fn_accepts_path(write_fn: Callable[..., Any]) -> bool:
+    """Return True when ``write_fn`` can be invoked with a path argument."""
+
+    try:
+        signature = inspect.signature(write_fn)
+    except (TypeError, ValueError):
+        # Builtins or C extensions: assume they accept the path argument.
+        return True
+
+    parameters = tuple(signature.parameters.values())
+    varargs = any(param.kind is inspect.Parameter.VAR_POSITIONAL for param in parameters)
+    if varargs:
+        return True
+
+    positional = [
+        param
+        for param in parameters
+        if param.kind in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+    ]
+
+    required_positional = [param for param in positional if param.default is inspect._empty]
+    if len(required_positional) > 1:
+        raise TypeError("safe_write write_fn must accept at most one positional argument")
+
+    if positional:
+        return True
+
+    if any(
+        param.kind is inspect.Parameter.KEYWORD_ONLY and param.default is inspect._empty
+        for param in parameters
+    ):
+        raise TypeError("safe_write write_fn cannot require keyword-only arguments")
+
+    return False
+
+
+def _invoke_write_fn(
+    write_fn: Callable[..., None],
+    target_path: Path,
+    *,
+    require_path: bool,
+) -> None:
+    """Invoke ``write_fn`` respecting whether a path argument is required."""
+
+    accepts_path = _write_fn_accepts_path(write_fn)
+    if require_path and not accepts_path:
+        raise TypeError(
+            "safe_write write_fn must accept a path argument when atomic writes are enabled"
+        )
+
+    if accepts_path:
+        write_fn(target_path)
+        return
+
+    write_fn()
+
+
+def _atomic_replace(path: Path, write_fn: Callable[..., None]) -> None:
+    """Write to a temporary file then atomically replace ``path``."""
+
+    fd: int | None = None
+    tmp_path: Path | None = None
+    try:
+        fd, tmp_name = tempfile.mkstemp(
+            dir=str(path.parent), prefix=f".{path.name}.", suffix=_TMP_SUFFIX
+        )
+        os.close(fd)
+        fd = None
+        tmp_path = Path(tmp_name)
+        _invoke_write_fn(write_fn, tmp_path, require_path=True)
+        _fsync_path(tmp_path)
+        os.replace(tmp_path, path)
+        _fsync_directory(path.parent)
+        tmp_path = None
+    finally:
+        if tmp_path is not None and tmp_path.exists():
+            with contextlib.suppress(OSError):
+                tmp_path.unlink()
+
+
 @contextlib.contextmanager
-def _acquire_lock(path: Path, *, timeout: float = 60.0) -> Iterator[bool]:
+def _acquire_lock(
+    path: Path,
+    *,
+    timeout: float = 60.0,
+    retain_lock_file: bool | None = None,
+) -> Iterator[bool]:
     """Acquire a process-safe lock for ``path``.
 
     This context manager exists for backwards compatibility with legacy code
     that previously relied on ``_acquire_lock``. It delegates locking to the
     same FileLock-based implementation used by :func:`safe_write` and yields a
-    simple boolean placeholder to preserve historical semantics.
+    simple boolean placeholder to preserve historical semantics. When
+    ``retain_lock_file`` or ``DOCSTOKG_RETAIN_LOCK_FILES`` is truthy, the lock
+    sentinel remains on disk after releasing the FileLock, allowing callers to
+    inspect recent lock usage.
     """
 
     lock_path = _lock_path_for(path)
@@ -132,16 +284,23 @@ def _acquire_lock(path: Path, *, timeout: float = 60.0) -> Iterator[bool]:
     finally:
         with contextlib.suppress(RuntimeError):
             file_lock.release()
-        with contextlib.suppress(OSError):
-            lock_path.unlink()
+        should_retain = _resolve_retain_lock(retain_lock_file)
+        if should_retain:
+            with contextlib.suppress(OSError):
+                lock_path.touch(exist_ok=True)
+        else:
+            with contextlib.suppress(OSError):
+                lock_path.unlink()
 
 
 def safe_write(
     path: Path,
-    write_fn: Callable[[], None],
+    write_fn: Callable[..., None],
     *,
     timeout: float = 60.0,
     skip_if_exists: bool = True,
+    atomic: bool | None = None,
+    retain_lock_file: bool | None = None,
 ) -> bool:
     """Atomically write a file with process-safe locking.
 
@@ -154,18 +313,31 @@ def safe_write(
         write_fn: Callable that performs the write (e.g., lambda: file.save())
         timeout: FileLock timeout in seconds
         skip_if_exists: If True, skip write if file already exists
+        atomic: When True (or configured via ``DOCSTOKG_ATOMIC_WRITES``), write to a
+            temporary file and atomically replace ``path`` using ``os.replace``.
+        retain_lock_file: When True (or configured via ``DOCSTOKG_RETAIN_LOCK_FILES``),
+            leave the ``.lock`` sentinel on disk after releasing the FileLock for
+            post-mortem inspection.
 
     Returns:
         True if write occurred, False otherwise
 
     Raises:
         TimeoutError: If lock cannot be acquired within timeout
+        TypeError: If ``write_fn`` requires unsupported parameters
     """
 
-    with _acquire_lock(path, timeout=timeout):
+    use_atomic = _resolve_atomic_flag(atomic)
+    retain_lock = _resolve_retain_lock(retain_lock_file)
+
+    with _acquire_lock(path, timeout=timeout, retain_lock_file=retain_lock):
         if skip_if_exists and path.exists():
             return False
-        write_fn()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if use_atomic:
+            _atomic_replace(path, write_fn)
+        else:
+            _invoke_write_fn(write_fn, path, require_path=False)
         return True
 
 

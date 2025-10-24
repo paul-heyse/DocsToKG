@@ -62,6 +62,20 @@ extensions = [
     "xref_rescue",
 ]
 
+if os.environ.get("SPHINX_BUILD", "dirhtml") not in {"html", "dirhtml"}:
+    html_only_extensions = {
+        "sphinx_sitemap",
+        "sphinx_copybutton",
+        "sphinx_design",
+        "sphinxext.opengraph",
+        "notfound.extension",
+        "sphinxext.rediraffe",
+        "sphinxcontrib.spelling",
+        "sphinx_issues",
+        "sphinxcontrib.mermaid",
+    }
+    extensions = [ext for ext in extensions if ext not in html_only_extensions]
+
 autosummary_generate = True
 autodoc_typehints = "description"
 autosectionlabel_prefix_document = True
@@ -69,7 +83,14 @@ nitpicky = True
 primary_domain = "py"
 default_role = None
 templates_path = ["_templates"]
-exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
+exclude_patterns = [
+    "_build",
+    "Thumbs.db",
+    ".DS_Store",
+    "04-api/generated/*",
+    "04-api/DocsToKG/OntologyDownload/cli*/**",
+    "04-api/DocsToKG/OntologyDownload/*cli*/**",
+]
 nitpick_ignore_regex = [
     (r"py:.*", r"tenacity\..*"),
     (r"py:.*", r"httpx\..*"),
@@ -79,6 +100,7 @@ nitpick_ignore = [
     ("py:class", "placeholder"),
     ("py:obj", "placeholder"),
 ]
+napoleon_custom_sections = [("Attributes", "notes")]
 
 source_suffix = {
     ".rst": "restructuredtext",

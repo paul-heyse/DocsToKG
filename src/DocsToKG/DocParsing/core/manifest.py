@@ -34,6 +34,8 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
+from .paths import normalize_output_path
+
 __all__ = [
     "ResumeController",
     "should_skip_output",
@@ -51,12 +53,12 @@ def should_skip_output(
 
     if not resume or force:
         return False
-    candidate_path = output_path
+    candidate_path = normalize_output_path(output_path)
     if manifest_entry and isinstance(manifest_entry, Mapping):
         recorded_path = manifest_entry.get("output_path")
         if recorded_path:
-            candidate_path = Path(str(recorded_path))
-    if not Path(candidate_path).exists():
+            candidate_path = normalize_output_path(recorded_path)
+    if not candidate_path.exists():
         return False
     if not manifest_entry or not isinstance(manifest_entry, Mapping):
         return False
@@ -71,7 +73,11 @@ def should_skip_output(
 
 @dataclass(slots=True)
 class ResumeController:
-    """Centralize resume/force decisions using manifest metadata."""
+    """Centralize resume/force decisions using manifest metadata.
+
+    Stage adapters attach instances to :class:`DocsToKG.DocParsing.core.runner.StageOptions`
+    so the runner can query :meth:`should_skip` before scheduling work items.
+    """
 
     resume: bool
     force: bool
@@ -105,12 +111,12 @@ class ResumeController:
         if status not in {"success", "skip"}:
             return False, entry
 
-        candidate_path = output_path
+        candidate_path = normalize_output_path(output_path)
         if entry and isinstance(entry, Mapping):
             recorded_path = entry.get("output_path")
             if recorded_path:
-                candidate_path = Path(str(recorded_path))
-        if not Path(candidate_path).exists():
+                candidate_path = normalize_output_path(recorded_path)
+        if not candidate_path.exists():
             return False, entry
 
         return True, entry
