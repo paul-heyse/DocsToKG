@@ -4,11 +4,61 @@ from __future__ import annotations
 
 import importlib.util
 import logging
+import threading
 import sys
 import types
+import time
 from pathlib import Path
 
 import pytest
+
+filelock_stub = types.ModuleType("filelock")
+
+
+class _Timeout(Exception):
+    """Stub Timeout exception compatible with filelock.Timeout."""
+
+
+class _FileLock:
+    """Lightweight in-memory lock emulating filelock.FileLock semantics."""
+
+    _locks: dict[str, threading.Lock] = {}
+    _registry_lock = threading.Lock()
+
+    def __init__(self, path: str) -> None:
+        self._path = path
+        self._lock: threading.Lock | None = None
+
+    def acquire(self, timeout: float | None = None) -> bool:
+        with _FileLock._registry_lock:
+            shared_lock = _FileLock._locks.setdefault(self._path, threading.Lock())
+
+        if timeout is None:
+            shared_lock.acquire()
+            self._lock = shared_lock
+            return True
+
+        deadline = time.monotonic() + timeout
+        while True:
+            if shared_lock.acquire(blocking=False):
+                self._lock = shared_lock
+                return True
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise _Timeout()
+            time.sleep(min(0.01, max(remaining, 0.001)))
+
+    def release(self) -> None:
+        if self._lock is None or not self._lock.locked():
+            raise RuntimeError("Lock not acquired")
+        self._lock.release()
+
+
+filelock_stub.FileLock = _FileLock
+filelock_stub.Timeout = _Timeout
+sys.modules["filelock"] = filelock_stub
+
+from filelock import FileLock
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SRC_DIR = PROJECT_ROOT / "src"
@@ -226,3 +276,75 @@ def test_safe_write_atomic_requires_path(
 
     with pytest.raises(TypeError):
         safe_write(target, _write_without_path, skip_if_exists=False, atomic=True)
+
+
+def test_safe_write_logs_contention(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Lock acquisition waits should emit structured contention events."""
+
+    events: list[tuple[str, str, dict[str, object]]] = []
+
+    def _capture_event(
+        logger: logging.Logger, level: str, message: str, **fields: object
+    ) -> None:
+        events.append((level, message, dict(fields)))
+
+    monkeypatch.setattr(concurrency, "log_event", _capture_event)
+
+    target = tmp_path / "contended.txt"
+    lock_path = concurrency._lock_path_for(target)
+    file_lock = FileLock(str(lock_path))
+    file_lock.acquire(timeout=1.0)
+
+    def _release_later() -> None:
+        time.sleep(0.05)
+        file_lock.release()
+
+    releaser = threading.Thread(target=_release_later)
+    releaser.start()
+
+    try:
+        wrote = safe_write(
+            target,
+            lambda path: path.write_text("data", encoding="utf-8"),
+            skip_if_exists=False,
+            atomic=False,
+        )
+    finally:
+        releaser.join()
+
+    assert wrote
+    assert events, "Expected contention log events"
+    level, message, fields = events[0]
+    assert level == "debug"
+    assert "acquired" in message.lower()
+    assert fields["lock_path"] == str(lock_path)
+    assert fields["lock_target"] == str(target)
+    assert fields["timeout_seconds"] == 60.0
+    assert fields["wait_seconds"] >= concurrency._CONTENTED_WAIT_THRESHOLD_SECONDS
+
+
+def test_safe_write_no_contention_skips_logging(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Immediate lock acquisition should not emit contention events."""
+
+    events: list[tuple[str, str, dict[str, object]]] = []
+
+    def _capture_event(
+        logger: logging.Logger, level: str, message: str, **fields: object
+    ) -> None:
+        events.append((level, message, dict(fields)))
+
+    monkeypatch.setattr(concurrency, "log_event", _capture_event)
+
+    target = tmp_path / "no_contention.txt"
+
+    wrote = safe_write(
+        target,
+        lambda path: path.write_text("clean", encoding="utf-8"),
+        skip_if_exists=False,
+        atomic=False,
+    )
+
+    assert wrote
+    assert events == []

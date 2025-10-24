@@ -112,6 +112,7 @@ _ATOMIC_WRITES_ENV = "DOCSTOKG_ATOMIC_WRITES"
 _RETAIN_LOCKS_ENV = "DOCSTOKG_RETAIN_LOCK_FILES"
 _RETAIN_LOCKS_ON_ERROR_ENV = "DOCSTOKG_RETAIN_LOCK_FILES_ON_ERROR"
 _TMP_SUFFIX = ".tmp"
+_CONTENTED_WAIT_THRESHOLD_SECONDS = 1e-3
 
 
 def _lock_path_for(path: Path) -> Path:
@@ -286,12 +287,36 @@ def _acquire_lock(
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     file_lock = FileLock(str(lock_path))
 
+    start = time.monotonic()
+
     try:
         file_lock.acquire(timeout=timeout)
     except Timeout as exc:
+        waited = time.monotonic() - start
+        log_event(
+            LOGGER,
+            "warning",
+            "Timed out waiting for file lock.",
+            lock_path=str(lock_path),
+            lock_target=str(path),
+            wait_seconds=waited,
+            timeout_seconds=timeout,
+        )
         raise TimeoutError(f"Could not acquire lock on {path} after {timeout}s") from exc
 
     error_raised = False
+    waited = time.monotonic() - start
+    if waited >= _CONTENTED_WAIT_THRESHOLD_SECONDS:
+        log_event(
+            LOGGER,
+            "debug",
+            "File lock acquired after waiting.",
+            lock_path=str(lock_path),
+            lock_target=str(path),
+            wait_seconds=waited,
+            timeout_seconds=timeout,
+        )
+
     try:
         yield True
     except Exception:

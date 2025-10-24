@@ -161,6 +161,10 @@ Files: `planning.py`, `discovery.py`, `runner.py`, `manifest.py`, `manifest_sink
   - [ ] Concurrency: add atomic write pattern (write to temp file + fsync + rename) to `safe_write`; preserve current behavior under flag.
   - [ ] Concurrency: include `log_event` on lock acquisition and contention (with wait duration) for observability.
   - [x] Concurrency: add option to keep `.lock` files on failure for forensics.
+  - [x] Concurrency: include `log_event` on lock acquisition and contention (with wait duration) for observability.
+    - Resolved: `_acquire_lock` records wait durations via monotonic timers and emits structured lock metadata when contention occurs.
+    - Remaining: Feed contention timings into future telemetry/metrics surfaces once StageTelemetry aggregation lands.
+  - [ ] Concurrency: add option to keep `.lock` files on failure for forensics.
 
 - Tests:
   - [ ] Runner: budget exhaustion aborts promptly; counts consistent; after_stage invoked once.
