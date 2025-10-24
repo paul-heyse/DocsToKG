@@ -129,6 +129,7 @@ import concurrent.futures as cf
 import json
 import math
 import random
+import statistics
 import time
 from collections import deque
 from collections.abc import Callable, Iterator, Mapping, Sequence
@@ -286,8 +287,11 @@ class StageOutcome:
     cancelled: bool
     wall_ms: float
     queue_p50_ms: float
+    queue_p95_ms: float
     exec_p50_ms: float
     exec_p95_ms: float
+    exec_p99_ms: float
+    cpu_time_total_ms: float
     errors: Sequence[StageError]
 
 
@@ -404,10 +408,20 @@ def _percentile(values: Sequence[float], pct: float) -> float:
         return 0.0
     if len(values) == 1:
         return float(values[0])
-    ordered = sorted(values)
-    index = int(math.ceil(pct / 100.0 * len(ordered))) - 1
-    index = max(0, min(index, len(ordered) - 1))
-    return float(ordered[index])
+    pct = float(pct)
+    if pct <= 0.0:
+        return float(min(values))
+    if pct >= 100.0:
+        return float(max(values))
+    try:
+        quantiles = statistics.quantiles(values, n=100, method="inclusive")
+        index = max(1, min(99, int(math.ceil(pct)))) - 1
+        return float(quantiles[index])
+    except (ValueError, statistics.StatisticsError):
+        ordered = sorted(values)
+        index = int(math.ceil(pct / 100.0 * len(ordered))) - 1
+        index = max(0, min(index, len(ordered) - 1))
+        return float(ordered[index])
 
 
 def _create_executor(options: StageOptions) -> tuple[cf.Executor | None, bool]:
@@ -438,6 +452,7 @@ def run_stage(
     )
     context = StageContext(plan=plan, options=options)
 
+    cpu_start = time.process_time()
     items = [item.materialize() for item in plan]
     total_items = plan.total_items if plan.total_items >= 0 else len(items)
 
@@ -501,6 +516,7 @@ def run_stage(
 
     if options.dry_run:
         wall_ms = (_now() - wall_start) * 1000.0
+        cpu_total_ms = max(0.0, (time.process_time() - cpu_start) * 1000.0)
         outcome = StageOutcome(
             scheduled=0,
             skipped=skipped,
@@ -509,8 +525,11 @@ def run_stage(
             cancelled=False,
             wall_ms=wall_ms,
             queue_p50_ms=0.0,
+            queue_p95_ms=0.0,
             exec_p50_ms=0.0,
             exec_p95_ms=0.0,
+            exec_p99_ms=0.0,
+            cpu_time_total_ms=cpu_total_ms,
             errors=tuple(),
         )
         if hooks.after_stage:
@@ -851,6 +870,7 @@ def run_stage(
             executor.shutdown(wait=True, cancel_futures=True)
 
     wall_ms = (_now() - wall_start) * 1000.0
+    cpu_total_ms = max(0.0, (time.process_time() - cpu_start) * 1000.0)
     outcome = StageOutcome(
         scheduled=total_to_run,
         skipped=skipped,
@@ -859,8 +879,11 @@ def run_stage(
         cancelled=cancelled,
         wall_ms=wall_ms,
         queue_p50_ms=_percentile(queue_ms, 50.0),
+        queue_p95_ms=_percentile(queue_ms, 95.0),
         exec_p50_ms=_percentile(exec_ms, 50.0),
         exec_p95_ms=_percentile(exec_ms, 95.0),
+        exec_p99_ms=_percentile(exec_ms, 99.0),
+        cpu_time_total_ms=cpu_total_ms,
         errors=tuple(errors),
     )
 

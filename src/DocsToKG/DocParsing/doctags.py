@@ -799,6 +799,12 @@ def _make_pdf_stage_hooks(
             skipped=total_skipped,
             cancelled=outcome.cancelled,
             wall_ms=round(outcome.wall_ms, 3),
+            queue_p50_ms=round(outcome.queue_p50_ms, 3),
+            queue_p95_ms=round(outcome.queue_p95_ms, 3),
+            exec_p50_ms=round(outcome.exec_p50_ms, 3),
+            exec_p95_ms=round(outcome.exec_p95_ms, 3),
+            exec_p99_ms=round(outcome.exec_p99_ms, 3),
+            cpu_time_total_ms=round(outcome.cpu_time_total_ms, 3),
             stage=MANIFEST_STAGE,
             doc_id="__summary__",
         )
@@ -2360,8 +2366,12 @@ def pdf_main(args: argparse.Namespace | None = None, config_adapter=None) -> int
                         "skip": outcome.skipped,
                         "fail": outcome.failed,
                         "total_wall_ms": outcome.wall_ms,
+                        "queue_p50_ms": outcome.queue_p50_ms,
+                        "queue_p95_ms": outcome.queue_p95_ms,
                         "exec_p50_ms": outcome.exec_p50_ms,
                         "exec_p95_ms": outcome.exec_p95_ms,
+                        "exec_p99_ms": outcome.exec_p99_ms,
+                        "cpu_time_total_ms": outcome.cpu_time_total_ms,
                     }
                 },
             )
@@ -3130,8 +3140,12 @@ def html_main(args: argparse.Namespace | None = None, config_adapter=None) -> in
                     "skip": outcome.skipped,
                     "fail": outcome.failed,
                     "total_wall_ms": outcome.wall_ms,
+                    "queue_p50_ms": outcome.queue_p50_ms,
+                    "queue_p95_ms": outcome.queue_p95_ms,
                     "exec_p50_ms": outcome.exec_p50_ms,
                     "exec_p95_ms": outcome.exec_p95_ms,
+                    "exec_p99_ms": outcome.exec_p99_ms,
+                    "cpu_time_total_ms": outcome.cpu_time_total_ms,
                 }
             },
         )

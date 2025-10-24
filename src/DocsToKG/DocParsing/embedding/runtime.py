@@ -2539,6 +2539,13 @@ def _make_embedding_stage_hooks(
             quarantined_files=quarantined_files,
             total_vectors=total_vectors,
             vector_format_fallbacks=fallback_total,
+            wall_ms=round(outcome.wall_ms, 3),
+            queue_p50_ms=round(outcome.queue_p50_ms, 3),
+            queue_p95_ms=round(outcome.queue_p95_ms, 3),
+            exec_p50_ms=round(outcome.exec_p50_ms, 3),
+            exec_p95_ms=round(outcome.exec_p95_ms, 3),
+            exec_p99_ms=round(outcome.exec_p99_ms, 3),
+            cpu_time_total_ms=round(outcome.cpu_time_total_ms, 3),
         )
 
         if exit_stack is not None:
