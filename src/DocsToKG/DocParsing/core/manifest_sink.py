@@ -53,7 +53,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
-from filelock import FileLock
+from DocsToKG.DocParsing.core.concurrency import _acquire_lock
 
 __all__ = [
     "ManifestSink",
@@ -180,13 +180,12 @@ class JsonlManifestSink:
             manifest_path: Path to manifest JSONL file.
         """
         self.manifest_path = Path(manifest_path)
-        self.lock_path = self.manifest_path.with_suffix(self.manifest_path.suffix + ".lock")
 
     def _append_entry(self, entry: ManifestEntry) -> None:
         """Append entry to manifest with FileLock for atomicity."""
         self.manifest_path.parent.mkdir(parents=True, exist_ok=True)
 
-        with FileLock(str(self.lock_path), timeout=30.0):
+        with _acquire_lock(self.manifest_path, timeout=30.0):
             with open(self.manifest_path, "a", encoding="utf-8") as f:
                 f.write(entry.to_json())
                 f.write("\n")

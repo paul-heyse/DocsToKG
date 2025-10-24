@@ -325,6 +325,14 @@ class AppCfg(BaseSettings):
         True, description="Treat unknown/deprecated keys as errors (false = warn)"
     )
     random_seed: int | None = Field(None, description="Random seed for reproducibility")
+    atomic_writes: bool = Field(
+        False,
+        description="Write outputs via temporary files and atomic os.replace",
+    )
+    retain_lock_files: bool = Field(
+        False,
+        description="Retain .lock sentinels after releasing FileLock handles",
+    )
 
     @field_validator("data_root", "manifests_root", "models_root", "log_dir", mode="before")
     @classmethod
