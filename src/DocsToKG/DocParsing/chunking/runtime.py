@@ -1645,6 +1645,12 @@ def _make_chunk_stage_hooks(
             skipped=outcome.skipped,
             cancelled=outcome.cancelled,
             wall_ms=round(outcome.wall_ms, 3),
+            queue_p50_ms=round(outcome.queue_p50_ms, 3),
+            queue_p95_ms=round(outcome.queue_p95_ms, 3),
+            exec_p50_ms=round(outcome.exec_p50_ms, 3),
+            exec_p95_ms=round(outcome.exec_p95_ms, 3),
+            exec_p99_ms=round(outcome.exec_p99_ms, 3),
+            cpu_time_total_ms=round(outcome.cpu_time_total_ms, 3),
             stage=MANIFEST_STAGE,
             doc_id="__summary__",
         )
