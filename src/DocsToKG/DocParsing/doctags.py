@@ -379,7 +379,7 @@ from DocsToKG.DocParsing.core import (
     run_stage,
     set_spawn_or_warn,
 )
-from DocsToKG.DocParsing.core.concurrency import _acquire_lock
+from DocsToKG.DocParsing.core.concurrency import safe_write
 from DocsToKG.DocParsing.env import (
     PDF_MODEL_SUBDIR,
     data_doctags,
@@ -1987,18 +1987,13 @@ def pdf_convert_one(task: PdfTask) -> PdfConversionResult:
                 error="empty-document",
             )
 
+        def _write_pdf_doctags(target_path: Path) -> None:
+            """Persist the DocTags payload to ``target_path``."""
+
+            result.document.save_as_doctags(target_path)
+
         try:
-            with _acquire_lock(out_path):
-                if out_path.exists():
-                    return PdfConversionResult(
-                        doc_id=task.doc_id,
-                        status="skip",
-                        duration_s=time.perf_counter() - start,
-                        input_path=str(pdf_path),
-                        input_hash=task.input_hash,
-                        output_path=str(out_path),
-                    )
-                result.document.save_as_doctags(out_path)
+            wrote = safe_write(out_path, _write_pdf_doctags, skip_if_exists=True)
         except TimeoutError as exc:
             return PdfConversionResult(
                 doc_id=task.doc_id,
@@ -2008,6 +2003,15 @@ def pdf_convert_one(task: PdfTask) -> PdfConversionResult:
                 input_hash=task.input_hash,
                 output_path=str(out_path),
                 error=str(exc),
+            )
+        if not wrote:
+            return PdfConversionResult(
+                doc_id=task.doc_id,
+                status="skip",
+                duration_s=time.perf_counter() - start,
+                input_path=str(pdf_path),
+                input_hash=task.input_hash,
+                output_path=str(out_path),
             )
         return PdfConversionResult(
             doc_id=task.doc_id,
@@ -2807,29 +2811,18 @@ def html_convert_one(task: HtmlTask) -> HtmlConversionResult:
             )
 
         out_path.parent.mkdir(parents=True, exist_ok=True)
-        tmp_path = out_path.with_suffix(out_path.suffix + ".tmp")
-        # Serialize under a lock to avoid partial writes when workers race
+
+        def _write_html_doctags(target_path: Path) -> None:
+            """Persist HTML-derived DocTags to ``target_path``."""
+
+            result.document.save_as_doctags(target_path)
+
         try:
-            with _acquire_lock(out_path):
-                if out_path.exists() and not task.overwrite:
-                    return HtmlConversionResult(
-                        doc_id=task.relative_id,
-                        status="skip",
-                        duration_s=time.perf_counter() - start,
-                        input_path=str(task.html_path),
-                        input_hash=task.input_hash,
-                        output_path=str(out_path),
-                        sanitizer_profile=task.sanitizer_profile,
-                    )
-                result.document.save_as_doctags(tmp_path)
-                try:
-                    tmp_path.replace(out_path)
-                finally:
-                    if tmp_path.exists():
-                        try:
-                            tmp_path.unlink()
-                        except Exception:
-                            pass
+            wrote = safe_write(
+                out_path,
+                _write_html_doctags,
+                skip_if_exists=not task.overwrite,
+            )
         except TimeoutError as exc:
             return HtmlConversionResult(
                 doc_id=task.relative_id,
@@ -2839,6 +2832,16 @@ def html_convert_one(task: HtmlTask) -> HtmlConversionResult:
                 input_hash=task.input_hash,
                 output_path=str(out_path),
                 error=str(exc),
+                sanitizer_profile=task.sanitizer_profile,
+            )
+        if not wrote:
+            return HtmlConversionResult(
+                doc_id=task.relative_id,
+                status="skip",
+                duration_s=time.perf_counter() - start,
+                input_path=str(task.html_path),
+                input_hash=task.input_hash,
+                output_path=str(out_path),
                 sanitizer_profile=task.sanitizer_profile,
             )
         return HtmlConversionResult(

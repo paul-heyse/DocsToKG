@@ -516,14 +516,6 @@ manifest_log_failure = _logging_manifest_log_failure
 manifest_log_success = _logging_manifest_log_success
 manifest_log_skip = _logging_manifest_log_skip
 manifest_append = _manifest_append
-
-
-def _embed_write_vectors() -> None:
-    """Placeholder used with :func:`safe_write` for vector artefacts."""
-
-    return None
-
-
 def _build_bm25_vector(**kwargs):
     """Construct a BM25 vector."""
 
@@ -2115,19 +2107,30 @@ def _embedding_stage_worker(item: WorkItem) -> ItemOutcome:
             content_hasher=hasher,
         )
 
+    def _make_vector_write_fn(fmt: str, message: str) -> Callable[[Path], None]:
+        """Return a safe_write-compatible writer that emits structured logs."""
+
+        def _write(target_path: Path) -> None:
+            nonlocal result_tuple
+            log_event(
+                logger,
+                "debug",
+                message,
+                stage=EMBED_STAGE,
+                doc_id=item.item_id,
+                vector_format=fmt,
+            )
+            result_tuple = _execute_vector_generation(target_path, fmt)
+
+        return _write
+
     try:
         try:
-            # Use safe_write for atomic vector writes
-            if safe_write(vectors_path, _embed_write_vectors):
-                log_event(
-                    logger,
-                    "debug",
-                    "Embedding worker invoke process_chunk_file_vectors",
-                    stage=EMBED_STAGE,
-                    doc_id=item.item_id,
-                    vector_format=effective_vector_format,
-                )
-                result_tuple = _execute_vector_generation(vectors_path, effective_vector_format)
+            write_vectors = _make_vector_write_fn(
+                effective_vector_format,
+                "Embedding worker invoke process_chunk_file_vectors",
+            )
+            safe_write(vectors_path, write_vectors)
         except VectorWriterError as exc:
             fallback_error = exc
             fallback_from = vector_format
@@ -2154,16 +2157,16 @@ def _embedding_stage_worker(item: WorkItem) -> ItemOutcome:
             vectors_path = fallback_path
             original_vectors_path = fallback_path
             try:
-                if safe_write(vectors_path, _embed_write_vectors, skip_if_exists=False):
-                    log_event(
-                        logger,
-                        "debug",
-                        "Embedding worker retry with JSONL",
-                        stage=EMBED_STAGE,
-                        doc_id=item.item_id,
-                        vector_format=effective_vector_format,
-                    )
-                    result_tuple = _execute_vector_generation(vectors_path, effective_vector_format)
+                write_vectors = _make_vector_write_fn(
+                    effective_vector_format,
+                    "Embedding worker retry with JSONL",
+                )
+                wrote = safe_write(
+                    vectors_path,
+                    write_vectors,
+                    skip_if_exists=False,
+                )
+                if wrote:
                     fallback_error = None
                 else:
                     raise VectorWriterError(
