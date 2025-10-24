@@ -92,16 +92,21 @@ from .cli_utils import CLIOption, build_subcommand, detect_mode
 from .concurrency import ReservedPort, find_free_port, safe_write, set_spawn_or_warn
 from .discovery import (
     DEFAULT_CAPTION_MARKERS,
+    DEFAULT_DISCOVERY_IGNORE,
     DEFAULT_HEADING_MARKERS,
     ChunkDiscovery,
+    configure_discovery_ignore,
     compute_relative_doc_id,
     compute_stable_shard,
     derive_doc_id_and_chunks_path,
     derive_doc_id_and_doctags_path,
     derive_doc_id_and_vectors_path,
+    get_discovery_ignore_patterns,
     iter_chunks,
     load_structural_marker_config,
     load_structural_marker_profile,
+    parse_discovery_ignore,
+    split_discovery_ignore,
     vector_artifact_name,
 )
 from .http import DEFAULT_HTTP_TIMEOUT, get_http_session, normalize_http_timeout
@@ -198,6 +203,11 @@ __all__ = [
     "ChunkResult",
     "DEFAULT_HEADING_MARKERS",
     "DEFAULT_CAPTION_MARKERS",
+    "DEFAULT_DISCOVERY_IGNORE",
+    "configure_discovery_ignore",
+    "get_discovery_ignore_patterns",
+    "parse_discovery_ignore",
+    "split_discovery_ignore",
     "DEFAULT_SERIALIZER_PROVIDER",
     "DEFAULT_TOKENIZER",
     "dedupe_preserve_order",

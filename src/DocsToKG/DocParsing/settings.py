@@ -190,6 +190,12 @@ from typing import Any
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_core import PydanticUndefined
+
+from DocsToKG.DocParsing.core.discovery import (
+    DEFAULT_DISCOVERY_IGNORE,
+    parse_discovery_ignore,
+)
 
 # ============================================================================
 # Enums for validated choices
@@ -325,6 +331,12 @@ class AppCfg(BaseSettings):
         True, description="Treat unknown/deprecated keys as errors (false = warn)"
     )
     random_seed: int | None = Field(None, description="Random seed for reproducibility")
+    discovery_ignore: tuple[str, ...] = Field(
+        (),
+        description=(
+            "Glob patterns ignored during discovery (use !pattern to drop defaults)."
+        ),
+    )
 
     @field_validator("data_root", "manifests_root", "models_root", "log_dir", mode="before")
     @classmethod
@@ -345,6 +357,15 @@ class AppCfg(BaseSettings):
         if not (1 <= v <= 65535):
             raise ValueError(f"Port must be 1-65535, got {v}")
         return v
+
+    @field_validator("discovery_ignore", mode="before")
+    @classmethod
+    def normalize_discovery_ignore(cls, value: Any) -> tuple[str, ...]:
+        """Normalize discovery ignore patterns with defaults and modifiers."""
+
+        if value is None or value is PydanticUndefined or value == ():
+            return parse_discovery_ignore(None, base=DEFAULT_DISCOVERY_IGNORE)
+        return parse_discovery_ignore(value, base=DEFAULT_DISCOVERY_IGNORE)
 
 
 # ============================================================================

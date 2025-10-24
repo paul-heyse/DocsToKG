@@ -103,7 +103,7 @@ from DocsToKG.DocParsing.app_context import (
 )
 from DocsToKG.DocParsing.chunking import runtime as chunking_runtime
 from DocsToKG.DocParsing.config_adapter import ConfigurationAdapter
-from DocsToKG.DocParsing.core import detect_mode
+from DocsToKG.DocParsing.core import detect_mode, split_discovery_ignore
 from DocsToKG.DocParsing.embedding import runtime as embedding_runtime
 from DocsToKG.DocParsing.settings import DenseBackend, Format
 
@@ -150,6 +150,14 @@ def root_callback(
     log_format: Annotated[
         str | None, typer.Option("--log-format", help="Logging format (console|json)")
     ] = None,
+    discovery_ignore: Annotated[
+        str | None,
+        typer.Option(
+            "--discovery-ignore",
+            help="Comma-separated glob patterns ignored during discovery (prefix ! to drop defaults)",
+            show_default=False,
+        ),
+    ] = None,
     verbose: Annotated[
         int,
         typer.Option(
@@ -191,6 +199,10 @@ def root_callback(
     [cyan]docparse --profile local embed --resume[/cyan]
     Resume embedding from local profile
     """
+    cli_discovery_ignore: tuple[str, ...] | None = None
+    if discovery_ignore is not None:
+        cli_discovery_ignore = split_discovery_ignore(discovery_ignore)
+
     try:
         # Map verbose count to log level
         if verbose >= 2 or verbose == 1:
@@ -206,6 +218,7 @@ def root_callback(
             data_root=data_root,
             log_level=effective_log_level,
             log_format=log_format,
+            discovery_ignore=cli_discovery_ignore,
             metrics_enabled=metrics,
             metrics_port=metrics_port,
         )
